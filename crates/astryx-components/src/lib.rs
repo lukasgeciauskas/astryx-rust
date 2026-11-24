@@ -22,6 +22,7 @@ pub mod pagination;
 pub mod people;
 mod press;
 pub mod segmented;
+pub mod slider;
 pub mod status;
 pub mod tabs;
 pub mod text;

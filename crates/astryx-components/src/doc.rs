@@ -103,6 +103,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::breadcrumbs::BREADCRUMBS_DOC,
     crate::breadcrumbs::BREADCRUMB_ITEM_DOC,
     crate::pagination::PAGINATION_DOC,
+    crate::slider::SLIDER_DOC,
 ];
 
 /// The registered doc for an upstream component name.

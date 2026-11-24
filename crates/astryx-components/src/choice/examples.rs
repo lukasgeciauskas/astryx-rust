@@ -15,6 +15,7 @@ use crate::indicator::{
 };
 use crate::item::ItemDensity;
 use crate::layout::{Orientation, SpacingStep, Stack, StackAlign};
+use crate::slider::{Slider, SliderMark, SliderValue, ValueDisplay};
 use crate::text::{Text, TextType};
 
 /// Stores a new value and redraws.
@@ -53,6 +54,14 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let size = window.use_keyed_state("size", cx, |_, _| SharedString::from("m"));
     let toppings =
         window.use_keyed_state("toppings", cx, |_, _| vec![SharedString::from("cheese")]);
+    let volume = window.use_keyed_state("volume", cx, |_, _| SliderValue::Single(40.));
+    let price = window.use_keyed_state("price", cx, |_, _| SliderValue::Range(20., 80.));
+    let set_value = |entity: Entity<SliderValue>| {
+        move |next: SliderValue, window: &mut Window, cx: &mut App| {
+            entity.update(cx, |v, _| *v = next);
+            window.refresh();
+        }
+    };
     let set_text = |entity: Entity<SharedString>| {
         move |next: SharedString, window: &mut Window, cx: &mut App| {
             entity.update(cx, |v, _| *v = next);
@@ -152,6 +161,29 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                         .description("Seasonal")
                         .disabled(true),
                 ),
+        )
+        .child(label("Slider"))
+        .child(
+            Stack::vertical()
+                .gap(SpacingStep::S4)
+                .width(gpui::px(360.))
+                .child(
+                    Slider::new("volume", "Volume", *volume.read(cx))
+                        .value_display(ValueDisplay::Text)
+                        .on_change(set_value(volume.clone())),
+                )
+                .child(
+                    Slider::new("price", "Price range", *price.read(cx))
+                        .step(5.)
+                        .min_steps_between_thumbs(2.)
+                        .value_display(ValueDisplay::Text)
+                        .marks(
+                            [0., 25., 50., 75., 100.]
+                                .map(|v| SliderMark::new(v).label(format!("${v}"))),
+                        )
+                        .on_change(set_value(price.clone())),
+                )
+                .child(Slider::new("locked", "Locked", 30.).disabled(true)),
         )
         .child(label("Indicators"))
         .child(
