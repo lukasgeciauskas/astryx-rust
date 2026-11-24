@@ -8,7 +8,9 @@ rust-version.workspace = true
 publish.workspace = true
 
 [features]
-default = ["themes"]
+default = ["themes", "locales"]
+# The 30 translated catalogs Astryx ships (English is always included).
+locales = ["astryx-i18n/locales"]
 # Every published theme. Turn off default features and pick `theme-*`
 # features to ship only the themes (and fonts) an app uses.
 themes = ["theme-butter", "theme-chocolate", "theme-gothic", "theme-matcha", "theme-neutral", "theme-stone", "theme-y2k"]
@@ -27,5 +29,6 @@ gpui.workspace = true
 astryx-theme.workspace = true
 astryx-themes = { workspace = true, optional = true }
 astryx-primitives.workspace = true
+astryx-i18n.workspace = true
 astryx-icons.workspace = true
 astryx-components.workspace = true

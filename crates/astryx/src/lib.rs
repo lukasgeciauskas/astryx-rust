@@ -14,6 +14,7 @@
 //! ```
 
 pub use astryx_components as components;
+pub use astryx_i18n as i18n;
 pub use astryx_icons as icons;
 pub use astryx_primitives as primitives;
 pub use astryx_theme as theme;
@@ -41,6 +42,7 @@ pub fn init(cx: &mut gpui::App) {
 
 /// The types most apps use.
 pub mod prelude {
+    pub use astryx_i18n::{Direction, I18n, LogicalStyled};
     pub use astryx_primitives::{ElementSize, provide, resolve_size, use_context};
     pub use astryx_theme::{ThemeMode, ThemeStyled};
 }

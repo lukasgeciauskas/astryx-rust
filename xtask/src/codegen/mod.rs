@@ -4,12 +4,14 @@
 //! - `crates/astryx-theme/src/generated/default_theme.rs`: core's defaults.
 //! - `crates/astryx-themes/src/generated/*.rs`: one module per theme.
 //! - `crates/astryx-icons/src/generated.rs`: the embedded icon files.
+//! - `crates/astryx-i18n/src/generated/catalogs.rs`: message catalogs.
 //! - `docs/theme-overrides-todo.md`: overrides that need a hand port.
 //!
 //! `--check` writes nothing and fails when any file differs from what it
 //! would generate.
 
 mod literal;
+mod locales;
 mod themes;
 mod tokens;
 
@@ -141,6 +143,10 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
     files.push((
         PathBuf::from("crates/astryx-icons/src/generated.rs"),
         rustfmt(&render_icons(root, &icons)?)?,
+    ));
+    files.push((
+        PathBuf::from("crates/astryx-i18n/src/generated/catalogs.rs"),
+        rustfmt(&locales::render(&spec)?)?,
     ));
     files.push((
         PathBuf::from("docs/theme-overrides-todo.md"),

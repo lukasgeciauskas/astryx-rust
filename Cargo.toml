@@ -4,6 +4,7 @@ members = [
     "crates/astryx",
     "crates/astryx-theme",
     "crates/astryx-primitives",
+    "crates/astryx-i18n",
     "crates/astryx-icons",
     "crates/astryx-components",
     "crates/astryx-themes",
@@ -32,11 +33,16 @@ gpui_platform = { git = "https://github.com/lukasgeciauskas/zed", rev = "4d4a306
 astryx = { path = "crates/astryx" }
 astryx-theme = { path = "crates/astryx-theme" }
 astryx-primitives = { path = "crates/astryx-primitives" }
+astryx-i18n = { path = "crates/astryx-i18n", default-features = false }
 astryx-icons = { path = "crates/astryx-icons" }
 astryx-components = { path = "crates/astryx-components" }
 astryx-themes = { path = "crates/astryx-themes", default-features = false }
 
 anyhow = "1"
+# ICU4X, the CLDR data behind upstream's `Intl.*`, at the version GPUI already uses.
+icu_decimal = { version = "2.4", features = ["alloc", "ryu"] }
+icu_locale = "2.4"
+icu_plurals = "2.4"
 serde_json = "1"
 wasm-bindgen = "0.2.120"
 

@@ -1,0 +1,23 @@
+[package]
+name = "astryx-i18n"
+description = "Astryx's internationalization runtime on GPUI: locales, catalogs, ICU messages and text direction"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+default = ["locales"]
+# The 30 translated catalogs Astryx ships. English is always included.
+locales = []
+
+[dependencies]
+astryx-primitives.workspace = true
+gpui.workspace = true
+icu_decimal.workspace = true
+icu_locale.workspace = true
+icu_plurals.workspace = true
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
