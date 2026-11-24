@@ -113,6 +113,21 @@ fn spinner_delay(t: &Tokens) -> Duration {
     t.duration.medium_min
 }
 
+/// Whether the spinner shows (upstream FR8): at once while loading or,
+/// under reduced motion, while a fire-once action is pending; else once a
+/// pending action has run for `delay`, so a fast one never flashes it.
+pub(crate) fn spinner_revealed(
+    loading: bool,
+    pending: bool,
+    interruptible: bool,
+    delay: Duration,
+    elapsed: Option<Duration>,
+) -> bool {
+    loading
+        || (pending && !interruptible && delay.is_zero())
+        || (pending && elapsed.is_some_and(|elapsed| elapsed >= delay))
+}
+
 type ActionFn = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App) -> Task<()>>;
 
 #[derive(Default)]
@@ -387,12 +402,13 @@ impl RenderOnce for Button {
         } else {
             spinner_delay(t)
         };
-        let revealed = self.loading
-            || (pending && !self.interruptible && delay.is_zero())
-            || since.is_some_and(|since| since.elapsed() >= delay);
+        // The executor's clock, which tests can advance.
+        let now = cx.background_executor().now();
+        let elapsed = since.map(|since| now.saturating_duration_since(since));
+        let revealed = spinner_revealed(self.loading, pending, self.interruptible, delay, elapsed);
         if pending && !revealed && !state.read(cx).reveal_scheduled {
             state.update(cx, |s, _| s.reveal_scheduled = true);
-            let wait = since.map_or(delay, |s| delay.saturating_sub(s.elapsed()));
+            let wait = delay.saturating_sub(elapsed.unwrap_or_default());
             let state = state.clone();
             window
                 .spawn(cx, async move |cx| {
@@ -500,9 +516,10 @@ impl RenderOnce for Button {
                 return;
             }
             let task = action(event, window, cx);
+            let now = cx.background_executor().now();
             activation_state.update(cx, |s, _| {
                 s.pending += 1;
-                s.pending_since.get_or_insert_with(Instant::now);
+                s.pending_since.get_or_insert(now);
             });
             announce(loading_text.clone(), Politeness::Polite, window, cx);
             let state = activation_state.clone();

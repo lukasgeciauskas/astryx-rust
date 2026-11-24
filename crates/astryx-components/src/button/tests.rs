@@ -290,3 +290,20 @@ fn toggle_groups_select_like_upstream() {
         v(&["b"])
     );
 }
+
+#[test]
+fn fr8_pending_actions_reveal_the_spinner_after_the_delay() {
+    let delay = Duration::from_millis(310);
+    let at = |ms| Some(Duration::from_millis(ms));
+    assert!(!spinner_revealed(false, true, false, delay, at(100)));
+    assert!(spinner_revealed(false, true, false, delay, at(310)));
+    assert!(
+        spinner_revealed(true, false, false, delay, None),
+        "loading shows at once"
+    );
+    assert!(
+        spinner_revealed(false, true, false, Duration::ZERO, at(0)),
+        "reduced motion shows at once"
+    );
+    assert!(!spinner_revealed(false, false, false, delay, None));
+}

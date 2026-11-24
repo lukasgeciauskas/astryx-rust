@@ -2,12 +2,15 @@
 //! is ported, and `astryx parity` for what is done.
 
 pub mod button;
+pub mod choice;
 pub mod containers;
 pub mod content;
 pub mod doc;
 pub mod feedback;
+pub mod field;
 mod focus;
 pub mod icon;
+pub mod indicator;
 pub mod layout;
 pub mod link;
 pub mod media;

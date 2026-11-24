@@ -80,6 +80,10 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::button::TOGGLE_BUTTON_DOC,
     crate::button::TOGGLE_BUTTON_GROUP_DOC,
     crate::link::LINK_DOC,
+    crate::choice::CHECKBOX_INPUT_DOC,
+    crate::choice::SWITCH_DOC,
+    crate::field::FIELD_STATUS_DOC,
+    crate::indicator::INDICATOR_DOC,
 ];
 
 /// The registered doc for an upstream component name.

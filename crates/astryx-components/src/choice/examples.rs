@@ -1,0 +1,124 @@
+//! Choice examples: the gallery's Choices page and the doc example of
+//! CheckboxInput, Switch, the indicators and FieldStatus.
+
+use std::time::Duration;
+
+use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Task, Window};
+
+use crate::choice::{CheckboxInput, LabelPosition, LabelSpacing, Switch};
+use crate::field::{FieldStatus, FieldStatusVariant, InputStatus, StatusType};
+use crate::indicator::{
+    CheckIndicator, CheckboxIndicator, ChoiceSize, IndicatorState, RadioIndicator,
+};
+use crate::layout::{SpacingStep, Stack, StackAlign};
+use crate::text::{Text, TextType};
+
+/// Stores a new value and redraws.
+fn store(entity: Entity<bool>) -> impl Fn(bool, &mut Window, &mut App) + 'static {
+    move |next, window, cx| {
+        entity.update(cx, |v, _| *v = next);
+        window.refresh();
+    }
+}
+
+/// A one-second save, then the new value.
+fn slow_save(entity: Entity<bool>) -> impl Fn(bool, &mut Window, &mut App) -> Task<()> + 'static {
+    move |next, window, cx| {
+        let wait = cx.background_executor().timer(Duration::from_secs(1));
+        let entity = entity.clone();
+        window.spawn(cx, async move |cx| {
+            wait.await;
+            cx.update(|window, cx| {
+                entity.update(cx, |v, _| *v = next);
+                window.refresh();
+            })
+            .ok();
+        })
+    }
+}
+
+pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
+    let label = |text: &'static str| Text::new(text).text_type(TextType::Supporting);
+    // The page keeps its own values between frames.
+    let terms = window.use_keyed_state("terms", cx, |_, _| false);
+    let news = window.use_keyed_state("news", cx, |_, _| true);
+    let wifi = window.use_keyed_state("wifi", cx, |_, _| true);
+    let sync = window.use_keyed_state("sync", cx, |_, _| false);
+    let dark = window.use_keyed_state("dark", cx, |_, _| false);
+
+    Stack::vertical()
+        .gap(SpacingStep::S4)
+        .child(label("CheckboxInput"))
+        .child(
+            Stack::vertical()
+                .gap(SpacingStep::S3)
+                .child(
+                    CheckboxInput::new("terms", "I accept the terms", *terms.read(cx))
+                        .required(true)
+                        .on_change(store(terms.clone())),
+                )
+                .child(
+                    CheckboxInput::new("news", "Product news (1 s save)", *news.read(cx))
+                        .description("A short email, at most once a month.")
+                        .change_action(slow_save(news.clone())),
+                )
+                .child(
+                    CheckboxInput::new("all", "Select all", IndicatorState::Indeterminate)
+                        .size(ChoiceSize::Sm),
+                )
+                .child(CheckboxInput::new("locked", "Managed by your admin", true).disabled(true))
+                .child(
+                    CheckboxInput::new("consent", "Share usage data", false)
+                        .status(InputStatus::error("Choose whether to share usage data.")),
+                ),
+        )
+        .child(label("Switch"))
+        .child(
+            Stack::vertical()
+                .gap(SpacingStep::S3)
+                .child(Switch::new("wifi", "Wi-Fi", *wifi.read(cx)).on_change(store(wifi.clone())))
+                .child(
+                    Switch::new("sync", "Sync (1 s save)", *sync.read(cx))
+                        .size(ChoiceSize::Sm)
+                        .change_action(slow_save(sync.clone())),
+                )
+                .child(
+                    Switch::new("dark", "Dark mode", *dark.read(cx))
+                        .label_position(LabelPosition::Start)
+                        .label_spacing(LabelSpacing::Spread)
+                        .width(gpui::px(320.))
+                        .on_change(store(dark.clone())),
+                )
+                .child(Switch::new("off", "Unavailable", false).disabled(true)),
+        )
+        .child(label("Indicators"))
+        .child(
+            Stack::horizontal()
+                .gap(SpacingStep::S4)
+                .v_align(StackAlign::Center)
+                .child(CheckboxIndicator::new(IndicatorState::Unchecked))
+                .child(CheckboxIndicator::new(IndicatorState::Checked))
+                .child(CheckboxIndicator::new(IndicatorState::Indeterminate))
+                .child(RadioIndicator::new(false))
+                .child(RadioIndicator::new(true))
+                .child(CheckIndicator::new(true)),
+        )
+        .child(label("FieldStatus"))
+        .child(
+            Stack::vertical()
+                .gap(SpacingStep::S2)
+                .child(
+                    FieldStatus::new(
+                        "warning",
+                        StatusType::Warning,
+                        "This will be visible to others.",
+                    )
+                    .variant(FieldStatusVariant::Detached),
+                )
+                .child(
+                    FieldStatus::new("success", StatusType::Success, "Username is available.")
+                        .variant(FieldStatusVariant::Detached),
+                ),
+        )
+        .into_any_element()
+}
