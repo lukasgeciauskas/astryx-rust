@@ -13,6 +13,7 @@ astryx-icons.workspace = true
 astryx-theme.workspace = true
 gpui.workspace = true
 smallvec = "1"
+web-time.workspace = true
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

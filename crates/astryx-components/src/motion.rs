@@ -2,7 +2,9 @@
 //! skeletons to the document timeline's origin, so every instance on screen
 //! moves in phase; [`elapsed`] is that timeline here.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use web_time::Instant;
 
 use gpui::{App, Global};
 

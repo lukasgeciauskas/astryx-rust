@@ -11,7 +11,9 @@ mod tests;
 pub use toggle::{SelectionMode, ToggleButton, ToggleButtonGroup};
 
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use web_time::Instant;
 
 use astryx_i18n::{LogicalStyled, current as i18n, use_direction};
 use astryx_primitives::{

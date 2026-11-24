@@ -23,6 +23,7 @@ pub enum Page {
     Media,
     Time,
     Buttons,
+    Links,
 }
 
 impl Page {
@@ -40,6 +41,7 @@ impl Page {
         Page::Media,
         Page::Time,
         Page::Buttons,
+        Page::Links,
     ];
 
     pub fn title(self) -> &'static str {
@@ -57,6 +59,7 @@ impl Page {
             Page::Media => "Media",
             Page::Time => "Time",
             Page::Buttons => "Buttons",
+            Page::Links => "Links",
         }
     }
 
@@ -75,6 +78,7 @@ impl Page {
             Page::Media => astryx::components::media::examples::examples(window, cx),
             Page::Time => astryx::components::time::examples::examples(window, cx),
             Page::Buttons => astryx::components::button::examples::examples(window, cx),
+            Page::Links => astryx::components::link::examples::examples(window, cx),
         }
     }
 }
