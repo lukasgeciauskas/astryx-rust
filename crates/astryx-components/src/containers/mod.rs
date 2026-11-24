@@ -619,7 +619,7 @@ mod context_tests {
 
     #[gpui::test]
     fn card_children_see_its_padding(cx: &mut TestAppContext) {
-        cx.update(|cx| astryx_theme::init(cx));
+        cx.update(astryx_theme::init);
         let seen = Rc::new(RefCell::new(None));
         let window = cx.add_window({
             let seen = seen.clone();
@@ -656,7 +656,7 @@ mod bleed_tests {
 
     #[gpui::test]
     fn full_bleed_dividers_reach_the_card_edges(cx: &mut TestAppContext) {
-        cx.update(|cx| astryx_theme::init(cx));
+        cx.update(astryx_theme::init);
         let (_, cx) = cx.add_window_view(|_, _| Root);
         cx.run_until_parked();
         let quads = cx.update(|window, _| window.painted_quads());
