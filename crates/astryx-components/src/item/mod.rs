@@ -328,6 +328,7 @@ impl RenderOnce for Item {
                 el = el.active(move |s| s.bg(pressed));
             }
             el = el.cursor_pointer().on_click(move |event, window, cx| {
+                cx.stop_propagation();
                 if let Some(f) = &on_click {
                     f(event, window, cx);
                     if window.default_prevented() {

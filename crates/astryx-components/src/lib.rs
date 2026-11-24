@@ -3,6 +3,7 @@
 
 pub mod button;
 pub mod choice;
+pub mod collapsible;
 pub mod containers;
 pub mod content;
 pub mod doc;
@@ -23,6 +24,7 @@ pub mod status;
 pub mod tabs;
 pub mod text;
 pub mod time;
+pub mod token;
 pub mod toolbar;
 
 pub use doc::{ComponentDoc, PropMapping, RustApi};

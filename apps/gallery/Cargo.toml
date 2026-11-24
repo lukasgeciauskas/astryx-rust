@@ -20,6 +20,9 @@ anyhow.workspace = true
 astryx = { workspace = true, features = ["json-themes"] }
 gpui.workspace = true
 
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }
+
 [target.'cfg(windows)'.dependencies]
 backtrace = { version = "0.3", optional = true }
 

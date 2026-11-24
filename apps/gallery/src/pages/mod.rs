@@ -90,3 +90,30 @@ impl Page {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use gpui::{Context, IntoElement, ParentElement, Render, TestAppContext, Window, div};
+
+    use super::Page;
+
+    struct PageView(Page);
+
+    impl Render for PageView {
+        fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let theme = astryx::theme::current(window, cx);
+            div().child(self.0.render(&theme, window, cx))
+        }
+    }
+
+    /// Every page renders without panicking: a smoke test over every
+    /// component example (debug assertions included).
+    #[gpui::test]
+    fn every_page_renders(cx: &mut TestAppContext) {
+        cx.update(astryx::init);
+        for &page in Page::ALL {
+            let (_, cx) = cx.add_window_view(move |_, _| PageView(page));
+            cx.run_until_parked();
+        }
+    }
+}

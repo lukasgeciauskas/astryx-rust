@@ -130,6 +130,7 @@ impl ChoiceRow {
         match (self.disabled || self.inert, self.on_toggle) {
             (false, Some(toggle)) => {
                 row = row.cursor_pointer().on_click(move |event, window, cx| {
+                    cx.stop_propagation();
                     if toggles(event) {
                         toggle(window, cx);
                     }

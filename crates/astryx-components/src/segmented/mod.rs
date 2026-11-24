@@ -291,6 +291,7 @@ impl RenderOnce for SegmentedControl {
                 let select = self.on_change.clone();
                 let value = item.value.clone();
                 seg = seg.cursor_pointer().on_click(move |event, window, cx| {
+                    cx.stop_propagation();
                     if row_toggles(event)
                         && !is_selected
                         && let Some(f) = &select

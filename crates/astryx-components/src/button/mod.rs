@@ -8,6 +8,7 @@ mod toggle;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use toggle::toggled;
 pub use toggle::{SelectionMode, ToggleButton, ToggleButtonGroup};
 
 use std::rc::Rc;

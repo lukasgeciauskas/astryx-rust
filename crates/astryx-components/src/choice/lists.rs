@@ -363,6 +363,7 @@ impl RenderOnce for RadioList {
                 row = row.on_click(|_, _, cx| cx.stop_propagation());
             } else {
                 row = row.cursor_pointer().on_click(move |event, window, cx| {
+                    cx.stop_propagation();
                     if toggles(event)
                         && !checked
                         && let Some(f) = &select
@@ -685,6 +686,7 @@ impl RenderOnce for CheckboxList {
                     .hover(move |s| s.bg(composite(rest, hover)))
                     .active(move |s| s.bg(composite(rest, pressed)))
                     .on_click(move |event, window, cx| {
+                        cx.stop_propagation();
                         if toggles(event) {
                             toggle(window, cx);
                         }

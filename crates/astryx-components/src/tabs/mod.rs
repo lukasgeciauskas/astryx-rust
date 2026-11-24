@@ -348,6 +348,7 @@ impl RenderOnce for TabList {
                 .hover(move |s| s.bg(hover))
                 .active(move |s| s.bg(pressed))
                 .on_click(move |_, window, cx| {
+                    cx.stop_propagation();
                     if let Some(f) = &select {
                         f(value.clone(), window, cx);
                     }

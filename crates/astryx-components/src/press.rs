@@ -66,7 +66,12 @@ pub(crate) fn apply_press(
             .hover(move |_| hover)
             .active(move |_| active);
         if let Some(on_click) = on_click {
-            el = el.on_click(move |event, window, cx| on_click(event, window, cx));
+            el = el.on_click(move |event, window, cx| {
+                // A control's click is its own; a ClickableCard around it
+                // never sees it (upstream: the card fires on its surface only).
+                cx.stop_propagation();
+                on_click(event, window, cx)
+            });
         }
     } else {
         // Inert controls keep their tab stop but swallow presses, so a

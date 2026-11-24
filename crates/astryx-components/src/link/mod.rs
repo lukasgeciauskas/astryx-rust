@@ -250,6 +250,7 @@ impl RenderOnce for Link {
                 .hover(move |_| hover)
                 .active(move |_| active)
                 .on_click(move |event, window, cx| {
+                    cx.stop_propagation();
                     // A native anchor activates on Enter, not Space.
                     if form == LinkForm::Anchor
                         && let ClickEvent::Keyboard(key) = event
