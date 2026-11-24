@@ -1,12 +1,14 @@
 //! Wayfinding examples: the gallery's Wayfinding page and the doc example
-//! of Breadcrumbs and Pagination.
+//! of Breadcrumbs, Pagination and Stepper.
 
 use astryx_primitives::ElementSize;
 use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Window};
 
 use crate::breadcrumbs::{BreadcrumbItem, Breadcrumbs, BreadcrumbsVariant};
+use crate::layout::Orientation;
 use crate::layout::{SpacingStep, Stack};
 use crate::pagination::{Pagination, PaginationVariant};
+use crate::stepper::{Step, StepStatus, Stepper};
 use crate::text::{Text, TextType};
 
 fn store(entity: Entity<usize>) -> impl Fn(usize, &mut Window, &mut App) + 'static {
@@ -21,6 +23,7 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let pages = window.use_keyed_state("pages", cx, |_, _| 5usize);
     let count = window.use_keyed_state("count", cx, |_, _| 1usize);
     let dots = window.use_keyed_state("dots", cx, |_, _| 2usize);
+    let step = window.use_keyed_state("step", cx, |_, _| 1usize);
 
     Stack::vertical()
         .gap(SpacingStep::S4)
@@ -62,6 +65,26 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                 .variant(PaginationVariant::Dots)
                 .total_pages(5)
                 .on_change(store(dots.clone())),
+        )
+        .child(label("Stepper: horizontal (clickable) and vertical"))
+        .child(
+            Stepper::new("checkout", *step.read(cx))
+                .on_step_click(store(step.clone()))
+                .step(Step::new("Cart").description("3 items"))
+                .step(Step::new("Shipping").description("Address and speed"))
+                .step(Step::new("Payment").optional(true))
+                .step(Step::new("Review").status(StepStatus::Warning)),
+        )
+        .child(
+            Stepper::new("setup", 1)
+                .orientation(Orientation::Vertical)
+                .step(Step::new("Create account").status(StepStatus::Success))
+                .step(
+                    Step::new("Verify email")
+                        .description("We sent a link to your inbox.")
+                        .child(Text::new("Didn't get it? Check your spam folder.")),
+                )
+                .step(Step::new("Invite your team")),
         )
         .into_any_element()
 }

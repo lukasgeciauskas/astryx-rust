@@ -203,19 +203,28 @@ The remaining primitives:
 - **M2 Primitives I + foundations (done, 2026-11-24):** context, direction, modality and
   focus ring, press, overlays, hotkeys, a11y helpers, i18n runtime + catalogs, link handler.
   - Carried into later milestones, recorded as `RustApi::Pending` in each doc: tooltips and
-    the Timestamp hover card (M5); Banner's and Thumbnail's controls use an interim ghost
-    icon button until M3's IconButton.
+    the Timestamp hover card (M5). Banner's and Thumbnail's controls became IconButtons in M3.
   - Components: Text (truncation), Heading, Stack/HStack/VStack/Center/Grid/Divider/AspectRatio,
     VisuallyHidden, Icon, Spinner, Skeleton, Badge, StatusDot, Kbd, Code, Blockquote,
     Citation, Avatar(+Group), Card, Section, EmptyState, Thumbnail, Timestamp, Timer,
     ProgressBar, Banner.
-- **M3 Actions & simple controls:** list focus and typeahead.
+- **M3 Actions & simple controls (done, 2026-11-24):** list focus and typeahead.
+  - Primitives: Tab/Shift+Tab traversal (`astryx::init`), `control_focus`, `ListKeys` and
+    `ListFocus` (roving tab stop, `on_move`), `RovingScope` (one tab stop among arbitrary
+    controls), `Typeahead` (ICU4X folding).
   - Components: Button (all variants, loading, icon-only, href, clickAction), IconButton,
-    ToggleButton, ButtonGroup, Link, SegmentedControl, CheckboxInput/List, RadioList, Switch,
-    Slider, Indicator, Token, ClickableCard, SelectableCard, Collapsible, Toolbar,
-    Breadcrumbs, Pagination, Stepper/Step, TabList.
-- **M4 Editing engine & fields:** TextInput, TextArea, NumberInput, InputGroup, Field,
-  FieldStatus, FormLayout, FileInput (`cx.prompt_for_paths`).
+    ToggleButton(+Group), ButtonGroup, Link, SegmentedControl, CheckboxInput/List, RadioList,
+    Switch, Slider, Indicator, Token, ClickableCard, SelectableCard, Collapsible(+Group),
+    Toolbar, Breadcrumbs, Pagination, Stepper/Step, TabList.
+  - Pulled forward because M3 components need them: Field and FieldStatus (from M4), and
+    Item's core (from M6; swipe actions wait for M11).
+  - Carried into later milestones, recorded in each doc: tooltips, InfoTips and disabled
+    messages (M5); TabMenu, BreadcrumbItem menus and Pagination's page-size selector (M5);
+    Pagination's input box (M4); the SegmentedControl lens and Item swipe actions (M11);
+    Stepper's on-track indicators and collapsed horizontal mode (to schedule).
+  - A gallery test renders every page, so an example that panics fails `cargo test`.
+- **M4 Editing engine & fields:** TextInput, TextArea, NumberInput, InputGroup, FormLayout,
+  FileInput (`cx.prompt_for_paths`); Field's attached status meets its bordered inputs.
 - **M5 Layer runtime & overlays:** Tooltip, InfoTip, Popover, HoverCard, Overlay,
   Dialog(+Header, imperative), AlertDialog, Drawer, Toast(+viewport/queue), DropdownMenu
   (submenus, menu press), ContextMenu, MoreMenu, Lightbox, CommandPalette.

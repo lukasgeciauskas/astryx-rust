@@ -24,6 +24,7 @@ mod press;
 pub mod segmented;
 pub mod slider;
 pub mod status;
+pub mod stepper;
 pub mod tabs;
 pub mod text;
 pub mod time;
