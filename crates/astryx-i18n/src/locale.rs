@@ -86,6 +86,7 @@ pub struct LocaleInfo {
     cardinal: PluralRules,
     ordinal: PluralRules,
     percent: Option<PercentFormatter<DecimalFormatter>>,
+    symbols: OnceCell<crate::number::NumberSymbols>,
 }
 
 impl LocaleInfo {
@@ -116,7 +117,18 @@ impl LocaleInfo {
             percent: PercentFormatter::try_new((&locale).into(), Default::default()).ok(),
             decimal: decimal(GroupingStrategy::Auto),
             locale,
+            symbols: OnceCell::new(),
         }
+    }
+
+    /// The locale's grouping and decimal separators and group sizes.
+    pub fn number_symbols(&self) -> &crate::number::NumberSymbols {
+        use crate::message::LocaleFormat as _;
+        self.symbols.get_or_init(|| {
+            crate::number::NumberSymbols::from_format(|value| {
+                self.number(value, NumberStyle::default())
+            })
+        })
     }
 
     /// An elapsed duration in narrow units, upstream `formatElapsedDuration`:

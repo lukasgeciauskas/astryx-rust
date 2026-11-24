@@ -269,3 +269,6 @@ fn fr12_a_click_on_the_box_focuses_the_field(cx: &mut TestAppContext) {
 
 #[path = "area_tests.rs"]
 mod area;
+
+#[path = "number_tests.rs"]
+mod number;

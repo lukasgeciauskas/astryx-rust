@@ -1,5 +1,5 @@
 //! Text entry examples: the gallery's Inputs page and the doc example of
-//! TextInput and TextArea.
+//! TextInput, TextArea and NumberInput.
 
 use std::time::Duration;
 
@@ -8,7 +8,7 @@ use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, SharedString, Ta
 
 use crate::field::{InputStatus, StatusPlacement};
 use crate::icon::Icon;
-use crate::input::{InputType, TextArea, TextInput};
+use crate::input::{InputType, NumberInput, TextArea, TextInput};
 use crate::layout::{SpacingStep, Stack};
 use crate::text::{Text, TextType};
 
@@ -66,6 +66,19 @@ Leave the parcel with the neighbor at number 12.",
         cx,
     );
     let submitted = entered.read(cx).clone();
+    let number = |key: &'static str, initial: Option<f64>, window: &mut Window, cx: &mut App| {
+        window.use_keyed_state(key, cx, move |_, _| initial)
+    };
+    let set = |entity: Entity<Option<f64>>| {
+        move |next: Option<f64>, window: &mut Window, cx: &mut App| {
+            entity.update(cx, |v, _| *v = next);
+            window.refresh();
+        }
+    };
+    let quantity = number("quantity", Some(2.), window, cx);
+    let opacity = number("opacity", Some(80.), window, cx);
+    let price = number("price", Some(1299.5), window, cx);
+    let guests = number("guests", None, window, cx);
 
     Stack::vertical()
         .gap(SpacingStep::S4)
@@ -168,6 +181,45 @@ Leave the parcel with the neighbor at number 12.",
                         .rows(2)
                         .disabled(true),
                 ),
+        )
+        .child(label("NumberInput"))
+        .child(
+            Stack::vertical()
+                .gap(SpacingStep::S4)
+                .width(px(360.))
+                .child(
+                    NumberInput::new("quantity", "Quantity", *quantity.read(cx))
+                        .min(1.)
+                        .max(10.)
+                        .integer_only(true)
+                        .number_steppers(true)
+                        .description("Between 1 and 10. Arrow keys and the wheel step it.")
+                        .on_change(set(quantity.clone())),
+                )
+                .child(
+                    NumberInput::new("opacity", "Opacity", *opacity.read(cx))
+                        .min(0.)
+                        .max(100.)
+                        .step(5.)
+                        .units("%")
+                        .number_steppers(true)
+                        .on_change(set(opacity.clone())),
+                )
+                .child(
+                    NumberInput::new("price", "Price", *price.read(cx))
+                        .format_value(|v| format!("${v:.2}"))
+                        .step(0.5)
+                        .clear(true)
+                        .on_change(set(price.clone())),
+                )
+                .child(
+                    NumberInput::new("guests", "Guests", *guests.read(cx))
+                        .placeholder("How many?")
+                        .integer_only(true)
+                        .optional(true)
+                        .on_change(set(guests.clone())),
+                )
+                .child(NumberInput::new("rooms", "Rooms", Some(3.)).disabled(true)),
         )
         .child(label("Sizes"))
         .child(

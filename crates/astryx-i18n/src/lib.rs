@@ -14,6 +14,7 @@ pub mod datetime;
 mod locale;
 mod logical;
 pub mod message;
+pub mod number;
 
 use std::cell::OnceCell;
 use std::collections::HashMap;
@@ -254,6 +255,23 @@ impl I18n {
     pub fn number(&self, value: f64) -> String {
         use message::LocaleFormat as _;
         self.0.info.number(value, Default::default())
+    }
+
+    /// The locale's number symbols, read from its number format.
+    pub fn number_symbols(&self) -> &number::NumberSymbols {
+        self.0.info.number_symbols()
+    }
+
+    /// Reads a typed number in this locale (`1,234.5`, `1.234,5`, `-12`,
+    /// `1.5e3`, other digit scripts); `None` when the text is not a number.
+    pub fn parse_number(&self, text: &str) -> Option<f64> {
+        number::parse_number(text, self.number_symbols())
+    }
+
+    /// A number as a person edits it: plain digits, the locale's decimal
+    /// separator, no grouping.
+    pub fn editable_number(&self, value: f64) -> String {
+        number::editable_number(value, self.number_symbols())
     }
 }
 

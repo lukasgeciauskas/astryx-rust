@@ -294,6 +294,12 @@ impl TextEditState {
         let focus = this.focus.clone();
         this._subscriptions
             .push(cx.on_focus(&focus, window, |this, window, cx| {
+                // Tabbing into a single-line field selects its text, as
+                // platform fields do.
+                if !this.buffer.is_multiline() && window.last_input_was_keyboard() {
+                    this.buffer.select_all();
+                    cx.notify();
+                }
                 if let Some(f) = this.on_focus.clone() {
                     window.defer(cx, move |window, cx| f(window, cx));
                 }
@@ -323,7 +329,14 @@ impl TextEditState {
     /// Syncs a controlled value: replaces the text if it differs.
     pub fn set_text(&mut self, text: &str, cx: &mut Context<Self>) {
         if self.buffer.text() != text {
+            // A field whose whole text was selected keeps it selected, as when
+            // a formatted value gives way to its editable form on focus.
+            let all = !self.buffer.text().is_empty()
+                && self.buffer.selection() == (0..self.buffer.text().len());
             self.buffer.set_text(text);
+            if all {
+                self.buffer.select_all();
+            }
             cx.notify();
         }
     }

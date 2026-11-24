@@ -4,12 +4,14 @@
 
 mod control;
 pub mod examples;
+pub(crate) mod number_input;
 pub(crate) mod text_area;
 mod text_input;
 
 #[cfg(test)]
 mod tests;
 
+pub use number_input::{EntryErrorKind, NumberInput, NumberInputEntryError};
 pub use text_area::TextArea;
 pub use text_input::{InputType, TextInput};
 
@@ -145,6 +147,80 @@ pub const TEXT_AREA_DOC: ComponentDoc = ComponentDoc {
         p("inputMode", RustApi::Waived(NO_TOUCH_KEYBOARD)),
         p("autoCapitalize", RustApi::Waived(NO_TOUCH_KEYBOARD)),
         p("hasAutoCorrect", RustApi::Waived(NO_TOUCH_KEYBOARD)),
+        p("ref", RustApi::Waived("GPUI elements have no refs")),
+        p("containerXstyle", RustApi::Trait("Styled")),
+        p("containerClassName", RustApi::Trait("Styled")),
+        p("containerStyle", RustApi::Trait("Styled")),
+        p("controlXstyle", RustApi::Method("control_style")),
+        p("controlClassName", RustApi::Method("control_style")),
+        p("controlStyle", RustApi::Method("control_style")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const NUMBER_INPUT_DOC: ComponentDoc = ComponentDoc {
+    name: "NumberInput",
+    rust_type: "astryx::components::input::NumberInput",
+    props: &[
+        p("label", RustApi::Argument("label")),
+        p("value", RustApi::Argument("value")),
+        p("onChange", RustApi::Method("on_change")),
+        p("size", RustApi::Method("size")),
+        p("isLabelHidden", RustApi::Method("label_hidden")),
+        p("description", RustApi::Method("description")),
+        p("isOptional", RustApi::Method("optional")),
+        p("onKeyDown", RustApi::Method("on_key_down")),
+        p("isRequired", RustApi::Method("required")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("isReadOnly", RustApi::Method("read_only")),
+        p(
+            "disabledMessage",
+            RustApi::Pending(
+                "disabled_message",
+                "describes the field now; the tooltip lands with Tooltip in M5",
+            ),
+        ),
+        p("placeholder", RustApi::Method("placeholder")),
+        p(
+            "labelTooltip",
+            RustApi::Pending("label_tooltip", "the InfoTip lands with Tooltip in M5"),
+        ),
+        p("startIcon", RustApi::Method("start_icon")),
+        p("labelIcon", RustApi::Method("label_icon")),
+        p("status", RustApi::Method("status")),
+        p(
+            "onEntryErrorChange",
+            RustApi::Method("on_entry_error_change"),
+        ),
+        p(
+            "entryErrorBehavior",
+            RustApi::Waived(
+                "a typed number is complete only at commit, so both behaviors are the same (FR14)",
+            ),
+        ),
+        p(
+            "statusVariant",
+            RustApi::Method("status_placement (tooltip lands with Tooltip in M5)"),
+        ),
+        p("min", RustApi::Method("min")),
+        p("max", RustApi::Method("max")),
+        p("step", RustApi::Method("step")),
+        p("formatValue", RustApi::Method("format_value")),
+        p("isWheelEnabled", RustApi::Method("wheel_enabled")),
+        p("hasNumberSteppers", RustApi::Method("number_steppers")),
+        p("units", RustApi::Method("units")),
+        p("isIntegerOnly", RustApi::Method("integer_only")),
+        p("hasClear", RustApi::Method("clear")),
+        p("htmlName", RustApi::Waived(NO_FORMS)),
+        p(
+            "autoComplete",
+            RustApi::Waived("browser autofill has no GPUI counterpart"),
+        ),
+        p("width", RustApi::Method("width")),
+        p("hasAutoFocus", RustApi::Method("auto_focus")),
+        p("onFocus", RustApi::Method("on_focus")),
+        p("onBlur", RustApi::Method("on_blur")),
+        p("onEnter", RustApi::Method("on_enter")),
         p("ref", RustApi::Waived("GPUI elements have no refs")),
         p("containerXstyle", RustApi::Trait("Styled")),
         p("containerClassName", RustApi::Trait("Styled")),
