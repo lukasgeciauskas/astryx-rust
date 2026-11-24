@@ -203,3 +203,264 @@ fn keystrokes_dispatch_actions(cx: &mut TestAppContext) {
 
     assert_eq!(view.read_with(cx, |view, _| view.count), 3);
 }
+
+mod hotkey_tests {
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    use gpui::{Context, IntoElement, Render, TestAppContext, Window, div, prelude::*};
+
+    use crate::{Hotkey, hotkeys};
+
+    struct Shortcuts {
+        presses: Rc<Cell<usize>>,
+        disabled: bool,
+    }
+
+    impl Render for Shortcuts {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let presses = self.presses.clone();
+            hotkeys(
+                [
+                    Hotkey::new("ctrl+k", move |_, _, _| presses.set(presses.get() + 1))
+                        .disabled(self.disabled),
+                ],
+                div().size_full(),
+            )
+        }
+    }
+
+    #[gpui::test]
+    fn root_hotkeys_fire_without_focus(cx: &mut TestAppContext) {
+        let presses = Rc::new(Cell::new(0));
+        let (view, cx) = cx.add_window_view({
+            let presses = presses.clone();
+            move |_, _| Shortcuts {
+                presses,
+                disabled: false,
+            }
+        });
+        cx.simulate_keystrokes("ctrl-k");
+        assert_eq!(presses.get(), 1);
+        cx.simulate_keystrokes("k");
+        assert_eq!(presses.get(), 1);
+        view.update(cx, |view, cx| {
+            view.disabled = true;
+            cx.notify();
+        });
+        cx.run_until_parked();
+        cx.simulate_keystrokes("ctrl-k");
+        assert_eq!(presses.get(), 1);
+    }
+
+    struct Focused {
+        presses: Rc<Cell<usize>>,
+        handle: gpui::FocusHandle,
+        consume: bool,
+        typing: bool,
+    }
+
+    impl Render for Focused {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let presses = self.presses.clone();
+            let consume = self.consume;
+            let mut field = div().track_focus(&self.handle).size_full();
+            if self.typing {
+                field = field.key_context(crate::modality::TYPING_TARGET);
+            }
+            hotkeys(
+                [Hotkey::new("escape", move |_, _, _| {
+                    presses.set(presses.get() + 1)
+                })],
+                field.on_key_down(move |_, _, cx| {
+                    if consume {
+                        cx.stop_propagation();
+                    }
+                }),
+            )
+        }
+    }
+
+    fn focused_presses(cx: &mut TestAppContext, consume: bool, typing: bool) -> usize {
+        let presses = Rc::new(Cell::new(0));
+        let (view, cx) = cx.add_window_view({
+            let presses = presses.clone();
+            move |_, cx| Focused {
+                presses,
+                handle: cx.focus_handle(),
+                consume,
+                typing,
+            }
+        });
+        cx.update(|window, cx| {
+            let handle = view.read(cx).handle.clone();
+            window.focus(&handle, cx);
+        });
+        cx.run_until_parked();
+        cx.simulate_keystrokes("escape");
+        presses.get()
+    }
+
+    #[gpui::test]
+    fn focused_handlers_and_typing_targets_win(cx: &mut TestAppContext) {
+        assert_eq!(focused_presses(cx, false, false), 1);
+        assert_eq!(focused_presses(cx, true, false), 0);
+        assert_eq!(focused_presses(cx, false, true), 0);
+    }
+}
+
+mod layer_tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use gpui::{
+        Anchor, Context, IntoElement, Modifiers, Render, TestAppContext, Window, div, point,
+        prelude::*, px,
+    };
+
+    use crate::{EscapeBehavior, layer};
+
+    /// Two nested layers; records which one was dismissed.
+    struct Nested {
+        outer: bool,
+        inner: bool,
+        block_inner: bool,
+        log: Rc<RefCell<Vec<&'static str>>>,
+    }
+
+    impl Render for Nested {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let mut root = div().size_full();
+            if self.outer {
+                let entity = cx.entity();
+                let dismiss = |name: &'static str, inner: bool| {
+                    let log = self.log.clone();
+                    let entity = entity.clone();
+                    move |_: &mut Window, cx: &mut gpui::App| {
+                        log.borrow_mut().push(name);
+                        entity.update(cx, |this, cx| {
+                            if inner {
+                                this.inner = false;
+                            } else {
+                                this.outer = false;
+                            }
+                            cx.notify();
+                        });
+                    }
+                };
+                let escape = if self.block_inner {
+                    EscapeBehavior::Block
+                } else {
+                    EscapeBehavior::Close
+                };
+                let inner = self.inner.then(|| {
+                    layer(div().w(px(50.)).h(px(50.)), dismiss("inner", true))
+                        .anchor(point(px(100.), px(100.)), Anchor::TopLeft)
+                        .escape(escape)
+                });
+                root = root.child(
+                    layer(
+                        div().w(px(80.)).h(px(80.)).children(inner),
+                        dismiss("outer", false),
+                    )
+                    .anchor(point(px(0.), px(0.)), Anchor::TopLeft),
+                );
+            }
+            root
+        }
+    }
+
+    fn open(
+        cx: &mut TestAppContext,
+        block_inner: bool,
+    ) -> (Rc<RefCell<Vec<&'static str>>>, &mut gpui::VisualTestContext) {
+        let log = Rc::new(RefCell::new(Vec::new()));
+        let (_, cx) = cx.add_window_view({
+            let log = log.clone();
+            move |_, _| Nested {
+                outer: true,
+                inner: true,
+                block_inner,
+                log,
+            }
+        });
+        cx.run_until_parked();
+        (log, cx)
+    }
+
+    #[gpui::test]
+    fn escape_closes_the_topmost_layer_first(cx: &mut TestAppContext) {
+        let (log, cx) = open(cx, false);
+        cx.simulate_keystrokes("escape");
+        cx.run_until_parked();
+        assert_eq!(*log.borrow(), ["inner"]);
+        cx.simulate_keystrokes("escape");
+        cx.run_until_parked();
+        assert_eq!(*log.borrow(), ["inner", "outer"]);
+    }
+
+    #[gpui::test]
+    fn a_blocking_layer_keeps_escape(cx: &mut TestAppContext) {
+        let (log, cx) = open(cx, true);
+        cx.simulate_keystrokes("escape");
+        cx.run_until_parked();
+        assert!(log.borrow().is_empty());
+    }
+
+    #[gpui::test]
+    fn outside_press_closes_the_topmost_layer(cx: &mut TestAppContext) {
+        let (log, cx) = open(cx, false);
+        // Inside the inner layer: nothing closes.
+        cx.simulate_click(point(px(120.), px(120.)), Modifiers::none());
+        cx.run_until_parked();
+        assert!(log.borrow().is_empty());
+        // Inside the outer layer but outside the inner one: the inner closes.
+        cx.simulate_click(point(px(10.), px(10.)), Modifiers::none());
+        cx.run_until_parked();
+        assert_eq!(*log.borrow(), ["inner"]);
+        // Outside both: the outer closes.
+        cx.simulate_click(point(px(300.), px(300.)), Modifiers::none());
+        cx.run_until_parked();
+        assert_eq!(*log.borrow(), ["inner", "outer"]);
+    }
+}
+
+mod announce_tests {
+    use std::time::Duration;
+
+    use gpui::{Context, IntoElement, Render, TestAppContext, Window, div, prelude::*};
+
+    use crate::announce::announcement;
+    use crate::{Politeness, announce, announcer};
+
+    struct Root;
+
+    impl Render for Root {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().size_full().child(announcer())
+        }
+    }
+
+    #[gpui::test]
+    fn same_frame_messages_join_then_clear(cx: &mut TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| Root);
+        cx.update(|window, cx| {
+            announce("Saved", Politeness::Polite, window, cx);
+            announce("3 items", Politeness::Polite, window, cx);
+            announce("Saved", Politeness::Polite, window, cx);
+        });
+        let text = cx.update(|window, cx| announcement(Politeness::Polite, window, cx));
+        assert_eq!(text, "Saved 3 items");
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        // A later frame's message replaces the text.
+        cx.update(|window, cx| announce("Deleted", Politeness::Polite, window, cx));
+        let text = cx.update(|window, cx| announcement(Politeness::Polite, window, cx));
+        assert_eq!(text, "Deleted");
+        cx.executor().advance_clock(Duration::from_millis(2100));
+        cx.run_until_parked();
+        let text = cx.update(|window, cx| announcement(Politeness::Polite, window, cx));
+        assert_eq!(text, "");
+        let assertive = cx.update(|window, cx| announcement(Politeness::Assertive, window, cx));
+        assert_eq!(assertive, "");
+    }
+}

@@ -8,6 +8,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+accesskit.workspace = true
 gpui.workspace = true
 
 [dev-dependencies]

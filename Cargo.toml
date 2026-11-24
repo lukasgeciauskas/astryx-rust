@@ -38,6 +38,8 @@ astryx-icons = { path = "crates/astryx-icons" }
 astryx-components = { path = "crates/astryx-components" }
 astryx-themes = { path = "crates/astryx-themes", default-features = false }
 
+# The accessibility tree types GPUI uses; keep it at GPUI's version.
+accesskit = "0.24.1"
 anyhow = "1"
 # ICU4X, the CLDR data behind upstream's `Intl.*`, at the version GPUI already uses.
 icu_decimal = { version = "2.4", features = ["alloc", "ryu"] }

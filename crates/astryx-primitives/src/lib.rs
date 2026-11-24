@@ -4,11 +4,24 @@
 //! layers and editing. Visual decisions belong to `astryx-components` and
 //! the theme.
 
+pub mod announce;
 pub mod context;
+pub mod hotkeys;
+pub mod layer;
+pub mod link;
+pub mod modality;
 pub mod props;
 pub mod size;
 
+pub use announce::{Politeness, announce, announcer};
 pub use context::{Provider, provide, use_context, with_context};
+pub use hotkeys::{Hotkey, hotkeys};
+pub use layer::{EscapeBehavior, Layer, has_open_layer, layer};
+pub use link::{LinkHandler, Navigation, link_provider, set_link_handler, use_link_handler};
+pub use modality::{
+    InteractionModality, interaction_modality, is_focus_visible, is_focus_within_visible,
+    prefers_reduced_motion, set_reduced_motion,
+};
 pub use size::{ElementSize, resolve_size};
 
 #[cfg(test)]

@@ -344,6 +344,7 @@ dependencies = [
 name = "astryx-primitives"
 version = "0.1.0"
 dependencies = [
+ "accesskit",
  "gpui",
 ]
 
