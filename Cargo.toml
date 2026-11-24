@@ -47,7 +47,13 @@ anyhow = "1"
 icu_decimal = { version = "2.4", features = ["alloc", "ryu"] }
 # Percent and relative-time formatting (`Intl.NumberFormat` percent, `Intl.RelativeTimeFormat`).
 icu_experimental = "0.7"
+icu_datetime = "2.4"
+icu_time = "2.4"
+icu_calendar = "2.4"
+# Time zones: IANA rules and the system zone, bundled on Windows and wasm.
+jiff = { version = "1", features = ["tzdb-bundle-always"] }
 writeable = "0.6"
+icu_list = "2.4"
 icu_locale = "2.4"
 icu_plurals = "2.4"
 serde_json = "1"

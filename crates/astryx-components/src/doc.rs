@@ -71,6 +71,9 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::containers::EMPTY_STATE_DOC,
     crate::feedback::PROGRESS_BAR_DOC,
     crate::feedback::BANNER_DOC,
+    crate::media::THUMBNAIL_DOC,
+    crate::time::TIMER_DOC,
+    crate::time::TIMESTAMP_DOC,
 ];
 
 /// The registered doc for an upstream component name.

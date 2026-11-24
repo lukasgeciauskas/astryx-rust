@@ -589,7 +589,7 @@ impl RenderOnce for Banner {
             let controlled = matches!(self.collapsible, Collapsible::Controlled { .. });
             let on_open_change = self.on_open_change.clone();
             GhostButton {
-                id: ElementId::Name("banner-toggle".into()),
+                id: ElementId::Name(format!("{:?}-toggle", self.id).into()),
                 icon: "chevronDown",
                 label,
                 rotated: open,
@@ -609,7 +609,7 @@ impl RenderOnce for Banner {
             let state = state.clone();
             let on_dismiss = self.on_dismiss.clone();
             GhostButton {
-                id: ElementId::Name("banner-dismiss".into()),
+                id: ElementId::Name(format!("{:?}-dismiss", self.id).into()),
                 icon: "close",
                 label: dismiss_name,
                 rotated: false,

@@ -5,7 +5,14 @@
 use icu_decimal::DecimalFormatter;
 use icu_decimal::input::{Decimal, FloatPrecision};
 use icu_decimal::options::{DecimalFormatterOptions, GroupingStrategy};
+use std::cell::OnceCell;
+
 use icu_experimental::dimension::percent::formatter::PercentFormatter;
+use icu_experimental::dimension::units::categorized_formatter::CategorizedFormatter;
+use icu_experimental::dimension::units::options::Width;
+use icu_experimental::measure::category::Duration as DurationCategory;
+use icu_list::ListFormatter;
+use icu_list::options::{ListFormatterOptions, ListLength};
 use icu_locale::{Locale, LocaleDirectionality};
 use icu_plurals::{PluralCategory as IcuCategory, PluralRules};
 
@@ -59,8 +66,21 @@ pub fn locale_chain(tag: &str) -> Vec<String> {
         .collect()
 }
 
+/// A unit of an elapsed duration, upstream `ElapsedDurationUnit`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DurationUnit {
+    Hour,
+    Minute,
+    Second,
+}
+
+type UnitFormatter = CategorizedFormatter<DurationCategory>;
+
 /// Number and plural formatting for one locale.
 pub struct LocaleInfo {
+    locale: Locale,
+    units: [OnceCell<Option<UnitFormatter>>; 3],
+    unit_list: OnceCell<Option<ListFormatter>>,
     decimal: DecimalFormatter,
     decimal_ungrouped: DecimalFormatter,
     cardinal: PluralRules,
@@ -84,7 +104,8 @@ impl LocaleInfo {
                 .expect("compiled decimal data covers the root locale")
         };
         Self {
-            decimal: decimal(GroupingStrategy::Auto),
+            units: Default::default(),
+            unit_list: OnceCell::new(),
             decimal_ungrouped: decimal(GroupingStrategy::Never),
             cardinal: PluralRules::try_new_cardinal((&locale).into())
                 .or_else(|_| PluralRules::try_new_cardinal(Default::default()))
@@ -93,6 +114,70 @@ impl LocaleInfo {
                 .or_else(|_| PluralRules::try_new_ordinal(Default::default()))
                 .expect("compiled plural data covers the root locale"),
             percent: PercentFormatter::try_new((&locale).into(), Default::default()).ok(),
+            decimal: decimal(GroupingStrategy::Auto),
+            locale,
+        }
+    }
+
+    /// An elapsed duration in narrow units, upstream `formatElapsedDuration`:
+    /// "5s", "1m 05s", "2h 03m". Parts after the first show two digits.
+    pub fn elapsed_duration(&self, parts: &[(DurationUnit, u64)]) -> String {
+        use writeable::Writeable as _;
+        let texts: Vec<String> = parts
+            .iter()
+            .enumerate()
+            .map(|(i, &(unit, value))| {
+                let slot = match unit {
+                    DurationUnit::Hour => 0,
+                    DurationUnit::Minute => 1,
+                    DurationUnit::Second => 2,
+                };
+                let formatter = self.units[slot].get_or_init(|| {
+                    let category = match unit {
+                        DurationUnit::Hour => DurationCategory::hour(),
+                        DurationUnit::Minute => DurationCategory::minute(),
+                        DurationUnit::Second => DurationCategory::second(),
+                    };
+                    UnitFormatter::try_new_core(
+                        (&self.locale).into(),
+                        category,
+                        Width::Narrow.into(),
+                    )
+                    .ok()
+                });
+                let mut decimal = Decimal::from(value);
+                if i > 0 {
+                    decimal.absolute.pad_start(2);
+                }
+                match formatter {
+                    Some(f) => f
+                        .format_fixed_decimal(&decimal)
+                        .write_to_string()
+                        .into_owned(),
+                    None => {
+                        let suffix = match unit {
+                            DurationUnit::Hour => "h",
+                            DurationUnit::Minute => "m",
+                            DurationUnit::Second => "s",
+                        };
+                        format!("{}{suffix}", decimal.write_to_string())
+                    }
+                }
+            })
+            .collect();
+        let list = self.unit_list.get_or_init(|| {
+            ListFormatter::try_new_unit(
+                (&self.locale).into(),
+                ListFormatterOptions::default().with_length(ListLength::Narrow),
+            )
+            .ok()
+        });
+        match list {
+            Some(list) => list
+                .format(texts.iter().map(String::as_str))
+                .write_to_string()
+                .into_owned(),
+            None => texts.join(" "),
         }
     }
 
@@ -204,6 +289,20 @@ mod tests {
             "{fr:?}"
         );
         assert!(LocaleInfo::new("tr-TR").percent(45.).starts_with('%'));
+    }
+
+    #[test]
+    fn elapsed_durations_are_narrow_and_padded() {
+        let en = LocaleInfo::new("en");
+        assert_eq!(en.elapsed_duration(&[(DurationUnit::Second, 5)]), "5s");
+        assert_eq!(
+            en.elapsed_duration(&[(DurationUnit::Minute, 1), (DurationUnit::Second, 5)]),
+            "1m 05s"
+        );
+        assert_eq!(
+            en.elapsed_duration(&[(DurationUnit::Hour, 2), (DurationUnit::Minute, 3)]),
+            "2h 03m"
+        );
     }
 
     #[test]

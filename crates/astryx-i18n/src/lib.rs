@@ -10,6 +10,7 @@
 //!   to English, then to the key itself.
 
 mod catalog;
+pub mod datetime;
 mod locale;
 mod logical;
 pub mod message;
@@ -21,7 +22,8 @@ use std::rc::Rc;
 use astryx_primitives::{Provider, provide, use_context};
 use gpui::{App, Global, IntoElement, SharedString};
 
-pub use locale::{Direction, LocaleInfo, locale_chain, locale_direction};
+pub use datetime::{InstantFormat, TimeZoneChoice};
+pub use locale::{Direction, DurationUnit, LocaleInfo, locale_chain, locale_direction};
 pub use logical::LogicalStyled;
 pub use message::{Arg, Message};
 
@@ -218,6 +220,29 @@ impl I18n {
             Ok(parsed) => parsed.format(args, &*self.0.info),
             Err(_) => message.to_string(),
         }
+    }
+
+    /// An instant in this locale and calendar, upstream `formatInstant`.
+    pub fn format_instant(
+        &self,
+        unix_seconds: i64,
+        format: datetime::InstantFormat,
+        zone: &datetime::TimeZoneChoice,
+        show_zone: bool,
+    ) -> String {
+        datetime::format_instant(
+            &locale::parse_locale(&self.0.locale),
+            unix_seconds,
+            format,
+            zone,
+            show_zone,
+            self.0.calendar,
+        )
+    }
+
+    /// A time relative to now, upstream `formatRelativeTime`.
+    pub fn format_relative(&self, ago_seconds: i64, narrow: bool) -> String {
+        datetime::format_relative(&locale::parse_locale(&self.0.locale), ago_seconds, narrow)
     }
 
     /// A percentage in the locale's pattern: `percent(45.)` is "45%" in English.

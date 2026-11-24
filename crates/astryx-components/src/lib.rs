@@ -8,9 +8,11 @@ pub mod feedback;
 mod focus;
 pub mod icon;
 pub mod layout;
+pub mod media;
 mod motion;
 pub mod people;
 pub mod status;
 pub mod text;
+pub mod time;
 
 pub use doc::{ComponentDoc, PropMapping, RustApi};
