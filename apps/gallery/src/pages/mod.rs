@@ -26,6 +26,7 @@ pub enum Page {
     Links,
     Choices,
     Navigation,
+    Wayfinding,
 }
 
 impl Page {
@@ -46,6 +47,7 @@ impl Page {
         Page::Links,
         Page::Choices,
         Page::Navigation,
+        Page::Wayfinding,
     ];
 
     pub fn title(self) -> &'static str {
@@ -66,6 +68,7 @@ impl Page {
             Page::Links => "Links",
             Page::Choices => "Choices",
             Page::Navigation => "Navigation",
+            Page::Wayfinding => "Wayfinding",
         }
     }
 
@@ -87,6 +90,7 @@ impl Page {
             Page::Links => astryx::components::link::examples::examples(window, cx),
             Page::Choices => astryx::components::choice::examples::examples(window, cx),
             Page::Navigation => astryx::components::segmented::examples::examples(window, cx),
+            Page::Wayfinding => astryx::components::pagination::examples::examples(window, cx),
         }
     }
 }

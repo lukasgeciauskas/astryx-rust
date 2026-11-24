@@ -1,6 +1,7 @@
 //! Astryx components for GPUI. See `astryx docs porting` for how each one
 //! is ported, and `astryx parity` for what is done.
 
+pub mod breadcrumbs;
 pub mod button;
 pub mod choice;
 pub mod collapsible;
@@ -17,6 +18,7 @@ pub mod layout;
 pub mod link;
 pub mod media;
 mod motion;
+pub mod pagination;
 pub mod people;
 mod press;
 pub mod segmented;

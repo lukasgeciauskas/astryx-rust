@@ -1,7 +1,7 @@
 //! Choice controls: CheckboxInput, Switch, RadioList and CheckboxList.
 //! Upstream: `CheckboxInput/`, `Switch/`, `RadioList/`, `CheckboxList/`.
 
-mod action;
+pub(crate) mod action;
 pub mod examples;
 mod lists;
 mod row;

@@ -100,6 +100,9 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::collapsible::COLLAPSIBLE_DOC,
     crate::collapsible::COLLAPSIBLE_GROUP_DOC,
     crate::token::TOKEN_DOC,
+    crate::breadcrumbs::BREADCRUMBS_DOC,
+    crate::breadcrumbs::BREADCRUMB_ITEM_DOC,
+    crate::pagination::PAGINATION_DOC,
 ];
 
 /// The registered doc for an upstream component name.
