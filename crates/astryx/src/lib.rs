@@ -35,10 +35,11 @@ pub use astryx_themes as themes;
 /// [`Assets::with_fallback`].
 pub type Assets<A = ()> = astryx_icons::IconAssets<A>;
 
-/// Sets up Astryx: core's default theme in system mode. Call once, before
-/// opening windows.
+/// Sets up Astryx: core's default theme in system mode, and Tab/Shift+Tab
+/// focus traversal. Call once, before opening windows.
 pub fn init(cx: &mut gpui::App) {
     astryx_theme::init(cx);
+    astryx_primitives::focus::init(cx);
 }
 
 /// The types most apps use.

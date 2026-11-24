@@ -6,17 +6,17 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use astryx_i18n::{LogicalStyled, current as i18n, use_direction};
-use astryx_primitives::{is_focus_visible, prefers_reduced_motion};
+use astryx_primitives::{ElementSize, prefers_reduced_motion};
 use astryx_theme::{ThemeStyled, Tokens, current};
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, Hsla, IntoElement, ParentElement, RenderOnce, Role,
-    SharedString, StyleRefinement, Styled, Window, div, prelude::*, px, relative,
+    AnyElement, App, ElementId, Hsla, IntoElement, ParentElement, RenderOnce, Role, SharedString,
+    StyleRefinement, Styled, Window, div, prelude::*, px, relative,
 };
 use smallvec::SmallVec;
 
+use crate::button::{ButtonVariant, IconButton};
 use crate::containers::Elevation;
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
-use crate::focus::focus_ring;
 use crate::icon::{Icon, IconSize};
 use crate::layout::VisuallyHidden;
 use crate::motion::elapsed;
@@ -306,61 +306,6 @@ impl RenderOnce for ProgressBar {
 }
 
 // ----------------------------------------------------------------------------
-// A ghost icon button for Banner's controls. M3's IconButton replaces it.
-
-struct GhostButton {
-    id: ElementId,
-    icon: &'static str,
-    label: SharedString,
-    rotated: bool,
-    on_click: ClickFn,
-}
-
-type ClickFn = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
-
-impl GhostButton {
-    fn render(self, window: &mut Window, cx: &mut App) -> AnyElement {
-        let theme = current(window, cx);
-        let t = theme.tokens();
-        let rem = window.rem_size();
-        let handle = window
-            .use_keyed_state(self.id.clone(), cx, |_, cx| cx.focus_handle())
-            .read(cx)
-            .clone();
-        let radius = t.radius.element.to_pixels(rem);
-        let on_click = self.on_click.clone();
-        let icon = Icon::new(self.icon).size(IconSize::Sm);
-        let icon = if self.rotated {
-            icon.scale_xy(1., -1.)
-        } else {
-            icon
-        };
-        div()
-            .id(self.id)
-            .track_focus(&handle)
-            .relative()
-            .flex()
-            .flex_none()
-            .items_center()
-            .justify_center()
-            .size(t.spacing.s6)
-            .rounded(t.radius.element)
-            .cursor_pointer()
-            .text_color(t.color.text_primary)
-            .hover(|s| s.bg(t.color.overlay_hover))
-            .active(|s| s.bg(t.color.overlay_pressed))
-            .role(Role::Button)
-            .aria_label(self.label)
-            .on_click(move |event, window, cx| on_click(event, window, cx))
-            .child(icon)
-            .when(is_focus_visible(&handle, window), |el| {
-                el.child(focus_ring(t, radius, rem))
-            })
-            .into_any_element()
-    }
-}
-
-// ----------------------------------------------------------------------------
 // Banner
 
 /// Upstream `Banner` `status`.
@@ -588,40 +533,53 @@ impl RenderOnce for Banner {
             let state = state.clone();
             let controlled = matches!(self.collapsible, Collapsible::Controlled { .. });
             let on_open_change = self.on_open_change.clone();
-            GhostButton {
-                id: ElementId::Name(format!("{:?}-toggle", self.id).into()),
-                icon: "chevronDown",
-                label,
-                rotated: open,
-                on_click: Rc::new(move |_, window, cx| {
-                    if !controlled {
-                        state.update(cx, |s, _| s.open = Some(!open));
-                    }
-                    if let Some(f) = &on_open_change {
-                        f(!open, window, cx);
-                    }
-                    window.refresh();
-                }),
-            }
-            .render(window, cx)
+            let chevron = Icon::new("chevronDown").size(IconSize::Sm);
+            let chevron = if open {
+                chevron.scale_xy(1., -1.)
+            } else {
+                chevron
+            };
+            IconButton::new(
+                ElementId::Name(format!("{:?}-toggle", self.id).into()),
+                label.clone(),
+                chevron,
+            )
+            .variant(ButtonVariant::Ghost)
+            .size(ElementSize::Sm)
+            .tooltip(label)
+            .expanded(open)
+            .on_click(move |_, window, cx| {
+                if !controlled {
+                    state.update(cx, |s, _| s.open = Some(!open));
+                }
+                if let Some(f) = &on_open_change {
+                    f(!open, window, cx);
+                }
+                window.refresh();
+            })
+            // Upstream re-defines text-primary as the status's on-muted color.
+            .text_color(fg)
         });
         let dismiss_button = self.dismissable.then(|| {
             let state = state.clone();
             let on_dismiss = self.on_dismiss.clone();
-            GhostButton {
-                id: ElementId::Name(format!("{:?}-dismiss", self.id).into()),
-                icon: "close",
-                label: dismiss_name,
-                rotated: false,
-                on_click: Rc::new(move |_, window, cx| {
-                    state.update(cx, |s, _| s.dismissed = true);
-                    if let Some(f) = &on_dismiss {
-                        f(window, cx);
-                    }
-                    window.refresh();
-                }),
-            }
-            .render(window, cx)
+            let mut button = IconButton::new(
+                ElementId::Name(format!("{:?}-dismiss", self.id).into()),
+                dismiss_name,
+                Icon::new("close").size(IconSize::Sm),
+            )
+            .variant(ButtonVariant::Ghost)
+            .size(ElementSize::Sm)
+            .on_click(move |_, window, cx| {
+                state.update(cx, |s, _| s.dismissed = true);
+                if let Some(f) = &on_dismiss {
+                    f(window, cx);
+                }
+                window.refresh();
+            })
+            .text_color(fg);
+            theme.refine(button.style(), "banner-close", &[], None);
+            button
         });
 
         let mut header = div()
@@ -677,8 +635,8 @@ impl RenderOnce for Banner {
                             .items_center()
                             .gap(t.spacing.s2)
                             .children(self.end_content)
-                            .children(dismiss_button)
                             .children(toggle)
+                            .children(dismiss_button)
                     },
                 ),
             );

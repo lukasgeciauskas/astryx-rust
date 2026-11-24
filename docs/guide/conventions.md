@@ -26,6 +26,19 @@
   - Use `theme.for_part(target, props)` to scope token re-definitions to the part's children.
 - **Prop setters:** many optional props → a field list in the setters macro (introduced
   with the first M2 component), not hand-written boilerplate.
+- **Inline components** (upstream `display: inline-flex`: Button, Badge, Kbd, Token...)
+  size to their content inside a flex container, such as a `Stack` or a `.flex()` row,
+  and stretch in a flex column whose items stretch, as in CSS.
+  - GPUI has no inline layout. In a block parent (a plain `div()`), they stretch to the
+    parent's width.
+  - Put them in a flex container.
+- **Pressables** (Button and everything built on it) share `press::apply_press`, which
+  provides:
+  - a tab stop (`control_focus`);
+  - the hover and pressed overlays composited over the fill;
+  - the press scale, skipped under reduced motion;
+  - the focus ring;
+  - the disabled and busy guards: focusable, but inert.
 
 ## Code
 

@@ -449,7 +449,14 @@ impl RenderOnce for Badge {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
         let t = theme.tokens();
-        let (bg, fg) = self.variant.colors(t);
+        let (mut bg, mut fg) = self.variant.colors(t);
+        // Inside a solid Button a neutral badge inverts the button's pair, so
+        // it keeps the fill's contrast (upstream Button FR2).
+        if self.variant == BadgeVariant::Neutral
+            && let Some(fill) = astryx_primitives::use_context::<crate::button::ButtonFill>(cx)
+        {
+            (bg, fg) = (fill.on_fill, fill.fill);
+        }
         let mut el = div()
             .flex()
             .flex_none()

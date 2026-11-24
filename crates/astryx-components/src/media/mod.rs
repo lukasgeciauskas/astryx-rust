@@ -5,13 +5,14 @@ pub mod examples;
 use std::rc::Rc;
 
 use astryx_i18n::{LogicalStyled, current as i18n, use_direction};
-use astryx_primitives::is_focus_visible;
+use astryx_primitives::{ElementSize, control_focus, is_focus_visible};
 use astryx_theme::current;
 use gpui::{
     App, ClickEvent, ElementId, ImageSource, IntoElement, ObjectFit, RenderOnce, Role,
     SharedString, StyleRefinement, Styled, StyledImage, Window, div, img, prelude::*, px, svg,
 };
 
+use crate::button::{ButtonVariant, IconButton};
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
 use crate::focus::focus_ring;
 use crate::icon::{Icon, IconSize};
@@ -205,14 +206,7 @@ impl RenderOnce for Thumbnail {
         let el = el.aria_label(name.clone());
         let el = match (self.on_click, self.disabled) {
             (Some(on_click), false) => {
-                let handle = window
-                    .use_keyed_state(
-                        ElementId::Name(format!("{group}-focus").into()),
-                        cx,
-                        |_, cx| cx.focus_handle(),
-                    )
-                    .read(cx)
-                    .clone();
+                let handle = control_focus(&ElementId::Name(group.clone()), window, cx);
                 let ring = is_focus_visible(&handle, window)
                     .then(|| focus_ring(t, radius.to_pixels(rem), rem));
                 el.track_focus(&handle)
@@ -229,29 +223,33 @@ impl RenderOnce for Thumbnail {
                 "@astryx.thumbnail.remove",
                 &[("accessibleName", name.to_string().into())],
             );
-            let button = div()
-                .id("remove")
+            // Upstream `removeButtonOverrides`: a 20 px secondary button on
+            // the image's dark overlay, its corner nested inside the thumbnail's.
+            let radius = t.radius.element.to_pixels(rem) - t.spacing.s1.to_pixels(rem);
+            let button = IconButton::new(
+                ElementId::Name(format!("{group}-remove").into()),
+                label,
+                Icon::new("close").size(IconSize::Xsm),
+            )
+            .variant(ButtonVariant::Secondary)
+            .size(ElementSize::Sm)
+            .on_click(move |event, window, cx| {
+                cx.stop_propagation();
+                on_remove(event, window, cx)
+            })
+            .h(px(20.))
+            .min_w(px(20.))
+            .rounded(radius)
+            .bg(t.color.overlay)
+            .text_color(t.color.on_dark);
+            let slot = div()
                 .absolute()
                 .top(t.spacing.s1)
                 .inset_end(dir, t.spacing.s1)
-                .flex()
-                .items_center()
-                .justify_center()
-                .size(px(20.))
-                .rounded(t.radius.inner)
-                .bg(t.color.overlay)
-                .text_color(t.color.on_dark)
-                .cursor_pointer()
-                .role(Role::Button)
-                .aria_label(label)
-                .on_click(move |event, window, cx| {
-                    cx.stop_propagation();
-                    on_remove(event, window, cx)
-                })
-                .child(Icon::new("close").size(IconSize::Xsm));
+                .child(button);
             match self.show_remove_on {
-                ShowRemoveOn::Always => button,
-                ShowRemoveOn::Hover => button
+                ShowRemoveOn::Always => slot,
+                ShowRemoveOn::Hover => slot
                     .opacity(0.)
                     .group_hover(group.clone(), |s| s.opacity(1.)),
             }

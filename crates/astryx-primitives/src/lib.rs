@@ -6,6 +6,7 @@
 
 pub mod announce;
 pub mod context;
+pub mod focus;
 pub mod hotkeys;
 pub mod layer;
 pub mod link;
@@ -15,6 +16,7 @@ pub mod size;
 
 pub use announce::{Politeness, announce, announcer};
 pub use context::{Provider, provide, use_context, with_context};
+pub use focus::{FocusNext, FocusPrevious, control_focus};
 pub use hotkeys::{Hotkey, hotkeys};
 pub use layer::{EscapeBehavior, Layer, has_open_layer, layer};
 pub use link::{LinkHandler, Navigation, link_provider, set_link_handler, use_link_handler};

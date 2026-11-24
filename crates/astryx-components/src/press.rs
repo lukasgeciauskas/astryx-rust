@@ -1,0 +1,86 @@
+//! The shared behavior of every pressable control: focus (a tab stop), the
+//! hover and pressed overlays (upstream `interactionOverlayStyles`),
+//! press scale, the focus ring, disabled and busy guards, and theme hover
+//! rules. Controls build their own look, then hand their root here.
+
+use std::rc::Rc;
+
+use astryx_primitives::{is_focus_visible, prefers_reduced_motion};
+use astryx_theme::color::composite;
+use astryx_theme::{ResolvedTheme, RuleState};
+use gpui::{
+    App, ClickEvent, Div, FocusHandle, Hsla, InteractiveElement as _, ParentElement as _, Pixels,
+    Stateful, StatefulInteractiveElement as _, StyleRefinement, Styled, Window,
+};
+
+use crate::focus::focus_ring;
+
+pub(crate) type ClickFn = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+
+/// How a control presses.
+pub(crate) struct Press<'a> {
+    /// The resting fill the overlays composite over (`None` is clear).
+    pub fill: Option<Hsla>,
+    /// Pressed scale (0.98 for a standalone Button), or none.
+    pub scale: Option<f32>,
+    /// Upstream disabled: focusable, half opacity, no activation.
+    pub disabled: bool,
+    /// Upstream busy: focusable, full opacity, no activation.
+    pub busy: bool,
+    /// The focus ring's corner radius and color (`None` for the token's).
+    pub ring: Option<(Pixels, Option<Hsla>)>,
+    /// The theme target and props whose hover and active rules apply.
+    pub theme_target: Option<(&'a str, &'a [(&'a str, &'a str)])>,
+}
+
+/// Applies the press behavior to `el` and wires `on_click`.
+pub(crate) fn apply_press(
+    el: Stateful<Div>,
+    focus: &FocusHandle,
+    press: Press<'_>,
+    on_click: Option<ClickFn>,
+    theme: &ResolvedTheme,
+    window: &mut Window,
+    cx: &mut App,
+) -> Stateful<Div> {
+    let t = theme.tokens();
+    let rem = window.rem_size();
+    let inert = press.disabled || press.busy;
+    let mut el = el.track_focus(focus);
+    if press.disabled {
+        el = el.opacity(0.5);
+    }
+    if !inert {
+        let base = press.fill.unwrap_or(Hsla::transparent_black());
+        let mut hover = StyleRefinement::default().bg(composite(base, t.color.overlay_hover));
+        let mut active = StyleRefinement::default().bg(composite(base, t.color.overlay_pressed));
+        if let Some(scale) = press.scale.filter(|_| !prefers_reduced_motion(cx)) {
+            active = active.scale(scale);
+        }
+        if let Some((target, props)) = press.theme_target {
+            theme.refine(&mut hover, target, props, Some(RuleState::Hover));
+            theme.refine(&mut active, target, props, Some(RuleState::Active));
+        }
+        el = el
+            .cursor_pointer()
+            .hover(move |_| hover)
+            .active(move |_| active);
+        if let Some(on_click) = on_click {
+            el = el.on_click(move |event, window, cx| on_click(event, window, cx));
+        }
+    } else {
+        // Inert controls keep their tab stop but swallow presses, so a
+        // click never reaches an ancestor's handler (upstream FR9).
+        el = el.on_click(|_, _, cx| cx.stop_propagation());
+    }
+    if let Some((radius, color)) = press.ring
+        && is_focus_visible(focus, window)
+    {
+        let mut ring = focus_ring(t, radius, rem);
+        if let Some(color) = color {
+            ring = ring.border_color(color);
+        }
+        el = el.child(ring);
+    }
+    el
+}
