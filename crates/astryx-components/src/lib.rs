@@ -6,6 +6,7 @@ pub mod doc;
 pub mod icon;
 pub mod layout;
 mod motion;
+pub mod people;
 pub mod status;
 pub mod text;
 

@@ -17,6 +17,7 @@ pub enum Page {
     Icon,
     Status,
     Content,
+    People,
 }
 
 impl Page {
@@ -28,6 +29,7 @@ impl Page {
         Page::Icon,
         Page::Status,
         Page::Content,
+        Page::People,
     ];
 
     pub fn title(self) -> &'static str {
@@ -39,6 +41,7 @@ impl Page {
             Page::Icon => "Icon",
             Page::Status => "Status",
             Page::Content => "Content",
+            Page::People => "People",
         }
     }
 
@@ -51,6 +54,7 @@ impl Page {
             Page::Icon => astryx::components::icon::examples::examples(window, cx),
             Page::Status => astryx::components::status::examples::examples(window, cx),
             Page::Content => astryx::components::content::examples::examples(window, cx),
+            Page::People => astryx::components::people::examples::examples(window, cx),
         }
     }
 }

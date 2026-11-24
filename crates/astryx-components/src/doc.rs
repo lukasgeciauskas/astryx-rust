@@ -64,6 +64,8 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::content::KBD_DOC,
     crate::content::BLOCKQUOTE_DOC,
     crate::content::CITATION_DOC,
+    crate::people::AVATAR_DOC,
+    crate::people::AVATAR_GROUP_DOC,
 ];
 
 /// The registered doc for an upstream component name.
