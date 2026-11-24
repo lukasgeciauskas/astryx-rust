@@ -188,6 +188,17 @@ pub fn render_types(root: &Node) -> Result<String> {
         out.push_str(&format!("        {token:?},\n"));
     }
     out.push_str("    ];\n\n");
+    out.push_str(
+        "    /// Every shared token's CSS name and its Rust field path, sorted by CSS name.\n",
+    );
+    out.push_str("    pub const FIELDS: &'static [(&'static str, &'static str)] = &[\n");
+    for (token, path, _) in &leaves {
+        out.push_str(&format!(
+            "        ({token:?}, {:?}),\n",
+            path.replace("r#", "")
+        ));
+    }
+    out.push_str("    ];\n\n");
     out.push_str("    /// Sets a token by its CSS name, as a theme override does.\n");
     out.push_str(
         "    pub fn set(&mut self, name: &str, value: TokenValue) -> Result<(), TokenError> {\n",

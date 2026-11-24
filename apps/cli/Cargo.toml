@@ -1,0 +1,18 @@
+[package]
+name = "astryx-cli"
+description = "The astryx CLI for the Rust port: component docs, tokens, guides and port parity, for people and coding agents"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "astryx"
+path = "src/main.rs"
+
+[dependencies]
+astryx-components.workspace = true
+astryx-theme.workspace = true
+astryx-themes = { workspace = true, features = ["all"] }
+serde_json.workspace = true

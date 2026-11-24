@@ -3,7 +3,7 @@
 //
 //   node tools/export/export-all.mjs [path/to/Astryx] [--strict] [--no-fonts]
 //
-// Writes spec/ (themes, icons, locales, upstream.json), the icon SVGs in
+// Writes spec/ (themes, icons, manifest, locales, upstream.json), the icon SVGs in
 // crates/astryx-icons/assets, and the theme fonts in crates/astryx-themes/fonts.
 // Then run `cargo xtask codegen`. See UPSTREAM.md.
 
@@ -15,6 +15,7 @@ import {stableStringify} from './lib/values.mjs';
 import {exportThemes} from './export-themes.mjs';
 import {exportIcons} from './export-icons.mjs';
 import {exportFonts} from './export-fonts.mjs';
+import {exportManifest} from './export-manifest.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = process.argv.slice(2);
@@ -26,6 +27,7 @@ fs.mkdirSync(specDir, {recursive: true});
 const warnings = [];
 const {themes, lucideComponents} = await exportThemes(root, specDir, warnings);
 await exportIcons(root, repoRoot, specDir, lucideComponents, warnings);
+await exportManifest(root, specDir, warnings);
 if (!args.includes('--no-fonts')) await exportFonts(root, repoRoot, specDir, warnings);
 
 const localesDir = path.join(specDir, 'locales');

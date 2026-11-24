@@ -71,6 +71,32 @@ impl Theme {
             .map(|(_, path)| path.as_ref())
     }
 
+    /// Adds component override rules after the theme's own, so they win where
+    /// both apply. This is how an app restyles a component everywhere, the
+    /// way a theme's `components` map does.
+    pub fn with_rules(mut self, rules: impl IntoIterator<Item = ComponentRule>) -> Self {
+        self.components.to_mut().extend(rules);
+        self
+    }
+
+    /// Re-defines tokens in one appearance, or both when `appearance` is
+    /// `None`. Fails on an unknown token or a value of the wrong kind.
+    pub fn with_token_values(
+        mut self,
+        appearance: Option<Appearance>,
+        overrides: impl IntoIterator<Item = (&'static str, TokenValue)>,
+    ) -> Result<Self, TokenError> {
+        for (name, value) in overrides {
+            if appearance != Some(Appearance::Dark) {
+                self.light.set(name, value.clone())?;
+            }
+            if appearance != Some(Appearance::Light) {
+                self.dark.set(name, value)?;
+            }
+        }
+        Ok(self)
+    }
+
     fn surface(&self, appearance: Appearance) -> Option<&SurfaceOverride> {
         match appearance {
             Appearance::Dark => self.on_dark.as_ref(),
@@ -426,4 +452,21 @@ pub fn current(window: &Window, cx: &App) -> ResolvedTheme {
 /// Draws `child` with `theme` instead of the surrounding one.
 pub fn scope(theme: ResolvedTheme, child: impl IntoElement) -> Provider<ThemeScope> {
     provide(ThemeScope(theme), child)
+}
+
+/// Draws `child` with some tokens re-defined, the counterpart of setting CSS
+/// custom properties on a subtree. Unknown tokens are ignored.
+///
+/// ```ignore
+/// with_tokens([("--color-accent", TokenValue::Color(brand))], card, window, cx)
+/// ```
+pub fn with_tokens<'a>(
+    overrides: impl IntoIterator<Item = (&'a str, TokenValue)>,
+    child: impl IntoElement,
+    window: &Window,
+    cx: &App,
+) -> Provider<ThemeScope> {
+    let overrides: Vec<(&str, TokenValue)> = overrides.into_iter().collect();
+    let theme = current(window, cx).with_tokens(overrides.iter().map(|(n, v)| (*n, v)));
+    scope(theme, child)
 }

@@ -280,3 +280,20 @@ The remaining primitives:
 - **Accessibility parity** is bounded by GPUI's AccessKit surface.
 - **The name.** "Astryx" is Meta's name. MIT covers the code, not the name. Keep attribution;
   rename before any public publish.
+
+## Decision log
+
+- **Own primitives on Zed-git GPUI, not Longbridge's gpui-component (2026-11-24).**
+  gpui-kit, gpui-base and gpui-component depend on crates.io `gpui-pre =0.3.14`. That is a
+  different crate from the Zed-git `gpui` the user's apps use, so its types cannot mix with
+  theirs, and adopting it would move every app off Zed git.
+  gpui-component (Apache-2.0) stays useful as reading material for the hardest pieces: the
+  text editing engine and the virtual table. Adapted code keeps attribution.
+- **No GPUI fork, ever.** Gaps are filled in this layer (`docs/guide/effects.md`), or
+  upstreamed to Zed followed by a rev bump.
+- **Agent tooling is part of the port (M1.5).**
+  - `CLAUDE.md`;
+  - the `astryx` CLI (`apps/cli`), with upstream docs, the Rust API, tokens and parity;
+  - `cargo xtask gpui-src`;
+  - hot reload through `cargo xtask dev`.
+  The goal is fast, accurate agentic iteration.

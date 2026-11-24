@@ -20,7 +20,7 @@ pub use generated::tokens::*;
 pub use styled::ThemeStyled;
 pub use theme::{
     ResolvedTheme, Theme, ThemeMode, ThemeScope, active, apply_style, current, init, prepare,
-    register_fonts, scope, set_mode, set_theme,
+    register_fonts, scope, set_mode, set_theme, with_tokens,
 };
 pub use types::*;
 
@@ -33,3 +33,6 @@ pub mod generated_prelude {
     pub use std::borrow::Cow;
     pub use std::time::Duration;
 }
+
+#[cfg(test)]
+mod tests;

@@ -141,6 +141,72 @@ impl TokenValue {
     }
 }
 
+/// `#RRGGBB` or `#RRGGBBAA` for a color.
+pub fn hex(color: Hsla) -> String {
+    let c = color.to_rgb();
+    let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+    if byte(c.a) == 255 {
+        format!("#{:02X}{:02X}{:02X}", byte(c.r), byte(c.g), byte(c.b))
+    } else {
+        format!(
+            "#{:02X}{:02X}{:02X}{:02X}",
+            byte(c.r),
+            byte(c.g),
+            byte(c.b),
+            byte(c.a)
+        )
+    }
+}
+
+fn length(f: &mut fmt::Formatter<'_>, length: &AbsoluteLength) -> fmt::Result {
+    match length {
+        AbsoluteLength::Pixels(px) => write!(f, "{}px", f32::from(*px)),
+        AbsoluteLength::Rems(rems) => write!(f, "{}rem", rems.0),
+    }
+}
+
+/// CSS-like text: `#0064E0`, `16px`, `1rem`, `125ms`, `cubic-bezier(..)`.
+impl fmt::Display for TokenValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenValue::Color(c) => f.write_str(&hex(*c)),
+            TokenValue::Length(l) => length(f, l),
+            TokenValue::Weight(w) => write!(f, "{}", w.0),
+            TokenValue::Leading(v) | TokenValue::Number(v) => write!(f, "{v}"),
+            TokenValue::Duration(d) => write!(f, "{}ms", d.as_secs_f64() * 1000.0),
+            TokenValue::Ease(CubicBezier(a, b, c, d)) => {
+                write!(f, "cubic-bezier({a}, {b}, {c}, {d})")
+            }
+            TokenValue::Families(stack) => {
+                let names: Vec<&str> = stack.0.iter().map(|n| n.as_ref()).collect();
+                f.write_str(&names.join(", "))
+            }
+            TokenValue::Shadow(shadow) => {
+                if shadow.0.is_empty() {
+                    return f.write_str("none");
+                }
+                for (i, layer) in shadow.0.iter().enumerate() {
+                    if i > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(
+                        f,
+                        "{}{}px {}px {}px {}px {}",
+                        if layer.inset { "inset " } else { "" },
+                        f32::from(layer.offset.x),
+                        f32::from(layer.offset.y),
+                        f32::from(layer.blur_radius),
+                        f32::from(layer.spread_radius),
+                        hex(layer.color)
+                    )?;
+                }
+                Ok(())
+            }
+            TokenValue::Keyword(k) => f.write_str(&k.0),
+        }
+    }
+}
+
 /// Why a token could not be set.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenError {

@@ -5,9 +5,10 @@ design system, built on [GPUI](https://github.com/zed-industries/zed/tree/main/c
 Zed's GPU-accelerated UI framework. It runs natively on Windows and Linux and
 in the browser (WebAssembly), with no React or web view.
 
-> **Status: early development.** Done: the workspace and GPUI pin (M0) and
-> the theme pipeline (M1): all of Astryx's tokens, core's defaults and the
-> seven published themes, with their fonts and icons, generated from upstream.
+> **Status: early development.** Done: the workspace and GPUI pin (M0), the
+> theme pipeline (M1: all of Astryx's tokens, core's defaults and the seven
+> published themes, with their fonts and icons, generated from upstream), and
+> the developer tooling (M1.5: hot reload, the `astryx` CLI, agent guides).
 > Components start in M2. See [`docs/PLAN.md`](docs/PLAN.md) for the
 > full-parity roadmap, [`UPSTREAM.md`](UPSTREAM.md) for the synced upstream
 > commit, and [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md).
@@ -22,6 +23,7 @@ in the browser (WebAssembly), with no React or web view.
 | `astryx-themes` | The seven published themes and their fonts, one cargo feature each |
 | `astryx-icons` | Built-in icons |
 | `astryx-components` | The components |
+| `astryx-cli` (`apps/cli`) | The `astryx` CLI |
 
 ## Using Astryx in your app
 
@@ -66,9 +68,17 @@ and `x11` features.
 
 ```sh
 cargo run -p astryx-gallery          # the component gallery, native
+cargo xtask dev                      # the gallery with hot reload (needs dx 0.7.10; not working on Windows yet)
 cargo xtask web                      # the gallery in the browser, at http://127.0.0.1:8080
 cargo test --workspace
+cargo run -q -p astryx-cli -- help   # the astryx CLI: component docs, tokens, guides, parity
+cargo xtask gpui-src                 # where the pinned GPUI source is checked out
 ```
+
+Coding agents start at [`CLAUDE.md`](CLAUDE.md). The `astryx` CLI is the Rust
+port's counterpart of upstream's agent-facing CLI: `astryx component Button --dense`
+shows upstream's props and guidance next to the Rust API, and `astryx parity`
+shows what is left to port. Guides are in [`docs/guide/`](docs/guide/).
 
 `cargo xtask web` needs `wasm-bindgen-cli` at the version in `Cargo.lock`
 (`cargo install wasm-bindgen-cli --version <version>`).

@@ -11,6 +11,10 @@ publish.workspace = true
 name = "astryx-gallery"
 path = "src/main.rs"
 
+[features]
+# Hot-patching for `cargo xtask dev` (debug builds only).
+hot-reload = ["gpui/hot-reload"]
+
 [dependencies]
 anyhow.workspace = true
 astryx.workspace = true
