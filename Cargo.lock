@@ -340,6 +340,7 @@ dependencies = [
  "anyhow",
  "astryx-primitives",
  "gpui",
+ "serde_json",
 ]
 
 [[package]]

@@ -5,8 +5,12 @@ use std::sync::Arc;
 
 use astryx::prelude::*;
 use astryx::theme::{self, ResolvedTheme, Theme};
-use gpui::{AnyElement, Context, ElementId, Hsla, SharedString, Window, div, prelude::*, px};
+use gpui::{
+    AnyElement, Context, ElementId, Hsla, ScrollHandle, SharedString, Window, div, point,
+    prelude::*, px,
+};
 
+use crate::dev_state::DevState;
 use crate::pages::Page;
 
 /// Core's defaults plus every theme compiled into the gallery.
@@ -19,21 +23,54 @@ pub fn available_themes() -> Vec<Arc<Theme>> {
 pub struct Gallery {
     themes: Vec<Arc<Theme>>,
     page: Page,
+    scroll: ScrollHandle,
+    restore_scroll: Option<f32>,
+    saved: Option<DevState>,
 }
 
 impl Gallery {
-    pub fn new(themes: Vec<Arc<Theme>>) -> Self {
+    /// `page` names the start page (case-insensitive); `scroll_y` restores
+    /// the page's scroll after a `cargo xtask dev` relaunch.
+    pub fn new(themes: Vec<Arc<Theme>>, page: Option<&str>, scroll_y: f32) -> Self {
         Gallery {
             themes,
-            page: std::env::var("GALLERY_PAGE")
-                .ok()
+            page: page
                 .and_then(|name| {
                     Page::ALL
                         .iter()
                         .copied()
-                        .find(|p| p.title().eq_ignore_ascii_case(&name))
+                        .find(|p| p.title().eq_ignore_ascii_case(name))
                 })
                 .unwrap_or(Page::Tokens),
+            scroll: ScrollHandle::new(),
+            restore_scroll: (scroll_y > 0.0).then_some(scroll_y),
+            saved: None,
+        }
+    }
+
+    /// Saves where the gallery is when it changed, for `cargo xtask dev`.
+    fn save_state(&mut self, theme: &str, mode: ThemeMode, window: &Window) {
+        let b = window.bounds();
+        let state = DevState {
+            page: self.page.title().to_string(),
+            theme: theme.to_string(),
+            mode: match mode {
+                ThemeMode::System => "system",
+                ThemeMode::Light => "light",
+                ThemeMode::Dark => "dark",
+            }
+            .to_string(),
+            bounds: Some([
+                f32::from(b.origin.x),
+                f32::from(b.origin.y),
+                f32::from(b.size.width),
+                f32::from(b.size.height),
+            ]),
+            scroll_y: -f32::from(self.scroll.offset().y),
+        };
+        if self.saved.as_ref() != Some(&state) {
+            state.save();
+            self.saved = Some(state);
         }
     }
 }
@@ -43,6 +80,10 @@ impl Render for Gallery {
         let resolved = theme::current(window, cx);
         let t = resolved.tokens();
         let (active, mode) = theme::active(cx);
+        if let Some(y) = self.restore_scroll.take() {
+            self.scroll.set_offset(point(px(0.), px(-y)));
+        }
+        self.save_state(&active.name, mode, window);
 
         let theme_chips = self.themes.iter().map(|candidate| {
             let selected = candidate.name == active.name;
@@ -137,6 +178,7 @@ impl Render for Gallery {
                     .child(
                         div()
                             .id("page")
+                            .track_scroll(&self.scroll)
                             .flex_1()
                             .min_w_0()
                             .overflow_y_scroll()

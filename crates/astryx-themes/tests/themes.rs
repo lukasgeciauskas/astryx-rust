@@ -124,3 +124,41 @@ fn coarse_narrow_adaptation_rescales_type() {
     assert_eq!(size(&desktop), 14.0);
     assert_eq!(size(&touch), 16.0);
 }
+
+#[test]
+fn json_themes_match_their_compiled_twins() {
+    // The compiled themes are generated from these files, so loading the JSON
+    // at run time (live theme reload) must give the same tokens and rules.
+    let cases = [
+        (
+            include_str!("../../../spec/themes/neutral.json"),
+            astryx_themes::neutral::theme(),
+        ),
+        (
+            include_str!("../../../spec/themes/butter.json"),
+            astryx_themes::butter::theme(),
+        ),
+        (
+            include_str!("../../../spec/themes/gothic.json"),
+            astryx_themes::gothic::theme(),
+        ),
+    ];
+    for (json, compiled) in cases {
+        let loaded = Theme::from_json(json, &Theme::default()).unwrap();
+        assert_eq!(loaded.name, compiled.name);
+        for name in Tokens::NAMES {
+            for mode in [Appearance::Light, Appearance::Dark] {
+                let a = loaded.tokens(mode).get(name).map(|v| v.to_string());
+                let b = compiled.tokens(mode).get(name).map(|v| v.to_string());
+                assert_eq!(a, b, "{} {mode:?} {name}", compiled.name);
+            }
+        }
+        assert_eq!(
+            loaded.components.len(),
+            compiled.components.len(),
+            "{} rules",
+            compiled.name
+        );
+        assert_eq!(loaded.adaptations.len(), compiled.adaptations.len());
+    }
+}

@@ -22,4 +22,5 @@ y2k = []
 astryx-theme.workspace = true
 
 [dev-dependencies]
+astryx-theme = { workspace = true, features = ["json"] }
 gpui.workspace = true

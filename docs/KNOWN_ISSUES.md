@@ -16,7 +16,7 @@
 
 ## Tooling
 
-- **Hot reload (`cargo xtask dev`) does not start on Windows yet.** GPUI's
+- **True hot-patching (`cargo xtask dev --hot-patch`) does not start on Windows yet.** GPUI's
   `hot-reload` feature compiles, and `dx serve --hot-patch` (Dioxus CLI 0.7.10, the
   version GPUI pins) builds the gallery. The fat link then fails with
   `Missing rustc capture`.
@@ -31,8 +31,8 @@
     GPUI's pinned `subsecond` (and so `dx`) moves on.
   - The `rust-lld` linker setting also breaks dx's link interception, so the repo keeps
     the default linker.
-  - Until then, the edit loop is a plain rebuild: an edit in a library crate relaunches
-    the gallery in about 4 s with `cargo run -p astryx-gallery`.
+  - The default `cargo xtask dev` does not depend on dx. It is a hot restart: it rebuilds
+    and relaunches the gallery in place in about 4 s, and it reloads theme JSON live.
 
 - **Chrome screenshots of a background tab hang.** Chrome pauses
   `requestAnimationFrame` in a tab whose window is not in the foreground. GPUI's web

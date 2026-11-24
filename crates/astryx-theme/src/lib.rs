@@ -6,6 +6,8 @@
 
 pub mod color;
 pub mod fonts;
+#[cfg(feature = "json")]
+pub mod spec;
 mod styled;
 mod theme;
 pub mod types;

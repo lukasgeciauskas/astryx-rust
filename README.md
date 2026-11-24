@@ -68,7 +68,7 @@ and `x11` features.
 
 ```sh
 cargo run -p astryx-gallery          # the component gallery, native
-cargo xtask dev                      # the gallery with hot reload (needs dx 0.7.10; not working on Windows yet)
+cargo xtask dev                      # edit loop: relaunches the gallery in place on save; theme JSON reloads live
 cargo xtask web                      # the gallery in the browser, at http://127.0.0.1:8080
 cargo test --workspace
 cargo run -q -p astryx-cli -- help   # the astryx CLI: component docs, tokens, guides, parity

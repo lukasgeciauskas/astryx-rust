@@ -19,6 +19,8 @@ theme-matcha = ["dep:astryx-themes", "astryx-themes/matcha"]
 theme-neutral = ["dep:astryx-themes", "astryx-themes/neutral"]
 theme-stone = ["dep:astryx-themes", "astryx-themes/stone"]
 theme-y2k = ["dep:astryx-themes", "astryx-themes/y2k"]
+# Load themes from their typed JSON at run time (`Theme::from_json`).
+json-themes = ["astryx-theme/json"]
 
 [dependencies]
 gpui.workspace = true
