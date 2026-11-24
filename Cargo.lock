@@ -365,6 +365,7 @@ dependencies = [
  "accesskit",
  "gpui",
  "icu_normalizer",
+ "unicode-segmentation",
  "web-time",
 ]
 

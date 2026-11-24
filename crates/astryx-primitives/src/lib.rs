@@ -6,6 +6,7 @@
 
 pub mod announce;
 pub mod context;
+pub mod editing;
 pub mod focus;
 pub mod hotkeys;
 pub mod layer;
