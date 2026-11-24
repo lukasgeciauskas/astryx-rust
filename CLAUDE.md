@@ -48,8 +48,9 @@ Measured on the dev machine (Windows, debug): an edit in `astryx-theme` or
   hard-code a value a token provides.
 - **Fonts:** never set `.font_family()` to an unregistered font; GPUI panics. Use
   `ThemeStyled::font_stack`.
-- **GPUI:** never fork it. Every app that uses Astryx must share one GPUI revision.
-  Fill gaps in this layer (see `astryx docs effects`).
+- **GPUI:** it comes from our fork (`docs/gpui-fork.md`), pinned to one revision that every
+  app shares. Renderer patches go to the fork via `cargo xtask gpui-local on`; everything
+  else is filled in this layer (see `astryx docs effects`).
 - **Licensing:** code adapted from GPUI or gpui-component (Apache-2.0) keeps an
   attribution comment. Never copy from Zed's GPL crates (`editor`, `ui`, the Zed app).
 - **New components:** follow `astryx docs porting`. That includes registering a

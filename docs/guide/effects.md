@@ -12,14 +12,14 @@ Astryx uses is drawn. Checked at Zed rev `2b248e6` against upstream usage.
 | 2-stop `linear-gradient` | Fades, table sticky edges | `linear_gradient(angle, from, to)` |
 | Multi-stop gradient | Rare | Adjacent 2-stop segments |
 | `mask-image` edge fade | TabList, Carousel, Chat, DateInput scroll edges | Gradient overlay from the surface color to transparent |
-| `backdrop-filter: blur` | Chat composer, Lightbox, SegmentedControl, lab TabBar/MediaPlayer | Upstream's non-blur fallback fill (a solid or translucent surface token) |
-| `filter` | Dialog/Drawer/MobileNav backdrops, PowerSearch, Swipe, Table | Per use: usually an overlay color or opacity |
+| `backdrop-filter: blur` | Chat composer, Lightbox, SegmentedControl, lab TabBar/MediaPlayer | Fork patch R2, a real backdrop blur; until it lands, upstream's non-blur fallback fill |
+| `filter` | Dialog/Drawer/MobileNav backdrops, PowerSearch, Swipe, Table | Fork patch R3 (offscreen layers with filters) |
 | `transform: rotate` | Chevrons, disclosure icons | SVG `with_transformation(Transformation::rotate(..))` |
-| `transform: translate` | Slides, sheets, toasts | Animated position offsets (`with_animation`) |
-| `transform: scale` (press) | Button press feedback | Decided with Button in M3: an animated inset of the visual layer, or omitted |
-| `clip-path` | Layer arrows, steppers, tokens | Rounded `overflow_hidden`, or `canvas` paths |
+| `transform: translate` | Slides, sheets, toasts | Fork patch R1; GPUI's `with_element_offset` also moves a subtree at paint time |
+| `transform: scale` (press, entrances) | Button press feedback, dialog and popover entrances | Fork patch R1 (transforms on any element, text included) |
+| `clip-path` | Layer arrows, steppers, tokens | Rounded `overflow_hidden` or `canvas` paths; arbitrary alpha masks via fork patch R3 |
 | Blend modes, radial/conic gradients | Not used upstream | Not needed |
 
-Policy:
-- Never fork GPUI. A fork breaks the shared GPUI revision with the apps that use Astryx.
-- Fill a gap in this layer, or upstream it to Zed and bump the revision.
+Policy: fill a gap in this layer when GPUI's existing paint APIs can draw it.
+Effects that need new shader code go in our GPUI fork as patches R1 to R4
+(`docs/gpui-fork.md`).

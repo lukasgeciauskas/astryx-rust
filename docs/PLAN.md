@@ -289,8 +289,12 @@ The remaining primitives:
   theirs, and adopting it would move every app off Zed git.
   gpui-component (Apache-2.0) stays useful as reading material for the hardest pieces: the
   text editing engine and the virtual table. Adapted code keeps attribution.
-- **No GPUI fork, ever.** Gaps are filled in this layer (`docs/guide/effects.md`), or
-  upstreamed to Zed followed by a rev bump.
+- **Our own GPUI fork for renderer-level effects (2026-11-24, replaces "no fork").**
+  - Backdrop blur, element transforms, filters, masks and blend modes need new shader code
+    inside GPUI.
+  - They live on the `astryx` branch of github.com/lukasgeciauskas/zed, and all the user's
+    apps pin that fork. See `docs/gpui-fork.md`.
+  - Everything that needs no renderer change stays in this layer.
 - **Agent tooling is part of the port (M1.5).**
   - `CLAUDE.md`;
   - the `astryx` CLI (`apps/cli`), with upstream docs, the Rust API, tokens and parity;
