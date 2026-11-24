@@ -10,6 +10,7 @@ mod row;
 mod tests;
 
 pub use lists::{CheckboxList, CheckboxListItem, RadioList, RadioListItem};
+pub(crate) use row::toggles as row_toggles;
 pub use row::{LabelPosition, LabelSpacing};
 
 use std::rc::Rc;

@@ -18,8 +18,11 @@ pub mod media;
 mod motion;
 pub mod people;
 mod press;
+pub mod segmented;
 pub mod status;
+pub mod tabs;
 pub mod text;
 pub mod time;
+pub mod toolbar;
 
 pub use doc::{ComponentDoc, PropMapping, RustApi};

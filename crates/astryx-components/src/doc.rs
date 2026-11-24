@@ -90,6 +90,11 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::choice::CHECKBOX_LIST_ITEM_DOC,
     crate::field::FIELD_DOC,
     crate::item::ITEM_DOC,
+    crate::segmented::SEGMENTED_CONTROL_DOC,
+    crate::segmented::SEGMENTED_CONTROL_ITEM_DOC,
+    crate::tabs::TAB_LIST_DOC,
+    crate::tabs::TAB_DOC,
+    crate::toolbar::TOOLBAR_DOC,
 ];
 
 /// The registered doc for an upstream component name.

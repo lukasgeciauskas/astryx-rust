@@ -55,13 +55,114 @@ pub fn init(cx: &mut App) {
 
 /// The focus handle of a control with id `id`, kept between frames and in
 /// the tab order. Keyed by the id, so sibling controls never share one.
+///
+/// Inside a [`RovingScope`] (a Toolbar), the control registers with the
+/// scope and is a tab stop only while it is the scope's active control.
 pub fn control_focus(id: &gpui::ElementId, window: &mut Window, cx: &mut App) -> FocusHandle {
-    window
+    let handle = window
         .use_keyed_state(
             gpui::ElementId::Name(format!("{id:?}-focus").into()),
             cx,
             |_, cx| cx.focus_handle().tab_stop(true),
         )
         .read(cx)
-        .clone()
+        .clone();
+    match crate::use_context::<RovingScope>(cx) {
+        Some(scope) => {
+            let active = scope.register(&handle);
+            handle.tab_stop(active)
+        }
+        None => handle,
+    }
+}
+
+#[derive(Default)]
+struct RovingState {
+    /// The controls registered this frame, in render order.
+    controls: Vec<FocusHandle>,
+    /// The control that holds the tab stop.
+    active: Option<FocusHandle>,
+    /// Whether this frame's first registration still has to clear the
+    /// last frame's list.
+    fresh: bool,
+}
+
+/// One tab stop among the controls inside it, moved with the arrow keys:
+/// upstream `oneTabStopAmong` with `useListFocus`'s roving tab index.
+///
+/// The owner calls [`RovingScope::begin`] in its render, wraps its children
+/// in `provide(scope.clone(), ..)`, and puts [`RovingScope::key_down_listener`]
+/// on its container. Every control built on [`control_focus`] joins.
+#[derive(Clone)]
+pub struct RovingScope {
+    state: std::rc::Rc<std::cell::RefCell<RovingState>>,
+    keys: crate::ListKeys,
+}
+
+impl RovingScope {
+    /// The scope with id `id`, for this frame.
+    pub fn begin(
+        id: &gpui::ElementId,
+        keys: crate::ListKeys,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self {
+        let state = window
+            .use_keyed_state(
+                gpui::ElementId::Name(format!("{id:?}-roving").into()),
+                cx,
+                |_, _| std::rc::Rc::new(std::cell::RefCell::new(RovingState::default())),
+            )
+            .read(cx)
+            .clone();
+        {
+            let mut s = state.borrow_mut();
+            // The focused control keeps the stop; otherwise the last one.
+            if let Some(focused) = s.controls.iter().find(|h| h.is_focused(window)) {
+                s.active = Some(focused.clone());
+            }
+            s.fresh = true;
+        }
+        RovingScope { state, keys }
+    }
+
+    /// Registers a control; returns whether it holds the tab stop.
+    fn register(&self, handle: &FocusHandle) -> bool {
+        let mut s = self.state.borrow_mut();
+        if s.fresh {
+            s.controls.clear();
+            s.fresh = false;
+        }
+        s.controls.push(handle.clone());
+        match &s.active {
+            Some(active) => active == handle,
+            None => s.controls.len() == 1,
+        }
+    }
+
+    /// The container's key-down listener: arrows (by the scope's keys),
+    /// Home and End move focus among the controls.
+    pub fn key_down_listener(
+        &self,
+    ) -> impl Fn(&gpui::KeyDownEvent, &mut Window, &mut App) + 'static {
+        let scope = self.clone();
+        move |event, window, cx| {
+            let m = &event.keystroke.modifiers;
+            if m.control || m.alt || m.platform {
+                return;
+            }
+            let key = event.keystroke.key.as_str();
+            if !scope.keys.handles(key) {
+                return;
+            }
+            let controls = scope.state.borrow().controls.clone();
+            let current = controls.iter().position(|h| h.is_focused(window));
+            if let Some(target) = scope.keys.target(key, current, controls.len(), |_| false) {
+                let handle = controls[target].clone();
+                scope.state.borrow_mut().active = Some(handle.clone());
+                handle.focus(window, cx);
+            }
+            cx.stop_propagation();
+        }
+    }
 }

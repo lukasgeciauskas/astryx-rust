@@ -32,6 +32,11 @@
   - GPUI has no inline layout. In a block parent (a plain `div()`), they stretch to the
     parent's width.
   - Put them in a flex container.
+  - Upstream `width: fit-content` (SegmentedControl) never stretches: wrap the root in a
+    `.flex().flex_row()` div, so a stretching column parent stretches only the wrapper.
+- **Roving composites:** data-driven lists (RadioList, SegmentedControl, TabList) use
+  `ListFocus`; a Toolbar of arbitrary controls uses `RovingScope`, which every control
+  built on `control_focus` joins.
 - **Pressables** (Button and everything built on it) share `press::apply_press`, which
   provides:
   - a tab stop (`control_focus`);
