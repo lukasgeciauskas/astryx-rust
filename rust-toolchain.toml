@@ -1,0 +1,6 @@
+[toolchain]
+# Matches the pinned Zed revision's toolchain. Bump together with GPUI.
+channel = "1.100.0"
+profile = "minimal"
+components = ["rustfmt", "clippy", "rust-src"]
+targets = ["wasm32-unknown-unknown"]

@@ -1,0 +1,5 @@
+/target
+/apps/gallery/dist
+**/*.rs.bk
+*.pdb
+.DS_Store

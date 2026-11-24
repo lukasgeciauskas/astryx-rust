@@ -1,0 +1,26 @@
+[package]
+name = "astryx-gallery"
+description = "Storybook-style gallery for the Astryx GPUI components"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "astryx-gallery"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+astryx.workspace = true
+gpui.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gpui_platform = { workspace = true, features = ["wayland", "x11"] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+gpui_platform.workspace = true
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+wasm-bindgen.workspace = true
