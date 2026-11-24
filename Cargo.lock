@@ -312,6 +312,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "astryx",
+ "backtrace",
  "gpui",
  "gpui_platform",
  "wasm-bindgen",

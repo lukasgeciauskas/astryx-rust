@@ -13,12 +13,15 @@ path = "src/main.rs"
 
 [features]
 # Hot-patching for `cargo xtask dev` (debug builds only).
-hot-reload = ["gpui/hot-reload"]
+hot-reload = ["gpui/hot-reload", "dep:backtrace"]
 
 [dependencies]
 anyhow.workspace = true
 astryx = { workspace = true, features = ["json-themes"] }
 gpui.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+backtrace = { version = "0.3", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gpui_platform = { workspace = true, features = ["wayland", "x11"] }

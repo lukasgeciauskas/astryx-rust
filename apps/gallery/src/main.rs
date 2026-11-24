@@ -3,6 +3,8 @@
 mod dev_state;
 mod gallery;
 mod live_themes;
+#[cfg(all(windows, feature = "hot-reload"))]
+mod overflow_probe;
 mod pages;
 
 use gpui::{App, Bounds, WindowBounds, WindowOptions, point, prelude::*, px, size};
@@ -10,6 +12,8 @@ use gpui::{App, Bounds, WindowBounds, WindowOptions, point, prelude::*, px, size
 use dev_state::DevState;
 
 fn run() {
+    #[cfg(all(windows, feature = "hot-reload"))]
+    overflow_probe::install();
     application()
         .with_assets(astryx::Assets::new())
         .run(|cx: &mut App| {

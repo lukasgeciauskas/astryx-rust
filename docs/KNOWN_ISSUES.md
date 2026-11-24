@@ -16,28 +16,25 @@
 
 ## Tooling
 
-- **True hot-patching (`cargo xtask dev --hot-patch`) crashes on Windows after the
-  first patch.** The default `cargo xtask dev` (hot restart, about 4 s, plus live theme
-  reload) does not use it.
-  - **Found and fixed: the capture failure.** On Windows, Cargo 1.100 hands rustc the
-    arguments of workspace crates in an `@argfile`. dx 0.7.10's rustc wrapper looked for
-    `--crate-name` in the literal arguments, captured nothing, and the fat link failed with
-    `Missing rustc capture`.
-  - `cargo xtask install-dx` installs dx 0.7.10 with our fix (`xtask/src/install_dx.rs`).
-    The wrapper expands argfiles, and replays use an argfile when the command line would
-    be too long. With it, the fat build succeeds, the gallery launches, and an edit is
-    hot-patched in about 0.6 s.
-  - **Still open: a stack overflow.** Right after the first patch the gallery's main
-    thread overflows its stack (`0xc000041d`). It is recursion, not stack size: it happens
-    with an 8 MB stack and with `/INCREMENTAL:NO`.
-  - Suspected cause: subsecond's jump table and the patched `AnyView` render indirection
-    on Windows.
-  - Next steps:
-    - get the recursive frames with a debugger (WinDbg/cdb);
-    - try the same flow on Linux, subsecond's best-supported platform;
-    - follow upstream subsecond fixes when GPUI moves its pin.
+- **True hot-patching needs our patched dx.** `cargo xtask dev --hot-patch` patches
+  edits into the running gallery in about 0.6 s, keeping all state. That covers the
+  gallery and every workspace crate under it. Stock dx 0.7.10 fails on Windows: the
+  capture fails, and once that is fixed the gallery overflows its stack right after
+  the first patch.
+  - `cargo xtask install-dx` builds dx 0.7.10 with five fixes, listed in
+    `xtask/src/install_dx.rs`. The stack overflow was dx's Windows x64 jump stub
+    (`movabs rax, addr; jmp rax`): it clobbered RAX, which `__chkstk` takes as the frame
+    size to probe. The first patched function with a large stack frame then probed an
+    address-sized frame.
+  - Diagnosis tool: hot-reload builds of the gallery on Windows install
+    `apps/gallery/src/overflow_probe.rs`, which writes the symbolized frames of a stack
+    overflow to `%TEMP%/astryx-stack-overflow.txt`.
+  - Subsecond limits still apply: changing a struct's layout, adding a dependency, or
+    editing `main` needs a restart, as does a change to GPUI itself. The default
+    `cargo xtask dev` (hot restart, about 4 s, plus live theme reload) handles those.
   - The `rust-lld` linker setting breaks dx's link interception, so the repo keeps the
     default linker.
+  - Not yet tried on Linux.
 
 - **Chrome screenshots of a background tab hang.** Chrome pauses
   `requestAnimationFrame` in a tab whose window is not in the foreground. GPUI's web

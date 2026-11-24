@@ -8,7 +8,8 @@
 //!
 //! `--hot-patch` uses Dioxus's `dx serve --hot-patch` instead, which patches
 //! changed code into the live process through GPUI's `hot-reload` feature.
-//! GPUI pins `subsecond =0.7.10`, so `dx` must be exactly that version.
+//! GPUI pins `subsecond =0.7.10`, so `dx` must be exactly that version, built
+//! with our Windows fixes by `cargo xtask install-dx`.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -17,7 +18,7 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::{Context, Result, bail};
 
-use crate::workspace_root;
+use crate::{install_dx, workspace_root};
 
 const DX_VERSION: &str = "0.7.10";
 // Theme JSON in spec/themes reloads live (GALLERY_LIVE_THEMES); generated
@@ -158,12 +159,21 @@ fn hot_patch(args: &[String]) -> Result<()> {
     match version {
         Some(v) if v.contains(DX_VERSION) => {}
         Some(v) => bail!(
-            "dx {DX_VERSION} is required (found `{}`): cargo install dioxus-cli --version {DX_VERSION} --locked",
+            "dx {DX_VERSION} is required (found `{}`): cargo xtask install-dx",
             v.trim()
         ),
-        None => {
-            bail!("dx is not installed: cargo install dioxus-cli --version {DX_VERSION} --locked")
-        }
+        None => bail!("dx is not installed: cargo xtask install-dx"),
+    }
+    // Stock dx 0.7.10 cannot hot-patch this workspace (see install_dx.rs).
+    let level = install_dx::cargo_home()
+        .ok()
+        .and_then(|home| std::fs::read_to_string(home.join("bin").join(install_dx::MARKER)).ok())
+        .and_then(|text| text.trim().parse::<u32>().ok());
+    if level != Some(install_dx::PATCH_LEVEL) {
+        bail!(
+            "the installed dx lacks our hot-patch fixes (level {level:?}, need {}): cargo xtask install-dx",
+            install_dx::PATCH_LEVEL
+        );
     }
 
     // dx records the gallery's rustc invocation during its build to patch
