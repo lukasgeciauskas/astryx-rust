@@ -200,8 +200,11 @@ The remaining primitives:
   (Appearance, registry, scopes, MediaTheme, color math, adaptations, overrides);
   `astryx::init`; fonts and icons registered.
   - Exit: the gallery Tokens page renders every theme in both modes and matches Storybook.
-- **M2 Primitives I + foundations:** context, direction, modality and focus ring, press,
-  overlays, hotkeys, a11y helpers, i18n runtime + catalogs, link handler.
+- **M2 Primitives I + foundations (done, 2026-11-24):** context, direction, modality and
+  focus ring, press, overlays, hotkeys, a11y helpers, i18n runtime + catalogs, link handler.
+  - Carried into later milestones, recorded as `RustApi::Pending` in each doc: tooltips and
+    the Timestamp hover card (M5); Banner's and Thumbnail's controls use an interim ghost
+    icon button until M3's IconButton.
   - Components: Text (truncation), Heading, Stack/HStack/VStack/Center/Grid/Divider/AspectRatio,
     VisuallyHidden, Icon, Spinner, Skeleton, Badge, StatusDot, Kbd, Code, Blockquote,
     Citation, Avatar(+Group), Card, Section, EmptyState, Thumbnail, Timestamp, Timer,
@@ -297,6 +300,13 @@ The remaining primitives:
   - Everything that needs no renderer change stays in this layer.
   - R1 (element transforms) landed without shader changes: elements only need
     rectangle-preserving transforms, which the window applies to primitive geometry.
+- **ICU4X for everything upstream does with `Intl` (M2, 2026-11-24).** Plural rules,
+  numbers, percentages, unit and list formats, dates and times in every CLDR calendar, and
+  relative times come from ICU4X's compiled CLDR data, the data behind `Intl`. Its
+  experimental crate (percent, units, relative time) is pinned with the stable 2.x crates
+  GPUI already uses. Time zones (IANA rules, the system zone) come from jiff, with the tz
+  database bundled on Windows and wasm. Translations ship as generated static tables
+  (`cargo xtask codegen`), 30 locales behind the facade's default `locales` feature.
 - **Agent tooling is part of the port (M1.5).**
   - `CLAUDE.md`;
   - the `astryx` CLI (`apps/cli`), with upstream docs, the Rust API, tokens and parity;
