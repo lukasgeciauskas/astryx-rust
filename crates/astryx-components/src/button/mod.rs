@@ -278,7 +278,7 @@ impl Button {
         let height = element_height(size, t);
         let mut el = div()
             .relative()
-            .flex()
+            .inline_flex()
             .flex_none()
             .items_center()
             .justify_center()
@@ -728,7 +728,7 @@ impl RenderOnce for ButtonGroup {
             Orientation::Horizontal => div().flex_row_logical(dir),
             Orientation::Vertical => div().flex().flex_col(),
         };
-        el = el.items_stretch().flex_none();
+        el = el.inline_flex().items_stretch().flex_none();
         if self.elevation != Elevation::None {
             el = self.elevation.apply(el.rounded(t.radius.element), t);
         }

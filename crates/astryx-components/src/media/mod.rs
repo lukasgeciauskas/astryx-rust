@@ -150,6 +150,7 @@ impl RenderOnce for Thumbnail {
         let mut el = div()
             .id(self.id.clone())
             .group(group.clone())
+            .inline_flex()
             .relative()
             .flex_none()
             .size(px(64.))

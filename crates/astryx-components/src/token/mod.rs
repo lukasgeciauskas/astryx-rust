@@ -230,7 +230,7 @@ impl RenderOnce for Token {
 
         let mut el = div()
             .relative()
-            .flex()
+            .inline_flex()
             .flex_row()
             .flex_none()
             .items_center()

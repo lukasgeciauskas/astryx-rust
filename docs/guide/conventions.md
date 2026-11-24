@@ -26,14 +26,14 @@
   - Use `theme.for_part(target, props)` to scope token re-definitions to the part's children.
 - **Prop setters:** many optional props → a field list in the setters macro (introduced
   with the first M2 component), not hand-written boilerplate.
-- **Inline components** (upstream `display: inline-flex`: Button, Badge, Kbd, Token...)
-  size to their content inside a flex container, such as a `Stack` or a `.flex()` row,
-  and stretch in a flex column whose items stretch, as in CSS.
-  - GPUI has no inline layout. In a block parent (a plain `div()`), they stretch to the
-    parent's width.
-  - Put them in a flex container.
-  - Upstream `width: fit-content` (SegmentedControl) never stretches: wrap the root in a
-    `.flex().flex_row()` div, so a stretching column parent stretches only the wrapper.
+- **Inline components:** where upstream's root is `display: inline-flex` (Button, Badge,
+  Kbd, Token, Link, Icon, Avatar...), the root is `.inline_flex()` (fork patch R5).
+  - In a block parent (a plain `div()`), consecutive inline boxes flow like words: side by
+    side at their content width, on one text baseline, wrapping at the parent's width,
+    placed by its `text_align`.
+  - In a flex or grid parent they are ordinary items, as in CSS: a stretching flex column
+    stretches them.
+  - Upstream `width: fit-content` is `.w_fit()` (also `.w_min()`, `.w_max()`).
 - **Roving composites:** data-driven lists (RadioList, SegmentedControl, TabList) use
   `ListFocus`; a Toolbar of arbitrary controls uses `RovingScope`, which every control
   built on `control_focus` joins.

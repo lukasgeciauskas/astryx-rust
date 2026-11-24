@@ -239,6 +239,7 @@ impl RenderOnce for Icon {
         let path = resolve_icon(&self.source, self.variant.as_deref(), &theme).unwrap_or_default();
         let mut el = svg()
             .path(path)
+            .inline_flex()
             .flex_none()
             .size(size.rems())
             .text_color(color);

@@ -307,3 +307,43 @@ fn fr8_pending_actions_reveal_the_spinner_after_the_delay() {
     );
     assert!(!spinner_revealed(false, false, false, delay, None));
 }
+
+/// A block parent, unlike the flex host above.
+struct BlockHost(Rc<dyn Fn() -> AnyElement>);
+
+impl Render for BlockHost {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().p(px(20.)).w(px(400.)).child((self.0)())
+    }
+}
+
+#[gpui::test]
+fn buttons_in_a_block_flow_side_by_side(cx: &mut TestAppContext) {
+    let clicks = Rc::new(RefCell::new(Vec::new()));
+    cx.update(astryx_theme::init);
+    let (_, cx) = cx.add_window_view({
+        let clicks = clicks.clone();
+        move |_, _| {
+            let clicks = clicks.clone();
+            BlockHost(Rc::new(move || {
+                let (a, b) = (clicks.clone(), clicks.clone());
+                div()
+                    .child(
+                        IconButton::new("a", "First", crate::icon::Icon::new("close"))
+                            .on_click(move |_, _, _| a.borrow_mut().push("first")),
+                    )
+                    .child(
+                        IconButton::new("b", "Second", crate::icon::Icon::new("close"))
+                            .on_click(move |_, _, _| b.borrow_mut().push("second")),
+                    )
+                    .into_any_element()
+            }))
+        }
+    });
+    cx.run_until_parked();
+    // Inline boxes (upstream `inline-flex`): the 32 px squares share the first
+    // line instead of each stretching across it.
+    cx.simulate_click(point(px(68.), px(36.)), Modifiers::none());
+    cx.run_until_parked();
+    assert_eq!(*clicks.borrow(), ["second"]);
+}

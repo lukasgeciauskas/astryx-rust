@@ -369,7 +369,7 @@ impl RenderOnce for ToggleButtonGroup {
             Orientation::Horizontal => div().flex_row_logical(dir).flex_wrap().items_center(),
             Orientation::Vertical => div().flex().flex_col(),
         };
-        el = el.gap(t.spacing.s1).max_w_full();
+        el = el.inline_flex().gap(t.spacing.s1).max_w_full();
         theme.refine(
             el.style(),
             "toggle-button-group",

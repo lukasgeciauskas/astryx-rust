@@ -249,7 +249,11 @@ impl RenderOnce for Kbd {
                 .font_weight(t.font.weight.medium)
                 .child(key_display(key, apple, &i18n))
         });
-        let mut el = div().flex().flex_none().items_center().gap(t.spacing.s1);
+        let mut el = div()
+            .inline_flex()
+            .flex_none()
+            .items_center()
+            .gap(t.spacing.s1);
         theme.refine(el.style(), "kbd", &[], None);
         el.style().refine(&self.style);
         let el = el.children(caps);
@@ -416,7 +420,7 @@ impl RenderOnce for Citation {
         );
         let hover_bg = t.color.overlay_hover;
         let hover_fg = t.color.text_primary;
-        let mut el = div().id(self.id).flex().flex_none().items_center();
+        let mut el = div().id(self.id).inline_flex().flex_none().items_center();
         el = match self.variant {
             CitationVariant::Number => el
                 .justify_center()

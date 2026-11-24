@@ -312,8 +312,10 @@ impl RenderOnce for SegmentedControl {
                 })
         });
 
+        // Upstream: `inline-flex`, and `fit-content` so a stretching parent never
+        // widens a hugging control.
         let mut el = div()
-            .flex()
+            .inline_flex()
             .flex_row()
             .items_center()
             .gap(t.spacing.s0_5)
@@ -323,7 +325,7 @@ impl RenderOnce for SegmentedControl {
         el = if fill {
             el.w_full()
         } else {
-            el.flex_none().max_w_full()
+            el.flex_none().w_fit().max_w_full()
         };
         if self.disabled {
             el = el.opacity(0.5);
@@ -335,20 +337,11 @@ impl RenderOnce for SegmentedControl {
             None,
         );
         el.style().refine(&self.style);
-        let el = el
-            .id(self.id.clone())
+        el.id(self.id.clone())
             .on_key_down(list.key_down_listener())
             .role(Role::RadioGroup)
             .aria_label(self.label)
-            .children(segments);
-        // Upstream sizes a hugging control `fit-content`: a flex row around
-        // it keeps it to its content even where the parent stretches.
-        div()
-            .flex()
-            .flex_row()
-            .max_w_full()
-            .when(fill, |w| w.w_full())
-            .child(el)
+            .children(segments)
     }
 }
 

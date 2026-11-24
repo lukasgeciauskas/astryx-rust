@@ -36,8 +36,8 @@ revision**, or Cargo builds two copies of GPUI whose types do not mix.
 ```toml
 [dependencies]
 astryx = { git = "<this repository>", branch = "main" } # or path = "../Astryx Rust/crates/astryx"
-gpui = { git = "https://github.com/lukasgeciauskas/zed", rev = "4d4a306e51c7e2c7624f0bc60c69b78b1a1e112f" }
-gpui_platform = { git = "https://github.com/lukasgeciauskas/zed", rev = "4d4a306e51c7e2c7624f0bc60c69b78b1a1e112f", default-features = false }
+gpui = { git = "https://github.com/lukasgeciauskas/zed", rev = "7ce1c61f5c6d01ac3275aa81448915e2b421d3ee" }
+gpui_platform = { git = "https://github.com/lukasgeciauskas/zed", rev = "7ce1c61f5c6d01ac3275aa81448915e2b421d3ee", default-features = false }
 
 # Zed patches these crates for GPUI. Patches apply only at a workspace root,
 # so your app must repeat them.

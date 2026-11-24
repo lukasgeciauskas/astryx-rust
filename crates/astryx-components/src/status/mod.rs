@@ -458,7 +458,7 @@ impl RenderOnce for Badge {
             (bg, fg) = (fill.on_fill, fill.fill);
         }
         let mut el = div()
-            .flex()
+            .inline_flex()
             .flex_none()
             .items_center()
             .gap(t.spacing.s1)
@@ -596,7 +596,7 @@ impl RenderOnce for StatusDot {
             1.
         };
         let mut el = div()
-            .flex()
+            .inline_flex()
             .flex_none()
             .items_center()
             .justify_center()

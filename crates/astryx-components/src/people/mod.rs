@@ -262,7 +262,12 @@ impl RenderOnce for Avatar {
         };
 
         let name = self.alt.clone().or_else(|| self.name.clone());
-        let mut el = div().relative().flex_none().size(px(size)).rounded(radius);
+        let mut el = div()
+            .relative()
+            .inline_flex()
+            .flex_none()
+            .size(px(size))
+            .rounded(radius);
         if group.is_some() {
             // A grouped face is ringed in the surface color so overlaps read.
             el = el.border_2().border_color(t.color.background_surface);
@@ -497,7 +502,7 @@ impl RenderOnce for AvatarGroup {
             size: self.size,
             shape: self.shape,
         };
-        let mut el = div().flex_row_logical(dir).items_center();
+        let mut el = div().flex_row_logical(dir).inline_flex().items_center();
         theme.refine(el.style(), "avatar-group", &[], None);
         el.style().refine(&self.style);
         let label = i18n(cx).t("@astryx.avatarGroup.label");

@@ -42,6 +42,7 @@ Each patch lands before the components that need it.
 | R2 | Backdrop blur | A blurred copy of what is already drawn behind an element, clipped to its rounded rect | Chat composer, Lightbox, SegmentedControl (M5, M10); lab TabBar, MediaPlayer |
 | R3 | Offscreen layers | A subtree drawn to a texture, then composited with group opacity, filters (blur, brightness, grayscale) or an alpha mask | Dialog, Drawer and MobileNav backdrops; PowerSearch, Swipe, Table (M5+) |
 | R4 | Blend modes | Multiply and screen in fixed-function blending; the rest through R3 layers | Not used by upstream today; lowest priority |
+| R5 | Inline layout (**landed**, `7ce1c61`) | Inline-level boxes (`inline-flex`, `inline-block`, `inline-grid`) that flow in line boxes inside block containers; `min-content`, `max-content` and `fit-content` sizes; text baselines | Every `inline-flex` component (M2, M3); inline text flow (Link in Text, Markdown, Chat) |
 
 ### How each patch works
 
@@ -68,6 +69,26 @@ Each patch lands before the components that need it.
       flicker at the edges.
   - Tests: `element_transform` in the fork (unit, paint geometry, clipping, hit testing).
     Example: `cargo run -p gpui --example astryx_transforms`. Gallery: the Effects page.
+- **R5 (inline layout), as built:**
+  - Taffy (0.15) lays out boxes but leaves inline formatting contexts to its host, and
+    GPUI only knew block, flex and grid, so an `inline-flex` root stretched across a
+    block parent.
+  - `Display::InlineBlock`, `InlineFlex` and `InlineGrid` lay their children out as
+    block, flex and grid. When a block container's node is built, each run of
+    consecutive in-flow inline-level children goes into an anonymous line box: a
+    wrapping flex row aligned on baselines and justified by the container's `text_align`.
+    Line boxes live in a scope derived from their container's, so Taffy's cache keeps
+    them between frames like any node.
+  - `Length::MinContent`, `MaxContent` and `FitContent` map to Taffy's sizing keywords
+    (and to `auto` for margins and insets).
+  - Text nodes report their first baseline through `Window::set_layout_baseline`, which
+    reaches Taffy with the node's measurement; flex containers carry their first item's
+    baseline up, so boxes of different sizes line their text up.
+  - Still to come: text that flows around inline elements in the same lines (a Link or
+    Code inside a wrapping paragraph). That is a GPUI element, not a Taffy change, and
+    lands before Markdown.
+  - Example: `cargo run -p gpui --example astryx_inline`.
+
 - **R2 (backdrop blur):**
   - A new scene primitive.
   - When the renderer meets it, it ends the current pass, copies the region behind it from

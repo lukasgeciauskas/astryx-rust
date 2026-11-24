@@ -48,6 +48,14 @@ from another version may not exist here.
   layout is unchanged and hit testing follows. They work in `.hover(..)`/`.active(..)`
   and `with_animation`. No element rotation: rotate SVGs with
   `svg().with_transformation(Transformation::rotate(..))`.
+- Inline layout (our fork, patch R5): `.inline_flex()`, `.inline_block()` and
+  `.inline_grid()` make inline-level boxes. Inside a block container (a plain `div()`,
+  whose default display is block) consecutive ones flow in line boxes: side by side at
+  their shrink-to-fit width, aligned on text baselines, wrapping at the container's width,
+  placed by its `.text_center()`/`.text_right()`. In flex and grid containers they are
+  ordinary items. Size keywords: `.w_fit()`, `.w_min()`, `.w_max()` (and `h_*`), or
+  `fit_content()`, `min_content()`, `max_content()` wherever a `Length` goes. A custom
+  measured element can report its first baseline with `window.set_layout_baseline(id, y)`.
 - Overlays: `deferred(anchored().position(point).child(..))` draws above later siblings.
 - Virtual lists: `uniform_list(id, count, |range, window, cx| items)` and `list(..)`.
   They need a view: drawing one through the test `cx.draw` helper panics in

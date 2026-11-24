@@ -138,5 +138,47 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                 .child(tile("Visible text", window, cx))
                 .child(VisuallyHidden::new().child("Hidden description")),
         )
+        .child(label(
+            "Inline flow: inline components in a plain block wrap like words",
+        ))
+        .child(inline_flow(window, cx))
         .into_any_element()
+}
+
+/// Buttons, badges, tokens and a link in a narrow block container: they flow
+/// side by side on one baseline and wrap (fork patch R5).
+fn inline_flow(window: &mut Window, cx: &mut App) -> impl IntoElement {
+    use crate::button::{Button, ButtonVariant};
+    use crate::link::Link;
+    use crate::status::Badge;
+    use crate::token::{Token, TokenColor};
+    let theme = current(window, cx);
+    let t = theme.tokens();
+    let gap = |el: AnyElement| {
+        div()
+            .inline_flex()
+            .mr(t.spacing.s2)
+            .mb(t.spacing.s2)
+            .child(el)
+    };
+    div()
+        .w(px(360.))
+        .p(t.spacing.s3)
+        .border_1()
+        .border_color(t.color.border)
+        .rounded(t.radius.element)
+        .child(gap(Button::new("inline-save", "Save")
+            .variant(ButtonVariant::Primary)
+            .into_any_element()))
+        .child(gap(Badge::new("New").into_any_element()))
+        .child(gap(
+            Button::new("inline-cancel", "Cancel").into_any_element()
+        ))
+        .child(gap(Token::new("inline-token", "Design")
+            .color(TokenColor::Blue)
+            .into_any_element()))
+        .child(gap(Link::new("inline-link", "Learn more")
+            .href("https://example.com")
+            .into_any_element()))
+        .child(gap(Badge::new("12").into_any_element()))
 }

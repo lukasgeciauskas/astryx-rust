@@ -170,7 +170,7 @@ impl RenderOnce for Link {
 
         let mut el = div()
             .relative()
-            .flex()
+            .inline_flex()
             .flex_row()
             .items_center()
             .gap(t.spacing.s0_5)
