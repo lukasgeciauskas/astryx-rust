@@ -290,7 +290,11 @@ dependencies = [
 name = "astryx-components"
 version = "0.1.0"
 dependencies = [
+ "astryx-primitives",
+ "astryx-theme",
+ "astryx-themes",
  "gpui",
+ "smallvec",
 ]
 
 [[package]]

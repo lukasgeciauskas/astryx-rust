@@ -25,7 +25,15 @@ impl Gallery {
     pub fn new(themes: Vec<Arc<Theme>>) -> Self {
         Gallery {
             themes,
-            page: Page::Tokens,
+            page: std::env::var("GALLERY_PAGE")
+                .ok()
+                .and_then(|name| {
+                    Page::ALL
+                        .iter()
+                        .copied()
+                        .find(|p| p.title().eq_ignore_ascii_case(&name))
+                })
+                .unwrap_or(Page::Tokens),
         }
     }
 }

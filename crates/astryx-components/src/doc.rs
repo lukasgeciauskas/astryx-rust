@@ -18,6 +18,9 @@ pub enum RustApi {
     Trait(&'static str),
     /// Deliberately not ported, with the reason (a web-only prop, say).
     Waived(&'static str),
+    /// Accepted by a builder method whose full behavior lands in a later
+    /// milestone, with what is missing.
+    Pending(&'static str, &'static str),
 }
 
 /// One upstream prop and its Rust counterpart.
@@ -43,7 +46,7 @@ pub struct ComponentDoc {
 
 /// Every ported component. A component module adds its `DOC` here when it
 /// lands; `astryx parity` and the CLI tests read this list.
-pub const REGISTRY: &[ComponentDoc] = &[];
+pub const REGISTRY: &[ComponentDoc] = &[crate::text::TEXT_DOC, crate::text::HEADING_DOC];
 
 /// The registered doc for an upstream component name.
 pub fn find(name: &str) -> Option<&'static ComponentDoc> {

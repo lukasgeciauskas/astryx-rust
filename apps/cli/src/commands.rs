@@ -73,6 +73,7 @@ fn rust_api(api: &RustApi) -> String {
         RustApi::Argument(a) => format!("constructor argument `{a}`"),
         RustApi::Trait(t) => format!("via `{t}`"),
         RustApi::Waived(why) => format!("not ported: {why}"),
+        RustApi::Pending(m, what) => format!(".{m}(..), pending: {what}"),
     }
 }
 

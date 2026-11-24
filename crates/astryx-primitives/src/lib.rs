@@ -5,6 +5,7 @@
 //! the theme.
 
 pub mod context;
+pub mod props;
 pub mod size;
 
 pub use context::{Provider, provide, use_context, with_context};
