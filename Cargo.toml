@@ -5,6 +5,7 @@ members = [
     "crates/astryx-theme",
     "crates/astryx-primitives",
     "crates/astryx-i18n",
+    "crates/astryx-effects",
     "crates/astryx-icons",
     "crates/astryx-components",
     "crates/astryx-themes",
@@ -34,6 +35,7 @@ astryx = { path = "crates/astryx" }
 astryx-theme = { path = "crates/astryx-theme" }
 astryx-primitives = { path = "crates/astryx-primitives" }
 astryx-i18n = { path = "crates/astryx-i18n", default-features = false }
+astryx-effects = { path = "crates/astryx-effects" }
 astryx-icons = { path = "crates/astryx-icons" }
 astryx-components = { path = "crates/astryx-components" }
 astryx-themes = { path = "crates/astryx-themes", default-features = false }

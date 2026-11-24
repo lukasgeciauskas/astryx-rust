@@ -20,6 +20,8 @@ in the browser (WebAssembly), with no React or web view.
 | `astryx` | Facade. Depend on this one. |
 | `astryx-theme` | Design tokens, themes, light/dark appearance |
 | `astryx-primitives` | Headless behavior: context, focus, keyboard, layers, editing |
+| `astryx-i18n` | Locales, message catalogs (ICU MessageFormat), text direction |
+| `astryx-effects` | CSS effects GPUI lacks: multi-stop gradients, edge fades, shapes |
 | `astryx-themes` | The seven published themes and their fonts, one cargo feature each |
 | `astryx-icons` | Built-in icons |
 | `astryx-components` | The components |

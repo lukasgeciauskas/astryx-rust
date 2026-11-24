@@ -30,5 +30,6 @@ astryx-theme.workspace = true
 astryx-themes = { workspace = true, optional = true }
 astryx-primitives.workspace = true
 astryx-i18n.workspace = true
+astryx-effects.workspace = true
 astryx-icons.workspace = true
 astryx-components.workspace = true

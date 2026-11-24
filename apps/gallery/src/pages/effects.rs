@@ -7,12 +7,16 @@
 
 use std::time::Duration;
 
+use astryx::effects::{
+    FadeEdge, GradientDirection, Pointing, StopPosition, edge_fade, gradient, polygon, stop,
+    triangle,
+};
 use astryx::icons::core_icon_path;
 use astryx::prelude::*;
 use astryx::theme::{ResolvedTheme, Tokens};
 use gpui::{
-    Animation, AnimationExt as _, AnyElement, App, Div, Window, div, ease_in_out, prelude::*, px,
-    relative, svg,
+    Animation, AnimationExt as _, AnyElement, App, Div, Window, div, ease_in_out, point,
+    prelude::*, px, relative, svg,
 };
 
 use crate::gallery::section;
@@ -118,7 +122,126 @@ pub fn render(theme: &ResolvedTheme, _window: &mut Window, _cx: &mut App) -> Any
                     ),
                 )),
         ))
+        .child(section("Gradients", theme, gradients(t)))
+        .child(section("Edge fade", theme, fades(t)))
+        .child(section("Shapes", theme, shapes(t)))
         .into_any_element()
+}
+
+/// Multi-stop gradients with length stops (astryx-effects).
+fn gradients(t: &Tokens) -> Div {
+    let accent = t.color.accent;
+    let band = |direction| {
+        gradient(
+            direction,
+            [
+                stop(accent.alpha(0.), StopPosition::Fraction(0.)),
+                stop(accent.alpha(0.3), StopPosition::Start(px(8.))),
+                stop(accent, StopPosition::Start(px(32.))),
+                stop(accent, StopPosition::End(px(32.))),
+                stop(accent.alpha(0.3), StopPosition::End(px(8.))),
+                stop(accent.alpha(0.), StopPosition::Fraction(1.)),
+            ],
+        )
+        .w(px(160.))
+        .h(px(100.))
+        .rounded(t.radius.container)
+    };
+    let rainbow = gradient(
+        GradientDirection::ToRight,
+        [
+            stop(t.color.background_red, StopPosition::Auto),
+            stop(t.color.background_yellow, StopPosition::Auto),
+            stop(t.color.background_green, StopPosition::Auto),
+            stop(t.color.background_blue, StopPosition::Auto),
+            stop(t.color.background_purple, StopPosition::Auto),
+        ],
+    )
+    .w(px(340.))
+    .h(px(100.));
+    row(t)
+        .child(slot(
+            t,
+            "to right, 6 stops",
+            band(GradientDirection::ToRight),
+        ))
+        .child(slot(t, "to bottom", band(GradientDirection::ToBottom)))
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap(t.spacing.s3)
+                .child(rainbow)
+                .child(
+                    div()
+                        .text_style(&t.text.supporting)
+                        .text_color(t.color.text_secondary)
+                        .child("5 evenly spaced stops"),
+                ),
+        )
+}
+
+/// A scroll region whose edges fade into the surface, upstream's
+/// `mask-image` fade.
+fn fades(t: &Tokens) -> Div {
+    let lines = (1..=12).map(|n| {
+        div()
+            .py(t.spacing.s1)
+            .text_style(&t.text.body)
+            .text_color(t.color.text_primary)
+            .child(format!("Message {n}"))
+    });
+    let surface = t.color.background_card;
+    row(t).child(slot(
+        t,
+        "top and bottom fade",
+        div()
+            .relative()
+            .size_full()
+            .overflow_hidden()
+            .bg(surface)
+            .border_1()
+            .border_color(t.color.border)
+            .rounded(t.radius.container)
+            .child(div().px(t.spacing.s3).children(lines))
+            .child(edge_fade(FadeEdge::Top, px(28.), surface).rounded_t(t.radius.container))
+            .child(edge_fade(FadeEdge::Bottom, px(28.), surface).rounded_b(t.radius.container)),
+    ))
+}
+
+/// Polygons, upstream's `clip-path: polygon(..)`.
+fn shapes(t: &Tokens) -> Div {
+    let accent = t.color.accent;
+    row(t)
+        .child(slot(
+            t,
+            "arrows",
+            div()
+                .flex()
+                .gap(t.spacing.s4)
+                .items_center()
+                .child(triangle(Pointing::Up, accent).w(px(16.)).h(px(8.)))
+                .child(triangle(Pointing::Down, accent).w(px(16.)).h(px(8.)))
+                .child(triangle(Pointing::Left, accent).w(px(8.)).h(px(16.)))
+                .child(triangle(Pointing::Right, accent).w(px(8.)).h(px(16.))),
+        ))
+        .child(slot(
+            t,
+            "stepper chevron",
+            polygon(
+                [
+                    point(0., 0.),
+                    point(0.85, 0.),
+                    point(1., 0.5),
+                    point(0.85, 1.),
+                    point(0., 1.),
+                    point(0.15, 0.5),
+                ],
+                t.color.background_blue,
+            )
+            .w(px(140.))
+            .h(px(40.)),
+        ))
 }
 
 fn row(t: &Tokens) -> Div {

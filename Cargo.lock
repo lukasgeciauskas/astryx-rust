@@ -269,6 +269,7 @@ name = "astryx"
 version = "0.1.0"
 dependencies = [
  "astryx-components",
+ "astryx-effects",
  "astryx-i18n",
  "astryx-icons",
  "astryx-primitives",
@@ -306,6 +307,14 @@ dependencies = [
  "astryx",
  "gpui",
  "gpui_platform",
+]
+
+[[package]]
+name = "astryx-effects"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "smallvec",
 ]
 
 [[package]]
