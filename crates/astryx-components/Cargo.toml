@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 astryx-primitives.workspace = true
 astryx-i18n.workspace = true
+astryx-icons.workspace = true
 astryx-theme.workspace = true
 gpui.workspace = true
 smallvec = "1"

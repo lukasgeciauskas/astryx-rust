@@ -293,6 +293,7 @@ name = "astryx-components"
 version = "0.1.0"
 dependencies = [
  "astryx-i18n",
+ "astryx-icons",
  "astryx-primitives",
  "astryx-theme",
  "astryx-themes",
