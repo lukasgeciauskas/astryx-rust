@@ -16,8 +16,10 @@ locales = []
 astryx-primitives.workspace = true
 gpui.workspace = true
 icu_decimal.workspace = true
+icu_experimental.workspace = true
 icu_locale.workspace = true
 icu_plurals.workspace = true
+writeable.workspace = true
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

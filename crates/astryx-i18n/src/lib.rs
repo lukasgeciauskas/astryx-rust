@@ -220,6 +220,11 @@ impl I18n {
         }
     }
 
+    /// A percentage in the locale's pattern: `percent(45.)` is "45%" in English.
+    pub fn percent(&self, value: f64) -> String {
+        self.0.info.percent(value)
+    }
+
     /// A number with the locale's digits and separators.
     pub fn number(&self, value: f64) -> String {
         use message::LocaleFormat as _;

@@ -4,6 +4,8 @@
 pub mod containers;
 pub mod content;
 pub mod doc;
+pub mod feedback;
+mod focus;
 pub mod icon;
 pub mod layout;
 mod motion;

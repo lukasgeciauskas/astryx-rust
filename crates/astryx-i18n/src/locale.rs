@@ -5,6 +5,7 @@
 use icu_decimal::DecimalFormatter;
 use icu_decimal::input::{Decimal, FloatPrecision};
 use icu_decimal::options::{DecimalFormatterOptions, GroupingStrategy};
+use icu_experimental::dimension::percent::formatter::PercentFormatter;
 use icu_locale::{Locale, LocaleDirectionality};
 use icu_plurals::{PluralCategory as IcuCategory, PluralRules};
 
@@ -64,6 +65,7 @@ pub struct LocaleInfo {
     decimal_ungrouped: DecimalFormatter,
     cardinal: PluralRules,
     ordinal: PluralRules,
+    percent: Option<PercentFormatter<DecimalFormatter>>,
 }
 
 impl LocaleInfo {
@@ -90,6 +92,20 @@ impl LocaleInfo {
             ordinal: PluralRules::try_new_ordinal((&locale).into())
                 .or_else(|_| PluralRules::try_new_ordinal(Default::default()))
                 .expect("compiled plural data covers the root locale"),
+            percent: PercentFormatter::try_new((&locale).into(), Default::default()).ok(),
+        }
+    }
+
+    /// A percentage in the locale's pattern, `Intl.NumberFormat(locale,
+    /// {style: 'percent'})` of `value / 100`: 45 gives "45%" in English,
+    /// "45 %" in French, "%45" in Turkish.
+    pub fn percent(&self, value: f64) -> String {
+        use writeable::Writeable as _;
+        match (&self.percent, Self::decimal(value, NumberStyle::default())) {
+            (Some(formatter), Some(decimal)) => {
+                formatter.format(&decimal).write_to_string().into_owned()
+            }
+            _ => format!("{}%", self.number(value, NumberStyle::default())),
         }
     }
 
@@ -177,6 +193,17 @@ mod tests {
         };
         assert_eq!(LocaleInfo::new("en").number(1536.04, ungrouped), "1536.0");
         assert_eq!(LocaleInfo::new("ar-SA").number(3.0, style), "٣");
+    }
+
+    #[test]
+    fn percentages_follow_the_locale() {
+        assert_eq!(LocaleInfo::new("en").percent(45.), "45%");
+        let fr = LocaleInfo::new("fr-FR").percent(45.);
+        assert!(
+            fr.starts_with("45") && fr.ends_with('%') && fr.len() > 3,
+            "{fr:?}"
+        );
+        assert!(LocaleInfo::new("tr-TR").percent(45.).starts_with('%'));
     }
 
     #[test]

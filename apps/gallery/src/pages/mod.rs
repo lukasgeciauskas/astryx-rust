@@ -19,6 +19,7 @@ pub enum Page {
     Content,
     People,
     Containers,
+    Feedback,
 }
 
 impl Page {
@@ -32,6 +33,7 @@ impl Page {
         Page::Content,
         Page::People,
         Page::Containers,
+        Page::Feedback,
     ];
 
     pub fn title(self) -> &'static str {
@@ -45,6 +47,7 @@ impl Page {
             Page::Content => "Content",
             Page::People => "People",
             Page::Containers => "Containers",
+            Page::Feedback => "Feedback",
         }
     }
 
@@ -59,6 +62,7 @@ impl Page {
             Page::Content => astryx::components::content::examples::examples(window, cx),
             Page::People => astryx::components::people::examples::examples(window, cx),
             Page::Containers => astryx::components::containers::examples::examples(window, cx),
+            Page::Feedback => astryx::components::feedback::examples::examples(window, cx),
         }
     }
 }

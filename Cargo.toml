@@ -45,6 +45,9 @@ accesskit = "0.24.1"
 anyhow = "1"
 # ICU4X, the CLDR data behind upstream's `Intl.*`, at the version GPUI already uses.
 icu_decimal = { version = "2.4", features = ["alloc", "ryu"] }
+# Percent and relative-time formatting (`Intl.NumberFormat` percent, `Intl.RelativeTimeFormat`).
+icu_experimental = "0.7"
+writeable = "0.6"
 icu_locale = "2.4"
 icu_plurals = "2.4"
 serde_json = "1"
