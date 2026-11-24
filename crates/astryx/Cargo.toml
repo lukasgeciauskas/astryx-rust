@@ -7,9 +7,23 @@ license.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+default = ["themes"]
+# Every published theme. Turn off default features and pick `theme-*`
+# features to ship only the themes (and fonts) an app uses.
+themes = ["theme-butter", "theme-chocolate", "theme-gothic", "theme-matcha", "theme-neutral", "theme-stone", "theme-y2k"]
+theme-butter = ["dep:astryx-themes", "astryx-themes/butter"]
+theme-chocolate = ["dep:astryx-themes", "astryx-themes/chocolate"]
+theme-gothic = ["dep:astryx-themes", "astryx-themes/gothic"]
+theme-matcha = ["dep:astryx-themes", "astryx-themes/matcha"]
+theme-neutral = ["dep:astryx-themes", "astryx-themes/neutral"]
+theme-stone = ["dep:astryx-themes", "astryx-themes/stone"]
+theme-y2k = ["dep:astryx-themes", "astryx-themes/y2k"]
+
 [dependencies]
 gpui.workspace = true
 astryx-theme.workspace = true
+astryx-themes = { workspace = true, optional = true }
 astryx-primitives.workspace = true
 astryx-icons.workspace = true
 astryx-components.workspace = true

@@ -5,10 +5,12 @@ design system, built on [GPUI](https://github.com/zed-industries/zed/tree/main/c
 Zed's GPU-accelerated UI framework. It runs natively on Windows and Linux and
 in the browser (WebAssembly), with no React or web view.
 
-> **Status: early development.** The workspace, toolchain, and core GPUI
-> assumptions are in place (milestone M0). See [`docs/PLAN.md`](docs/PLAN.md)
-> for the full-parity roadmap and [`UPSTREAM.md`](UPSTREAM.md) for the synced
-> upstream commit.
+> **Status: early development.** Done: the workspace and GPUI pin (M0) and
+> the theme pipeline (M1): all of Astryx's tokens, core's defaults and the
+> seven published themes, with their fonts and icons, generated from upstream.
+> Components start in M2. See [`docs/PLAN.md`](docs/PLAN.md) for the
+> full-parity roadmap, [`UPSTREAM.md`](UPSTREAM.md) for the synced upstream
+> commit, and [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md).
 
 ## Crates
 
@@ -17,6 +19,7 @@ in the browser (WebAssembly), with no React or web view.
 | `astryx` | Facade. Depend on this one. |
 | `astryx-theme` | Design tokens, themes, light/dark appearance |
 | `astryx-primitives` | Headless behavior: context, focus, keyboard, layers, editing |
+| `astryx-themes` | The seven published themes and their fonts, one cargo feature each |
 | `astryx-icons` | Built-in icons |
 | `astryx-components` | The components |
 
@@ -38,6 +41,22 @@ gpui_platform = { git = "https://github.com/zed-industries/zed", rev = "2b248e60
 async-task = { git = "https://github.com/smol-rs/async-task", rev = "41fd3359c75e221bd8b187a8ee361aa309c1714c" }
 calloop = { git = "https://github.com/zed-industries/calloop", rev = "3759371fee14c40066d64777e2a36b6ffcc22590" }
 ```
+
+Then set up Astryx when the app starts:
+
+```rust
+gpui_platform::application()
+    .with_assets(astryx::Assets::new()) // serves the icons; wrap your own source with `with_fallback`
+    .run(|cx| {
+        astryx::init(cx);
+        astryx::theme::set_theme(astryx::themes::neutral::theme(), cx);
+        astryx::theme::set_mode(astryx::theme::ThemeMode::System, cx);
+        // open windows; components read `astryx::theme::current(window, cx)`
+    });
+```
+
+The `astryx` crate enables every theme by default. To ship fewer fonts, turn
+off default features and enable `theme-neutral` (or any other `theme-*`).
 
 Use the Rust toolchain in [`rust-toolchain.toml`](rust-toolchain.toml); it
 matches the pinned Zed revision. On Linux, enable `gpui_platform`'s `wayland`

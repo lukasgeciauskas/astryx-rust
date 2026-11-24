@@ -1,0 +1,25 @@
+[package]
+name = "astryx-themes"
+description = "The published Astryx themes for GPUI, each behind a cargo feature"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+default = ["all"]
+all = ["butter", "chocolate", "gothic", "matcha", "neutral", "stone", "y2k"]
+butter = []
+chocolate = []
+gothic = []
+matcha = []
+neutral = []
+stone = []
+y2k = []
+
+[dependencies]
+astryx-theme.workspace = true
+
+[dev-dependencies]
+gpui.workspace = true

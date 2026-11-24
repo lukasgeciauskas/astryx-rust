@@ -272,6 +272,7 @@ dependencies = [
  "astryx-icons",
  "astryx-primitives",
  "astryx-theme",
+ "astryx-themes",
  "gpui",
 ]
 
@@ -300,12 +301,14 @@ dependencies = [
  "gpui",
  "gpui_platform",
  "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
 name = "astryx-icons"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "gpui",
 ]
 
@@ -320,6 +323,16 @@ dependencies = [
 name = "astryx-theme"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "astryx-primitives",
+ "gpui",
+]
+
+[[package]]
+name = "astryx-themes"
+version = "0.1.0"
+dependencies = [
+ "astryx-theme",
  "gpui",
 ]
 
@@ -6577,7 +6590,6 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "serde",
  "serde_json",
 ]
 

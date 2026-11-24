@@ -1,64 +1,86 @@
 #![cfg_attr(target_family = "wasm", no_main)]
 
-use std::borrow::Cow;
+mod gallery;
+mod pages;
 
-use gpui::{
-    App, Bounds, Context, FontWeight, Window, WindowBounds, WindowOptions, div, prelude::*, px,
-    rgb, size,
-};
+use gpui::{App, Bounds, WindowBounds, WindowOptions, prelude::*, px, size};
 
-const FONTS: &[&[u8]] = &[
-    include_bytes!("../../../crates/astryx-themes/fonts/figtree/Figtree-400.ttf"),
-    include_bytes!("../../../crates/astryx-themes/fonts/figtree/Figtree-500.ttf"),
-    include_bytes!("../../../crates/astryx-themes/fonts/figtree/Figtree-600.ttf"),
-    include_bytes!("../../../crates/astryx-themes/fonts/figtree/Figtree-700.ttf"),
-];
+fn run() {
+    application()
+        .with_assets(astryx::Assets::new())
+        .run(|cx: &mut App| {
+            astryx::init(cx);
+            let themes = gallery::available_themes();
+            // Every theme's fonts load up front so switching never reflows
+            // through a fallback face.
+            for theme in &themes {
+                astryx::theme::register_fonts(theme, cx);
+            }
+            // GALLERY_THEME and GALLERY_MODE pick the starting theme and mode,
+            // for screenshots; the default is neutral in system mode.
+            let wanted = env("GALLERY_THEME").unwrap_or_else(|| "neutral".into());
+            let start = themes
+                .iter()
+                .find(|t| t.name == wanted.as_str())
+                .cloned()
+                .unwrap_or_else(|| themes[0].clone());
+            astryx::theme::set_theme(start, cx);
+            match env("GALLERY_MODE").as_deref() {
+                Some("light") => astryx::theme::set_mode(astryx::theme::ThemeMode::Light, cx),
+                Some("dark") => astryx::theme::set_mode(astryx::theme::ThemeMode::Dark, cx),
+                _ => {}
+            }
 
-struct Gallery;
-
-impl Render for Gallery {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let weights = [400., 500., 600., 700.];
-        div()
-            .size_full()
-            .flex()
-            .flex_col()
-            .gap_3()
-            .p_8()
-            .bg(rgb(0xffffff))
-            .text_color(rgb(0x1c2b33))
-            .font_family("Figtree")
-            .text_size(px(20.))
-            .child(
-                div()
-                    .text_size(px(32.))
-                    .font_weight(FontWeight(700.))
-                    .child("Astryx gallery"),
+            let bounds = Bounds::centered(None, size(px(1280.), px(860.)), cx);
+            cx.open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    ..Default::default()
+                },
+                |_, cx| cx.new(|_| gallery::Gallery::new(themes)),
             )
-            .children(weights.map(|weight| {
-                div().font_weight(FontWeight(weight)).child(format!(
-                    "Figtree {weight}: The quick brown fox jumps over the lazy dog"
-                ))
-            }))
+            .expect("failed to open the gallery window");
+            cx.activate(true);
+        });
+}
+
+fn env(name: &str) -> Option<String> {
+    #[cfg(not(target_family = "wasm"))]
+    {
+        std::env::var(name).ok()
+    }
+    #[cfg(target_family = "wasm")]
+    {
+        let _ = name;
+        None
     }
 }
 
-fn run() {
-    gpui_platform::application().run(|cx: &mut App| {
-        cx.text_system()
-            .add_fonts(FONTS.iter().map(|font| Cow::Borrowed(*font)).collect())
-            .expect("failed to load the gallery fonts");
-        let bounds = Bounds::centered(None, size(px(1200.), px(800.)), cx);
-        cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
-            |_, cx| cx.new(|_| Gallery),
-        )
-        .expect("failed to open the gallery window");
-        cx.activate(true);
-    });
+#[cfg(not(target_family = "wasm"))]
+fn application() -> gpui::Application {
+    gpui_platform::application()
+}
+
+/// `?backend=webgl` or `?backend=webgpu` forces a browser graphics backend.
+#[cfg(target_family = "wasm")]
+fn application() -> gpui::Application {
+    let search = web_sys::window()
+        .and_then(|window| window.location().search().ok())
+        .unwrap_or_default();
+    let has = |param: &str| {
+        search
+            .trim_start_matches('?')
+            .split('&')
+            .any(|p| p == param)
+    };
+    let backend = if has("backend=webgl") {
+        gpui_platform::WebBackendPreference::WebGl
+    } else if has("backend=webgpu") {
+        gpui_platform::WebBackendPreference::WebGpu
+    } else {
+        gpui_platform::WebBackendPreference::Auto
+    };
+    gpui_platform::application_with_web_backend(backend)
 }
 
 #[cfg(not(target_family = "wasm"))]
