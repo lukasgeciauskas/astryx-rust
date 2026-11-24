@@ -1,13 +1,15 @@
-//! Choice controls: CheckboxInput and Switch. Upstream: `CheckboxInput/`,
-//! `Switch/`.
+//! Choice controls: CheckboxInput, Switch, RadioList and CheckboxList.
+//! Upstream: `CheckboxInput/`, `Switch/`, `RadioList/`, `CheckboxList/`.
 
 mod action;
 pub mod examples;
+mod lists;
 mod row;
 
 #[cfg(test)]
 mod tests;
 
+pub use lists::{CheckboxList, CheckboxListItem, RadioList, RadioListItem};
 pub use row::{LabelPosition, LabelSpacing};
 
 use std::rc::Rc;
@@ -521,6 +523,111 @@ pub const CHECKBOX_INPUT_DOC: ComponentDoc = ComponentDoc {
         p("labelIcon", RustApi::Method("label_icon")),
         p("status", RustApi::Method("status")),
         p("width", RustApi::Method("width")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+const GROUP_CONTAINER: &str = "Styled reaches the field container";
+const GROUP_CONTROL: &str = "not yet: the inner control box takes no separate style";
+
+pub const RADIO_LIST_DOC: ComponentDoc = ComponentDoc {
+    name: "RadioList",
+    rust_type: "astryx::components::choice::RadioList",
+    props: &[
+        p("label", RustApi::Argument("label")),
+        p("value", RustApi::Argument("value")),
+        p("onChange", RustApi::Method("on_change")),
+        p("children", RustApi::Method("item / items")),
+        p("isLabelHidden", RustApi::Method("label_hidden")),
+        p("description", RustApi::Method("description")),
+        p("orientation", RustApi::Method("orientation")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("htmlName", RustApi::Waived(NO_FORMS)),
+        p(
+            "disabledMessage",
+            RustApi::Pending("disabled_message", TOOLTIP),
+        ),
+        p("isRequired", RustApi::Method("required")),
+        p("isOptional", RustApi::Method("optional")),
+        p("status", RustApi::Method("status")),
+        p("size", RustApi::Method("size")),
+        p("labelTooltip", RustApi::Pending("label_tooltip", TOOLTIP)),
+        p("width", RustApi::Method("width")),
+        p("containerXstyle", RustApi::Waived(GROUP_CONTAINER)),
+        p("containerClassName", RustApi::Waived(GROUP_CONTAINER)),
+        p("containerStyle", RustApi::Waived(GROUP_CONTAINER)),
+        p("controlXstyle", RustApi::Trait("Styled")),
+        p("controlClassName", RustApi::Trait("Styled")),
+        p("controlStyle", RustApi::Trait("Styled")),
+        p("ref", RustApi::Waived(NO_REFS)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const RADIO_LIST_ITEM_DOC: ComponentDoc = ComponentDoc {
+    name: "RadioListItem",
+    rust_type: "astryx::components::choice::RadioListItem",
+    props: &[
+        p("label", RustApi::Argument("label")),
+        p("aria-label", RustApi::Method("aria_label")),
+        p("value", RustApi::Argument("value")),
+        p("description", RustApi::Method("description")),
+        p("align", RustApi::Method("align")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("startContent", RustApi::Method("start_content")),
+        p("endContent", RustApi::Method("end_content")),
+        p("ref", RustApi::Waived(NO_REFS)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const CHECKBOX_LIST_DOC: ComponentDoc = ComponentDoc {
+    name: "CheckboxList",
+    rust_type: "astryx::components::choice::CheckboxList",
+    props: &[
+        p("label", RustApi::Argument("label")),
+        p("children", RustApi::Method("item / items")),
+        p("value", RustApi::Method("value")),
+        p("onChange", RustApi::Method("on_change")),
+        p("changeAction", RustApi::Method("change_action")),
+        p("isLabelHidden", RustApi::Method("label_hidden")),
+        p("description", RustApi::Method("description")),
+        p("isOptional", RustApi::Method("optional")),
+        p("isRequired", RustApi::Method("required")),
+        p("density", RustApi::Method("density")),
+        p("hasDividers", RustApi::Method("dividers")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p(
+            "disabledMessage",
+            RustApi::Pending("disabled_message", TOOLTIP),
+        ),
+        p("isReadOnly", RustApi::Method("read_only")),
+        p("status", RustApi::Method("status")),
+        p("width", RustApi::Method("width")),
+        p("containerXstyle", RustApi::Waived(GROUP_CONTAINER)),
+        p("containerClassName", RustApi::Waived(GROUP_CONTAINER)),
+        p("containerStyle", RustApi::Waived(GROUP_CONTAINER)),
+        p("controlXstyle", RustApi::Waived(GROUP_CONTROL)),
+        p("controlClassName", RustApi::Waived(GROUP_CONTROL)),
+        p("controlStyle", RustApi::Waived(GROUP_CONTROL)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const CHECKBOX_LIST_ITEM_DOC: ComponentDoc = ComponentDoc {
+    name: "CheckboxListItem",
+    rust_type: "astryx::components::choice::CheckboxListItem",
+    props: &[
+        p("label", RustApi::Argument("label")),
+        p("aria-label", RustApi::Method("aria_label")),
+        p("value", RustApi::Method("value")),
+        p("description", RustApi::Method("description")),
+        p("endContent", RustApi::Method("end_content")),
+        p("align", RustApi::Method("align")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("isLoading", RustApi::Method("loading")),
+        p("isChecked", RustApi::Method("checked")),
+        p("onCheck", RustApi::Method("on_check")),
     ],
     example: include_str!("examples.rs"),
 };

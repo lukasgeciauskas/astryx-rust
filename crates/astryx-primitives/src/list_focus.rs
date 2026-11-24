@@ -194,6 +194,7 @@ struct ListFocusState {
 }
 
 type EscapeFn = Rc<dyn Fn(&mut Window, &mut App)>;
+type MoveFn = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
 /// A list's item focus, upstream `useListFocus`. Build it each render.
 #[derive(Clone)]
@@ -203,6 +204,7 @@ pub struct ListFocus {
     keys: ListKeys,
     disabled: Rc<[bool]>,
     on_escape: Option<EscapeFn>,
+    on_move: Option<MoveFn>,
 }
 
 impl ListFocus {
@@ -238,6 +240,7 @@ impl ListFocus {
             keys,
             disabled: Rc::from(vec![false; count]),
             on_escape: None,
+            on_move: None,
         }
     }
 
@@ -259,6 +262,13 @@ impl ListFocus {
     /// Escape reaches the surrounding layer.
     pub fn on_escape(mut self, f: impl Fn(&mut Window, &mut App) + 'static) -> Self {
         self.on_escape = Some(Rc::new(f));
+        self
+    }
+
+    /// Called with the item each arrow key moves to, after focusing it, so
+    /// a list can follow focus (radios select as they move).
+    pub fn on_move(mut self, f: impl Fn(usize, &mut Window, &mut App) + 'static) -> Self {
+        self.on_move = Some(Rc::new(f));
         self
     }
 
@@ -335,6 +345,9 @@ impl ListFocus {
             let disabled = |i: usize| list.disabled.get(i).copied().unwrap_or(false);
             if let Some(target) = list.keys.target(key, current, list.len(), disabled) {
                 list.focus(target, window, cx);
+                if let Some(f) = &list.on_move {
+                    f(target, window, cx);
+                }
             }
             cx.stop_propagation();
         }

@@ -11,6 +11,7 @@ pub mod field;
 mod focus;
 pub mod icon;
 pub mod indicator;
+pub mod item;
 pub mod layout;
 pub mod link;
 pub mod media;

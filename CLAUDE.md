@@ -26,7 +26,7 @@ Don't guess. GPUI changes often, and upstream Astryx is the specification.
 | Task | Command |
 |---|---|
 | Inner loop | `cargo check -p <crate>` (~1–2 s incremental) |
-| Gallery, native | `cargo run -p astryx-gallery` (`GALLERY_THEME=butter GALLERY_MODE=light` to pick a start state) |
+| Gallery, native | `cargo run -p astryx-gallery` (`GALLERY_THEME=butter GALLERY_MODE=light GALLERY_PAGE=buttons GALLERY_SCROLL=400` to pick a start state) |
 | Gallery edit loop | `cargo xtask dev`: a save rebuilds and relaunches the gallery in place (same page, theme, mode, window, scroll) in about 4 s; editing `spec/themes/*.json` re-applies the theme live with no rebuild |
 | True hot-patching | `cargo xtask install-dx` once, then `cargo xtask dev --hot-patch`: edits patch into the running gallery in about 0.6 s; layout or dependency changes need the hot-restart loop (`docs/KNOWN_ISSUES.md`) |
 | Gallery, browser | `cargo xtask web` (http://127.0.0.1:8080) |

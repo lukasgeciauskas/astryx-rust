@@ -361,11 +361,200 @@ impl RenderOnce for FieldStatus {
 }
 
 // ----------------------------------------------------------------------------
+// Field
+
+/// Upstream Field `statusVariant`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum StatusPlacement {
+    /// Tucked under a bordered, fixed-height control.
+    #[default]
+    Attached,
+    /// Its own box below the control.
+    Detached,
+}
+
+/// The shell of a custom control: a label above, the control, and a status
+/// below, upstream `Field`.
+#[derive(IntoElement)]
+pub struct Field {
+    id: ElementId,
+    label: SharedString,
+    description: Option<SharedString>,
+    label_hidden: bool,
+    disabled: bool,
+    optional: bool,
+    required: bool,
+    label_icon: Option<AnyElement>,
+    label_tooltip: Option<SharedString>,
+    status: Option<InputStatus>,
+    status_placement: StatusPlacement,
+    width: Option<gpui::Length>,
+    style: StyleRefinement,
+    children: smallvec::SmallVec<[AnyElement; 1]>,
+}
+
+impl Field {
+    /// Upstream `label`.
+    pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
+        Field {
+            id: id.into(),
+            label: label.into(),
+            description: None,
+            label_hidden: false,
+            disabled: false,
+            optional: false,
+            required: false,
+            label_icon: None,
+            label_tooltip: None,
+            status: None,
+            status_placement: StatusPlacement::Attached,
+            width: None,
+            style: StyleRefinement::default(),
+            children: smallvec::SmallVec::new(),
+        }
+    }
+
+    astryx_primitives::setters! {
+        /// Upstream `description`: between the label and the control.
+        ?description: SharedString,
+        /// Upstream `isLabelHidden`.
+        !label_hidden,
+        /// Upstream `isDisabled`: greys the label.
+        !disabled,
+        /// Upstream `isOptional`.
+        !optional,
+        /// Upstream `isRequired`.
+        !required,
+        /// Upstream `labelTooltip`. The InfoTip lands with Tooltip (M5).
+        ?label_tooltip: SharedString,
+        /// Upstream `status`.
+        ?status: InputStatus,
+        /// Upstream `statusVariant`.
+        status_placement: StatusPlacement,
+        /// Upstream `width`: the whole field.
+        ?width: gpui::Length,
+    }
+
+    /// Upstream `labelIcon`.
+    pub fn label_icon(mut self, icon: impl IntoElement) -> Self {
+        self.label_icon = Some(icon.into_any_element());
+        self
+    }
+
+    pub(crate) fn description_opt(mut self, description: Option<SharedString>) -> Self {
+        self.description = description;
+        self
+    }
+}
+
+impl Styled for Field {
+    fn style(&mut self) -> &mut StyleRefinement {
+        &mut self.style
+    }
+}
+
+impl ParentElement for Field {
+    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
+        self.children.extend(elements);
+    }
+}
+
+impl RenderOnce for Field {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = current(window, cx);
+        let t = theme.tokens();
+        let label = FieldLabel::new(self.label)
+            .description_opt(self.description)
+            .label_hidden(self.label_hidden)
+            .disabled(self.disabled)
+            .optional(self.optional)
+            .required(self.required)
+            .label_icon_opt(self.label_icon);
+        let status = self.status.and_then(|status| {
+            let message = status.message?;
+            Some(
+                FieldStatus::new(
+                    ElementId::Name(format!("{:?}-status", self.id).into()),
+                    status.status,
+                    message,
+                )
+                .variant(match self.status_placement {
+                    StatusPlacement::Attached => FieldStatusVariant::Attached,
+                    StatusPlacement::Detached => FieldStatusVariant::Detached,
+                }),
+            )
+        });
+        let control = match self.status_placement {
+            // The status slides under the control: listed first and laid
+            // out in reverse, so the control paints over the overlap.
+            StatusPlacement::Attached => div()
+                .flex()
+                .flex_col_reverse()
+                .children(status)
+                .child(div().flex().flex_col().children(self.children))
+                .into_any_element(),
+            StatusPlacement::Detached => div()
+                .flex()
+                .flex_col()
+                .children(self.children)
+                .children(status)
+                .into_any_element(),
+        };
+        let mut el = div().flex().flex_col().min_w_0();
+        if !self.label_hidden {
+            el = el.gap(t.spacing.s1);
+        }
+        if let Some(width) = self.width {
+            el = el.w(width);
+        }
+        theme.refine(el.style(), "field", &[], None);
+        el.style().refine(&self.style);
+        el.id(self.id).child(label).child(control)
+    }
+}
+
+// ----------------------------------------------------------------------------
 // Docs
 
 const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
+
+const NO_IDS: &str = "GPUI ties labels to controls through the accessibility tree, not ids";
+
+pub const FIELD_DOC: ComponentDoc = ComponentDoc {
+    name: "Field",
+    rust_type: "astryx::components::field::Field",
+    props: &[
+        p("label", RustApi::Argument("label")),
+        p("inputID", RustApi::Waived(NO_IDS)),
+        p("labelID", RustApi::Waived(NO_IDS)),
+        p("isGroupLabel", RustApi::Waived(NO_IDS)),
+        p("children", RustApi::Trait("ParentElement")),
+        p("isLabelHidden", RustApi::Method("label_hidden")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("description", RustApi::Method("description")),
+        p("descriptionID", RustApi::Waived(NO_IDS)),
+        p("isOptional", RustApi::Method("optional")),
+        p("isRequired", RustApi::Method("required")),
+        p("labelIcon", RustApi::Method("label_icon")),
+        p(
+            "labelTooltip",
+            RustApi::Pending("label_tooltip", "the InfoTip lands with Tooltip in M5"),
+        ),
+        p("status", RustApi::Method("status")),
+        p(
+            "statusVariant",
+            RustApi::Method("status_placement (tooltip lands with Tooltip in M5)"),
+        ),
+        p("width", RustApi::Method("width")),
+        p("ref", RustApi::Waived("GPUI elements have no refs")),
+        p("xstyle", RustApi::Trait("Styled")),
+        p("className", RustApi::Trait("Styled")),
+        p("style", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("../choice/examples.rs"),
+};
 
 pub const FIELD_STATUS_DOC: ComponentDoc = ComponentDoc {
     name: "FieldStatus",

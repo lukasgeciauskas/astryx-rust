@@ -153,3 +153,67 @@ fn the_switch_thumb_travels_and_grows() {
     assert_eq!(thumb_at(ChoiceSize::Sm, 0.), (3., 14.));
     assert_eq!(thumb_at(ChoiceSize::Sm, 1.), (14., 16.));
 }
+
+#[gpui::test]
+fn radio_arrows_move_and_select_skipping_disabled(cx: &mut TestAppContext) {
+    let selected = Rc::new(RefCell::new(Vec::new()));
+    let cx = host(cx, {
+        let selected = selected.clone();
+        move || {
+            let selected = selected.clone();
+            RadioList::new("r", "Plan", "a")
+                .label_hidden(true)
+                .on_change(move |value, _, _| selected.borrow_mut().push(value))
+                .item(RadioListItem::new("a", "A"))
+                .item(RadioListItem::new("b", "B").disabled(true))
+                .item(RadioListItem::new("c", "C"))
+                .into_any_element()
+        }
+    });
+    press(cx, "tab");
+    press(cx, "down");
+    assert_eq!(*selected.borrow(), [SharedString::from("c")]);
+    press(cx, "down");
+    assert_eq!(
+        selected.borrow().last(),
+        Some(&SharedString::from("a")),
+        "wraps"
+    );
+    press(cx, "enter");
+    assert_eq!(selected.borrow().len(), 2, "Enter never selects");
+}
+
+#[gpui::test]
+fn checkbox_lists_toggle_values(cx: &mut TestAppContext) {
+    let next = Rc::new(RefCell::new(None));
+    let cx = host(cx, {
+        let next = next.clone();
+        move || {
+            let next = next.clone();
+            CheckboxList::new("l", "Toppings")
+                .label_hidden(true)
+                .value(["b"])
+                .on_change(move |values, _, _| *next.borrow_mut() = Some(values))
+                .item(CheckboxListItem::new("A").value("a"))
+                .item(CheckboxListItem::new("B").value("b"))
+                .into_any_element()
+        }
+    });
+    click(cx);
+    assert_eq!(
+        *next.borrow(),
+        Some(vec![SharedString::from("b"), SharedString::from("a")])
+    );
+}
+
+#[test]
+fn toggling_a_value_adds_or_removes_it() {
+    let v = |s: &[&str]| {
+        s.iter()
+            .map(|s| SharedString::from(s.to_string()))
+            .collect::<Vec<_>>()
+    };
+    let a: SharedString = "a".into();
+    assert_eq!(lists::toggle_value(&v(&["b"]), &a), v(&["b", "a"]));
+    assert_eq!(lists::toggle_value(&v(&["a", "b"]), &a), v(&["b"]));
+}

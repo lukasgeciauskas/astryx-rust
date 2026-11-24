@@ -3,14 +3,18 @@
 
 use std::time::Duration;
 
-use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Task, Window};
+use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, SharedString, Task, Window};
 
-use crate::choice::{CheckboxInput, LabelPosition, LabelSpacing, Switch};
+use crate::choice::{
+    CheckboxInput, CheckboxList, CheckboxListItem, LabelPosition, LabelSpacing, RadioList,
+    RadioListItem, Switch,
+};
 use crate::field::{FieldStatus, FieldStatusVariant, InputStatus, StatusType};
 use crate::indicator::{
     CheckIndicator, CheckboxIndicator, ChoiceSize, IndicatorState, RadioIndicator,
 };
-use crate::layout::{SpacingStep, Stack, StackAlign};
+use crate::item::ItemDensity;
+use crate::layout::{Orientation, SpacingStep, Stack, StackAlign};
 use crate::text::{Text, TextType};
 
 /// Stores a new value and redraws.
@@ -45,6 +49,16 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let wifi = window.use_keyed_state("wifi", cx, |_, _| true);
     let sync = window.use_keyed_state("sync", cx, |_, _| false);
     let dark = window.use_keyed_state("dark", cx, |_, _| false);
+    let plan = window.use_keyed_state("plan", cx, |_, _| SharedString::from("pro"));
+    let size = window.use_keyed_state("size", cx, |_, _| SharedString::from("m"));
+    let toppings =
+        window.use_keyed_state("toppings", cx, |_, _| vec![SharedString::from("cheese")]);
+    let set_text = |entity: Entity<SharedString>| {
+        move |next: SharedString, window: &mut Window, cx: &mut App| {
+            entity.update(cx, |v, _| *v = next);
+            window.refresh();
+        }
+    };
 
     Stack::vertical()
         .gap(SpacingStep::S4)
@@ -90,6 +104,54 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                         .on_change(store(dark.clone())),
                 )
                 .child(Switch::new("off", "Unavailable", false).disabled(true)),
+        )
+        .child(label("RadioList"))
+        .child(
+            Stack::horizontal()
+                .gap(SpacingStep::S8)
+                .child(
+                    RadioList::new("plan", "Plan", plan.read(cx).clone())
+                        .description("You can change it later.")
+                        .on_change(set_text(plan.clone()))
+                        .item(RadioListItem::new("free", "Free").description("Up to 3 projects"))
+                        .item(RadioListItem::new("pro", "Pro").description("Unlimited projects"))
+                        .item(
+                            RadioListItem::new("team", "Team")
+                                .description("Contact sales")
+                                .disabled(true),
+                        ),
+                )
+                .child(
+                    RadioList::new("size", "Size", size.read(cx).clone())
+                        .orientation(Orientation::Horizontal)
+                        .size(ChoiceSize::Sm)
+                        .on_change(set_text(size.clone()))
+                        .items(["s", "m", "l"].map(|v| RadioListItem::new(v, v.to_uppercase()))),
+                ),
+        )
+        .child(label("CheckboxList"))
+        .child(
+            CheckboxList::new("toppings", "Toppings")
+                .description("Pick any.")
+                .width(gpui::px(360.))
+                .density(ItemDensity::Compact)
+                .dividers(true)
+                .value(toppings.read(cx).clone())
+                .on_change({
+                    let toppings = toppings.clone();
+                    move |next, window, cx| {
+                        toppings.update(cx, |v, _| *v = next);
+                        window.refresh();
+                    }
+                })
+                .item(CheckboxListItem::new("Cheese").value("cheese"))
+                .item(CheckboxListItem::new("Mushrooms").value("mushrooms"))
+                .item(
+                    CheckboxListItem::new("Truffle")
+                        .value("truffle")
+                        .description("Seasonal")
+                        .disabled(true),
+                ),
         )
         .child(label("Indicators"))
         .child(

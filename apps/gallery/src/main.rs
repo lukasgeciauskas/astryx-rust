@@ -25,7 +25,8 @@ fn run() {
                 astryx::theme::register_fonts(theme, cx);
             }
             // Under `cargo xtask dev` the saved state reopens the gallery in
-            // place. Otherwise GALLERY_THEME, GALLERY_MODE and GALLERY_PAGE pick
+            // place. Otherwise GALLERY_THEME, GALLERY_MODE, GALLERY_PAGE and
+            // GALLERY_SCROLL (pixels down the page) pick
             // the start, for screenshots; the default is neutral in system mode.
             let state = DevState::load();
             let wanted = state
@@ -61,7 +62,11 @@ fn run() {
                 .map(|s| s.page.clone())
                 .filter(|p| !p.is_empty())
                 .or_else(|| env("GALLERY_PAGE"));
-            let scroll_y = state.as_ref().map_or(0.0, |s| s.scroll_y);
+            let scroll_y = state
+                .as_ref()
+                .map(|s| s.scroll_y)
+                .or_else(|| env("GALLERY_SCROLL").and_then(|y| y.parse().ok()))
+                .unwrap_or(0.0);
             cx.open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
