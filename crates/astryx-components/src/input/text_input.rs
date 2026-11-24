@@ -6,7 +6,7 @@
 
 use std::rc::Rc;
 
-use astryx_i18n::current as i18n;
+use astryx_i18n::{current as i18n, use_direction};
 use astryx_primitives::editing::{
     EditorStyle, FieldSettings, KeyDownFn, TextEditState, text_editor,
 };
@@ -20,6 +20,7 @@ use gpui::{
 };
 
 use super::control::{Chrome, control_box, described_by, status_icon};
+use super::group::{group_context, group_disabled, group_place, inside_member};
 use crate::button::{ButtonVariant, IconButton};
 use crate::choice::action::{ActionFn, ChangeFn, Optimistic};
 use crate::field::{Field, InputStatus, StatusPlacement, StatusType};
@@ -237,7 +238,12 @@ pub(crate) fn selection_color(t: &astryx_theme::Tokens) -> gpui::Hsla {
 }
 
 impl RenderOnce for TextInput {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        // FR6: an enclosing InputGroup's disabled state, never re-enabling.
+        self.disabled |= group_disabled(cx);
+        let place = group_place(cx);
+        let group = place.and_then(|_| group_context(cx));
+        let dir = use_direction(cx);
         let theme = current(window, cx);
         let size = resolve_size(self.size, ElementSize::Md, cx);
         let i18n = i18n(cx);
@@ -302,6 +308,8 @@ impl RenderOnce for TextInput {
             focused: focus.is_focused(window),
             focus_visible: is_focus_visible(&focus, window),
             row: true,
+            place,
+            dir,
         };
         let part_override = theme.for_part("text-input", &chrome.props());
         let part = part_override.clone().unwrap_or_else(|| theme.clone());
@@ -334,6 +342,15 @@ impl RenderOnce for TextInput {
                 .flatten(),
             &i18n,
         );
+        // FR2: a grouped field is named by the group and itself, and
+        // described by the group first.
+        let (name, described) = match &group {
+            Some(group) => (
+                SharedString::from(format!("{} {}", group.label, self.label)),
+                group.described.iter().cloned().chain(described).collect(),
+            ),
+            None => (self.label.clone(), described),
+        };
 
         let style = EditorStyle {
             text_color: t.color.text_primary,
@@ -353,7 +370,7 @@ impl RenderOnce for TextInput {
             .font_stack(&t.font.family.body)
             .text_style(&t.text.body)
             .role(self.input_type.role())
-            .aria_label(self.label.clone())
+            .aria_label(name)
             .aria_disabled(self.disabled)
             .aria_read_only(!editable)
             .aria_required(self.required)
@@ -403,6 +420,7 @@ impl RenderOnce for TextInput {
         }
         if let Some(status) = status
             && self.status_placement == StatusPlacement::Attached
+            && place.is_none()
         {
             control = control.child(status_icon(status, &part));
         }
@@ -411,6 +429,10 @@ impl RenderOnce for TextInput {
             Some(part) => scope(part, control).into_any_element(),
             None => control.into_any_element(),
         };
+        // In a group the control is the member: no Field of its own.
+        if place.is_some() {
+            return inside_member(control).into_any_element();
+        }
         let mut field = Field::new(self.id, self.label)
             .description_opt(self.description)
             .label_hidden(self.label_hidden)
@@ -428,6 +450,6 @@ impl RenderOnce for TextInput {
             field = field.width(width);
         }
         field.style().refine(&self.style);
-        field.child(control)
+        field.child(control).into_any_element()
     }
 }

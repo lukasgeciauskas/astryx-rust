@@ -1,14 +1,15 @@
 //! Text entry examples: the gallery's Inputs page and the doc example of
-//! TextInput, TextArea and NumberInput.
+//! TextInput, TextArea, NumberInput and InputGroup.
 
 use std::time::Duration;
 
 use astryx_primitives::ElementSize;
 use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, SharedString, Task, Window, px};
 
+use crate::button::{Button, ButtonVariant};
 use crate::field::{InputStatus, StatusPlacement};
 use crate::icon::Icon;
-use crate::input::{InputType, NumberInput, TextArea, TextInput};
+use crate::input::{InputGroup, InputGroupText, InputType, NumberInput, TextArea, TextInput};
 use crate::layout::{SpacingStep, Stack};
 use crate::text::{Text, TextType};
 
@@ -79,6 +80,9 @@ Leave the parcel with the neighbor at number 12.",
     let opacity = number("opacity", Some(80.), window, cx);
     let price = number("price", Some(1299.5), window, cx);
     let guests = number("guests", None, window, cx);
+    let site = text("site", "astryx", window, cx);
+    let amount = number("amount", Some(25.), window, cx);
+    let coupon = text("coupon", "", window, cx);
 
     Stack::vertical()
         .gap(SpacingStep::S4)
@@ -220,6 +224,49 @@ Leave the parcel with the neighbor at number 12.",
                         .on_change(set(guests.clone())),
                 )
                 .child(NumberInput::new("rooms", "Rooms", Some(3.)).disabled(true)),
+        )
+        .child(label("InputGroup"))
+        .child(
+            Stack::vertical()
+                .gap(SpacingStep::S4)
+                .width(px(360.))
+                .child(
+                    InputGroup::new("site-group", "Website")
+                        .description("Your public profile address.")
+                        .child(InputGroupText::new("https://"))
+                        .child(
+                            TextInput::new("site", "Subdomain", site.read(cx).clone())
+                                .on_change(store(site.clone())),
+                        )
+                        .child(InputGroupText::new(".example.com")),
+                )
+                .child(
+                    InputGroup::new("amount-group", "Amount")
+                        .child(InputGroupText::new("$"))
+                        .child(
+                            NumberInput::new("amount", "in USD", *amount.read(cx))
+                                .min(0.)
+                                .on_change(set(amount.clone())),
+                        )
+                        .child(InputGroupText::new("USD")),
+                )
+                .child(
+                    InputGroup::new("coupon-group", "Coupon")
+                        .status(InputStatus::error("That code has expired."))
+                        .child(
+                            TextInput::new("coupon", "Code", coupon.read(cx).clone())
+                                .placeholder("SPRING25")
+                                .on_change(store(coupon.clone())),
+                        )
+                        .child(Button::new("apply", "Apply").variant(ButtonVariant::Secondary)),
+                )
+                .child(
+                    InputGroup::new("search-group", "Search")
+                        .label_hidden(true)
+                        .disabled(true)
+                        .child(TextInput::new("q", "Query", "").placeholder("Search is offline"))
+                        .child(Button::new("go", "Go")),
+                ),
         )
         .child(label("Sizes"))
         .child(

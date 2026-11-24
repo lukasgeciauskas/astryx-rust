@@ -24,6 +24,7 @@ use gpui::{
 };
 
 use super::control::{Chrome, control_box, described_by, status_icon};
+use super::group::{group_context, group_disabled, group_place, inside_member};
 use super::text_input::selection_color;
 use crate::button::{ButtonVariant, IconButton};
 use crate::field::{Field, InputStatus, StatusPlacement, StatusType};
@@ -701,11 +702,15 @@ fn bits(value: Option<f64>) -> Option<u64> {
 }
 
 impl RenderOnce for NumberInput {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        // FR6: an enclosing InputGroup's disabled state, never re-enabling.
+        self.disabled |= group_disabled(cx);
+        let place = group_place(cx);
+        let group = place.and_then(|_| group_context(cx));
+        let dir = use_direction(cx);
         let theme = current(window, cx);
         let size = resolve_size(self.size, ElementSize::Md, cx);
         let i18n = i18n(cx);
-        let dir = use_direction(cx);
         let rem = window.rem_size();
         let rules = Rules {
             min: self.min,
@@ -926,6 +931,8 @@ impl RenderOnce for NumberInput {
             focused,
             focus_visible: is_focus_visible(&focus, window),
             row: true,
+            place,
+            dir,
         };
         let part_override = theme.for_part("number-input", &chrome.props());
         let part = part_override.clone().unwrap_or_else(|| theme.clone());
@@ -976,6 +983,15 @@ impl RenderOnce for NumberInput {
             &i18n,
         );
         described.extend(self.units.clone());
+        // FR2: a grouped field is named by the group and itself, and
+        // described by the group first.
+        let (name, described) = match &group {
+            Some(group) => (
+                SharedString::from(format!("{} {}", group.label, self.label)),
+                group.described.iter().cloned().chain(described).collect(),
+            ),
+            None => (self.label.clone(), described),
+        };
         let invalid = status == Some(StatusType::Error) || shown_error.is_some();
         let style = EditorStyle {
             // FR15: a rejected draft greys while its message shows.
@@ -1000,7 +1016,7 @@ impl RenderOnce for NumberInput {
             .font_stack(&t.font.family.body)
             .text_style(&t.text.body)
             .role(Role::SpinButton)
-            .aria_label(self.label.clone())
+            .aria_label(name)
             .aria_value(SharedString::from(display.clone()))
             .aria_disabled(self.disabled)
             .aria_read_only(!editable)
@@ -1060,6 +1076,7 @@ impl RenderOnce for NumberInput {
         }
         if let Some(status) = status
             && self.status_placement == StatusPlacement::Attached
+            && place.is_none()
         {
             control = control.child(status_icon(status, &part));
         }
@@ -1164,6 +1181,10 @@ impl RenderOnce for NumberInput {
             Some(part) => scope(part, control).into_any_element(),
             None => control.into_any_element(),
         };
+        // In a group the control is the member: no Field of its own.
+        if place.is_some() {
+            return inside_member(control).into_any_element();
+        }
         let mut field = Field::new(self.id, self.label)
             .description_opt(self.description)
             .label_hidden(self.label_hidden)
@@ -1184,7 +1205,7 @@ impl RenderOnce for NumberInput {
             field = field.width(width);
         }
         field.style().refine(&self.style);
-        field.child(control)
+        field.child(control).into_any_element()
     }
 }
 

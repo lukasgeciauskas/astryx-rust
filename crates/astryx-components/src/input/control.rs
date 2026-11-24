@@ -4,14 +4,16 @@
 
 use std::time::Duration;
 
+use astryx_i18n::Direction;
 use astryx_primitives::ElementSize;
 use astryx_theme::color::mix_srgb;
 use astryx_theme::{ResolvedTheme, Tokens};
 use gpui::{
-    App, BoxShadow, Div, ElementId, Hsla, InteractiveElement, Pixels, SharedString, Stateful,
-    Styled, Window, div, point, px,
+    App, BoxShadow, Div, ElementId, Hsla, InteractiveElement, ParentElement, Pixels, SharedString,
+    Stateful, Styled, Window, div, point, px,
 };
 
+use super::group::{GroupPlace, join, raised_ring};
 use crate::button::element_height;
 use crate::field::{InputStatus, StatusType};
 use crate::icon::{Icon, IconColor, IconSize};
@@ -32,6 +34,9 @@ pub(crate) struct Chrome {
     pub focus_visible: bool,
     /// A fixed-height row (TextInput, NumberInput); TextArea grows.
     pub row: bool,
+    /// Its place among an InputGroup's members, if it is one.
+    pub place: Option<GroupPlace>,
+    pub dir: Direction,
 }
 
 impl Chrome {
@@ -158,6 +163,17 @@ pub(crate) fn control_box(
         el = el.opacity(0.5);
     }
     part.refine(el.style(), chrome.target, &chrome.props(), None);
+    if let Some(place) = chrome.place {
+        // In a group the box fills the row, joined to its neighbours, and
+        // its focus ring paints above them (upstream `groupStyles.inGroup`).
+        let radius = t.radius.element.to_pixels(rem);
+        let width = t.border.width.to_pixels(rem);
+        el = join(el, place, radius, width, chrome.dir).flex_1();
+        el.style().size.height = Some(gpui::relative(1.).into());
+        if eased > 0. {
+            el = el.child(raised_ring(border, width, place, radius, chrome.dir));
+        }
+    }
     el
 }
 

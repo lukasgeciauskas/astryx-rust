@@ -387,9 +387,14 @@ impl RenderOnce for Button {
         let dir = use_direction(cx);
         let rem = window.rem_size();
         let group = use_context::<GroupMember>(cx);
+        // A direct InputGroup member is an addon joined to the row (FR4),
+        // disabled with its group (FR6).
+        let addon = crate::input::group::group_place(cx);
         let size = resolve_size(self.size, ElementSize::Md, cx);
         let (fill, fg) = self.variant.colors(t);
-        let disabled = self.disabled || group.is_some_and(|g| g.disabled);
+        let disabled = self.disabled
+            || group.is_some_and(|g| g.disabled)
+            || crate::input::group::group_disabled(cx);
 
         let state = window.use_keyed_state(self.id.clone(), cx, |_, _| ButtonState::default());
         let (pending, since) = {
@@ -426,6 +431,9 @@ impl RenderOnce for Button {
         let focus = control_focus(&self.id, window, cx);
 
         let mut el = self.root(&theme, size, group, dir, rem);
+        if let Some(place) = addon {
+            el = crate::input::group::join_addon(el, place, t.radius.element.to_pixels(rem), dir);
+        }
         // The overlays composite over the resting fill as finally styled,
         // theme and caller overrides included (upstream layers them as a
         // background image over whatever the background is).
@@ -556,6 +564,7 @@ impl RenderOnce for Button {
                 disabled,
                 busy,
                 ring: Some((radius, ring_color)),
+                raise_ring: addon.is_some(),
                 theme_target: Some(("button", &props)),
             },
             Some(activate),

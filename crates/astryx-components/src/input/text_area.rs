@@ -411,6 +411,8 @@ impl RenderOnce for TextArea {
             focused: focus.is_focused(window),
             focus_visible: is_focus_visible(&focus, window),
             row: false,
+            place: None,
+            dir,
         };
         let part_override = theme.for_part("text-area", &chrome.props());
         let part = part_override.clone().unwrap_or_else(|| theme.clone());

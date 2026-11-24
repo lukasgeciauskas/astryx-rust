@@ -4,6 +4,7 @@
 
 mod control;
 pub mod examples;
+pub(crate) mod group;
 pub(crate) mod number_input;
 pub(crate) mod text_area;
 mod text_input;
@@ -11,6 +12,7 @@ mod text_input;
 #[cfg(test)]
 mod tests;
 
+pub use group::{InputGroup, InputGroupText};
 pub use number_input::{EntryErrorKind, NumberInput, NumberInputEntryError};
 pub use text_area::TextArea;
 pub use text_input::{InputType, TextInput};
@@ -228,6 +230,45 @@ pub const NUMBER_INPUT_DOC: ComponentDoc = ComponentDoc {
         p("controlXstyle", RustApi::Method("control_style")),
         p("controlClassName", RustApi::Method("control_style")),
         p("controlStyle", RustApi::Method("control_style")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const INPUT_GROUP_DOC: ComponentDoc = ComponentDoc {
+    name: "InputGroup",
+    rust_type: "astryx::components::input::InputGroup",
+    props: &[
+        p("children", RustApi::Trait("ParentElement")),
+        p("label", RustApi::Argument("label")),
+        p("isLabelHidden", RustApi::Method("label_hidden")),
+        p("description", RustApi::Method("description")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("isOptional", RustApi::Method("optional")),
+        p("isRequired", RustApi::Method("required")),
+        p("size", RustApi::Method("size")),
+        p("status", RustApi::Method("status")),
+        p(
+            "labelTooltip",
+            RustApi::Pending("label_tooltip", "the InfoTip lands with Tooltip in M5"),
+        ),
+        p("xstyle", RustApi::Trait("Styled")),
+        p(
+            "data-testid",
+            RustApi::Waived("GPUI tests find elements by id"),
+        ),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const INPUT_GROUP_TEXT_DOC: ComponentDoc = ComponentDoc {
+    name: "InputGroupText",
+    rust_type: "astryx::components::input::InputGroupText",
+    props: &[
+        p("children", RustApi::Argument("content")),
+        p("xstyle", RustApi::Trait("Styled")),
+        p("className", RustApi::Trait("Styled")),
+        p("style", RustApi::Trait("Styled")),
+        p("ref", RustApi::Waived("GPUI elements have no refs")),
     ],
     example: include_str!("examples.rs"),
 };

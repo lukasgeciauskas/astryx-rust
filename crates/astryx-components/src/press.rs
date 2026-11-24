@@ -29,6 +29,9 @@ pub(crate) struct Press<'a> {
     pub busy: bool,
     /// The focus ring's corner radius and color (`None` for the token's).
     pub ring: Option<(Pixels, Option<Hsla>)>,
+    /// Paints the ring after the control's neighbours, so a joined
+    /// neighbour never covers it (an InputGroup addon's `zIndex: 2`).
+    pub raise_ring: bool,
     /// The theme target and props whose hover and active rules apply.
     pub theme_target: Option<(&'a str, &'a [(&'a str, &'a str)])>,
 }
@@ -85,7 +88,11 @@ pub(crate) fn apply_press(
         if let Some(color) = color {
             ring = ring.border_color(color);
         }
-        el = el.child(ring);
+        el = if press.raise_ring {
+            el.child(gpui::deferred(ring).with_priority(1))
+        } else {
+            el.child(ring)
+        };
     }
     el
 }

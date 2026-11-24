@@ -272,3 +272,6 @@ mod area;
 
 #[path = "number_tests.rs"]
 mod number;
+
+#[path = "group_tests.rs"]
+mod group;
