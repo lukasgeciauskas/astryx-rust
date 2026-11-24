@@ -8,12 +8,12 @@ use astryx_primitives::ElementSize;
 use astryx_theme::color::mix_srgb;
 use astryx_theme::{ResolvedTheme, Tokens};
 use gpui::{
-    App, BoxShadow, Div, ElementId, Hsla, InteractiveElement, Pixels, Stateful, Styled, Window,
-    div, point, px,
+    App, BoxShadow, Div, ElementId, Hsla, InteractiveElement, Pixels, SharedString, Stateful,
+    Styled, Window, div, point, px,
 };
 
 use crate::button::element_height;
-use crate::field::StatusType;
+use crate::field::{InputStatus, StatusType};
 use crate::icon::{Icon, IconColor, IconSize};
 use crate::motion::transition;
 
@@ -177,4 +177,29 @@ pub(crate) fn status_icon(status: StatusType, part: &ResolvedTheme) -> Icon {
         None,
     );
     icon
+}
+
+/// A field's accessible description, in upstream's order (ORD3): its own
+/// description, the status message (an error without one still says it is
+/// invalid), and the reason it is disabled.
+pub(crate) fn described_by(
+    description: Option<&SharedString>,
+    status: Option<&InputStatus>,
+    disabled_reason: Option<&SharedString>,
+    i18n: &astryx_i18n::I18n,
+) -> Vec<SharedString> {
+    let mut parts: Vec<SharedString> = description.into_iter().cloned().collect();
+    match status {
+        Some(InputStatus {
+            message: Some(message),
+            ..
+        }) => parts.push(message.clone()),
+        Some(InputStatus {
+            status: StatusType::Error,
+            message: None,
+        }) => parts.push(i18n.t("@astryx.field.errorFallback")),
+        _ => {}
+    }
+    parts.extend(disabled_reason.cloned());
+    parts
 }

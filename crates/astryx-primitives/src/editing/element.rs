@@ -29,6 +29,9 @@ pub struct EditorStyle {
     pub multiline: bool,
     pub min_lines: usize,
     pub max_lines: Option<usize>,
+    /// A multiline field's height, overriding its lines (a field the user
+    /// resized). It scrolls when its text is taller.
+    pub height: Option<Pixels>,
     /// No caret blink.
     pub reduced_motion: bool,
 }
@@ -113,6 +116,10 @@ impl Element for EditorElement {
         style.size.width = relative(1.).into();
         if !self.style.multiline {
             style.size.height = line_height.into();
+            return (window.request_layout(style, [], cx), ());
+        }
+        if let Some(height) = self.style.height {
+            style.size.height = height.into();
             return (window.request_layout(style, [], cx), ());
         }
         // A multiline field is as tall as its wrapped text, within its rows.

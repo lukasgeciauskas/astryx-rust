@@ -141,8 +141,14 @@ pub fn init(cx: &mut App) {
 }
 
 /// Accepts or rewrites inserted text (a NumberInput keeps digits): given the
-/// current text and the text being inserted, returns what to insert.
-pub type InsertFilter = Rc<dyn Fn(&str, &str) -> String>;
+/// current text, the byte range the insertion replaces and the text being
+/// inserted, returns what to insert.
+pub type InsertFilter = Rc<dyn Fn(&str, Range<usize>, &str) -> String>;
+
+/// Told the clipboard text of a paste, before it lands.
+pub type PasteFn = Rc<dyn Fn(&str, &mut Window, &mut App)>;
+/// Told when the field gains or loses focus.
+pub type FocusFn = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// Told the new text after each change the user makes.
 pub type ChangeFn = Rc<dyn Fn(String, &mut Window, &mut App)>;
@@ -187,11 +193,16 @@ pub struct TextEditState {
     /// the component reports it.
     changed: bool,
     enter_pressed: bool,
+    /// A paste waiting to be reported, before its change.
+    pasted: Option<String>,
     /// The component's callbacks, refreshed every render.
     pub on_change: Option<ChangeFn>,
     pub on_enter: Option<EnterFn>,
     pub on_key_down: Option<KeyDownFn>,
-    _keys: Subscription,
+    pub on_paste: Option<PasteFn>,
+    pub on_focus: Option<FocusFn>,
+    pub on_blur: Option<FocusFn>,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl TextEditState {
@@ -232,10 +243,14 @@ impl TextEditState {
             blink_scheduled: false,
             changed: false,
             enter_pressed: false,
+            pasted: None,
             on_change: None,
             on_enter: None,
             on_key_down: None,
-            _keys: keys,
+            on_paste: None,
+            on_focus: None,
+            on_blur: None,
+            _subscriptions: vec![keys],
         }
     }
 
@@ -251,6 +266,11 @@ impl TextEditState {
         let entity = cx.entity();
         window
             .observe(&entity, cx, |entity, window, cx| {
+                let (pasted, on_paste) =
+                    entity.update(cx, |s, _| (s.pasted.take(), s.on_paste.clone()));
+                if let (Some(text), Some(f)) = (pasted, on_paste) {
+                    f(&text, window, cx);
+                }
                 let (changed, enter, text, on_change, on_enter) = entity.update(cx, |s, _| {
                     (
                         s.take_changed(),
@@ -268,7 +288,23 @@ impl TextEditState {
                 }
             })
             .detach();
-        Self::new(text, multiline, cx)
+        let mut this = Self::new(text, multiline, cx);
+        // Focus callbacks run after the focus change settles, outside this
+        // entity's update, so they may read the field.
+        let focus = this.focus.clone();
+        this._subscriptions
+            .push(cx.on_focus(&focus, window, |this, window, cx| {
+                if let Some(f) = this.on_focus.clone() {
+                    window.defer(cx, move |window, cx| f(window, cx));
+                }
+            }));
+        this._subscriptions
+            .push(cx.on_blur(&focus, window, |this, window, cx| {
+                if let Some(f) = this.on_blur.clone() {
+                    window.defer(cx, move |window, cx| f(window, cx));
+                }
+            }));
+        this
     }
 
     pub fn text(&self) -> &str {
@@ -277,6 +313,11 @@ impl TextEditState {
 
     pub fn buffer(&self) -> &EditBuffer {
         &self.buffer
+    }
+
+    /// Where the text area was last drawn, in window coordinates.
+    pub fn bounds(&self) -> Option<Bounds<Pixels>> {
+        self.layout.as_ref().map(|layout| layout.bounds)
     }
 
     /// Syncs a controlled value: replaces the text if it differs.
@@ -415,7 +456,9 @@ impl TextEditState {
             return;
         }
         if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
+            self.pasted = Some(text.clone());
             self.insert(&text, window, cx);
+            cx.notify();
         }
     }
 
@@ -452,7 +495,13 @@ impl TextEditState {
             return;
         }
         let text = match &self.settings.filter {
-            Some(filter) => filter(self.buffer.text(), text),
+            Some(filter) => {
+                let range = self
+                    .buffer
+                    .marked()
+                    .unwrap_or_else(|| self.buffer.selection());
+                filter(self.buffer.text(), range, text)
+            }
             None => text.to_string(),
         };
         if self.buffer.insert(&text) {

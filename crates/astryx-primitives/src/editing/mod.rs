@@ -34,7 +34,8 @@ pub use state::{
     SelectWordLeft, SelectWordRight, ShowCharacterPalette, Undo, Up, WordLeft, WordRight,
 };
 pub use state::{
-    ChangeFn, EnterFn, FieldSettings, InsertFilter, KEY_CONTEXT, KeyDownFn, TextEditState, init,
+    ChangeFn, EnterFn, FieldSettings, FocusFn, InsertFilter, KEY_CONTEXT, KeyDownFn, PasteFn,
+    TextEditState, init,
 };
 
 use gpui::{

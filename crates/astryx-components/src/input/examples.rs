@@ -1,5 +1,5 @@
 //! Text entry examples: the gallery's Inputs page and the doc example of
-//! TextInput.
+//! TextInput and TextArea.
 
 use std::time::Duration;
 
@@ -8,7 +8,7 @@ use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, SharedString, Ta
 
 use crate::field::{InputStatus, StatusPlacement};
 use crate::icon::Icon;
-use crate::input::{InputType, TextInput};
+use crate::input::{InputType, TextArea, TextInput};
 use crate::layout::{SpacingStep, Stack};
 use crate::text::{Text, TextType};
 
@@ -51,6 +51,20 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let small = text("small", "", window, cx);
     let large = text("large", "", window, cx);
     let entered = text("entered", "", window, cx);
+    let bio = text("bio", "", window, cx);
+    let notes = text(
+        "notes",
+        "Shipping notes.
+Leave the parcel with the neighbor at number 12.",
+        window,
+        cx,
+    );
+    let tweet = text(
+        "tweet",
+        "Porting Astryx to GPUI, one component at a time",
+        window,
+        cx,
+    );
     let submitted = entered.read(cx).clone();
 
     Stack::vertical()
@@ -124,6 +138,35 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                     TextInput::new("lookup", "Lookup", "")
                         .loading(true)
                         .placeholder("Loading…"),
+                ),
+        )
+        .child(label("TextArea"))
+        .child(
+            Stack::vertical()
+                .gap(SpacingStep::S4)
+                .width(px(360.))
+                .child(
+                    TextArea::new("bio", "Bio", bio.read(cx).clone())
+                        .placeholder("A few words about you")
+                        .description("Shown on your profile.")
+                        .on_change(store(bio.clone())),
+                )
+                .child(
+                    TextArea::new("notes", "Delivery notes", notes.read(cx).clone())
+                        .rows(4)
+                        .size(ElementSize::Lg)
+                        .on_change(store(notes.clone())),
+                )
+                .child(
+                    TextArea::new("tweet", "Post", tweet.read(cx).clone())
+                        .max_length(50)
+                        .status(InputStatus::warning("Posts over 50 characters get cut."))
+                        .on_change(store(tweet.clone())),
+                )
+                .child(
+                    TextArea::new("terms", "Terms", "Accepted on 1 March.")
+                        .rows(2)
+                        .disabled(true),
                 ),
         )
         .child(label("Sizes"))

@@ -26,6 +26,7 @@ impl Render for Field {
             multiline: self.multiline,
             min_lines: 1,
             max_lines: Some(4),
+            height: None,
             reduced_motion: true,
         };
         div()

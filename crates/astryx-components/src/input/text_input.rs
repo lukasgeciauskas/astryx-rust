@@ -19,7 +19,7 @@ use gpui::{
     StyleRefinement, Styled, Task, Window, div, prelude::*, px,
 };
 
-use super::control::{Chrome, control_box, status_icon};
+use super::control::{Chrome, control_box, described_by, status_icon};
 use crate::button::{ButtonVariant, IconButton};
 use crate::choice::action::{ActionFn, ChangeFn, Optimistic};
 use crate::field::{Field, InputStatus, StatusPlacement, StatusType};
@@ -326,17 +326,14 @@ impl RenderOnce for TextInput {
             );
         }
 
-        // The field's accessible description: its own, the status message
-        // when a message box shows it, and the disabled reason (ORD3).
-        let mut described: Vec<SharedString> = self.description.iter().cloned().collect();
-        if let Some(message) = self.status.as_ref().and_then(|s| s.message.clone()) {
-            described.push(message);
-        }
-        if self.disabled
-            && let Some(reason) = &self.disabled_message
-        {
-            described.push(reason.clone());
-        }
+        let described = described_by(
+            self.description.as_ref(),
+            self.status.as_ref(),
+            self.disabled
+                .then_some(self.disabled_message.as_ref())
+                .flatten(),
+            &i18n,
+        );
 
         let style = EditorStyle {
             text_color: t.color.text_primary,
@@ -347,6 +344,7 @@ impl RenderOnce for TextInput {
             multiline: false,
             min_lines: 1,
             max_lines: Some(1),
+            height: None,
             reduced_motion: prefers_reduced_motion(cx),
         };
         let mut editor = text_editor("editor", &state, style, cx)

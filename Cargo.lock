@@ -299,6 +299,7 @@ dependencies = [
  "astryx-themes",
  "gpui",
  "smallvec",
+ "unicode-segmentation",
  "web-time",
 ]
 
