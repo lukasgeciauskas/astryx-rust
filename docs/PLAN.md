@@ -295,6 +295,8 @@ The remaining primitives:
   - They live on the `astryx` branch of github.com/lukasgeciauskas/zed, and all the user's
     apps pin that fork. See `docs/gpui-fork.md`.
   - Everything that needs no renderer change stays in this layer.
+  - R1 (element transforms) landed without shader changes: elements only need
+    rectangle-preserving transforms, which the window applies to primitive geometry.
 - **Agent tooling is part of the port (M1.5).**
   - `CLAUDE.md`;
   - the `astryx` CLI (`apps/cli`), with upstream docs, the Rust API, tokens and parity;

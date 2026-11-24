@@ -14,9 +14,11 @@ Astryx uses is drawn. Checked at Zed rev `2b248e6` against upstream usage.
 | `mask-image` edge fade | TabList, Carousel, Chat, DateInput scroll edges | Gradient overlay from the surface color to transparent |
 | `backdrop-filter: blur` | Chat composer, Lightbox, SegmentedControl, lab TabBar/MediaPlayer | Fork patch R2, a real backdrop blur; until it lands, upstream's non-blur fallback fill |
 | `filter` | Dialog/Drawer/MobileNav backdrops, PowerSearch, Swipe, Table | Fork patch R3 (offscreen layers with filters) |
-| `transform: rotate` | Chevrons, disclosure icons | SVG `with_transformation(Transformation::rotate(..))` |
-| `transform: translate` | Slides, sheets, toasts | Fork patch R1; GPUI's `with_element_offset` also moves a subtree at paint time |
-| `transform: scale` (press, entrances) | Button press feedback, dialog and popover entrances | Fork patch R1 (transforms on any element, text included) |
+| `transform: rotate` | Chevrons, disclosure icons, Spinner | SVG `with_transformation(Transformation::rotate(..))`; upstream rotates only icons |
+| `transform: translate` | Slides, sheets, toasts | `.translate(x, y)`, fork patch R1; percentages are `relative(..)` of the element's own size |
+| `transform: scale` (press, entrances) | Button press feedback, dialog and popover entrances | `.scale(..)` and `.transform_origin(..)`, fork patch R1; text, icons and shadows follow |
+| `scaleX(-1)` RTL mirroring | Disclosure chevrons in tables, Collapsible | `.scale_xy(-1., 1.)`, fork patch R1 |
+| `rotateX(..)` (3D) | DateInput wheel | Approximated with `.scale_xy(1., cos(angle))`: no perspective |
 | `clip-path` | Layer arrows, steppers, tokens | Rounded `overflow_hidden` or `canvas` paths; arbitrary alpha masks via fork patch R3 |
 | Blend modes, radial/conic gradients | Not used upstream | Not needed |
 

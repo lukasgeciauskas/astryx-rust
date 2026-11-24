@@ -42,6 +42,12 @@ from another version may not exist here.
   no font in a stack exists.
 - Shadows: `ThemeStyled::shadow_token(&t.shadow.low)`; `BoxShadow` has `inset`.
 - Gradients: `linear_gradient(angle, from, to)`, two stops only.
+- Transforms (our fork, patch R1): `.scale(0.96)`, `.scale_xy(-1., 1.)` (mirror),
+  `.translate(x, y)`, `.translate_x(relative(1.))` (fractions of the element's own size)
+  and `.transform_origin(0., 0.)`. They move the element and its subtree when painted;
+  layout is unchanged and hit testing follows. They work in `.hover(..)`/`.active(..)`
+  and `with_animation`. No element rotation: rotate SVGs with
+  `svg().with_transformation(Transformation::rotate(..))`.
 - Overlays: `deferred(anchored().position(point).child(..))` draws above later siblings.
 - Virtual lists: `uniform_list(id, count, |range, window, cx| items)` and `list(..)`.
   They need a view: drawing one through the test `cx.draw` helper panics in
