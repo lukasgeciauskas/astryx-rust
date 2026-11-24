@@ -6,7 +6,7 @@ use astryx_primitives::use_context;
 use astryx_theme::{ResolvedTheme, ThemeStyled, current};
 use gpui::{
     AnyElement, App, Div, ElementId, IntoElement, ParentElement, RenderOnce, Role, SharedString,
-    StyleRefinement, Styled, Window, div, prelude::*, px, relative,
+    StyleRefinement, Styled, Window, div, prelude::*, px,
 };
 use smallvec::SmallVec;
 
@@ -201,15 +201,17 @@ impl RenderOnce for Divider {
         };
         if self.full_bleed {
             let pad = use_context::<ContainerPadding>(cx).unwrap_or_default();
+            // Upstream widens the box by `calc(100% + padding)`. GPUI has no
+            // calc, but an auto-sized item stretched across its parent grows
+            // by its negative margins, which is the same box.
             el = if horizontal {
-                el.margin_start(dir, -pad.inline_start)
+                el.style().size.width = None;
+                el.self_stretch()
+                    .margin_start(dir, -pad.inline_start)
                     .margin_end(dir, -pad.inline_end)
-                    .w(relative(1.))
-                    .min_w(gpui::Length::Definite(
-                        (pad.inline_start + pad.inline_end).into(),
-                    ))
             } else {
-                el.mt(-pad.block_start).mb(-pad.block_end)
+                el.style().size.height = None;
+                el.self_stretch().mt(-pad.block_start).mb(-pad.block_end)
             };
         }
         let color = match self.variant {

@@ -16,6 +16,7 @@ pub use misc::{
     VisuallyHidden,
 };
 pub use spacing::{ContainerPadding, Padding, Sizing, SpacingStep};
+pub(crate) use spacing::{padding_setters, size_setters};
 pub use stack::{Stack, StackAlign, StackDirection, StackItem, StackItemSize, StackWrap};
 
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
