@@ -486,7 +486,8 @@ impl RenderOnce for Button {
                 .child(
                     Spinner::new("spinner")
                         .size(SpinnerSize::Sm)
-                        .shade(SpinnerShade::Inherit),
+                        .shade(SpinnerShade::Inherit)
+                        .decorative(),
                 )
         });
 

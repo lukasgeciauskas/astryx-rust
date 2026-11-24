@@ -43,6 +43,7 @@ Each patch lands before the components that need it.
 | R3 | Offscreen layers | A subtree drawn to a texture, then composited with group opacity, filters (blur, brightness, grayscale) or an alpha mask | Dialog, Drawer and MobileNav backdrops; PowerSearch, Swipe, Table (M5+) |
 | R4 | Blend modes | Multiply and screen in fixed-function blending; the rest through R3 layers | Not used by upstream today; lowest priority |
 | R5 | Inline layout (**landed**, `7ce1c61`) | Inline-level boxes (`inline-flex`, `inline-block`, `inline-grid`) that flow in line boxes inside block containers; `min-content`, `max-content` and `fit-content` sizes; text baselines | Every `inline-flex` component (M2, M3); inline text flow (Link in Text, Markdown, Chat) |
+| R6 | ARIA states (**landed**, `de7e405`) | `aria_disabled`, `aria_read_only`, `aria_required`, `aria_invalid`, `aria_busy`, `aria_modal` and `aria_multiselectable` on any stateful element, setting the matching AccessKit flags | Every form control (M4 onward): disabled, read-only, required and invalid fields; busy controls; modal dialogs and multi-select lists (M5) |
 
 ### How each patch works
 
@@ -88,6 +89,14 @@ Each patch lands before the components that need it.
     Code inside a wrapping paragraph). That is a GPUI element, not a Taffy change, and
     lands before Markdown.
   - Example: `cargo run -p gpui --example astryx_inline`.
+- **R6 (ARIA states), as built:**
+  - GPUI's elements could carry a role, label, value and the like, but no states, so a
+    disabled, required or invalid control looked enabled and valid to a screen reader.
+  - Seven setters on `StatefulInteractiveElement` set AccessKit flags in the element's
+    `write_a11y_info`: disabled, read-only, required, invalid (`Invalid::True`), busy,
+    modal and multiselectable. Unset states stay absent.
+  - `aria_disabled` is only the flag: a focus-tracking element keeps its tab stop, matching
+    upstream's `aria-disabled` controls.
 
 - **R2 (backdrop blur):**
   - A new scene primitive.

@@ -11,8 +11,8 @@ use std::rc::Rc;
 
 use gpui::{
     Action, App, Bounds, ClipboardItem, Context, EntityInputHandler, FocusHandle, Focusable,
-    KeyBinding, KeyBindingContextPredicate, OperatingSystem, Pixels, Point, UTF16Selection, Window,
-    WrappedLine, actions, point, px,
+    KeyBinding, KeyBindingContextPredicate, KeyDownEvent, OperatingSystem, Pixels, Point,
+    Subscription, UTF16Selection, Window, WrappedLine, actions, point, px,
 };
 use unicode_segmentation::UnicodeSegmentation;
 use web_time::Instant;
@@ -148,6 +148,8 @@ pub type InsertFilter = Rc<dyn Fn(&str, &str) -> String>;
 pub type ChangeFn = Rc<dyn Fn(String, &mut Window, &mut App)>;
 /// Told when Enter is pressed in a single-line field.
 pub type EnterFn = Rc<dyn Fn(&mut Window, &mut App)>;
+/// Told every key pressed in a focused field, before the field acts on it.
+pub type KeyDownFn = Rc<dyn Fn(&KeyDownEvent, &mut Window, &mut App)>;
 
 /// The last layout of a field, for hit testing and the IME.
 #[derive(Clone)]
@@ -188,12 +190,39 @@ pub struct TextEditState {
     /// The component's callbacks, refreshed every render.
     pub on_change: Option<ChangeFn>,
     pub on_enter: Option<EnterFn>,
+    pub on_key_down: Option<KeyDownFn>,
+    _keys: Subscription,
 }
 
 impl TextEditState {
     pub fn new(text: impl Into<String>, multiline: bool, cx: &mut Context<Self>) -> Self {
+        let focus = cx.focus_handle().tab_stop(true);
+        // Key bindings stop a key before element key listeners see it, so
+        // `on_key_down` intercepts keystrokes instead: every key reaches it
+        // first while this field has focus (upstream onKeyDown).
+        let weak = cx.weak_entity();
+        let keys = cx.intercept_keystrokes({
+            let focus = focus.clone();
+            move |event, window, cx| {
+                if !focus.is_focused(window) {
+                    return;
+                }
+                let Some(f) = weak
+                    .upgrade()
+                    .and_then(|state| state.read(cx).on_key_down.clone())
+                else {
+                    return;
+                };
+                let key_down = KeyDownEvent {
+                    keystroke: event.keystroke.clone(),
+                    is_held: false,
+                    prefer_character_input: false,
+                };
+                f(&key_down, window, cx);
+            }
+        });
         TextEditState {
-            focus: cx.focus_handle().tab_stop(true),
+            focus,
             buffer: EditBuffer::new(text, multiline),
             layout: None,
             settings: FieldSettings::default(),
@@ -205,6 +234,8 @@ impl TextEditState {
             enter_pressed: false,
             on_change: None,
             on_enter: None,
+            on_key_down: None,
+            _keys: keys,
         }
     }
 
@@ -404,8 +435,8 @@ impl TextEditState {
 
     pub(crate) fn enter(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         // Enter commits an IME composition; it never reaches the field then
-        // (upstream's IME guard).
-        if self.buffer.marked().is_some() {
+        // (upstream's IME guard). A disabled field cancels it.
+        if self.buffer.marked().is_some() || self.settings.disabled {
             return;
         }
         if self.buffer.is_multiline() {

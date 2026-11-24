@@ -106,6 +106,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::slider::SLIDER_DOC,
     crate::stepper::STEPPER_DOC,
     crate::stepper::STEP_DOC,
+    crate::input::TEXT_INPUT_DOC,
 ];
 
 /// The registered doc for an upstream component name.

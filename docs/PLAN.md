@@ -105,7 +105,9 @@ examples/consumer/        tiny app using `astryx` via path, to keep the public A
 - **State:** controlled-first like Astryx: `.value(v).on_change(|v, window, cx| ..)`.
   - Where Astryx allows uncontrolled use (Popover, `isDefaultOpen`), internal state lives in
     `window.use_keyed_state(id, ..)`.
-  - Heavy editors (inputs, Table, Calendar, Typeahead, Tokenizer, CodeEditor, RichText) use an
+  - Text fields (TextInput, TextArea, NumberInput) stay controlled by `value`; their editing
+    state lives in a keyed `TextEditState` (decided in M4).
+  - Heavy editors (Table, Calendar, Typeahead, Tokenizer, CodeEditor, RichText) use an
     app-owned `Entity<XState>` + `X::new(&state)`, with `EventEmitter` events.
 - **Async actions:** `clickAction` and `changeAction` become closures returning
   `Task<anyhow::Result<()>>`; pending/loading state is tracked automatically.

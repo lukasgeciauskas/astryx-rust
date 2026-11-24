@@ -33,7 +33,9 @@ pub use state::{
     SelectDocumentStart, SelectDown, SelectEnd, SelectHome, SelectLeft, SelectRight, SelectUp,
     SelectWordLeft, SelectWordRight, ShowCharacterPalette, Undo, Up, WordLeft, WordRight,
 };
-pub use state::{ChangeFn, EnterFn, FieldSettings, InsertFilter, KEY_CONTEXT, TextEditState, init};
+pub use state::{
+    ChangeFn, EnterFn, FieldSettings, InsertFilter, KEY_CONTEXT, KeyDownFn, TextEditState, init,
+};
 
 use gpui::{
     App, CursorStyle, ElementId, Entity, Focusable, InteractiveElement, MouseButton, ParentElement,

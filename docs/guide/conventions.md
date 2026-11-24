@@ -12,7 +12,10 @@
 - **State is controlled-first,** as upstream: `.value(v).on_change(|v, window, cx| ..)`.
   - Uncontrolled state (upstream `isDefaultOpen`, an uncontrolled Popover) lives in
     `window.use_keyed_state`.
-  - Heavy editors (inputs, Table, Calendar) use an app-owned `Entity<XState>` plus
+  - Text fields (TextInput, TextArea, NumberInput) stay controlled by `value`, as
+    upstream. Their editing state (caret, selection, undo, IME) lives in a keyed
+    `astryx_primitives::editing::TextEditState` that follows `value` every render.
+  - Heavy editors (Table, Calendar, CodeEditor) use an app-owned `Entity<XState>` plus
     `X::new(&state)`.
 - **Context:** `astryx_primitives::provide(value, child)` / `use_context::<T>(cx)`.
   - Read context during render only.

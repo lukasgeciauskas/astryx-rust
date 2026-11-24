@@ -96,6 +96,9 @@ pub struct Spinner {
     shade: SpinnerShade,
     label: Option<SharedString>,
     aria_label: Option<SharedString>,
+    /// Upstream `aria-hidden`: no accessibility node, for a spinner that only
+    /// echoes a busy state its control already reports.
+    decorative: bool,
     id: ElementId,
     style: StyleRefinement,
 }
@@ -108,6 +111,7 @@ impl Spinner {
             shade: SpinnerShade::Default,
             label: None,
             aria_label: None,
+            decorative: false,
             id: id.into(),
             style: StyleRefinement::default(),
         }
@@ -122,6 +126,11 @@ impl Spinner {
         ?label: SharedString,
         /// Upstream `aria-label`: the accessible name. Defaults to the label, else "Loading".
         ?aria_label: SharedString,
+    }
+
+    pub(crate) fn decorative(mut self) -> Self {
+        self.decorative = true;
+        self
     }
 }
 
@@ -205,16 +214,18 @@ impl RenderOnce for Spinner {
             None,
         );
         el.style().refine(&self.style);
-        el.id(self.id)
-            .role(Role::ProgressIndicator)
-            .aria_label(name)
-            .child(ring)
-            .children(self.label.map(|label| {
-                div()
-                    .text_style(&t.text.supporting)
-                    .text_color(t.color.text_secondary)
-                    .child(label)
-            }))
+        let el = el.id(self.id);
+        let el = if self.decorative {
+            el
+        } else {
+            el.role(Role::ProgressIndicator).aria_label(name)
+        };
+        el.child(ring).children(self.label.map(|label| {
+            div()
+                .text_style(&t.text.supporting)
+                .text_color(t.color.text_secondary)
+                .child(label)
+        }))
     }
 }
 
