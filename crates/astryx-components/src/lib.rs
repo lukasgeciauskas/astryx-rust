@@ -2,6 +2,7 @@
 //! is ported, and `astryx parity` for what is done.
 
 pub mod doc;
+pub mod layout;
 pub mod text;
 
 pub use doc::{ComponentDoc, PropMapping, RustApi};

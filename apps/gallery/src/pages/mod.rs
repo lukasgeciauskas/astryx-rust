@@ -13,16 +13,18 @@ pub enum Page {
     Tokens,
     Effects,
     Text,
+    Layout,
 }
 
 impl Page {
-    pub const ALL: &'static [Page] = &[Page::Tokens, Page::Effects, Page::Text];
+    pub const ALL: &'static [Page] = &[Page::Tokens, Page::Effects, Page::Text, Page::Layout];
 
     pub fn title(self) -> &'static str {
         match self {
             Page::Tokens => "Tokens",
             Page::Effects => "Effects",
             Page::Text => "Text",
+            Page::Layout => "Layout",
         }
     }
 
@@ -31,6 +33,7 @@ impl Page {
             Page::Tokens => tokens::render(theme, window, cx),
             Page::Effects => effects::render(theme, window, cx),
             Page::Text => astryx::components::text::examples::examples(),
+            Page::Layout => astryx::components::layout::examples::examples(window, cx),
         }
     }
 }

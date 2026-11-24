@@ -46,7 +46,16 @@ pub struct ComponentDoc {
 
 /// Every ported component. A component module adds its `DOC` here when it
 /// lands; `astryx parity` and the CLI tests read this list.
-pub const REGISTRY: &[ComponentDoc] = &[crate::text::TEXT_DOC, crate::text::HEADING_DOC];
+pub const REGISTRY: &[ComponentDoc] = &[
+    crate::text::TEXT_DOC,
+    crate::text::HEADING_DOC,
+    crate::layout::STACK_DOC,
+    crate::layout::CENTER_DOC,
+    crate::layout::GRID_DOC,
+    crate::layout::DIVIDER_DOC,
+    crate::layout::ASPECT_RATIO_DOC,
+    crate::layout::VISUALLY_HIDDEN_DOC,
+];
 
 /// The registered doc for an upstream component name.
 pub fn find(name: &str) -> Option<&'static ComponentDoc> {
