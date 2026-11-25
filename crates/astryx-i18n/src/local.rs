@@ -1,10 +1,23 @@
 //! The port's own strings: text for what upstream leaves to the browser,
 //! such as a text field's context menu (its spelling suggestions and
-//! clipboard commands). English only; an app translates them like any key,
-//! with its catalogs or overrides.
+//! clipboard commands), and for spec items upstream has not built yet (a
+//! PowerSearch value-only row). English only; an app translates them like
+//! any key, with its catalogs or overrides.
 
 const ENGLISH: &[(&str, &str)] = &[
     ("@astryx.listItem.moreActions", "More actions for {label}"),
+    (
+        "@astryx.powersearch.moreMatches",
+        "More {field} matching ''{query}''",
+    ),
+    (
+        "@astryx.powersearch.valueMatch",
+        "{field} {operator} {value}",
+    ),
+    (
+        "@astryx.powersearch.valueMatchText",
+        "{field} {operator} \"{value}\"",
+    ),
     ("@astryx.textField.addToDictionary", "Add to dictionary"),
     ("@astryx.textField.copy", "Copy"),
     ("@astryx.textField.cut", "Cut"),

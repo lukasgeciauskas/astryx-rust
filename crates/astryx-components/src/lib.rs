@@ -27,6 +27,7 @@ pub mod overflow;
 pub mod overlay;
 pub mod pagination;
 pub mod people;
+pub mod power_search;
 mod press;
 pub mod search;
 pub mod segmented;

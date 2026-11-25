@@ -137,7 +137,21 @@ Suggested order, each a commit:
    **OverflowList**~~ (done; List's `reorderable` comes with step 4).
 3. ~~**Typeahead** and **Tokenizer** (share `search::`), **MultiSelector**,
    **ComplexSelector**~~ (done: `typeahead/`, `tokenizer/`, `multi_selector/`,
-   `complex_selector/`), then **PowerSearch**.
+   `complex_selector/`), then **PowerSearch**, in stages, each a commit:
+   - A: the model (`power_search/model.rs`: config, operators, filter values,
+     `create_power_search_config` with `apply_filters`), operator labels, value and
+     token formatting, and the main search source (field, field-and-operator and
+     field-prefixed value rows; the content-search row; FR27-FR29's value-only rows,
+     source calls held 150 ms, "More" rows). Upstream's source lacks FR27-FR30
+     (marked "implementation gap" in its spec); build them from the spec.
+   - B: the popover presentation: the Tokenizer-based field, filter tokens (FR24),
+     the editor popover with its 400-720 px width and edge rules (FR1-FR9), the
+     filter and value editors for every non-date value type, Clear all (FR22,
+     FR23), the result count (FR19), `components` overrides.
+   - C: the sheet flow (FR10-FR21, FR30, DEC-7).
+   - The date and time value types (`time`, `date_absolute`, `date_relative`,
+     `date_range`, `timezoneID`, FR25, FR26) need M8's Calendar, date inputs and
+     calendar systems: record them as M8 work in PLAN.md and the doc's Pending notes.
 4. **TreeList** (tree focus), virtualization for long lists, reordering.
 
 Before starting, read PLAN.md's M6 entry and the upstream `Selector/`,

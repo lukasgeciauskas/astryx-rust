@@ -344,11 +344,20 @@ The remaining primitives:
     while it runs), a close helper and the shell's state; ArrowDown opens, the content or
     `ComplexSelectorController` closes, every route reports through `on_open_change`, and
     focus returns to the trigger only when it would be lost (FR1-FR13).
+  - PowerSearch, stage A (done): the model (`power_search::model`), the config builder
+    with `apply_filters` (upstream `usePowerSearchConfig`), value and token text, and the
+    main field's rows: fields, field-and-operator and field-prefixed value rows, the
+    content search, and FR27's value-only rows with FR29's order, per-field cap and
+    "More" rows. Next: the popover presentation with FR28's source rows (stage B), then
+    the sheet flow (stage C).
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.
 - **M8 Dates:** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
   DateRangeInput, DateTimeInput, TimeInput.
+  - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and
+    `date_range` editors, `timezoneID`, and calendar-day text in the locale's calendar
+    (FR25, FR26, DEC-5, DEC-6). Until then `power_search::format` writes ISO dates in UTC.
 - **M9 Shell & navigation:** AppShell, Layout, SideNav, TopNav, NavMenu/NavHeadingMenu,
   NavItem, NavIcon, MobileNav, Outline, Resizable, ScrollableArea (AST-025), Carousel,
   SnapPaging.
