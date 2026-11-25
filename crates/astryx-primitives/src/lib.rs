@@ -10,6 +10,7 @@ pub mod context;
 pub mod diagnostics;
 pub mod editing;
 pub mod focus;
+pub mod gestures;
 pub mod hotkeys;
 pub mod layer;
 pub mod link;
@@ -17,6 +18,7 @@ pub mod list_focus;
 #[doc(hidden)]
 pub mod list_window;
 pub mod modality;
+pub mod motion;
 pub mod props;
 pub mod size;
 pub mod spell;
@@ -42,8 +44,8 @@ pub use list_window::{
     ListAnchor, ListPitch, ListWindowKey, ScrollHost, WindowedList, WindowedListAxis,
 };
 pub use modality::{
-    InteractionModality, interaction_modality, is_focus_visible, is_focus_within_visible,
-    prefers_reduced_motion, set_reduced_motion,
+    InteractionModality, coarse_primary_pointer, interaction_modality, is_focus_visible,
+    is_focus_within_visible, prefers_reduced_motion, set_reduced_motion,
 };
 pub use size::{ElementSize, resolve_size};
 pub use typeahead::Typeahead;

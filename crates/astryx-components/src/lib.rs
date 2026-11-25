@@ -51,5 +51,6 @@ pub mod tokenizer;
 pub mod toolbar;
 pub mod tree_list;
 pub mod typeahead;
+pub(crate) mod wheel;
 
 pub use doc::{ComponentDoc, PropMapping, RustApi};

@@ -69,9 +69,10 @@ pub(crate) enum Surface {
 }
 
 /// A coarse primary pointer: a finger (upstream `(pointer: coarse)`), read
-/// as the last input having been touch. There is no width bound (FR4).
-pub(crate) fn coarse_pointer(window: &Window) -> bool {
-    window.last_input_was_touch()
+/// as the last pointer input having been touch; a key press keeps it. There
+/// is no width bound (FR4).
+pub(crate) fn coarse_pointer(window: &Window, cx: &mut gpui::App) -> bool {
+    astryx_primitives::coarse_primary_pointer(window, cx)
 }
 
 /// The effective policy of a date picker (`effectivePickerPresentation`):

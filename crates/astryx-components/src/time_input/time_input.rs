@@ -50,37 +50,37 @@ type ValueFn = Rc<dyn Fn(Option<PlainTime>, &mut Window, &mut App)>;
 /// ```
 #[derive(IntoElement)]
 pub struct TimeInput {
-    id: ElementId,
-    label: SharedString,
-    value: Option<PlainTime>,
-    on_change: Option<ValueFn>,
-    change_action: Option<ActionFn<Option<PlainTime>>>,
-    label_hidden: bool,
-    description: Option<SharedString>,
-    optional: bool,
-    required: bool,
-    disabled: bool,
-    disabled_message: Option<SharedString>,
-    loading: bool,
-    min: Option<PlainTime>,
-    max: Option<PlainTime>,
-    seconds: bool,
-    clear: bool,
-    hour_format: Option<HourFormat>,
-    increment: i64,
-    presentation: Option<InputPresentation>,
-    native_picker: Option<LegacyNativePicker>,
-    placeholder: Option<SharedString>,
-    size: Option<ElementSize>,
-    status: Option<InputStatus>,
-    on_entry_error_change: Option<ReportFn<TimeInputEntryError>>,
-    entry_error_behavior: Option<EntryErrorBehavior>,
-    status_placement: StatusPlacement,
-    label_tooltip: Option<SharedString>,
-    auto_focus: bool,
-    width: Option<Length>,
-    control_style: StyleRefinement,
-    style: StyleRefinement,
+    pub(super) id: ElementId,
+    pub(super) label: SharedString,
+    pub(super) value: Option<PlainTime>,
+    pub(super) on_change: Option<ValueFn>,
+    pub(super) change_action: Option<ActionFn<Option<PlainTime>>>,
+    pub(super) label_hidden: bool,
+    pub(super) description: Option<SharedString>,
+    pub(super) optional: bool,
+    pub(super) required: bool,
+    pub(super) disabled: bool,
+    pub(super) disabled_message: Option<SharedString>,
+    pub(super) loading: bool,
+    pub(super) min: Option<PlainTime>,
+    pub(super) max: Option<PlainTime>,
+    pub(super) seconds: bool,
+    pub(super) clear: bool,
+    pub(super) hour_format: Option<HourFormat>,
+    pub(super) increment: i64,
+    pub(super) presentation: Option<InputPresentation>,
+    pub(super) native_picker: Option<LegacyNativePicker>,
+    pub(super) placeholder: Option<SharedString>,
+    pub(super) size: Option<ElementSize>,
+    pub(super) status: Option<InputStatus>,
+    pub(super) on_entry_error_change: Option<ReportFn<TimeInputEntryError>>,
+    pub(super) entry_error_behavior: Option<EntryErrorBehavior>,
+    pub(super) status_placement: StatusPlacement,
+    pub(super) label_tooltip: Option<SharedString>,
+    pub(super) auto_focus: bool,
+    pub(super) width: Option<Length>,
+    pub(super) control_style: StyleRefinement,
+    pub(super) style: StyleRefinement,
 }
 
 impl TimeInput {
@@ -331,10 +331,13 @@ impl RenderOnce for TimeInput {
         // Every surface gets the resolved hour format (FR5).
         let hour_format = resolve_hour_format(&locale, self.hour_format);
 
-        // ORD1: the surface. The sheet and the platform picker land in later
-        // M8 stages; until then every surface is the typed field.
+        // ORD1: the surface. The platform picker lands in a later M8 stage;
+        // until then it is the typed field.
         let policy = effective_input(self.presentation, self.native_picker, "TimeInput");
-        let _surface: Surface = resolve_input(policy, coarse_pointer(window));
+        let surface: Surface = resolve_input(policy, coarse_pointer(window, cx));
+        if surface == Surface::Sheet {
+            return super::sheet::render_sheet(self, hour_format, window, cx);
+        }
 
         let optimistic = Rc::new(Optimistic::<Option<PlainTime>>::new(&self.id, window, cx));
         let shown_value = optimistic.shown(self.value, cx);

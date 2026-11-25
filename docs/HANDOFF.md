@@ -5,7 +5,7 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-25, during M8 (Dates): stages 1 to 5 done._
+_Last updated: 2026-11-26, during M8 (Dates): stages 1 to 5 and 6a done._
 
 ## State
 
@@ -171,6 +171,19 @@ time:
 - **Upstream gives each table cell its own context menu** (TableCell FR4), not one menu
   per row, whatever an older code comment says; read the spec when the two disagree.
 
+## Lessons from M8
+
+- **A BottomSheet slides in by a transform.** Debug bounds give its laid-out place, but its
+  hit areas sit below the window until the entrance ends: tests advance the clock (1 s)
+  after opening a sheet before they click or scroll inside it.
+- **Touch arrives three ways.** A tap synthesizes mouse presses; a pan becomes
+  `ScrollEvent`s with `ScrollSource::Touch`, followed by GPUI's own momentum; an element
+  that wants the raw finger claims a `TouchDragEvent` by calling `prevent_default` at
+  `Started` (the wheel does, from a canvas probe's `window.on_mouse_event`). Tests drive
+  touches with `simulate_event(TouchEvent { .. })`.
+- **Read the pointer with `coarse_primary_pointer`,** not `last_input_was_touch`: a key
+  press is no pointer.
+
 ## Next: M8 Dates
 
 M7 (Table) is done: `crates/astryx-components/src/table/` (Table, its parts, all 14 plugin
@@ -186,7 +199,9 @@ the typed date and time parsers) and Calendar with its three public hooks
 (`crates/astryx-components/src/calendar/`). The owner approved the calendar crates; ICU4X
 and jiff were already dependencies. Stage 2 added DateInput's pointer field (`crates/astryx-components/src/date_input/`) and the
 shared entry-error report (`field/entry_report.rs`). Stage 3 added TimeInput's typed field (`time_input/`). Stage 4 added DateTimeInput's pointer field (`date_time_input/`), stage 5 DateRangeInput
-(`date_range_input/`). The remaining stages, in order: the touch sheets (MonthScroller,
+(`date_range_input/`), stage 6a the picker wheels (`wheel/`, with the motion math pulled forward
+into `astryx_primitives::motion`) and TimeInput's sheet. The remaining stages, in order: the
+touch sheets of DateInput (6b: MonthScroller, the month and year wheels) and DateTimeInput (6c) (MonthScroller,
 the month/year and time wheels), the native pickers (a fork patch: a hidden
 `<input type="date">` and `showPicker()` on the web, the Common Controls month calendar and
 date-time picker on Windows), then the carried items. Carried into M8:

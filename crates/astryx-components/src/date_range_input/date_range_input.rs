@@ -358,7 +358,7 @@ impl Content {
         let i18n = i18n(cx);
         let rtl = use_direction(cx).is_rtl();
         let border = t.border.width.to_pixels(rem);
-        let coarse = coarse_pointer(window);
+        let coarse = coarse_pointer(window, cx);
 
         // FR5: the presets and the calendar share a wrapping row. When they
         // do not fit side by side, the presets stack above. The group draws

@@ -546,6 +546,25 @@ The remaining primitives:
     (FR2, FR3, AR1-AR3, ORD1, ORD2), the presets beside the calendar or stacked above it in a
     wrapping row whose divider shows only between the parts (FR5), clear, `changeAction`
     and disabled. Escape drops a range in progress and leaves the popover open.
+  - Stage 6a (done): the picker wheels and TimeInput's bottom sheet.
+    - Pulled forward from M11 into `astryx_primitives`: `motion` (closed-form springs,
+      UIScrollView's decay, projection, rubber band and the UIKit tables the wheels read)
+      and `gestures::VelocityTracker`.
+    - `wheel/`: the shared rules (`wheelOptions`), the release physics (`wheelPhysics`) and
+      one `Wheel` element: UIPickerView's column under a finger (a claimed touch drag or a
+      mouse pan, UIKit's coast, snap and rubber band, spring turns, loops, a notch per row,
+      a trackpad's pan) and the snapping scroll column under a fine pointer (wheel and
+      trackpad scrolling, mouse drags, the quiet-period settle, the tipped rows). Rests on
+      a disabled row travel on (DateInput FR13), outside changes turn (FR14), keys step
+      in time order and across the loop's seam (FR17), no row is marked while the touch
+      column moves (FR18).
+    - TimeInput's sheet (`time_input/sheet.rs`, `wheels.rs`, `wheel_rules.rs`): the
+      read-only combobox, the BottomSheet of wheels with Save, UIDatePicker's TimeWheels
+      under a finger (the AM/PM wheel follows the hour across 11 and 12, the minutes loop
+      and keep the hour) and one-column-at-a-time wheels under a mouse (FR7).
+    - `coarse_primary_pointer` (`astryx_primitives::modality`): upstream's
+      `(pointer: coarse)` remembers the last pointer through key presses, so typing never
+      flips a field's surface.
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
     `entryErrorBehavior: complete` (`table/filtering.rs` shows none until then).
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

@@ -666,7 +666,7 @@ impl RenderOnce for DateTimeInput {
             calendar,
             "DateTimeInput",
         );
-        let _surface: Surface = resolve_picker(policy, coarse_pointer(window));
+        let _surface: Surface = resolve_picker(policy, coarse_pointer(window, cx));
 
         let optimistic = Rc::new(Optimistic::<Option<PlainDateTime>>::new(
             &self.id, window, cx,

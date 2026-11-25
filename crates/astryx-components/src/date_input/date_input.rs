@@ -324,7 +324,7 @@ impl RenderOnce for DateInput {
             calendar,
             "DateInput",
         );
-        let _surface: Surface = resolve_picker(policy, coarse_pointer(window));
+        let _surface: Surface = resolve_picker(policy, coarse_pointer(window, cx));
 
         let optimistic = Rc::new(Optimistic::<Option<PlainDate>>::new(&self.id, window, cx));
         let shown_value = optimistic.shown(self.value, cx);

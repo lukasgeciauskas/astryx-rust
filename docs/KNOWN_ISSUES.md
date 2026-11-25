@@ -200,6 +200,18 @@
 - **No server render, so today is always known (M8).** Calendar FR12's hydration rules
   (an empty month until today is known) and DateRangeInput's year-while-today-is-unknown
   trigger text have nothing to apply to.
+- **The picker wheels have no haptics (M8).** GPUI has no vibration API, so the touch
+  wheel's selection ticks are silent (upstream ticks only where the platform vibrates).
+- **A trackpad without lift phases lifts on a pause (M8).** Under a finger the touch wheel
+  follows a trackpad's two-finger scroll (DateInput FR15). Where the platform reports the
+  lift (macOS), the wheel coasts from it; elsewhere a 50 ms pause counts as the lift, so
+  momentum the platform keeps sending before that pause moves the wheel too.
+- **The scrolling column's tip is projected flat (M8).** Upstream tips each row with
+  `rotateX` under a perspective; here a row scales by the same angle's cosine vertically and
+  by 0.86 at the edges, without the perspective's trapezoid.
+- **TimeInput's sheet opens from the keyboard (M8).** Upstream's FR7 notes an
+  implementation gap: Enter, Space and ArrowDown do not open its sheet. Here they do, as
+  DateInput's sheet field does, so the wheels are reachable by keyboard as FR7 requires.
 - **DateRangeInput's applied preset in dark mode is 3.88:1 (M8).** As upstream (its spec's
   implementation gap): the label in `text-accent` on the `accent-muted` fill, on the
   popover surface, is under 4.5:1. The tokens are upstream's.

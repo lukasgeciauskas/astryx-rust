@@ -233,3 +233,285 @@ fn fr5_the_locale_s_hour_cycle_shows(cx: &mut TestAppContext) {
         "2:30 PM"
     );
 }
+
+// ---- The bottom-sheet surface (FR7) ----------------------------------------
+
+use crate::date_input::InputPresentation;
+use gpui::{Modifiers, ScrollDelta, ScrollEvent, TouchEvent, TouchId, TouchPhase, point, px};
+
+fn sheet(
+    cx: &mut TestAppContext,
+    initial: Option<PlainTime>,
+    configure: impl Fn(TimeInput) -> TimeInput + 'static,
+) -> (&mut VisualTestContext, Rc<Log>) {
+    field(cx, initial, move |f| {
+        configure(f.presentation(InputPresentation::BottomSheet))
+    })
+}
+
+fn bounds_of(cx: &mut VisualTestContext, selector: &str) -> Option<gpui::Bounds<gpui::Pixels>> {
+    cx.debug_bounds(Box::leak(selector.to_string().into_boxed_str()))
+}
+
+fn wheel_shows(cx: &mut VisualTestContext, wheel: &str) -> bool {
+    bounds_of(cx, &format!("ti-{wheel}")).is_some()
+}
+
+/// A click on a wheel's band: it takes focus and keeps its row.
+fn focus_wheel(cx: &mut VisualTestContext, wheel: &str) {
+    let at = bounds_of(cx, &format!("ti-{wheel}")).unwrap().center();
+    cx.simulate_click(at, Modifiers::none());
+    settle(cx);
+}
+
+/// A finger's tap somewhere blank: the primary pointer turns coarse.
+fn touch_somewhere(cx: &mut VisualTestContext) {
+    for phase in [TouchPhase::Started, TouchPhase::Ended] {
+        cx.simulate_event(TouchEvent {
+            id: TouchId(9),
+            phase,
+            position: point(px(700.), px(20.)),
+            ..Default::default()
+        });
+    }
+    cx.run_until_parked();
+}
+
+fn touch(cx: &mut VisualTestContext, phase: TouchPhase, x: f32, y: f32) {
+    cx.simulate_event(TouchEvent {
+        id: TouchId(1),
+        phase,
+        position: point(px(x), px(y)),
+        ..Default::default()
+    });
+}
+
+fn settle(cx: &mut VisualTestContext) {
+    for _ in 0..3 {
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+}
+
+/// Opens the sheet and lets it finish rising: until then its hit areas are
+/// below the window.
+fn open(cx: &mut VisualTestContext) {
+    press(cx, "enter");
+    settle(cx);
+    cx.executor().advance_clock(Duration::from_secs(1));
+    settle(cx);
+}
+
+#[gpui::test]
+fn fr7_the_sheet_opens_from_the_keyboard_and_escape_closes_it(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(t(6, 45)), |f| f);
+    assert!(!wheel_shows(cx, "minute"));
+    open(cx);
+    assert!(wheel_shows(cx, "hour") && wheel_shows(cx, "minute") && wheel_shows(cx, "meridiem"));
+    assert!(!wheel_shows(cx, "second"));
+    press(cx, "escape");
+    cx.run_until_parked();
+    assert!(!wheel_shows(cx, "minute"));
+    assert!(
+        log.changes.borrow().is_empty(),
+        "opening and closing change nothing"
+    );
+}
+
+#[gpui::test]
+fn fr7_under_a_mouse_each_wheel_turns_its_own_part(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(t(6, 45)), |f| f);
+    open(cx);
+    focus_wheel(cx, "minute");
+    assert!(
+        log.changes.borrow().is_empty(),
+        "a click on the band's row keeps it"
+    );
+    press(cx, "down");
+    assert_eq!(log.changes.borrow().last(), Some(&Some(t(6, 46))));
+    press(cx, "pageup");
+    assert_eq!(log.changes.borrow().last(), Some(&Some(t(6, 36))));
+    focus_wheel(cx, "meridiem");
+    press(cx, "down");
+    assert_eq!(log.changes.borrow().last(), Some(&Some(t(18, 36))));
+}
+
+#[gpui::test]
+fn fr7_a_wheel_never_commits_past_a_bound(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(t(11, 20)), |f| f.min(t(5, 0)).max(t(11, 30)));
+    open(cx);
+    focus_wheel(cx, "minute");
+    press(cx, "pagedown");
+    assert_eq!(log.changes.borrow().last(), Some(&Some(t(11, 30))));
+    press(cx, "pagedown");
+    press(cx, "down");
+    assert_eq!(
+        log.changes.borrow().len(),
+        1,
+        "nothing enabled lies further"
+    );
+    focus_wheel(cx, "hour");
+    press(cx, "down");
+    assert_eq!(log.changes.borrow().len(), 1, "12 PM is past the bound");
+}
+
+#[gpui::test]
+fn fr7_under_a_finger_the_meridiem_follows_the_hour(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(t(11, 30)), |f| f);
+    touch_somewhere(cx);
+    press(cx, "tab");
+    press(cx, "shift-tab");
+    open(cx);
+    let hour = bounds_of(cx, "ti-wheels-hour").expect("the finger's wheels");
+    touch(
+        cx,
+        TouchPhase::Started,
+        f32::from(hour.center().x),
+        f32::from(hour.center().y),
+    );
+    touch(
+        cx,
+        TouchPhase::Ended,
+        f32::from(hour.center().x),
+        f32::from(hour.center().y),
+    );
+    cx.run_until_parked();
+    press(cx, "down");
+    assert_eq!(
+        log.changes.borrow().last(),
+        Some(&Some(t(12, 30))),
+        "11 AM → 12 PM"
+    );
+    cx.executor().advance_clock(Duration::from_secs(2));
+    cx.run_until_parked();
+    press(cx, "down");
+    assert_eq!(
+        log.changes.borrow().last(),
+        Some(&Some(t(13, 30))),
+        "12 PM → 1 PM"
+    );
+}
+
+#[gpui::test]
+fn fr15_a_notch_turns_one_row_under_a_finger(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(t(6, 45)), |f| f);
+    touch_somewhere(cx);
+    press(cx, "tab");
+    press(cx, "shift-tab");
+    open(cx);
+    let minute = bounds_of(cx, "ti-wheels-minute").expect("the finger's wheels");
+    cx.simulate_event(ScrollEvent {
+        position: minute.center(),
+        delta: ScrollDelta::Lines(point(0., -1.)),
+        ..Default::default()
+    });
+    cx.run_until_parked();
+    assert_eq!(log.changes.borrow().last(), Some(&Some(t(6, 46))));
+}
+
+#[gpui::test]
+fn fr13_a_fling_coasts_and_commits_the_row_it_rests_on(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(t(6, 45)), |f| f);
+    touch_somewhere(cx);
+    press(cx, "tab");
+    press(cx, "shift-tab");
+    open(cx);
+    let minute = bounds_of(cx, "ti-wheels-minute").expect("the finger's wheels");
+    let (x, y) = (f32::from(minute.center().x), f32::from(minute.center().y));
+    touch(cx, TouchPhase::Started, x, y);
+    for step in 1..=6 {
+        cx.executor().advance_clock(Duration::from_millis(16));
+        touch(cx, TouchPhase::Moved, x, y - 20. * step as f32);
+    }
+    touch(cx, TouchPhase::Ended, x, y - 120.);
+    cx.run_until_parked();
+    assert!(
+        log.changes.borrow().is_empty(),
+        "nothing commits while it coasts"
+    );
+    cx.executor().advance_clock(Duration::from_secs(5));
+    cx.run_until_parked();
+    let rested = log
+        .changes
+        .borrow()
+        .last()
+        .cloned()
+        .flatten()
+        .expect("a rest commits");
+    // The minutes loop: passing :59 comes to :00 and keeps the hour.
+    let travelled = (i64::from(rested.minute) - 45).rem_euclid(60);
+    assert!(rested.hour == 6 && travelled > 4, "{rested:?}");
+}
+
+#[gpui::test]
+fn fr9_a_disabled_sheet_field_never_opens(cx: &mut TestAppContext) {
+    let (cx, _) = sheet(cx, Some(t(6, 45)), |f| f.disabled(true));
+    open(cx);
+    assert!(!wheel_shows(cx, "minute"));
+}
+
+#[gpui::test]
+fn fr8_the_sheet_field_clears(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(t(6, 45)), |f| f.clear(true));
+    press(cx, "tab");
+    press(cx, "enter");
+    cx.run_until_parked();
+    assert_eq!(*log.changes.borrow(), [None]);
+}
+
+#[gpui::test]
+fn fr13_a_drag_resting_on_a_disabled_row_travels_to_the_nearest_enabled_one(
+    cx: &mut TestAppContext,
+) {
+    let (cx, log) = sheet(cx, Some(t(6, 45)), |f| f.min(t(5, 0)));
+    open(cx);
+    let hour = bounds_of(cx, "ti-hour").unwrap().center();
+    // Three rows down: the column rests on 3 AM, before the minimum.
+    cx.simulate_mouse_down(hour, gpui::MouseButton::Left, Modifiers::none());
+    settle(cx);
+    let below = point(hour.x, hour.y + px(84.));
+    cx.simulate_mouse_move(below, gpui::MouseButton::Left, Modifiers::none());
+    cx.simulate_mouse_up(below, gpui::MouseButton::Left, Modifiers::none());
+    settle(cx);
+    cx.executor().advance_clock(Duration::from_secs(2));
+    settle(cx);
+    assert_eq!(
+        log.changes.borrow().last(),
+        Some(&Some(t(5, 45))),
+        "on to 5 AM"
+    );
+}
+
+#[gpui::test]
+fn fr14_a_wheel_another_turned_turns_onto_its_row(cx: &mut TestAppContext) {
+    let (cx, _) = sheet(cx, Some(t(11, 30)), |f| f);
+    touch_somewhere(cx);
+    press(cx, "tab");
+    press(cx, "shift-tab");
+    open(cx);
+    let hour = bounds_of(cx, "ti-wheels-hour").unwrap().center();
+    touch(
+        cx,
+        TouchPhase::Started,
+        f32::from(hour.x),
+        f32::from(hour.y),
+    );
+    touch(cx, TouchPhase::Ended, f32::from(hour.x), f32::from(hour.y));
+    settle(cx);
+    let band = bounds_of(cx, "ti-wheels-meridiem").unwrap().center().y;
+    press(cx, "down");
+    cx.executor().advance_clock(Duration::from_millis(60));
+    settle(cx);
+    let pm = bounds_of(cx, "ti-wheels-meridiem-option-1")
+        .unwrap()
+        .center()
+        .y;
+    assert!(pm > band + px(2.), "PM is still on its way to the band");
+    cx.executor().advance_clock(Duration::from_secs(2));
+    settle(cx);
+    let pm = bounds_of(cx, "ti-wheels-meridiem-option-1")
+        .unwrap()
+        .center()
+        .y;
+    assert!((pm - band).abs() < px(0.5), "then rests under it");
+}

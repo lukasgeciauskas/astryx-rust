@@ -6,7 +6,9 @@
 //! (`Window::last_input_was_keyboard`, used by its `focus_visible` styles),
 //! so these read it. A focus ring shows for keyboard focus, not for a click.
 
-use gpui::{App, FocusHandle, Global, Window};
+use std::collections::HashMap;
+
+use gpui::{App, FocusHandle, Global, Window, WindowId};
 
 /// How the user last interacted, upstream `InteractionModality`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,6 +31,28 @@ pub fn interaction_modality(window: &Window) -> InteractionModality {
     } else {
         InteractionModality::Pointer
     }
+}
+
+/// Each window's last pointer: whether it was a touch screen.
+#[derive(Default)]
+struct LastPointer(HashMap<WindowId, bool>);
+
+impl Global for LastPointer {}
+
+/// Whether the primary pointer is coarse, upstream `(pointer: coarse)`: the
+/// last pointer input was a finger. A key press is no pointer, so typing or
+/// tabbing keeps the answer (a tablet with a keyboard stays coarse).
+pub fn coarse_primary_pointer(window: &Window, cx: &mut App) -> bool {
+    let id = window.window_handle().window_id();
+    if window.last_input_was_keyboard() {
+        return cx
+            .try_global::<LastPointer>()
+            .and_then(|last| last.0.get(&id).copied())
+            .unwrap_or(false);
+    }
+    let touch = window.last_input_was_touch();
+    cx.default_global::<LastPointer>().0.insert(id, touch);
+    touch
 }
 
 /// Whether `handle` has focus that should show a ring: CSS `:focus-visible`.

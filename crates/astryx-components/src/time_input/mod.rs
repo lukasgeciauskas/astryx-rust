@@ -2,9 +2,12 @@
 //! system specs AST-043, AST-117, AST-118).
 
 pub mod examples;
+mod sheet;
 #[allow(clippy::module_inception)]
 mod time_input;
 pub(crate) mod typed;
+pub(crate) mod wheel_rules;
+pub(crate) mod wheels;
 
 #[cfg(test)]
 mod tests;
@@ -19,7 +22,7 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
 }
 
 const LATER_SURFACES: &str =
-    "the bottom sheet and the platform picker; the typed field shows meanwhile";
+    "the platform picker (a later M8 stage); the typed field shows in its place meanwhile";
 
 pub const TIME_INPUT_DOC: ComponentDoc = ComponentDoc {
     name: "TimeInput",
