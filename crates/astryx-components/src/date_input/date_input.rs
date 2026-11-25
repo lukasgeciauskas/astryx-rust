@@ -18,8 +18,8 @@ use astryx_primitives::{
 };
 use astryx_theme::{ThemeStyled, current, scope};
 use gpui::{
-    AnyElement, App, ElementId, Focusable, IntoElement, KeyDownEvent, Length, MouseButton,
-    RenderOnce, Role, SharedString, StyleRefinement, Styled, Task, Window, div, prelude::*, px,
+    App, ElementId, Focusable, IntoElement, KeyDownEvent, Length, MouseButton, RenderOnce, Role,
+    SharedString, StyleRefinement, Styled, Task, Window, div, prelude::*, px,
 };
 
 use super::presentation::{
@@ -317,16 +317,24 @@ impl RenderOnce for DateInput {
         let i18n = i18n(cx);
         let calendar = self.calendar.unwrap_or_else(|| i18n.calendar_system());
 
-        // ORD1: the surface. The platform picker lands in a later M8 stage;
-        // until then it is the pointer field.
+        // ORD1: the surface; Native where the platform has a picker (R16).
         let policy = calendar_picker(
             effective_picker(self.presentation, self.native_picker, "DateInput"),
             calendar,
             "DateInput",
         );
-        let surface: Surface = resolve_picker(policy, coarse_pointer(window, cx));
-        if surface == Surface::Sheet {
-            return super::sheet::render_sheet(self, window, cx);
+        let coarse = coarse_pointer(window, cx);
+        let surface = super::native::native_or_fallback(
+            resolve_picker(policy, coarse),
+            gpui::NativePickerKind::Date,
+            coarse,
+            Surface::Desktop,
+            window,
+        );
+        match surface {
+            Surface::Sheet => return super::sheet::render_sheet(self, window, cx),
+            Surface::Native => return super::native::render_native(self, window, cx),
+            _ => {}
         }
 
         let optimistic = Rc::new(Optimistic::<Option<PlainDate>>::new(&self.id, window, cx));
@@ -826,12 +834,3 @@ impl RenderOnce for DateInput {
         field.child(control).into_any_element()
     }
 }
-
-/// The element a test reads by its debug selector.
-#[allow(dead_code)]
-pub(crate) fn editor_selector(id: &str) -> String {
-    format!("{id}-editor")
-}
-
-#[allow(dead_code)]
-fn _unused(_: AnyElement) {}

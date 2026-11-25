@@ -587,3 +587,117 @@ fn reset_clears_the_date_and_returns_to_today_s_month(cx: &mut TestAppContext) {
     assert_eq!(*log.changes.borrow(), [None]);
     assert!(shows_month_of(cx, d(2026, 11, 25)), "today's month");
 }
+
+// ---- The native surface (R16) ------------------------------------------------
+
+use gpui::{NativePickerKind, NativePickerOutcome};
+
+fn native(
+    cx: &mut TestAppContext,
+    initial: Option<PlainDate>,
+    supported: bool,
+    configure: impl Fn(DateInput) -> DateInput + 'static,
+) -> (&mut VisualTestContext, Rc<Log>) {
+    cx.set_native_pickers_supported(supported);
+    field(cx, initial, move |f| {
+        configure(f.presentation(PickerPresentation::Native))
+    })
+}
+
+fn alerted(cx: &mut VisualTestContext) -> String {
+    cx.update(|window, cx| {
+        astryx_primitives::announce::announcement(
+            astryx_primitives::Politeness::Assertive,
+            window,
+            cx,
+        )
+        .to_string()
+    })
+}
+
+/// Opens the platform picker from the focused field and answers it.
+fn pick(cx: &mut VisualTestContext, outcome: NativePickerOutcome) {
+    press(cx, "space");
+    cx.run_until_parked();
+    cx.simulate_native_picker(outcome);
+    cx.run_until_parked();
+}
+
+#[gpui::test]
+fn fr2_without_a_platform_picker_native_is_the_pointer_field(cx: &mut TestAppContext) {
+    let (cx, log) = native(cx, None, false, |f| f);
+    focus_input(cx);
+    type_text(cx, "11/20/2026");
+    assert_eq!(*log.changes.borrow(), [Some(d(2026, 11, 20))]);
+}
+
+#[gpui::test]
+fn fr5_a_native_pick_commits_through_the_bounds(cx: &mut TestAppContext) {
+    let (cx, log) = native(cx, Some(d(2026, 11, 18)), true, |f| {
+        f.min(d(2026, 11, 1)).max(d(2026, 12, 31))
+    });
+    press(cx, "tab");
+    press(cx, "space");
+    cx.run_until_parked();
+    let request = cx
+        .native_picker_request()
+        .expect("the platform picker opened");
+    assert_eq!(request.kind, NativePickerKind::Date);
+    assert_eq!(request.value.as_deref(), Some("2026-11-18"));
+    assert_eq!(request.min.as_deref(), Some("2026-11-01"));
+    assert_eq!(request.max.as_deref(), Some("2026-12-31"));
+    cx.simulate_native_picker(NativePickerOutcome::Picked("2026-11-20".into()));
+    cx.run_until_parked();
+    assert_eq!(*log.changes.borrow(), [Some(d(2026, 11, 20))]);
+    // Dismissing changes nothing; the picker's clear clears.
+    pick(cx, NativePickerOutcome::Dismissed);
+    assert_eq!(log.changes.borrow().len(), 1);
+    pick(cx, NativePickerOutcome::Cleared);
+    assert_eq!(log.changes.borrow().last(), Some(&None));
+    // Native control takes no typed text, so nothing is reported.
+    assert!(log.errors.borrow().is_empty());
+}
+
+#[gpui::test]
+fn fr5_a_refused_date_is_held_until_enter(cx: &mut TestAppContext) {
+    let (cx, log) = native(cx, Some(d(2026, 11, 18)), true, |f| f.max(d(2026, 12, 31)));
+    press(cx, "tab");
+    pick(cx, NativePickerOutcome::Picked("2027-01-05".into()));
+    assert!(
+        log.changes.borrow().is_empty(),
+        "a date past max never commits"
+    );
+    assert_eq!(alerted(cx), "", "the refusal waits for Enter or blur");
+    press(cx, "enter");
+    assert_ne!(alerted(cx), "", "Enter shows it");
+    assert!(
+        cx.native_picker_request().is_none(),
+        "Enter commits, it does not open"
+    );
+}
+
+#[gpui::test]
+fn fr5_blur_shows_a_held_refusal_and_a_new_value_ends_it(cx: &mut TestAppContext) {
+    let (cx, log) = native(cx, Some(d(2026, 11, 18)), true, |f| {
+        let rule: Rc<dyn Fn(PlainDate) -> bool> = Rc::new(|date: PlainDate| date.day != 13);
+        f.date_constraints(vec![rule])
+    });
+    press(cx, "tab");
+    pick(cx, NativePickerOutcome::Picked("2026-11-13".into()));
+    assert_eq!(alerted(cx), "");
+    cx.update(|window, cx| window.blur(cx));
+    cx.run_until_parked();
+    assert_ne!(alerted(cx), "", "blur shows the refusal");
+    press(cx, "tab");
+    pick(cx, NativePickerOutcome::Picked("2026-11-14".into()));
+    assert_eq!(*log.changes.borrow(), [Some(d(2026, 11, 14))]);
+}
+
+#[gpui::test]
+fn fr12_a_disabled_native_field_never_opens_its_picker(cx: &mut TestAppContext) {
+    let (cx, _) = native(cx, Some(d(2026, 11, 18)), true, |f| f.disabled(true));
+    press(cx, "tab");
+    press(cx, "space");
+    cx.run_until_parked();
+    assert!(cx.native_picker_request().is_none());
+}

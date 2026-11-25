@@ -8,6 +8,7 @@ pub mod examples;
 pub(crate) mod month_model;
 pub(crate) mod month_scroller;
 pub(crate) mod month_year_wheels;
+pub(crate) mod native;
 pub(crate) mod presentation;
 pub(crate) mod segment;
 pub(crate) mod sheet;
@@ -25,9 +26,6 @@ use crate::doc::{ComponentDoc, PropMapping, RustApi};
 const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
-
-const LATER_SURFACES: &str =
-    "the platform picker (a later M8 stage); the pointer field shows in its place meanwhile";
 
 pub const DATE_INPUT_DOC: ComponentDoc = ComponentDoc {
     name: "DateInput",
@@ -65,14 +63,8 @@ pub const DATE_INPUT_DOC: ComponentDoc = ComponentDoc {
         p("weekStartsOn", RustApi::Method("week_starts_on")),
         p("format", RustApi::Method("format")),
         p("calendar", RustApi::Method("calendar")),
-        p(
-            "presentation",
-            RustApi::Pending("presentation", LATER_SURFACES),
-        ),
-        p(
-            "nativePicker",
-            RustApi::Pending("native_picker", LATER_SURFACES),
-        ),
+        p("presentation", RustApi::Method("presentation")),
+        p("nativePicker", RustApi::Method("native_picker")),
         p("width", RustApi::Method("width")),
         p("containerXstyle", RustApi::Trait("Styled")),
         p("containerClassName", RustApi::Trait("Styled")),

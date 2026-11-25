@@ -198,6 +198,28 @@ impl TypedTimeState {
         (entry_error, rejected)
     }
 
+    /// Upstream `setSurfaceRejected`: the native picker chose a time outside
+    /// the bounds, or one inside them. Under `Complete` it shows at once.
+    pub fn set_surface_rejected(&mut self, rejected: bool, behavior: EntryErrorBehavior) {
+        self.surface = if !rejected {
+            SurfaceRejection::None
+        } else if behavior == EntryErrorBehavior::Complete
+            || self.surface == SurfaceRejection::Shown
+        {
+            SurfaceRejection::Shown
+        } else {
+            SurfaceRejection::Held
+        };
+    }
+
+    /// Upstream `commitSurface`: a held native rejection shows at Enter or
+    /// blur.
+    pub fn commit_surface(&mut self) {
+        if self.surface == SurfaceRejection::Held {
+            self.surface = SurfaceRejection::Shown;
+        }
+    }
+
     /// A native control's rejection shows.
     pub fn surface_shown(&self, locked: bool, behavior: EntryErrorBehavior) -> bool {
         !locked
@@ -264,29 +286,6 @@ impl TypedTimeState {
         }
         self.last_committed = Some(current.time);
         (Some(current.time), report)
-    }
-
-    /// Upstream `setSurfaceRejected`: the native surface's (a later M8 stage).
-    #[allow(dead_code)]
-    pub fn set_surface_rejected(&mut self, rejected: bool, behavior: EntryErrorBehavior) {
-        self.surface = if !rejected {
-            SurfaceRejection::None
-        } else if behavior == EntryErrorBehavior::Complete
-            || self.surface == SurfaceRejection::Shown
-        {
-            SurfaceRejection::Shown
-        } else {
-            SurfaceRejection::Held
-        };
-    }
-
-    /// Upstream `commitSurface`: a held native rejection shows at Enter or
-    /// blur.
-    #[allow(dead_code)]
-    pub fn commit_surface(&mut self) {
-        if self.surface == SurfaceRejection::Held {
-            self.surface = SurfaceRejection::Shown;
-        }
     }
 }
 

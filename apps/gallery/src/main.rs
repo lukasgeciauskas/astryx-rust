@@ -84,10 +84,20 @@ fn env(name: &str) -> Option<String> {
     {
         std::env::var(name).ok()
     }
+    // In the browser the start state comes from the query instead:
+    // `?page=dates&theme=butter&mode=light&scroll=400`.
     #[cfg(target_family = "wasm")]
     {
-        let _ = name;
-        None
+        let key = name.trim_start_matches("GALLERY_").to_ascii_lowercase();
+        let search = web_sys::window()
+            .and_then(|window| window.location().search().ok())
+            .unwrap_or_default();
+        search
+            .trim_start_matches('?')
+            .split('&')
+            .filter_map(|pair| pair.split_once('='))
+            .find(|(k, _)| *k == key)
+            .map(|(_, v)| v.to_string())
     }
 }
 

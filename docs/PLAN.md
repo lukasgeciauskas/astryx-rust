@@ -256,8 +256,7 @@ The remaining primitives:
   - Touch keyboards (fork patch R11): `inputMode`, `enterKeyHint`, `autoCapitalize`,
     `hasAutoCorrect` and `hasSpellCheck` reach the web's IME mirror; NumberInput asks for
     the number pad.
-  - Carried into later milestones, recorded in each doc: FormLayout's
-    `defaultEntryErrorBehavior` readers (M8).
+  - Carried into M8 and done there: FormLayout's `defaultEntryErrorBehavior` readers.
 - **M5 Layer runtime & overlays (done, 2026-11-25):** Popover (done: focus region through fork patch R12,
   focus entry and return, light and Escape dismissal, the disclosure contract with its
   trigger; its sheet presentations wait for BottomSheet), HoverCard (done: Tooltip's
@@ -347,8 +346,8 @@ The remaining primitives:
     with `apply_filters` (upstream `usePowerSearchConfig`), value and token text, and the
     main field's rows: fields, field-and-operator and field-prefixed value rows, the
     content search, and FR27's value-only rows with FR29's order, per-field cap and
-    "More" rows. Stage B (done): the value editors (every type but the M8
-    date and time ones, which show their value until then), `PowerSearchFilterEditor`
+    "More" rows. Stage B (done): the value editors (the date and time ones since
+    M8), `PowerSearchFilterEditor`
     (field, operator and value; Delete, Cancel, Apply; Enter and Escape; focus starting in
     the value; nested filters on a TreeList), and the field: filter tokens named by their
     text with their editor (FR24), the editor popover 400-720 px wide at the nearer edge of
@@ -370,7 +369,7 @@ The remaining primitives:
     open (a text field's value, or a search editor's opening query: BaseTypeahead FR18,
     Tokenizer FR31, built here though upstream lists FR31 as an implementation gap),
     with a people field's "More" row opening its Tokenizer sheet directly (FR29, FR30).
-    PowerSearch is done but for its date and time values, which M8 brings.
+    PowerSearch is done; its date and time values came with M8 (stage 8).
   - TreeList (done): data-driven rows with chevrons, guides, start and end content,
     density and variants; row actions (FR7); the WAI-ARIA tree keys as the
     `astryx_primitives::tree_focus` primitive (upstream `useTreeFocus`) with one tab stop
@@ -493,7 +492,7 @@ The remaining primitives:
     columns near the inline viewport, plus pinned columns and a focused cell's; an
     unmounted column keeps its grid track. Product rows are built by one `RowBuilder` that
     the full and windowed bodies share.
-- **M8 Dates:** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
+- **M8 Dates (done, 2026-11-25):** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
   DateRangeInput, DateTimeInput, TimeInput.
   - Stage 1 (done): calendar systems and Calendar. `astryx_i18n::date` ports
     `plainDate`, `calendarSystem`, `calendarDateParser`, `dateParser`, `timeParser` and
@@ -524,7 +523,7 @@ The remaining primitives:
     field and calendar (FR8, FR9). Clear, `changeAction` with the busy state, disabled with
     its reason, the format hint and calendar description (AR9), InputGroup membership, and
     AST-043's presentation vocabulary (`date_input/presentation.rs`); the sheet and native
-    surfaces come in later stages.
+    surfaces are stages 6b and 7.
   - Stage 3 (done): TimeInput's typed field (`time_input/`): a draft that commits as soon
     as it parses to an in-range time, in the locale's digits, separators and day periods
     (FR3), ArrowUp and ArrowDown stepping by `increment` from the value or now with a
@@ -595,11 +594,27 @@ The remaining primitives:
       DateTimeInput since stages 2 to 4.
     - `astryx_i18n::datetime`: `day_of_instant`, `midnight_in_zone`,
       `wall_clock_in_zone`, `instant_in_zone`.
-  - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
-    `entryErrorBehavior: complete` (`table/filtering.rs` shows none until then).
-  - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and
-    `date_range` editors, `timezoneID`, and calendar-day text in the locale's calendar
-    (FR25, FR26, DEC-5, DEC-6). Until then `power_search::format` writes ISO dates in UTC.
+  - Stage 7 (done): the platform's pickers, through fork patch R16 (`b39b0e1`).
+    - `Window::show_native_picker` and `native_picker_supported`: the Common Controls
+      month calendar or date-time picker in a popup below the field on Windows, the
+      browser's `<input type=date|time|datetime-local>` picker on the web, and none
+      elsewhere, where `Native` resolves to the pointer's Astryx surface (KNOWN_ISSUES).
+    - `date_input/native.rs`: the shared native segment (a press, Space, ArrowDown or F4
+      opens the picker over the box; Enter and blur commit) and `NativeDateRejection`
+      (upstream `useNativeDateRejection`): a refused date is held until Enter or blur, a
+      new value ends it, and a caller's error message repeats once through the alert.
+      DateInput's native field commits through `min`, `max` and `dateConstraints`,
+      clears without taking focus back, and keeps its picker through a pending Action
+      while refusing its commits (FR5, FR11, FR12).
+    - TimeInput's native field keeps the field's own status: it steps whole minutes
+      (upstream's `step=60`), and a pick outside the bounds is a surface rejection, shown
+      at once under `Complete` and otherwise at Enter or blur. The adaptive and
+      deprecated policies keep the typed field with seconds or an increment (FR2).
+    - DateTimeInput's native segments: a date picker and a time picker. The adaptive
+      policies keep the Astryx time with seconds, an increment or preset times, and a
+      time picked before any date waits for the date (FR2).
+    - The web gallery reads its start state from the query (`?page=dates`), and
+      `cargo xtask gpui-local` now patches `gpui_web` too.
 - **M9 Shell & navigation:** AppShell, Layout, SideNav, TopNav, NavMenu/NavHeadingMenu,
   NavItem, NavIcon, MobileNav, Outline, Resizable, ScrollableArea (AST-025), Carousel,
   SnapPaging.

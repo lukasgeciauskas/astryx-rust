@@ -136,9 +136,6 @@
   strings, which the live region speaks. A trigger whose search makes it a button is always described as
   required when it is, since its name is the bare label (upstream's name can carry the
   label's marker).
-- **PowerSearch's date and time values wait for M8.** Their editors show the value
-  (an ISO date in UTC) and cannot change it until M8 brings the date inputs, the
-  calendar systems and `timezoneID`; tokens read dates as ISO dates meanwhile.
 - **A ComplexSelector's trigger has no separate value.** `trigger_label` and
   `placeholder` are elements, as upstream's nodes are, so the combobox carries the shown
   value as the text inside it rather than as an accessible value.
@@ -222,6 +219,21 @@
 - **DateRangeInput's applied preset in dark mode is 3.88:1 (M8).** As upstream (its spec's
   implementation gap): the label in `text-accent` on the `accent-muted` fill, on the
   popover surface, is under 4.5:1. The tokens are upstream's.
+- **Native pickers exist on Windows and the web only (M8).** Fork patch R16 opens the
+  Common Controls month calendar or date-time picker on Windows and the browser's
+  `<input type=date|time|datetime-local>` picker on the web. macOS and Linux report
+  `native_picker_supported` false, and `Native` (or `AdaptiveNative` under a finger)
+  resolves to the pointer's Astryx surface: the sheet under a finger, otherwise the
+  popover (DateInput, DateTimeInput) or the typed field (TimeInput). An AppKit
+  `NSDatePicker` or GTK picker needs those platforms to build and check on.
+- **The native field paints its own text (M8).** Upstream lays its text over the browser's
+  control and lets a press reach it. Here the value is Astryx text in the field's box, and
+  a press, Space, ArrowDown or F4 opens the platform's picker below the box (Enter
+  commits, as in upstream's control). The Windows popup is drawn by the system, in the
+  system's style rather than the theme's.
+- **The browser's picker popup is not in captures (M8).** It is drawn outside the page,
+  so a headless capture shows the native field but not the popup. The Windows popups
+  were captured from the gallery and the fork's `astryx_native_picker` example.
 
 ## Tooling
 

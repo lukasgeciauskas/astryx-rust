@@ -16,7 +16,8 @@ Astryx itself; see `docs/guide/effects.md`.
 ## Working on a patch
 
 1. **Edit and build locally.** Edit `../zed-astryx`, a clone of the `astryx` branch.
-   `cargo xtask gpui-local on` builds this workspace against the clone.
+   `cargo xtask gpui-local on` builds this workspace against the clone (`gpui`,
+   `gpui_platform` and `gpui_web`).
 2. **Prove it:**
    - add an example to the fork (`crates/gpui/examples/astryx_<feature>.rs`);
    - add a gallery page here;
@@ -53,6 +54,7 @@ Each patch lands before the components that need it.
 | R13 | Active descendants across layers (**landed**, `01da1ad`) | `aria_active_descendant_of(&FocusHandle)`: an element is the active descendant of the element tracking that handle while it is focused, wherever it sits in the tree | Selector's listbox options (M6), and every combobox popup after it |
 | R14 | `aria-sort` (**landed**, `d436e06`) | `aria_sort(SortDirection)` on any stateful element, setting AccessKit's sort direction; `SortDirection` is re-exported | A sortable Table column's header (M7) |
 | R15 | Named nodes and `aria-controls` (**landed**, `52f7859`) | `aria_id(name)` names an element's node as an HTML `id` does; `aria_controls(names)` points at named nodes. Both are collected per frame and resolved when the tree is finished, so a relation may name a node that comes later; unknown names are skipped | A tree table's expanders and row expansion's toggles (M7) |
+| R16 | Native pickers (**landed**, `b39b0e1`) | `Window::show_native_picker(NativePickerRequest)` opens the platform's date, time or date-and-time picker below an anchor and answers `Picked` (an ISO value), `Cleared` or `Dismissed` through a channel; `native_picker_supported(kind)` says whether one exists | The native surfaces of DateInput, TimeInput and DateTimeInput (M8) |
 
 ### How each patch works
 
@@ -152,6 +154,23 @@ Each patch lands before the components that need it.
     focus (`A11y::set_active_descendant_of_focused`), provided a focused node exists.
     Deferred layers prepaint after the main tree, so the focused trigger's node is
     already known.
+
+- **R16 (native pickers), as built:**
+  - `NativePickerRequest` carries the kind, the value, `min` and `max` as ISO text,
+    whether seconds show, and the anchor in window coordinates. `PlatformWindow` gains
+    `native_picker_supported` and `show_native_picker` (defaults: false and `None`).
+  - Windows (`gpui_windows/src/native_picker.rs`): an owned `WS_POPUP` tool window
+    below the anchor hosts `SysMonthCal32` for dates or `SysDateTimePick32` for times
+    (`DTS_TIMEFORMAT`) and date-times (`DTS_UPDOWN`, the locale's short date and time
+    formats). A month-calendar pick answers at once; Enter answers with the control's
+    value; Escape or a deactivation without a change dismisses, and one after a change
+    answers with it.
+  - Web (`gpui_web/src/window.rs`): a transparent `<input>` of the kind (`step=1` with
+    seconds) placed over the anchor, focused, then `showPicker()`; `change` answers,
+    `cancel`, `blur` and Escape dismiss, and the IME mirror takes focus back.
+  - The test platform is off by default; `set_native_pickers_supported`,
+    `native_picker_request` and `simulate_native_picker` drive it.
+  - Example: `crates/gpui/examples/astryx_native_picker.rs`.
 
 - **R2 (backdrop blur):**
   - A new scene primitive.

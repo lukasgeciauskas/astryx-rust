@@ -328,6 +328,8 @@ struct Ctx {
     on_change: Option<ValueFn>,
     action: Option<ActionFn<Option<PlainDateTime>>>,
     optimistic: Rc<Optimistic<Option<PlainDateTime>>>,
+    /// A native time chosen before any date.
+    time_draft: Option<PlainTime>,
     date_popover: PopoverController,
     time_popover: PopoverController,
     time: Entity<TimeState>,
@@ -364,6 +366,7 @@ impl Ctx {
         let mut time = self
             .value
             .map(|v| v.time)
+            .or(self.time_draft)
             .unwrap_or_else(|| PlainTime::now().truncated(self.seconds));
         if let Some(DateTimeBound {
             date: d,
@@ -659,17 +662,42 @@ impl RenderOnce for DateTimeInput {
         let calendar = self.calendar.unwrap_or_else(|| i18n.calendar_system());
         let hour_format = resolve_hour_format(&locale, self.hour_format);
 
-        // ORD1: the surfaces. The platform pickers land in a later M8 stage;
-        // until then they are the pointer field.
+        // ORD1: the surfaces. Native where the platform has a picker (R16);
+        // the time segment goes native where the picker can step it: always
+        // under a forced Native, else without seconds or an increment.
         let policy = calendar_picker(
             effective_picker(self.presentation, self.native_picker, "DateTimeInput"),
             calendar,
             "DateTimeInput",
         );
-        let surface: Surface = resolve_picker(policy, coarse_pointer(window, cx));
+        let coarse = coarse_pointer(window, cx);
+        let surface = crate::date_input::native::native_or_fallback(
+            resolve_picker(policy, coarse),
+            gpui::NativePickerKind::Date,
+            coarse,
+            Surface::Desktop,
+            window,
+        );
         if surface == Surface::Sheet {
             return super::sheet::render_sheet(self, window, cx);
         }
+        let native_date = surface == Surface::Native;
+        // Forced is an explicit `presentation` of Native; the adaptive and
+        // deprecated policies keep the Astryx time where the picker cannot
+        // step it or list presets.
+        let forced = self.presentation == Some(PickerPresentation::Native)
+            && policy == PickerPresentation::Native;
+        let native_time = native_date
+            && window.native_picker_supported(gpui::NativePickerKind::Time)
+            && (forced
+                || (self.time_increment == 1
+                    && !self.seconds
+                    && self.time_option_interval.is_none()));
+        let native_rejection = window.use_keyed_state(
+            ElementId::Name(format!("{:?}-native-rejection", self.id).into()),
+            cx,
+            |_, _| crate::date_input::native::NativeDateRejection::default(),
+        );
 
         let optimistic = Rc::new(Optimistic::<Option<PlainDateTime>>::new(
             &self.id, window, cx,
@@ -677,8 +705,22 @@ impl RenderOnce for DateTimeInput {
         let shown_value = optimistic.shown(self.value, cx);
         let pending_change = optimistic.pending(cx);
         let busy = self.loading || pending_change;
-        // FR9: a pending action makes the popover surface inert too.
-        let locked = self.disabled || self.loading || pending_change;
+        // FR9: a pending action makes the popover surface inert too; a
+        // native segment keeps taking edits.
+        let locked = self.disabled || self.loading || (pending_change && !native_date);
+        // The two pickers are separate: a time chosen before any date waits
+        // for the date's commit, and a new value drops it.
+        let time_draft_state = window.use_keyed_state(
+            ElementId::Name(format!("{:?}-native-time-draft", self.id).into()),
+            cx,
+            |_, _| (None::<PlainTime>, shown_value),
+        );
+        let time_draft = time_draft_state.update(cx, |d, _| {
+            if d.1 != shown_value {
+                *d = (None, shown_value);
+            }
+            d.0
+        });
         optimistic.announce_busy(busy, i18n.t("@astryx.spinner.loading"), window, cx);
         let behavior = entry_error_behavior(self.entry_error_behavior, cx);
 
@@ -728,7 +770,8 @@ impl RenderOnce for DateTimeInput {
             |_, _| TimeState::default(),
         );
         let (time_error, time_rejected) = time.update(cx, |s, _| {
-            s.typed.reconcile(shown_value.map(|v| v.time), false, true);
+            s.typed
+                .reconcile(shown_value.map(|v| v.time), false, !native_time);
             s.typed.resolve(&time_rules, locked || busy, behavior)
         });
         let options: Rc<Vec<(PlainTime, String)>> = Rc::new(match self.time_option_interval {
@@ -776,6 +819,7 @@ impl RenderOnce for DateTimeInput {
             options: options.clone(),
             time_increment: self.time_increment,
             time_focus: time_focus.clone(),
+            time_draft,
         };
 
         // The date segment: DateInput's typing session (FR11).
@@ -829,6 +873,29 @@ impl RenderOnce for DateTimeInput {
         // FR16: the date segment's message comes first; a time rejection
         // under it speaks through the time alert.
         let date_status = date_resolved.status.clone();
+        // On the native surface the date's message is its refusal.
+        let native_view = native_date.then(|| {
+            native_rejection.update(cx, |r, _| {
+                r.resolve(
+                    self.value.map(|v| v.date),
+                    locked || busy,
+                    self.status.as_ref(),
+                    self.on_entry_error_change.is_some(),
+                    true,
+                    &typed,
+                )
+            })
+        });
+        if let Some(alert) = native_view.as_ref().and_then(|v| v.alert.clone()) {
+            window.defer(cx, move |window, cx| {
+                announce(alert, Politeness::Assertive, window, cx)
+            });
+        }
+        let native_date_invalid = native_view.as_ref().is_some_and(|v| v.message.is_some());
+        let (date_status, date_shown) = match native_view {
+            Some(view) => (view.field_status, native_date_invalid),
+            None => (date_status, date_shown),
+        };
         let time_status = if date_shown {
             self.status.clone()
         } else {
@@ -1411,6 +1478,247 @@ impl RenderOnce for DateTimeInput {
                 .into_any_element()
         } else {
             time_box.into_any_element()
+        };
+
+        // R16: the platform's pickers in place of the Astryx segments.
+        let date_segment: AnyElement = if native_date {
+            let on_outcome: crate::date_input::native::OutcomeFn = {
+                let (ctx, rejection, typed) =
+                    (ctx.clone(), native_rejection.clone(), typed.clone());
+                let (value, draft_state) = (self.value, time_draft_state.clone());
+                Rc::new(move |outcome, window, cx| {
+                    if locked {
+                        return;
+                    }
+                    match outcome {
+                        gpui::NativePickerOutcome::Dismissed => {}
+                        gpui::NativePickerOutcome::Cleared => {
+                            rejection.update(cx, |r, _| r.clear());
+                            if value.is_some() {
+                                draft_state.update(cx, |d, _| d.0 = None);
+                                ctx.fire(None, window, cx);
+                            }
+                        }
+                        gpui::NativePickerOutcome::Picked(iso) => {
+                            let Some(date) = PlainDate::from_iso(&iso) else {
+                                return;
+                            };
+                            if typed.is_disabled(date) {
+                                rejection.update(cx, |r, _| r.refuse(date));
+                                return;
+                            }
+                            rejection.update(cx, |r, _| r.clear());
+                            if value.map(|v| v.date) != Some(date) {
+                                ctx.date_changed(date, false, window, cx);
+                            }
+                        }
+                    }
+                    window.refresh();
+                })
+            };
+            let on_commit: astryx_primitives::editing::FocusFn = {
+                let (rejection, optimistic, loading) =
+                    (native_rejection.clone(), optimistic.clone(), self.loading);
+                Rc::new(move |window, cx| {
+                    let locked = locked || loading || optimistic.pending(cx);
+                    rejection.update(cx, |r, _| r.commit(locked));
+                    window.refresh();
+                })
+            };
+            let mut trailing: Vec<AnyElement> = Vec::new();
+            if self.clear && self.value.is_some() && !locked {
+                let (ctx, draft_state) = (ctx.clone(), time_draft_state.clone());
+                // A clear never takes focus back: focus would reopen a picker.
+                trailing.push(
+                    provide(
+                        Disclosure::detached(),
+                        IconButton::new(
+                            ElementId::Name(format!("{}-clear", self.id).into()),
+                            i18n.format(
+                                "@astryx.dateInput.clear",
+                                &[("label", self.label.as_ref().into())],
+                            ),
+                            Icon::new("close")
+                                .size(IconSize::Sm)
+                                .color(IconColor::Secondary),
+                        )
+                        .variant(ButtonVariant::Ghost)
+                        .size(ElementSize::Sm)
+                        .tooltip(i18n.t("@astryx.inputClearButton.tooltip"))
+                        .h(px(20.))
+                        .on_click(move |_, window, cx| {
+                            draft_state.update(cx, |d, _| d.0 = None);
+                            ctx.fire(None, window, cx);
+                        }),
+                    )
+                    .into_any_element(),
+                );
+            }
+            if busy {
+                trailing.push(
+                    Spinner::new(ElementId::Name(format!("{}-spinner", self.id).into()))
+                        .size(SpinnerSize::Sm)
+                        .shade(SpinnerShade::Inherit)
+                        .decorative()
+                        .into_any_element(),
+                );
+            }
+            crate::date_input::native::native_segment(
+                crate::date_input::native::NativeSegment {
+                    id: ElementId::Name(format!("{}-native-date", self.id).into()),
+                    target: "date-time-input-date-segment",
+                    icon: "calendar",
+                    icon_label: i18n.t("@astryx.dateInput.openCalendar"),
+                    role: Role::DateInput,
+                    name: self.label.clone(),
+                    description: description.clone(),
+                    display: shown_value
+                        .map(|v| typed.format_committed(v.date))
+                        .unwrap_or_default(),
+                    placeholder: self
+                        .placeholder
+                        .clone()
+                        .unwrap_or_else(|| i18n.t("@astryx.dateTimeInput.placeholder")),
+                    size,
+                    status: date_status_type,
+                    disabled: self.disabled,
+                    inert: locked,
+                    busy,
+                    required,
+                    invalid: native_date_invalid,
+                    request: gpui::NativePickerRequest {
+                        kind: gpui::NativePickerKind::Date,
+                        value: shown_value.map(|v| v.date.to_string()),
+                        min: min_date.map(|d| d.to_string()),
+                        max: max_date.map(|d| d.to_string()),
+                        seconds: false,
+                        anchor: gpui::Bounds::default(),
+                    },
+                    on_outcome,
+                    on_commit: Some(on_commit),
+                    trailing,
+                    control_style: StyleRefinement::default(),
+                },
+                &theme,
+                window,
+                cx,
+            )
+            .flex_1()
+            .flex_basis(px(SEGMENT_BASIS))
+            .min_w_0()
+            .into_any_element()
+        } else {
+            date_segment.into_any_element()
+        };
+        let time_segment: AnyElement = if native_time {
+            // The time the picker shows: a held draft, else the value's.
+            let native_time_value = time_draft.or(shown_value.map(|v| v.time));
+            let on_outcome: crate::date_input::native::OutcomeFn = {
+                let (ctx, time_state, draft_state) =
+                    (ctx.clone(), time.clone(), time_draft_state.clone());
+                let value = shown_value;
+                Rc::new(move |outcome, window, cx| {
+                    if locked {
+                        return;
+                    }
+                    let set_rejected = |rejected: bool, cx: &mut App| {
+                        time_state
+                            .update(cx, |s, _| s.typed.set_surface_rejected(rejected, behavior))
+                    };
+                    match outcome {
+                        gpui::NativePickerOutcome::Dismissed => {}
+                        gpui::NativePickerOutcome::Cleared => {
+                            set_rejected(false, cx);
+                            if native_time_value.is_some() {
+                                draft_state.update(cx, |d, _| d.0 = None);
+                                if value.is_some() {
+                                    ctx.fire(None, window, cx);
+                                }
+                            }
+                        }
+                        gpui::NativePickerOutcome::Picked(iso) => {
+                            let Some(time) = PlainTime::from_iso(&iso) else {
+                                return;
+                            };
+                            if !is_time_in_range(time, time_min, time_max) {
+                                set_rejected(true, cx);
+                                window.refresh();
+                                return;
+                            }
+                            set_rejected(false, cx);
+                            if Some(time) != native_time_value {
+                                match value {
+                                    Some(value) => ctx.fire(
+                                        Some(PlainDateTime::new(value.date, time)),
+                                        window,
+                                        cx,
+                                    ),
+                                    // A time before any date waits for the date (FR2).
+                                    None => draft_state.update(cx, |d, _| d.0 = Some(time)),
+                                }
+                            }
+                        }
+                    }
+                    window.refresh();
+                })
+            };
+            let on_commit: astryx_primitives::editing::FocusFn = {
+                let time_state = time.clone();
+                Rc::new(move |window, cx| {
+                    time_state.update(cx, |s, _| s.typed.commit_surface());
+                    window.refresh();
+                })
+            };
+            crate::date_input::native::native_segment(
+                crate::date_input::native::NativeSegment {
+                    id: ElementId::Name(format!("{}-native-time", self.id).into()),
+                    target: "date-time-input-time-segment",
+                    icon: "clock",
+                    icon_label: i18n.format(
+                        "@astryx.dateTimeInput.openTimePicker",
+                        &[("label", time_label.as_ref().into())],
+                    ),
+                    role: Role::TimeInput,
+                    name: time_label.clone(),
+                    description: description.clone(),
+                    display: native_time_value
+                        .map(|t| format_locale_time(t, &locale, hour_format, false))
+                        .unwrap_or_default(),
+                    placeholder: self
+                        .time_placeholder
+                        .clone()
+                        .unwrap_or_else(|| i18n.t("@astryx.dateTimeInput.timePlaceholder")),
+                    size,
+                    status: time_status_type,
+                    disabled: self.disabled,
+                    inert: locked,
+                    busy,
+                    required,
+                    invalid: time_rejected,
+                    // The picker steps whole minutes, as upstream's `step=60`.
+                    request: gpui::NativePickerRequest {
+                        kind: gpui::NativePickerKind::Time,
+                        value: native_time_value.map(|t| t.to_iso(false)),
+                        min: time_min.map(|t| t.to_iso(false)),
+                        max: time_max.map(|t| t.to_iso(false)),
+                        seconds: false,
+                        anchor: gpui::Bounds::default(),
+                    },
+                    on_outcome,
+                    on_commit: Some(on_commit),
+                    trailing: Vec::new(),
+                    control_style: StyleRefinement::default(),
+                },
+                &theme,
+                window,
+                cx,
+            )
+            .flex_1()
+            .flex_basis(px(SEGMENT_BASIS))
+            .min_w_0()
+            .into_any_element()
+        } else {
+            time_segment
         };
 
         let mut row = div().flex().flex_row().flex_wrap().gap(t.spacing.s2);

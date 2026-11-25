@@ -19,7 +19,7 @@ const END: &str = "# END gpui-local";
 
 fn local_block() -> String {
     format!(
-        "{BEGIN}\n[patch.\"{FORK_URL}\"]\ngpui = {{ path = \"../zed-astryx/crates/gpui\" }}\ngpui_platform = {{ path = \"../zed-astryx/crates/gpui_platform\" }}\n{END}\n"
+        "{BEGIN}\n[patch.\"{FORK_URL}\"]\ngpui = {{ path = \"../zed-astryx/crates/gpui\" }}\ngpui_platform = {{ path = \"../zed-astryx/crates/gpui_platform\" }}\ngpui_web = {{ path = \"../zed-astryx/crates/gpui_web\" }}\n{END}\n"
     )
 }
 

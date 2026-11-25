@@ -5,24 +5,22 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M8 (Dates): stages 1 to 6 and 8 done; the native pickers remain._
+_Last updated: 2026-11-25, at the end of M8 (Dates). Next: M9 (Shell & navigation)._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6 and M7; M8 (Dates) is under way
-  (stages 1 to 5: calendar systems and Calendar, the pointer surfaces of DateInput,
-  TimeInput and DateTimeInput, and DateRangeInput). Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7 and M8. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
 - **Parity:** 88 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
-- **Last commits on `main`:** M7's seven stages, from `cceff1a` (Table and its parts)
-  through sorting, selection and activation, pagination and filtering, tree and grouped
-  rows, column settings and resize, to virtualization. CI runs on
+- **Last commits on `main`:** M8's stages, from `90581cb` (calendar systems and
+  Calendar) through the pointer fields, DateRangeInput, the wheels and the three bottom
+  sheets and the carried items, to the native pickers. CI runs on
   ubuntu, windows and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
-  `52f785921072e000e31d957c7008cde0a01f7afd` (patches R1 and R5 to R15; see
+  `b39b0e1a3afa568fec8d6ac16eab1d9ffa645082` (patches R1 and R5 to R16; see
   [`gpui-fork.md`](gpui-fork.md)). The `[patch.crates-io]` block in
   `Cargo.toml` (async-task, calloop) is legitimate and stays.
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
@@ -30,8 +28,7 @@ _Last updated: 2026-11-26, during M8 (Dates): stages 1 to 6 and 8 done; the nati
 
 ### Not yet ported (26)
 
-- **M8:** every date component is ported, sheets included; the native surfaces of DateInput,
-  TimeInput and DateTimeInput come later in M8. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
+- **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
@@ -51,6 +48,7 @@ _Last updated: 2026-11-26, during M8 (Dates): stages 1 to 6 and 8 done; the nati
 | Backdrop blur (Lightbox, scrims) | Fork patch R2 |
 | Table row expansion's `animatedLayout` glide (FR15) | Motion layer (M11) |
 | TreeList's `animatedLayout` and expand glide (FR8, FR9) | Motion layer (M11) |
+| Native date and time pickers on macOS and Linux (`Native` shows the Astryx surface there) | Fork patch R16 built and checked on those platforms |
 
 ## The owner's standing instructions
 
@@ -180,28 +178,33 @@ time:
   touches with `simulate_event(TouchEvent { .. })`.
 - **Read the pointer with `coarse_primary_pointer`,** not `last_input_was_touch`: a key
   press is no pointer.
+- **GPUI turns Enter and Space on a focused clickable element into a click**
+  (`ClickEvent::Keyboard`). An element whose keys mean something else checks
+  `event.is_keyboard()` in `on_click`.
+- **Focus listeners run inside a draw,** where `window.refresh()` is lost: defer the work
+  (`window.defer`). A window that loses activation also fires focus-out, since the focus
+  event reads the window's activity (the native picker's popup does this on Windows).
+- **`gpui-local` must patch every fork crate the workspace names.** `gpui_web` was
+  missing, so local wasm builds linked two copies of it; the xtask now patches it too.
+- **Browser captures without Claude in Chrome:** run `cargo xtask web`, then headless
+  Chrome: `chrome --headless=new --use-angle=swiftshader --enable-unsafe-swiftshader
+  --virtual-time-budget=30000 --window-size=1300,900 --screenshot=<png>
+  "http://127.0.0.1:8080/?page=dates&backend=webgl"`, with a scratch
+  `--user-data-dir`. The query picks the page, theme, mode and scroll.
 
-## Next: M8 Dates
+## Next: M9 Shell & navigation
 
-M7 (Table) is done: `crates/astryx-components/src/table/` (Table, its parts, all 14 plugin
-families, selection's toolbar and activation), fork patches R14 and R15, tests in
-`table/tests.rs`, `row_tests.rs`, `data_tests.rs`, `structure_tests.rs`,
-`column_tests.rs` and `window_tests.rs`. What it carried: Table filtering's date and
-time controls (M8 below) and row expansion's glide (M11).
+M8 (Dates) is done: calendar systems in `astryx_i18n::date` (ICU4X), Calendar,
+DateInput, TimeInput, DateTimeInput and DateRangeInput, each with its pointer field, its
+bottom sheet (`wheel/`, the month pager, the month and year wheels) and its native
+surface (fork patch R16: the Common Controls pickers on Windows, the browser's pickers on
+the web; `date_input/native.rs`). The motion math was pulled forward from M11 into
+`astryx_primitives::motion` and `gestures`. The items carried into M8 are done:
+PowerSearch's date and time values with `timezoneID`, Table filtering's date and time
+controls, and FormLayout's `defaultEntryErrorBehavior` readers.
 
-M8 builds the date and time inputs on calendar systems (jiff + icu4x, AST-111): Calendar,
-DateInput (segmented), DateRangeInput, DateTimeInput and TimeInput. Stage 1 is done: the
-date and time foundations in `astryx_i18n::date` (calendar arithmetic, formatting as parts,
-the typed date and time parsers) and Calendar with its three public hooks
-(`crates/astryx-components/src/calendar/`). The owner approved the calendar crates; ICU4X
-and jiff were already dependencies. Stage 2 added DateInput's pointer field (`crates/astryx-components/src/date_input/`) and the
-shared entry-error report (`field/entry_report.rs`). Stage 3 added TimeInput's typed field (`time_input/`). Stage 4 added DateTimeInput's pointer field (`date_time_input/`), stage 5 DateRangeInput
-(`date_range_input/`), stage 6a the picker wheels (`wheel/`, with the motion math pulled forward
-into `astryx_primitives::motion`) and TimeInput's sheet, stage 6b DateInput's sheet (the month pager, the month and year
-wheels), stage 6c DateTimeInput's sheet. The items carried into M8 are done (stage 8: PowerSearch's date and time values with
-`timezoneID`, Table filtering's date and time controls, FormLayout's
-`defaultEntryErrorBehavior` readers). The remaining stage: the native pickers (a fork patch: a hidden
-`<input type="date">` and `showPicker()` on the web, the Common Controls month calendar and
-date-time picker on Windows), closing M8.
-
-Ask the owner before adding the jiff or icu4x calendar crates (installing software).
+M9 ports AppShell, Layout, SideNav, TopNav, NavMenu and NavHeadingMenu, NavItem, NavIcon,
+MobileNav, Outline, Resizable, ScrollableArea (AST-025), Carousel and SnapPaging (see
+`PLAN.md`). It carries Dialog's content inset, which Layout provides. Start with
+`cargo run -q -p astryx-cli -- component <Name> --dense` for each and the upstream specs
+in `../Astryx/docs/specs/components/`.

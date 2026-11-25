@@ -2,6 +2,7 @@
 //! system specs AST-043, AST-117, AST-118).
 
 pub mod examples;
+mod native;
 pub(crate) mod sheet;
 #[allow(clippy::module_inception)]
 mod time_input;
@@ -20,9 +21,6 @@ use crate::doc::{ComponentDoc, PropMapping, RustApi};
 const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
-
-const LATER_SURFACES: &str =
-    "the platform picker (a later M8 stage); the typed field shows in its place meanwhile";
 
 pub const TIME_INPUT_DOC: ComponentDoc = ComponentDoc {
     name: "TimeInput",
@@ -45,14 +43,8 @@ pub const TIME_INPUT_DOC: ComponentDoc = ComponentDoc {
         p("hasClear", RustApi::Method("clear")),
         p("hourFormat", RustApi::Method("hour_format")),
         p("increment", RustApi::Method("increment")),
-        p(
-            "presentation",
-            RustApi::Pending("presentation", LATER_SURFACES),
-        ),
-        p(
-            "nativePicker",
-            RustApi::Pending("native_picker", LATER_SURFACES),
-        ),
+        p("presentation", RustApi::Method("presentation")),
+        p("nativePicker", RustApi::Method("native_picker")),
         p("placeholder", RustApi::Method("placeholder")),
         p("size", RustApi::Method("size")),
         p("status", RustApi::Method("status")),

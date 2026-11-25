@@ -515,3 +515,80 @@ fn fr14_a_wheel_another_turned_turns_onto_its_row(cx: &mut TestAppContext) {
         .y;
     assert!((pm - band).abs() < px(0.5), "then rests under it");
 }
+
+// ---- The native surface (R16) ------------------------------------------------
+
+fn alerted(cx: &mut VisualTestContext) -> String {
+    cx.update(|window, cx| {
+        astryx_primitives::announce::announcement(Politeness::Assertive, window, cx).to_string()
+    })
+}
+
+fn pick(cx: &mut VisualTestContext, outcome: gpui::NativePickerOutcome) {
+    press(cx, "space");
+    cx.run_until_parked();
+    cx.simulate_native_picker(outcome);
+    cx.run_until_parked();
+}
+
+#[gpui::test]
+fn fr2_a_forced_native_opens_even_with_seconds(cx: &mut TestAppContext) {
+    cx.set_native_pickers_supported(true);
+    let (cx, _) = field(cx, Some(t(6, 45)), |f| {
+        f.presentation(InputPresentation::Native).seconds(true)
+    });
+    press(cx, "space");
+    cx.run_until_parked();
+    let request = cx.native_picker_request().expect("forced native opens");
+    // The picker steps whole minutes, as upstream's `step=60`.
+    assert!(!request.seconds);
+    assert_eq!(request.value.as_deref(), Some("06:45"));
+}
+
+#[gpui::test]
+fn fr2_the_deprecated_always_keeps_the_typed_field_with_seconds(cx: &mut TestAppContext) {
+    cx.set_native_pickers_supported(true);
+    let (cx, log) = field(cx, None, |f| {
+        f.native_picker(crate::date_input::LegacyNativePicker::Always)
+            .seconds(true)
+    });
+    press(cx, "space");
+    cx.run_until_parked();
+    assert!(cx.native_picker_request().is_none());
+    type_text(cx, "9:30:15 AM");
+    assert_eq!(
+        log.changes.borrow().last(),
+        Some(&Some(PlainTime::new(9, 30, 15).unwrap()))
+    );
+}
+
+#[gpui::test]
+fn fr6_a_native_time_commits_within_its_bounds(cx: &mut TestAppContext) {
+    cx.set_native_pickers_supported(true);
+    let (cx, log) = field(cx, Some(t(9, 0)), |f| {
+        f.presentation(InputPresentation::Native)
+            .min(t(8, 0))
+            .max(t(17, 0))
+    });
+    pick(cx, gpui::NativePickerOutcome::Picked("10:30".into()));
+    assert_eq!(*log.changes.borrow(), [Some(t(10, 30))]);
+    // Under `Complete` (the default) a time past max shows at once.
+    pick(cx, gpui::NativePickerOutcome::Picked("18:00".into()));
+    assert_eq!(log.changes.borrow().len(), 1, "past max is refused");
+    assert_ne!(alerted(cx), "");
+}
+
+#[gpui::test]
+fn fr13_under_blur_or_enter_a_native_rejection_waits(cx: &mut TestAppContext) {
+    cx.set_native_pickers_supported(true);
+    let (cx, log) = field(cx, Some(t(9, 0)), |f| {
+        f.presentation(InputPresentation::Native)
+            .max(t(17, 0))
+            .entry_error_behavior(EntryErrorBehavior::BlurOrEnter)
+    });
+    pick(cx, gpui::NativePickerOutcome::Picked("18:00".into()));
+    assert!(log.changes.borrow().is_empty());
+    assert_eq!(alerted(cx), "");
+    press(cx, "enter");
+    assert_ne!(alerted(cx), "", "Enter shows it");
+}

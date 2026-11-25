@@ -17,9 +17,6 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
 
-const LATER_SURFACES: &str =
-    "the platform pickers (a later M8 stage); the pointer field shows in their place meanwhile";
-
 pub const DATE_TIME_INPUT_DOC: ComponentDoc = ComponentDoc {
     name: "DateTimeInput",
     rust_type: "astryx::components::date_time_input::DateTimeInput",
@@ -63,14 +60,8 @@ pub const DATE_TIME_INPUT_DOC: ComponentDoc = ComponentDoc {
         p("labelTooltip", RustApi::Method("label_tooltip")),
         p("numberOfMonths", RustApi::Method("number_of_months")),
         p("weekStartsOn", RustApi::Method("week_starts_on")),
-        p(
-            "presentation",
-            RustApi::Pending("presentation", LATER_SURFACES),
-        ),
-        p(
-            "nativePicker",
-            RustApi::Pending("native_picker", LATER_SURFACES),
-        ),
+        p("presentation", RustApi::Method("presentation")),
+        p("nativePicker", RustApi::Method("native_picker")),
         p("width", RustApi::Method("width")),
         p("containerXstyle", RustApi::Trait("Styled")),
         p("containerClassName", RustApi::Trait("Styled")),

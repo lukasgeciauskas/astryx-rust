@@ -371,3 +371,68 @@ fn the_sheet_field_clears(cx: &mut TestAppContext) {
     settle(cx);
     assert_eq!(*log.changes.borrow(), [None]);
 }
+
+// ---- The native segments (R16) ----------------------------------------------
+
+fn pick(
+    cx: &mut VisualTestContext,
+    outcome: gpui::NativePickerOutcome,
+) -> gpui::NativePickerRequest {
+    press(cx, "space");
+    cx.run_until_parked();
+    let request = cx
+        .native_picker_request()
+        .expect("a platform picker opened");
+    cx.simulate_native_picker(outcome);
+    cx.run_until_parked();
+    request
+}
+
+#[gpui::test]
+fn fr3_native_segments_keep_the_time_and_the_date(cx: &mut TestAppContext) {
+    cx.set_native_pickers_supported(true);
+    let (cx, log) = field(cx, Some(at(d(2026, 12, 2), t(9, 15))), |f| {
+        f.presentation(crate::date_input::PickerPresentation::Native)
+    });
+    press(cx, "tab");
+    let request = pick(cx, gpui::NativePickerOutcome::Picked("2026-12-10".into()));
+    assert_eq!(request.kind, gpui::NativePickerKind::Date);
+    assert_eq!(*log.changes.borrow(), [Some(at(d(2026, 12, 10), t(9, 15)))]);
+    press(cx, "tab");
+    let request = pick(cx, gpui::NativePickerOutcome::Picked("14:00".into()));
+    assert_eq!(request.kind, gpui::NativePickerKind::Time);
+    assert_eq!(request.value.as_deref(), Some("09:15"));
+    assert_eq!(
+        log.changes.borrow().last(),
+        Some(&Some(at(d(2026, 12, 10), t(14, 0))))
+    );
+}
+
+#[gpui::test]
+fn fr2_a_native_time_before_any_date_waits_for_the_date(cx: &mut TestAppContext) {
+    cx.set_native_pickers_supported(true);
+    let (cx, log) = field(cx, None, |f| {
+        f.presentation(crate::date_input::PickerPresentation::Native)
+    });
+    press(cx, "tab");
+    press(cx, "tab");
+    pick(cx, gpui::NativePickerOutcome::Picked("09:30".into()));
+    assert!(
+        log.changes.borrow().is_empty(),
+        "no date-time without a date"
+    );
+    press(cx, "shift-tab");
+    pick(cx, gpui::NativePickerOutcome::Picked("2026-12-10".into()));
+    assert_eq!(*log.changes.borrow(), [Some(at(d(2026, 12, 10), t(9, 30)))]);
+}
+
+#[gpui::test]
+fn fr2_adaptive_native_keeps_the_astryx_time_for_presets(cx: &mut TestAppContext) {
+    cx.set_native_pickers_supported(true);
+    let (cx, _) = field(cx, None, |f| {
+        f.native_picker(crate::date_input::LegacyNativePicker::Always)
+            .time_option_interval(TimeOptionInterval::Thirty)
+    });
+    assert!(cx.debug_bounds("dti-native-date-value").is_some());
+    assert!(cx.debug_bounds("dti-native-time-value").is_none());
+}

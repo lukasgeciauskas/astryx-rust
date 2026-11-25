@@ -17,6 +17,7 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let start = window.use_keyed_state("date-input-start", cx, |_, _| None::<PlainDate>);
     let persian = window.use_keyed_state("date-input-persian", cx, |_, _| Some(date(2026, 10, 30)));
     let trip = window.use_keyed_state("date-input-trip", cx, |_, _| Some(date(2026, 12, 4)));
+    let visit = window.use_keyed_state("date-input-visit", cx, |_, _| Some(date(2026, 12, 15)));
     let error = window.use_keyed_state("date-input-error", cx, |_, _| None::<DateInputEntryError>);
     let store = |state: gpui::Entity<Option<PlainDate>>| {
         move |value: Option<PlainDate>, window: &mut Window, cx: &mut App| {
@@ -66,6 +67,14 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                 .max(date(2027, 6, 30))
                 .clear(true)
                 .on_change(store(trip.clone())),
+        )
+        .child(
+            DateInput::new("visit", "Visit", *visit.read(cx))
+                .description("The platform's own picker, where it has one")
+                .presentation(PickerPresentation::Native)
+                .min(date(2026, 11, 1))
+                .clear(true)
+                .on_change(store(visit.clone())),
         )
         .child(
             DateInput::new("persian", "Persian date", *persian.read(cx))

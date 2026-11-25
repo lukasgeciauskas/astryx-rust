@@ -331,13 +331,27 @@ impl RenderOnce for TimeInput {
         // Every surface gets the resolved hour format (FR5).
         let hour_format = resolve_hour_format(&locale, self.hour_format);
 
-        // ORD1: the surface. The platform picker lands in a later M8 stage;
-        // until then it is the typed field.
+        // ORD1: the surface. An adaptive policy keeps the typed field where
+        // the platform picker cannot step (seconds, an increment); Native
+        // falls back where the platform has no picker (R16).
         let policy = effective_input(self.presentation, self.native_picker, "TimeInput");
-        let surface: Surface = resolve_input(policy, coarse_pointer(window, cx));
+        let coarse = coarse_pointer(window, cx);
+        let mut surface: Surface = resolve_input(policy, coarse);
+        let forced = self.presentation == Some(InputPresentation::Native);
+        if surface == Surface::Native && !forced && (self.seconds || self.increment != 1) {
+            surface = Surface::TextInput;
+        }
+        let surface = crate::date_input::native::native_or_fallback(
+            surface,
+            gpui::NativePickerKind::Time,
+            coarse,
+            Surface::TextInput,
+            window,
+        );
         if surface == Surface::Sheet {
             return super::sheet::render_sheet(self, hour_format, window, cx);
         }
+        let native = surface == Surface::Native;
 
         let optimistic = Rc::new(Optimistic::<Option<PlainTime>>::new(&self.id, window, cx));
         let shown_value = optimistic.shown(self.value, cx);
@@ -358,7 +372,7 @@ impl RenderOnce for TimeInput {
             |_, _| FieldState::default(),
         );
         let (entry_error, rejected) = state.update(cx, |s, _| {
-            s.typed.reconcile(self.value, self.disabled, true);
+            s.typed.reconcile(self.value, self.disabled, !native);
             s.typed.resolve(&rules, locked, behavior)
         });
 
@@ -430,6 +444,43 @@ impl RenderOnce for TimeInput {
             locked,
             increment: self.increment,
         };
+
+        if native {
+            if self.auto_focus {
+                let done = window.use_keyed_state(
+                    ElementId::Name(format!("{:?}-autofocused", self.id).into()),
+                    cx,
+                    |_, _| false,
+                );
+                if !*done.read(cx) {
+                    done.update(cx, |done, _| *done = true);
+                    let focus = astryx_primitives::control_focus(&self.id, window, cx);
+                    window.defer(cx, move |window, cx| window.focus(&focus, cx));
+                }
+            }
+            let (fire, set, commit) = (ctx.clone(), ctx.clone(), ctx.clone());
+            let props = super::native::NativeTime {
+                hour_format,
+                size,
+                shown: shown_value,
+                busy,
+                field_status,
+                rejected,
+                in_group: place.is_some(),
+                group,
+                fire: Rc::new(move |value, window, cx| fire.fire(value, window, cx)),
+                set_rejected: Rc::new(move |rejected, cx| {
+                    set.state.update(cx, |s, _| {
+                        s.typed.set_surface_rejected(rejected, set.behavior)
+                    })
+                }),
+                commit: Rc::new(move |window, cx| {
+                    commit.state.update(cx, |s, _| s.typed.commit_surface());
+                    window.refresh();
+                }),
+            };
+            return super::native::render_native(self, props, window, cx);
+        }
 
         let (pending, focused_state) = {
             let s = state.read(cx);

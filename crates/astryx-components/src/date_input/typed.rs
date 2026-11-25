@@ -214,6 +214,11 @@ impl TypedDate {
     }
 
     /// The message of a rejected result; each kind has its own (AR3).
+    /// Whether `min`, `max` or a constraint rules `date` out.
+    pub fn is_disabled(&self, date: PlainDate) -> bool {
+        (self.is_disabled)(date)
+    }
+
     pub fn error_message(&self, result: &DateParse) -> SharedString {
         match result {
             DateParse::Nonexistent { .. } => {
