@@ -7,7 +7,7 @@ use gpui::{AnyElement, App, IntoElement, ParentElement, Window};
 
 use crate::layout::{SpacingStep, Stack, StackAlign};
 use crate::text::{Text, TextType};
-use crate::time::{Timer, TimerFormat, Timestamp, TimestampFormat};
+use crate::time::{Timer, TimerFormat, Timestamp, TimestampEntry, TimestampFormat};
 
 pub fn examples(_window: &mut Window, _cx: &mut App) -> AnyElement {
     let label = |text: &'static str| Text::new(text).text_type(TextType::Supporting);
@@ -56,6 +56,23 @@ pub fn examples(_window: &mut Window, _cx: &mut App) -> AnyElement {
             "date",
             Timestamp::new("date", "2025-03-21T21:51:07Z")
                 .format(TimestampFormat::Date)
+                .into_any_element(),
+        ))
+        .child(row(
+            "date_time, three zones on hover",
+            Timestamp::new("zones", "2025-03-21T21:51:07Z")
+                .format(TimestampFormat::DateTime)
+                .tooltip_entries([
+                    TimestampEntry::new().label("Local").copyable(true),
+                    TimestampEntry::new()
+                        .timezone_id("America/New_York")
+                        .label("New York")
+                        .copyable(true),
+                    TimestampEntry::new()
+                        .timezone_id("Asia/Tokyo")
+                        .label("Tokyo")
+                        .format(astryx_i18n::InstantFormat::DateTime),
+                ])
                 .into_any_element(),
         ))
         .child(row(

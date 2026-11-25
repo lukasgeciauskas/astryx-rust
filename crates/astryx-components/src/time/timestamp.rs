@@ -108,6 +108,7 @@ pub struct Timestamp {
     timezone: TimeZoneChoice,
     auto_threshold: i64,
     has_tooltip: bool,
+    tooltip_entries: Vec<super::hover::TimestampEntry>,
     timezone_shown: bool,
     live: bool,
     text_type: TextType,
@@ -127,6 +128,7 @@ impl Timestamp {
             timezone: TimeZoneChoice::Local,
             auto_threshold: 604_800,
             has_tooltip: true,
+            tooltip_entries: Vec::new(),
             timezone_shown: false,
             live: false,
             text_type: TextType::Supporting,
@@ -142,7 +144,8 @@ impl Timestamp {
         format: TimestampFormat,
         /// Upstream `autoThreshold`: seconds before `auto` switches to a date.
         auto_threshold: i64,
-        /// Upstream `hasTooltip`. The hover card lands with HoverCard (M5).
+        /// Upstream `hasTooltip`: a copyable hover card with the full time,
+        /// on a relative time, or on any format with `tooltip_entries`.
         !has_tooltip,
         /// Upstream `isTimezoneShown`: the zone after `date_time` and `time`.
         !timezone_shown,
@@ -156,6 +159,16 @@ impl Timestamp {
         color: TextColor,
         /// Upstream `weight`.
         ?weight: TextWeight,
+    }
+
+    /// Upstream `tooltipEntries`: the hover card's lines, one per zone and
+    /// format.
+    pub fn tooltip_entries(
+        mut self,
+        entries: impl IntoIterator<Item = super::hover::TimestampEntry>,
+    ) -> Self {
+        self.tooltip_entries = entries.into_iter().collect();
+        self
     }
 
     /// Upstream `timezoneID`: an IANA zone, or `"local"`.
@@ -253,10 +266,35 @@ impl RenderOnce for Timestamp {
             None,
         );
         el.style().refine(&self.style);
-        el.id(self.id)
+        let card = self.has_tooltip && (relative || !self.tooltip_entries.is_empty());
+        let mut el = el
+            .id(self.id.clone())
             .role(Role::Time)
             .aria_label(name)
-            .child(text_el)
+            .child(text_el);
+        if !card {
+            return el.into_any_element();
+        }
+        // The card's trigger takes focus (upstream `tabIndex={0}`).
+        let focus = astryx_primitives::control_focus(&self.id, window, cx);
+        el = el.track_focus(&focus).relative();
+        if astryx_primitives::is_focus_visible(&focus, window) {
+            el = el.child(crate::focus::focus_ring(
+                theme.tokens(),
+                gpui::px(0.),
+                window.rem_size(),
+            ));
+        }
+        let (id, entries, zone) = (self.id.clone(), self.tooltip_entries, self.timezone);
+        let label = i18n.t("@astryx.timestamp.detailsLabel");
+        crate::overlay::HoverCard::new(ElementId::Name(format!("{}-card", self.id).into()))
+            .label(label)
+            .content_fn(move |window, cx| {
+                let i18n = astryx_i18n::current(cx);
+                let lines = super::hover::lines(&i18n, seconds, &entries, &zone);
+                super::hover::card_content(&id, lines, window, cx)
+            })
+            .child(el)
             .into_any_element()
     }
 }

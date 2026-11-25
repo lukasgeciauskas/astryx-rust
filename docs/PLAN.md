@@ -260,7 +260,8 @@ The remaining primitives:
     `defaultEntryErrorBehavior` readers (M8).
 - **M5 Layer runtime & overlays:** Popover (done: focus region through fork patch R12,
   focus entry and return, light and Escape dismissal, the disclosure contract with its
-  trigger; its sheet presentations wait for BottomSheet), BottomSheet, HoverCard, Overlay,
+  trigger; its sheet presentations wait for BottomSheet), HoverCard (done: Tooltip's
+  engine with a card surface; Timestamp's copyable hover card), BottomSheet, Overlay,
   Dialog(+Header, imperative), AlertDialog, Drawer, Toast(+viewport/queue), DropdownMenu
   (submenus, menu press), ContextMenu (with spelling suggestions in text fields),
   MoreMenu, Lightbox, CommandPalette.

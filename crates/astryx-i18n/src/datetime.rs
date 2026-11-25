@@ -204,6 +204,19 @@ pub fn format_instant(
     .unwrap_or_else(|_| fallback())
 }
 
+/// The long name of the zone an instant falls in ("Pacific Daylight
+/// Time"), upstream `formatZoneName`.
+pub fn format_zone_name(locale: &Locale, unix_seconds: i64, zone: &TimeZoneChoice) -> String {
+    let clock = wall_clock(unix_seconds, zone);
+    NoCalendarFormatter::try_new(locale.into(), SpecificLong)
+        .map(|f| {
+            f.format(&icu_zone_of(&clock, unix_seconds))
+                .write_to_string()
+                .into_owned()
+        })
+        .unwrap_or_default()
+}
+
 /// Unix seconds from an ISO 8601 instant ("2025-03-21T21:51:07Z"), upstream
 /// `value` as a string.
 pub fn parse_iso(value: &str) -> Option<i64> {

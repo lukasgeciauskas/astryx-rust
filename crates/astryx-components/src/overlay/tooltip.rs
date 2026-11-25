@@ -90,6 +90,12 @@ pub struct TooltipState {
     group: FocusHandle,
     /// A text trigger's own tab stop.
     text: FocusHandle,
+    /// A hover card's surface: focus inside it holds the card open.
+    surface: FocusHandle,
+    /// Whether the trigger is a text span (else an element), for focus return.
+    text_trigger: bool,
+    /// Visible last frame.
+    was_visible: bool,
     // Refreshed every frame from the component.
     controlled: Option<bool>,
     enabled: bool,
@@ -111,6 +117,9 @@ impl TooltipState {
             side: Placement::Above,
             group: cx.focus_handle().tab_stop(false),
             text: cx.focus_handle().tab_stop(true),
+            surface: cx.focus_handle().tab_stop(false),
+            text_trigger: false,
+            was_visible: false,
             controlled: None,
             enabled: true,
             on_open_change: None,
@@ -166,6 +175,21 @@ fn hide(state: &Entity<TooltipState>, window: &mut Window, cx: &mut App) {
         f(false, window, cx);
     }
     window.refresh();
+}
+
+/// Gives focus back to the trigger: a text trigger's span, or the first tab
+/// stop inside an element trigger.
+fn return_focus(state: &Entity<TooltipState>, window: &mut Window, cx: &mut App) {
+    let (text_trigger, text, group) = {
+        let s = state.read(cx);
+        (s.text_trigger, s.text.clone(), s.group.clone())
+    };
+    if text_trigger {
+        text.focus(window, cx);
+    } else {
+        group.focus(window, cx);
+        window.focus_next(cx);
+    }
 }
 
 /// Opens or closes after `delay`, replacing any pending change. A close
@@ -242,6 +266,19 @@ pub type ContentFn = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 pub enum TooltipContent {
     Text(SharedString),
     Element(ContentFn),
+    /// An element for this frame: a hover card's content.
+    #[doc(hidden)]
+    Ready(Rc<std::cell::RefCell<Option<AnyElement>>>),
+}
+
+/// What surface the engine draws: a tooltip, or a hover card (upstream
+/// HoverCard shares Tooltip's triggers and timing).
+#[derive(Clone, Default)]
+pub(crate) enum Surface {
+    #[default]
+    Tooltip,
+    /// A card of interactive content, a dialog when labeled.
+    Card { label: Option<SharedString> },
 }
 
 impl<T: Into<SharedString>> From<T> for TooltipContent {
@@ -272,6 +309,7 @@ pub struct Tooltip {
     trigger_acts: bool,
     press_closes: bool,
     controller: Option<TooltipController>,
+    surface: Surface,
     style: StyleRefinement,
 }
 
@@ -298,8 +336,21 @@ impl Tooltip {
             trigger_acts: false,
             press_closes: true,
             controller: None,
+            surface: Surface::Tooltip,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Replaces the content.
+    pub(crate) fn content(mut self, content: TooltipContent) -> Self {
+        self.content = content;
+        self
+    }
+
+    /// Draws a hover card instead of a tooltip.
+    pub(crate) fn card(mut self, label: Option<SharedString>) -> Self {
+        self.surface = Surface::Card { label };
+        self
     }
 
     /// Content built when shown: anything, not only text.
@@ -431,14 +482,19 @@ impl RenderOnce for Tooltip {
 
         // Focus in the trigger opens it per `focus_trigger`; focus leaving
         // closes it, pinned or not, unless the pointer holds it (FR4, FR12).
-        let group = state.read(cx).group.clone();
-        let within = group.contains_focused(window, cx);
-        let opens = within
-            && match self.focus_trigger {
-                FocusTrigger::Never => false,
-                FocusTrigger::Always => true,
-                FocusTrigger::Auto => self.text_entry || window.last_input_was_keyboard(),
-            };
+        let (group, card) = {
+            let s = state.read(cx);
+            (s.group.clone(), s.surface.clone())
+        };
+        let in_card = card.contains_focused(window, cx);
+        let within = group.contains_focused(window, cx) || in_card;
+        let opens = in_card
+            || (within
+                && match self.focus_trigger {
+                    FocusTrigger::Never => false,
+                    FocusTrigger::Always => true,
+                    FocusTrigger::Auto => self.text_entry || window.last_input_was_keyboard(),
+                });
         let was_focused = state.read(cx).focused;
         if opens != was_focused {
             state.update(cx, |s, _| s.focused = opens);
@@ -465,6 +521,17 @@ impl RenderOnce for Tooltip {
         }
 
         let visible = state.read(cx).visible();
+        let text_trigger = self.text.is_some();
+        let was_visible = state.update(cx, |s, _| {
+            s.text_trigger = text_trigger;
+            std::mem::replace(&mut s.was_visible, visible)
+        });
+        if was_visible && !visible && in_card {
+            // The card closed with focus inside it: back to the trigger
+            // (HoverCard FR6, FR7).
+            let state = state.clone();
+            window.defer(cx, move |window, cx| return_focus(&state, window, cx));
+        }
         let (delay, hide_delay) = (self.delay, self.hide_delay);
         let leave_delay = if hide_delay.is_zero() {
             HOVER_BRIDGE
@@ -473,9 +540,10 @@ impl RenderOnce for Tooltip {
         };
 
         // The trigger: the element, or a focusable span of text.
+        let is_card = matches!(self.surface, Surface::Card { .. });
         let describes = match &self.content {
-            TooltipContent::Text(text) => Some(text.clone()),
-            TooltipContent::Element(_) => None,
+            TooltipContent::Text(text) if !is_card => Some(text.clone()),
+            _ => None,
         };
         let indicate = self.hover_indication.unwrap_or(self.text.is_some());
         let trigger: AnyElement = match (self.text, self.trigger) {
@@ -496,9 +564,20 @@ impl RenderOnce for Tooltip {
                 }
                 span.into_any_element()
             }
-            (None, Some(trigger)) => match &describes {
-                Some(d) => provide(TooltipDescribes(d.clone()), trigger).into_any_element(),
-                None => trigger,
+            (None, Some(trigger)) => match (&describes, &self.surface) {
+                (Some(d), _) => provide(TooltipDescribes(d.clone()), trigger).into_any_element(),
+                // A labeled card tells a button trigger it opens a dialog
+                // (HoverCard FR3).
+                (None, Surface::Card { label: Some(_) }) => provide(
+                    super::disclosure::Disclosure {
+                        expanded: visible,
+                        popup: gpui::HasPopup::Dialog,
+                        toggle: None,
+                    },
+                    trigger,
+                )
+                .into_any_element(),
+                (None, _) => trigger,
             },
             (None, None) => div().into_any_element(),
         };
@@ -588,20 +667,45 @@ impl RenderOnce for Tooltip {
             let content = match &self.content {
                 TooltipContent::Text(text) => text.clone().into_any_element(),
                 TooltipContent::Element(build) => build(window, cx),
+                TooltipContent::Ready(element) => element
+                    .borrow_mut()
+                    .take()
+                    .unwrap_or_else(|| div().into_any_element()),
             };
             let selector = format!("{}-surface", self.id);
             let mut surface = div()
                 .id(ElementId::Name(format!("{}-surface", self.id).into()))
                 .debug_selector(|| selector)
-                .max_w(px(MAX_WIDTH))
-                .py(t.spacing.s1)
-                .px(t.spacing.s2)
-                .bg(t.color.background_inverted)
-                .text_color(t.color.background_surface)
                 .rounded(t.radius.container)
                 .font_stack(&t.font.family.body)
-                .text_style(&t.text.body)
-                .role(Role::Tooltip)
+                .text_style(&t.text.body);
+            surface = match &self.surface {
+                Surface::Tooltip => surface
+                    .max_w(px(MAX_WIDTH))
+                    .py(t.spacing.s1)
+                    .px(t.spacing.s2)
+                    .bg(t.color.background_inverted)
+                    .text_color(t.color.background_surface)
+                    .role(Role::Tooltip),
+                Surface::Card { label } => {
+                    let cap = super::motion::viewport_cap(t, window);
+                    let card = surface
+                        .track_focus(&card)
+                        .occlude()
+                        .max_w(cap.width)
+                        .max_h(cap.height)
+                        .overflow_y_scroll()
+                        .p(t.spacing.s3)
+                        .bg(t.color.background_surface)
+                        .text_color(t.color.text_primary)
+                        .shadow_token(&t.shadow.med);
+                    match label {
+                        Some(label) => card.role(Role::Dialog).aria_label(label.clone()),
+                        None => card.role(Role::Group),
+                    }
+                }
+            };
+            surface = surface
                 .on_hover({
                     let state = state.clone();
                     move |hovered, window, cx| {
@@ -620,7 +724,8 @@ impl RenderOnce for Tooltip {
             if let Some(d) = &describes {
                 surface = surface.aria_label(d.clone());
             }
-            theme.refine(surface.style(), "tooltip", &[], None);
+            let target = if is_card { "hover-card" } else { "tooltip" };
+            theme.refine(surface.style(), target, &[], None);
             surface.style().refine(&self.style);
             let surface = super::motion::entrance(surface, since, side, rtl, t, window, cx);
             let options = LayerOptions {

@@ -1,8 +1,10 @@
 //! Time: Timer and Timestamp. Upstream: `Timer/`, `Timestamp/`.
 
 pub mod examples;
+mod hover;
 mod timestamp;
 
+pub use hover::TimestampEntry;
 pub use timestamp::{Timestamp, TimestampFormat, TimestampValue};
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -194,20 +196,8 @@ pub const TIMESTAMP_DOC: ComponentDoc = ComponentDoc {
         p("format", RustApi::Method("format")),
         p("timezoneID", RustApi::Method("timezone_id")),
         p("autoThreshold", RustApi::Method("auto_threshold")),
-        p(
-            "hasTooltip",
-            RustApi::Pending(
-                "has_tooltip",
-                "the copyable hover card lands with HoverCard in M5",
-            ),
-        ),
-        p(
-            "tooltipEntries",
-            RustApi::Pending(
-                "tooltip_entries",
-                "the hover card lands with HoverCard in M5",
-            ),
-        ),
+        p("hasTooltip", RustApi::Method("has_tooltip")),
+        p("tooltipEntries", RustApi::Method("tooltip_entries")),
         p("isTimezoneShown", RustApi::Method("timezone_shown")),
         p("isLive", RustApi::Method("live")),
         p("type", RustApi::Method("text_type")),
@@ -238,6 +228,37 @@ pub const TIMER_DOC: ComponentDoc = ComponentDoc {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hover_lines_follow_upstream() {
+        use astryx_i18n::{InstantFormat, TimeZoneChoice};
+        let en = astryx_i18n::english();
+        let at = 1_742_593_867; // 2025-03-21T21:51:07Z
+        // No entries: the full time, copyable.
+        let lines = hover::lines(&en, at, &[], &TimeZoneChoice::Local);
+        assert_eq!(lines.len(), 1);
+        assert!(lines[0].copyable && lines[0].label.is_none());
+        // Entries in several zones show their zone with date_time.
+        let entries = [
+            TimestampEntry::new()
+                .timezone_id("UTC")
+                .label("UTC")
+                .format(InstantFormat::DateTime),
+            TimestampEntry::new()
+                .timezone_id("Asia/Tokyo")
+                .format(InstantFormat::Date),
+        ];
+        let lines = hover::lines(&en, at, &entries, &TimeZoneChoice::Local);
+        assert_eq!(lines[0].label.as_deref(), Some("UTC"));
+        assert!(lines[0].value.contains("UTC"), "{}", lines[0].value);
+        assert_eq!(lines[1].value, "Mar 22, 2025", "Tokyo is a day ahead");
+        assert!(!lines[1].copyable);
+        assert!(
+            lines[1].zone_name.contains("Japan"),
+            "{}",
+            lines[1].zone_name
+        );
+    }
 
     #[test]
     fn timer_text_follows_upstream() {

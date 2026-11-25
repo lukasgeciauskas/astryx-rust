@@ -190,3 +190,80 @@ fn text_triggers_take_focus(cx: &mut TestAppContext) {
     press(cx, "tab");
     assert!(shown(cx).is_some());
 }
+
+// ----------------------------------------------------------------------------
+// HoverCard, numbered by its spec's FR items.
+
+fn card() -> AnyElement {
+    HoverCard::new("t")
+        .label("Ada Lovelace")
+        .content(
+            div()
+                .flex()
+                .gap(px(8.))
+                .child(Button::new("follow", "Follow"))
+                .child(Button::new("message", "Message")),
+        )
+        .child(Button::new("b", "Ada").w(px(80.)))
+        .into_any_element()
+}
+
+#[gpui::test]
+fn card_fr4_hover_opens_after_300ms_and_the_pointer_may_cross_onto_it(cx: &mut TestAppContext) {
+    let cx = host(cx, card);
+    hover(cx, 140., 130.);
+    wait(cx, 250);
+    assert!(shown(cx).is_none(), "not before the 300 ms delay");
+    wait(cx, 100);
+    let surface = shown(cx).expect("open after the delay");
+    assert!(surface.bottom() <= px(120.), "above the trigger");
+    // Crossing onto the card within the hide delay keeps it.
+    hover(cx, 140., 119.);
+    let inside = surface.center();
+    hover(cx, inside.x.into(), inside.y.into());
+    wait(cx, 300);
+    assert!(shown(cx).is_some(), "the card holds itself open");
+    hover(cx, 900., 700.);
+    wait(cx, 150);
+    assert!(shown(cx).is_some(), "the 200 ms hide delay");
+    wait(cx, 100);
+    assert!(shown(cx).is_none());
+}
+
+#[gpui::test]
+fn card_fr6_escape_from_inside_returns_focus_to_the_trigger(cx: &mut TestAppContext) {
+    let log: Rc<RefCell<Vec<&'static str>>> = Rc::default();
+    let cx = host(cx, {
+        let log = log.clone();
+        move || {
+            let (follow, trigger) = (log.clone(), log.clone());
+            HoverCard::new("t")
+                .label("Ada Lovelace")
+                .content(
+                    Button::new("follow", "Follow")
+                        .on_click(move |_, _, _| follow.borrow_mut().push("follow")),
+                )
+                .child(
+                    Button::new("b", "Ada")
+                        .w(px(80.))
+                        .on_click(move |_, _, _| trigger.borrow_mut().push("trigger")),
+                )
+                .into_any_element()
+        }
+    });
+    press(cx, "tab");
+    assert!(shown(cx).is_some(), "keyboard focus opens it");
+    // Into the card, whose tab stops come after the page's.
+    press(cx, "tab");
+    assert!(shown(cx).is_some(), "focus inside holds it open");
+    press(cx, "enter");
+    assert_eq!(*log.borrow(), ["follow"], "focus was in the card");
+    press(cx, "escape");
+    assert!(shown(cx).is_none());
+    press(cx, "enter");
+    assert_eq!(
+        *log.borrow(),
+        ["follow", "trigger"],
+        "focus was back on the trigger"
+    );
+}

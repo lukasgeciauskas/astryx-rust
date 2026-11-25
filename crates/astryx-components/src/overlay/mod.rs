@@ -3,6 +3,7 @@
 
 mod disclosure;
 pub mod examples;
+mod hover_card;
 mod info_tip;
 mod motion;
 mod popover;
@@ -14,6 +15,7 @@ mod popover_tests;
 mod tests;
 
 pub(crate) use disclosure::disclosure;
+pub use hover_card::HoverCard;
 pub use info_tip::InfoTip;
 pub use popover::{Popover, PopoverController, PopoverRole};
 pub(crate) use tooltip::tooltip_description;
@@ -144,6 +146,31 @@ pub const POPOVER_DOC: ComponentDoc = ComponentDoc {
             ),
         ),
         p("xstyle", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const HOVER_CARD_DOC: ComponentDoc = ComponentDoc {
+    name: "HoverCard",
+    rust_type: "astryx::components::overlay::HoverCard",
+    props: &[
+        p("children", RustApi::Method("child / text")),
+        p("content", RustApi::Method("content / content_fn")),
+        p("placement", RustApi::Method("placement")),
+        p("alignment", RustApi::Method("alignment")),
+        p("delay", RustApi::Method("delay")),
+        p("hideDelay", RustApi::Method("hide_delay")),
+        p("focusTrigger", RustApi::Method("focus_trigger")),
+        p("touchTrigger", RustApi::Method("touch_trigger")),
+        p("isEnabled", RustApi::Method("enabled")),
+        p("label", RustApi::Method("label")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p("hasHoverIndication", RustApi::Method("hover_indication")),
+        p("isDefaultOpen", RustApi::Method("default_open")),
+        p("isOpen", RustApi::Method("open")),
+        p("xstyle", RustApi::Trait("Styled")),
+        p("className", RustApi::Trait("Styled")),
+        p("style", RustApi::Trait("Styled")),
     ],
     example: include_str!("examples.rs"),
 };

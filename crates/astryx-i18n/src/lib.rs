@@ -241,6 +241,12 @@ impl I18n {
         )
     }
 
+    /// The long name of the zone an instant falls in, upstream
+    /// `formatZoneName`.
+    pub fn format_zone_name(&self, unix_seconds: i64, zone: &datetime::TimeZoneChoice) -> String {
+        datetime::format_zone_name(&locale::parse_locale(&self.0.locale), unix_seconds, zone)
+    }
+
     /// A time relative to now, upstream `formatRelativeTime`.
     pub fn format_relative(&self, ago_seconds: i64, narrow: bool) -> String {
         datetime::format_relative(&locale::parse_locale(&self.0.locale), ago_seconds, narrow)

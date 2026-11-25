@@ -10,7 +10,7 @@ use crate::field::InputStatus;
 use crate::icon::Icon;
 use crate::input::TextInput;
 use crate::layout::{SpacingStep, Stack};
-use crate::overlay::{InfoTip, Popover, PopoverRole, Tooltip};
+use crate::overlay::{HoverCard, InfoTip, Popover, PopoverRole, Tooltip};
 use crate::text::{Text, TextType};
 
 pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
@@ -106,6 +106,28 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                         )
                         .child(Button::new("actions-button", "Actions").variant(ButtonVariant::Secondary)),
                 ),
+        )
+        .child(label("HoverCard"))
+        .child(
+            Text::new("Reviewed by ")
+                .text_type(TextType::Body)
+                .child(
+                    HoverCard::new("reviewer")
+                        .label("Ada Lovelace")
+                        .content(
+                            Stack::vertical()
+                                .gap(SpacingStep::S2)
+                                .width(gpui::px(240.))
+                                .child(Text::new("Ada Lovelace").text_type(TextType::Label))
+                                .child(
+                                    Text::new("Analyst. Wrote the first published program.")
+                                        .text_type(TextType::Supporting),
+                                )
+                                .child(Button::new("reviewer-follow", "Follow")),
+                        )
+                        .text("Ada Lovelace"),
+                )
+                .child(" two days ago."),
         )
         .child(label("InfoTip"))
         .child(
