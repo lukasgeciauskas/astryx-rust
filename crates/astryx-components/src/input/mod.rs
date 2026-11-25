@@ -26,8 +26,6 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
 }
 
 const NO_FORMS: &str = "GPUI apps have no HTML forms; read the value from your state";
-const NO_TOUCH_KEYBOARD: &str =
-    "a touch keyboard hint; GPUI's platforms have no touch keyboard to configure";
 
 pub const TEXT_INPUT_DOC: ComponentDoc = ComponentDoc {
     name: "TextInput",
@@ -62,14 +60,11 @@ pub const TEXT_INPUT_DOC: ComponentDoc = ComponentDoc {
             "autoComplete",
             RustApi::Waived("browser autofill has no GPUI counterpart"),
         ),
-        p("enterKeyHint", RustApi::Waived(NO_TOUCH_KEYBOARD)),
-        p("inputMode", RustApi::Waived(NO_TOUCH_KEYBOARD)),
-        p("autoCapitalize", RustApi::Waived(NO_TOUCH_KEYBOARD)),
-        p("hasAutoCorrect", RustApi::Waived(NO_TOUCH_KEYBOARD)),
-        p(
-            "hasSpellCheck",
-            RustApi::Waived("GPUI has no spell checker to turn on or off"),
-        ),
+        p("enterKeyHint", RustApi::Method("enter_key_hint")),
+        p("inputMode", RustApi::Method("input_mode")),
+        p("autoCapitalize", RustApi::Method("auto_capitalize")),
+        p("hasAutoCorrect", RustApi::Method("auto_correct")),
+        p("hasSpellCheck", RustApi::Method("spell_check")),
         p("ref", RustApi::Waived("GPUI elements have no refs")),
         p("containerXstyle", RustApi::Trait("Styled")),
         p("containerClassName", RustApi::Trait("Styled")),
@@ -108,10 +103,7 @@ pub const TEXT_AREA_DOC: ComponentDoc = ComponentDoc {
         p("statusVariant", RustApi::Method("status_placement")),
         p("labelTooltip", RustApi::Method("label_tooltip")),
         p("startIcon", RustApi::Method("start_icon")),
-        p(
-            "hasSpellCheck",
-            RustApi::Waived("GPUI has no spell checker to turn on or off"),
-        ),
+        p("hasSpellCheck", RustApi::Method("spell_check")),
         p("hasAutoFocus", RustApi::Method("auto_focus")),
         p("size", RustApi::Method("size")),
         p("onPaste", RustApi::Method("on_paste")),
@@ -123,10 +115,10 @@ pub const TEXT_AREA_DOC: ComponentDoc = ComponentDoc {
             "autoComplete",
             RustApi::Waived("browser autofill has no GPUI counterpart"),
         ),
-        p("enterKeyHint", RustApi::Waived(NO_TOUCH_KEYBOARD)),
-        p("inputMode", RustApi::Waived(NO_TOUCH_KEYBOARD)),
-        p("autoCapitalize", RustApi::Waived(NO_TOUCH_KEYBOARD)),
-        p("hasAutoCorrect", RustApi::Waived(NO_TOUCH_KEYBOARD)),
+        p("enterKeyHint", RustApi::Method("enter_key_hint")),
+        p("inputMode", RustApi::Method("input_mode")),
+        p("autoCapitalize", RustApi::Method("auto_capitalize")),
+        p("hasAutoCorrect", RustApi::Method("auto_correct")),
         p("ref", RustApi::Waived("GPUI elements have no refs")),
         p("containerXstyle", RustApi::Trait("Styled")),
         p("containerClassName", RustApi::Trait("Styled")),

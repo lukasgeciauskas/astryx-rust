@@ -21,6 +21,22 @@
   border in upstream's CSS too; only the status icon and message show the status. The port
   matches upstream.
 
+- **Inline text flow is close to CSS, not identical.** A Text with children lays them out
+  with `InlineFlow` (`text/inline.rs`):
+  - Whitespace is kept as written: runs of spaces do not collapse, and a newline breaks
+    the line (GPUI text behaves the same way).
+  - An inline box (anything other than text, an inline Text or a Link) sits at its
+    max-content size, its bottom the paragraph's descent below the baseline; CSS would
+    use the box's own last baseline.
+  - Bidirectional text is laid out left to right, and text in a paragraph cannot be
+    selected.
+- **Spell checking depends on the platform's dictionaries.** Windows uses the system
+  checker. Linux reads Hunspell dictionaries from `/usr/share/hunspell` and similar folders
+  (packages such as `hunspell-en-us`); with none installed, nothing is marked. Browsers do
+  not expose their checker, so on the web an app installs one with
+  `astryx_primitives::spell::set_spell_checker(DictionaryChecker::new(aff, dic))`.
+  `spellbook`, which reads the dictionaries, is MPL-2.0.
+
 ## Tooling
 
 - **True hot-patching needs our patched dx.** `cargo xtask dev --hot-patch` patches

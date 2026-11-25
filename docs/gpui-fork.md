@@ -47,6 +47,8 @@ Each patch lands before the components that need it.
 | R7 | Display contents and grid tracks (**landed**, `7633ed6`) | `display: contents` (an element whose children lay out as its parent's), explicit grid track lists (`auto`, `min-content`, `max-content`, lengths, `fr`, `minmax`, `fit-content`), `grid-auto-flow`, `grid-auto-columns` and `grid-auto-rows` | FormLayout's `horizontal-labels` grid (M4); any upstream layout built on `display: contents` or track lists |
 | R8 | Browser files (**landed**, `cc84f94`) | On the web: `prompt_for_paths` opens the browser's file dialog, files dragged from the system drop as `ExternalPaths`, and `gpui_web::web_files` gives each browser file a virtual path with its name, size, type and bytes | FileInput on the web (M4); any app that opens or receives files in the browser |
 | R9 | `aria-current` (**landed**, `69dc0ba`) | `aria_current(AriaCurrent)` on any stateful element, setting AccessKit's aria-current; `AriaCurrent` is re-exported next to `Role` | The current page of Breadcrumbs and Pagination and the current step of a Stepper (M4); nav items (M9) |
+| R10 | The view inside a `ViewElement` (**landed**, `2e391af`) | `ViewElement::view_mut` and `take_view`: a parent reaches the component inside an `AnyElement` | The inline text flow (M4): a Text or Link inside a paragraph joins its lines |
+| R11 | Input modes and spellcheck (**landed**, `d8be0c9`) | `TextInputConfiguration::input_mode` (the HTML `inputmode` set) and `spellcheck`; the web's IME mirror applies both | `inputMode`, `enterKeyHint`, `autoCapitalize`, `hasAutoCorrect` and `hasSpellCheck` on text fields (M4) |
 
 ### How each patch works
 
@@ -119,6 +121,15 @@ Each patch lands before the components that need it.
     get virtual paths and replace the empty list before the drop lands.
 - **R9 (`aria-current`), as built:** one more ARIA property next to R6's states, kept
   unset unless a component sets it. The R6 test covers it.
+- **R10 (the view inside a `ViewElement`), as built:** `#[derive(IntoElement)]` wraps a
+  component in a `ViewElement`, so `AnyElement::downcast_mut::<ViewElement<Text>>()`
+  finds a Text among a paragraph's children and `take_view` hands it over. The element
+  must not be laid out after.
+- **R11 (input modes and spellcheck), as built:** two fields on
+  `TextInputConfiguration`, which an input handler returns every frame. The web mirror
+  remembers the mode, so the keyboard it brings up after an editable tap is the field's;
+  native platforms ignore both (they have no touch keyboard, and Astryx checks spelling
+  itself).
 
 - **R2 (backdrop blur):**
   - A new scene primitive.

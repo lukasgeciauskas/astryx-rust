@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use astryx_i18n::{current as i18n, use_direction};
 use astryx_primitives::editing::{
-    EditorStyle, FieldSettings, KeyDownFn, TextEditState, text_editor,
+    EditorStyle, FieldSettings, KeyDownFn, KeyboardHints, TextEditState, text_editor,
 };
 use astryx_primitives::{
     ElementSize, is_focus_visible, prefers_reduced_motion, provide, resolve_size,
@@ -95,6 +95,8 @@ pub struct TextInput {
     status_placement: StatusPlacement,
     clear: bool,
     auto_focus: bool,
+    spell_check: Option<bool>,
+    keyboard: KeyboardHints,
     width: Option<Length>,
     control_style: StyleRefinement,
     style: StyleRefinement,
@@ -133,6 +135,8 @@ impl TextInput {
             status_placement: StatusPlacement::Attached,
             clear: false,
             auto_focus: false,
+            spell_check: None,
+            keyboard: KeyboardHints::default(),
             width: None,
             control_style: StyleRefinement::default(),
             style: StyleRefinement::default(),
@@ -157,17 +161,17 @@ impl TextInput {
         /// Upstream `isReadOnly`: focusable and selectable, never changed.
         !read_only,
         /// Upstream `disabledMessage`: why the field is disabled. It
-        /// describes the field now; its tooltip lands with Tooltip (M5).
+        /// shown in a tooltip on hover and focus.
         ?disabled_message: SharedString,
         /// Upstream `isLoading`: a spinner, and the field reports busy.
         !loading,
         /// Upstream `placeholder`.
         ?placeholder: SharedString,
-        /// Upstream `labelTooltip`. The InfoTip lands with Tooltip (M5).
+        /// Upstream `labelTooltip`: help in an InfoTip after the label.
         ?label_tooltip: SharedString,
         /// Upstream `status`.
         ?status: InputStatus,
-        /// Upstream `statusVariant` (`tooltip` lands with Tooltip, M5).
+        /// Upstream `statusVariant`.
         status_placement: StatusPlacement,
         /// Upstream `hasClear`: a clear button while there is a value.
         !clear,
@@ -190,6 +194,38 @@ impl TextInput {
         f: impl Fn(SharedString, &mut Window, &mut App) -> Task<()> + 'static,
     ) -> Self {
         self.change_action = Some(Rc::new(f));
+        self
+    }
+
+    /// Upstream `hasSpellCheck`: underlines misspelled words once the field
+    /// has had focus. On unless turned off; never in a password field.
+    pub fn spell_check(mut self, spell_check: bool) -> Self {
+        self.spell_check = Some(spell_check);
+        self
+    }
+
+    /// Upstream `inputMode`: which touch keyboard the field asks for,
+    /// without changing what it accepts.
+    pub fn input_mode(mut self, mode: gpui::TextInputMode) -> Self {
+        self.keyboard.input_mode = Some(mode);
+        self
+    }
+
+    /// Upstream `enterKeyHint`: what a touch keyboard's Return key says.
+    pub fn enter_key_hint(mut self, hint: gpui::TextInputAction) -> Self {
+        self.keyboard.enter_key_hint = Some(hint);
+        self
+    }
+
+    /// Upstream `autoCapitalize`: when a touch keyboard capitalizes.
+    pub fn auto_capitalize(mut self, capitalize: gpui::Autocapitalize) -> Self {
+        self.keyboard.autocapitalize = Some(capitalize);
+        self
+    }
+
+    /// Upstream `hasAutoCorrect`: whether a touch keyboard corrects words.
+    pub fn auto_correct(mut self, correct: bool) -> Self {
+        self.keyboard.autocorrect = Some(correct);
         self
     }
 
@@ -271,6 +307,18 @@ impl RenderOnce for TextInput {
                 read_only: self.read_only,
                 masked,
                 filter: None,
+                spell_check: self.spell_check.unwrap_or(true),
+                // The type picks the keyboard, as a browser's does.
+                keyboard: KeyboardHints {
+                    input_mode: self.keyboard.input_mode.or(match self.input_type {
+                        InputType::Email => Some(gpui::TextInputMode::Email),
+                        InputType::Url => Some(gpui::TextInputMode::Url),
+                        InputType::Tel => Some(gpui::TextInputMode::Tel),
+                        InputType::Search => Some(gpui::TextInputMode::Search),
+                        InputType::Text | InputType::Password => None,
+                    }),
+                    ..self.keyboard
+                },
             });
             s.on_change = editable.then(|| {
                 let change = change.clone();
@@ -363,6 +411,7 @@ impl RenderOnce for TextInput {
             max_lines: Some(1),
             height: None,
             reduced_motion: prefers_reduced_motion(cx),
+            spelling_color: t.color.error,
         };
         let mut editor = text_editor("editor", &state, style, cx)
             .flex_1()

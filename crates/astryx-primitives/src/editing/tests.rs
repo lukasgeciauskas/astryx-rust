@@ -28,6 +28,7 @@ impl Render for Field {
             max_lines: Some(4),
             height: None,
             reduced_motion: true,
+            spelling_color: hsla(0., 1., 0.5, 1.),
         };
         div()
             .p(px(10.))
@@ -165,4 +166,115 @@ fn clicking_places_the_caret(cx: &mut TestAppContext) {
         7,
         "past the end lands at the end"
     );
+}
+
+// ----------------------------------------------------------------------------
+// Spelling and the touch keyboard
+
+const AFF: &str = "SET UTF-8
+TRY esianrtolcdugmphbyfvkwzESIANRTOLCDUGMPHBYFVKWZ'
+";
+const DIC: &str = "4
+hello
+world
+the
+spell
+";
+
+fn dictionary(cx: &mut VisualTestContext) {
+    cx.update(|_, cx| {
+        let checker = crate::spell::DictionaryChecker::new(AFF, DIC).expect("a dictionary");
+        crate::spell::set_spell_checker(Some(Rc::new(checker)), cx);
+    });
+}
+
+fn errors(
+    cx: &mut VisualTestContext,
+    state: &Entity<TextEditState>,
+    focused: bool,
+) -> Vec<std::ops::Range<usize>> {
+    cx.update(|_, cx| state.update(cx, |s, cx| s.spelling_errors(focused, cx)))
+}
+
+#[gpui::test]
+fn misspelled_words_show_once_the_field_has_had_focus(cx: &mut TestAppContext) {
+    let (cx, state, _) = field(cx, "hello wrold the", false);
+    dictionary(cx);
+    state.update(cx, |s, _| {
+        s.set_settings(FieldSettings {
+            spell_check: true,
+            ..Default::default()
+        })
+    });
+    assert!(errors(cx, &state, false).is_empty(), "not before focus");
+    cx.simulate_keystrokes("home");
+    assert_eq!(errors(cx, &state, true), vec![6..11]);
+    assert_eq!(errors(cx, &state, false), vec![6..11], "and after blur");
+}
+
+#[gpui::test]
+fn the_word_being_typed_is_left_alone(cx: &mut TestAppContext) {
+    let (cx, state, _) = field(cx, "", false);
+    dictionary(cx);
+    state.update(cx, |s, _| {
+        s.set_settings(FieldSettings {
+            spell_check: true,
+            ..Default::default()
+        })
+    });
+    cx.simulate_input("the wrol");
+    assert!(errors(cx, &state, true).is_empty(), "the caret ends it");
+    cx.simulate_input(" ");
+    assert_eq!(errors(cx, &state, true), vec![4..8], "a space finishes it");
+}
+
+#[gpui::test]
+fn masked_and_unchecked_fields_mark_nothing(cx: &mut TestAppContext) {
+    let (cx, state, _) = field(cx, "wrold", false);
+    dictionary(cx);
+    assert!(errors(cx, &state, true).is_empty(), "spell checking is off");
+    state.update(cx, |s, _| {
+        s.set_settings(FieldSettings {
+            spell_check: true,
+            masked: true,
+            ..Default::default()
+        })
+    });
+    assert!(errors(cx, &state, true).is_empty(), "a password field");
+}
+
+#[test]
+fn the_touch_keyboard_follows_the_field() {
+    use gpui::{Autocapitalize, TextInputAction, TextInputMode};
+    let plain = FieldSettings {
+        spell_check: true,
+        ..Default::default()
+    }
+    .input_configuration();
+    assert_eq!(plain.autocapitalize, Autocapitalize::Sentences);
+    assert!(plain.autocorrect && plain.suggestions);
+    assert_eq!(plain.spellcheck, Some(true));
+    assert_eq!(plain.input_mode, TextInputMode::Text);
+
+    let email = FieldSettings {
+        keyboard: KeyboardHints {
+            input_mode: Some(TextInputMode::Email),
+            enter_key_hint: Some(TextInputAction::Next),
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+    .input_configuration();
+    assert_eq!(email.autocapitalize, Autocapitalize::None);
+    assert!(!email.autocorrect);
+    assert_eq!(email.input_action, TextInputAction::Next);
+
+    let password = FieldSettings {
+        masked: true,
+        spell_check: true,
+        ..Default::default()
+    }
+    .input_configuration();
+    assert!(!password.suggestions && !password.autocorrect);
+    assert_eq!(password.spellcheck, Some(false));
 }

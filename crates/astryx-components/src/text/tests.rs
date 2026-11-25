@@ -139,3 +139,99 @@ fn heading_uses_level_style_and_heading_family() {
         .root(&theme);
     assert_eq!(el.style().text.font_size, Some(t.text.display_1.size));
 }
+
+// ----------------------------------------------------------------------------
+// Inline flow
+
+mod inline_flow {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use gpui::{
+        AnyElement, InteractiveElement as _, IntoElement, Modifiers, ParentElement, Pixels, Styled,
+        TestAppContext, VisualTestContext, div, point, px,
+    };
+
+    use crate::link::Link;
+    use crate::segmented::tests::{host, press};
+    use crate::text::{Text, TextWeight};
+
+    fn height(cx: &mut VisualTestContext, id: &'static str) -> Pixels {
+        cx.debug_bounds(id)
+            .expect("the paragraph is drawn")
+            .size
+            .height
+    }
+
+    fn paragraph(width: f32, clicks: Rc<RefCell<usize>>) -> impl Fn() -> AnyElement + 'static {
+        move || {
+            let clicks = clicks.clone();
+            div()
+                .w(px(width))
+                .debug_selector(|| "para".into())
+                .child(
+                    Text::new("")
+                        .child(
+                            Link::new("docs", "the documentation")
+                                .on_click(move |_, _, _| *clicks.borrow_mut() += 1),
+                        )
+                        .child(" explains every ")
+                        .child(Text::new("option").weight(TextWeight::Semibold))
+                        .child(" in detail."),
+                )
+                .into_any_element()
+        }
+    }
+
+    #[gpui::test]
+    fn spans_and_links_share_one_line_when_it_fits(cx: &mut TestAppContext) {
+        let cx = host(cx, paragraph(2000., Rc::default()));
+        let one = height(cx, "para");
+        assert!(one > px(0.));
+        assert!(one < px(40.), "one line, not {one:?}");
+    }
+
+    #[gpui::test]
+    fn capsize_trims_the_box_to_cap_height_and_baseline(cx: &mut TestAppContext) {
+        let cx = host(cx, || {
+            div()
+                .flex()
+                .flex_col()
+                .child(
+                    div()
+                        .debug_selector(|| "plain".into())
+                        .child(Text::new("Revenue")),
+                )
+                .child(
+                    div()
+                        .debug_selector(|| "trimmed".into())
+                        .child(Text::new("Revenue").capsize(true)),
+                )
+                .into_any_element()
+        });
+        let (plain, trimmed) = (height(cx, "plain"), height(cx, "trimmed"));
+        assert!(trimmed < plain, "{trimmed:?} < {plain:?}");
+        // What is left is about the cap height: well over a third of the line.
+        assert!(trimmed > plain * 0.35, "{trimmed:?} of {plain:?}");
+    }
+
+    #[gpui::test]
+    fn a_narrow_paragraph_wraps_through_its_link(cx: &mut TestAppContext) {
+        let cx = host(cx, paragraph(90., Rc::default()));
+        assert!(height(cx, "para") > px(60.), "several lines");
+    }
+
+    #[gpui::test]
+    fn a_link_in_a_paragraph_takes_focus_and_activates(cx: &mut TestAppContext) {
+        let clicks = Rc::new(RefCell::new(0));
+        let cx = host(cx, paragraph(2000., clicks.clone()));
+        press(cx, "tab");
+        press(cx, "enter");
+        assert_eq!(*clicks.borrow(), 1, "the keyboard reaches the link");
+        // The host pads by 20px: the link's text starts there.
+        cx.simulate_click(point(px(30.), px(28.)), Modifiers::none());
+        assert_eq!(*clicks.borrow(), 2, "so does the pointer");
+        cx.simulate_click(point(px(1500.), px(28.)), Modifiers::none());
+        assert_eq!(*clicks.borrow(), 2, "but not past the text");
+    }
+}

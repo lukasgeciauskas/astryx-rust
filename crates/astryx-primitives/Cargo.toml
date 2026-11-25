@@ -13,6 +13,10 @@ gpui.workspace = true
 icu_normalizer.workspace = true
 web-time.workspace = true
 unicode-segmentation.workspace = true
+spellbook.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows.workspace = true
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

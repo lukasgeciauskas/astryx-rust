@@ -151,8 +151,200 @@ impl ParentElement for Link {
     }
 }
 
+impl Link {
+    /// What a press does: the click handler, then navigation (unless the
+    /// handler prevented it). A native anchor activates on Enter, not Space.
+    fn activation(&self, form: LinkForm, cx: &App) -> ClickFn {
+        let on_click = self.on_click.clone();
+        let navigation = self
+            .href
+            .clone()
+            .filter(|_| form == LinkForm::Anchor)
+            .map(|href| {
+                let target = if self.external {
+                    Some(SharedString::from("_blank"))
+                } else {
+                    self.target.clone()
+                };
+                (href, target, use_link_handler(cx))
+            });
+        Rc::new(move |event, window, cx| {
+            cx.stop_propagation();
+            if form == LinkForm::Anchor
+                && let ClickEvent::Keyboard(key) = event
+                && key.button == KeyboardButton::Space
+            {
+                return;
+            }
+            if let Some(f) = &on_click {
+                f(event, window, cx);
+                if window.default_prevented() {
+                    return;
+                }
+            }
+            if let Some((href, target, handler)) = &navigation {
+                handler.open(href, target.clone(), window, cx);
+            }
+        })
+    }
+
+    /// Whether it joins an enclosing paragraph's lines: a link with a
+    /// tooltip or a line limit stays one inline box.
+    pub(crate) fn flows_inline(&self) -> bool {
+        self.tooltip.is_none() && self.max_lines == 0
+    }
+
+    /// Lays itself out inside an enclosing paragraph: its text wraps with the
+    /// paragraph's, and its fragments hover, press and take focus as one.
+    pub(crate) fn inline(
+        self,
+        flow: &mut crate::text::InlineBuilder,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let theme = current(window, cx);
+        let t = theme.tokens();
+        let rem = window.rem_size();
+        let form = self.form();
+        let focus = control_focus(&self.id, window, cx);
+        let state = window.use_keyed_state(
+            ElementId::Name(format!("{}-inline", self.id).into()),
+            cx,
+            |_, _| crate::text::InlineGroupState::default(),
+        );
+        let (hovered, pressed) = {
+            let s = state.read(cx);
+            (s.hovered, s.pressed.is_some())
+        };
+
+        // The root's text style, then :hover and :active, as the box form.
+        let color = self.color.token(t);
+        let mut root = div();
+        if let Some(color) = color {
+            root = root.text_color(color);
+        }
+        if self.standalone {
+            root = root
+                .text_size(t.text.body.size)
+                .line_height(relative(t.text.body.leading));
+        }
+        if self.underline {
+            root = root.underline();
+        }
+        let props = [("color", self.color.as_str())];
+        theme.refine(root.style(), "link", &props, None);
+        root.style().refine(&self.style);
+        if !self.disabled && hovered {
+            let mut hover = StyleRefinement::default().underline();
+            if let TextColor::Primary | TextColor::Secondary | TextColor::Accent = self.color
+                && let Some(color) = color
+            {
+                hover = hover.text_color(mix_srgb(color, t.color.tint_hover, 0.15));
+            }
+            theme.refine(&mut hover, "link", &props, Some(RuleState::Hover));
+            root.style().refine(&hover);
+        }
+        let mut refinement = root.style().text.clone();
+        if !self.disabled && pressed {
+            refinement.background_color = Some(t.color.overlay_pressed);
+        }
+        if self.disabled {
+            // Upstream's 0.5 opacity.
+            let base = refinement.color.unwrap_or_else(|| flow_text_color(window));
+            refinement.color = Some(base.opacity(0.5));
+        }
+        // The type, size and weight of the label, as its inner Text.
+        let mut label = Text::new("")
+            .text_type(self.text_type)
+            .color(TextColor::Inherit);
+        if let Some(size) = self.size {
+            label = label.size(size);
+        }
+        if let Some(weight) = self.weight {
+            label = label.weight(weight);
+        }
+        let mut label_root = label.root(&theme);
+        gpui::Refineable::refine(&mut refinement, &label_root.style().text);
+
+        let role = match form {
+            LinkForm::Anchor | LinkForm::DisabledAnchor => Role::Link,
+            LinkForm::Button => Role::Button,
+        };
+        let external_icon = self.external && form != LinkForm::Button;
+        let mut name = self
+            .label
+            .clone()
+            .filter(|l| !l.is_empty())
+            .unwrap_or_else(|| self.text.clone());
+        if external_icon {
+            let new_tab = self
+                .new_tab_label
+                .clone()
+                .unwrap_or_else(|| i18n(cx).t("@astryx.link.newTab"));
+            name = format!("{name}, {new_tab}").into();
+        }
+        let activate = (!self.disabled).then(|| self.activation(form, cx));
+        // The stand-in: the tab stop, role, name and keyboard activation.
+        let mut proxy = div()
+            .id(self.id.clone())
+            .track_focus(&focus)
+            .size_full()
+            .role(role)
+            .aria_label(name);
+        if self.disabled {
+            proxy = proxy.aria_disabled(true);
+        }
+        if let Some(description) = crate::overlay::tooltip_description(cx) {
+            proxy = proxy.aria_description(description);
+        }
+        if let Some(activate) = activate.clone() {
+            proxy = proxy.on_click(move |event, window, cx| {
+                // The flow handles the pointer; this, the keyboard.
+                if event.is_keyboard() {
+                    activate(event, window, cx);
+                }
+            });
+        }
+        let ring = is_focus_visible(&focus, window).then(|| crate::text::InlineRing {
+            color: t.focus.outline_color,
+            width: t.focus.outline_width.to_pixels(rem),
+            offset: t.focus.outline_offset.to_pixels(rem),
+            dashed: t.focus.outline_style.0 == "dashed",
+        });
+        let group = crate::text::InlineGroup {
+            state,
+            on_click: activate,
+            focus: Some(focus),
+            ring,
+            proxy: Some(proxy.into_any_element()),
+        };
+        flow.styled(&refinement, |flow| {
+            flow.grouped(group, |flow| {
+                flow.text(self.text.clone());
+                for child in self.children {
+                    flow.child(child, window, cx);
+                }
+                if external_icon {
+                    flow.child(
+                        Icon::new("externalLink")
+                            .size(IconSize::Xsm)
+                            .into_any_element(),
+                        window,
+                        cx,
+                    );
+                }
+            });
+        });
+    }
+}
+
+/// The text color in effect where a paragraph lays its content out.
+fn flow_text_color(window: &Window) -> gpui::Hsla {
+    window.text_style().color
+}
+
 impl RenderOnce for Link {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
         let t = theme.tokens();
         let rem = window.rem_size();
@@ -214,11 +406,12 @@ impl RenderOnce for Link {
             ]
         });
 
+        let activate = (!self.disabled).then(|| self.activation(form, cx));
         let mut el = el
             .id(self.id.clone())
             .track_focus(&focus)
             .child(div().min_w_0().child(text))
-            .children(self.children)
+            .children(std::mem::take(&mut self.children))
             .children(new_tab.into_iter().flatten());
 
         if self.disabled {
@@ -232,42 +425,12 @@ impl RenderOnce for Link {
             let mut active = StyleRefinement::default().bg(t.color.overlay_pressed);
             theme.refine(&mut hover, "link", &props, Some(RuleState::Hover));
             theme.refine(&mut active, "link", &props, Some(RuleState::Active));
-            let on_click = self.on_click.clone();
-            let navigation = self
-                .href
-                .clone()
-                .filter(|_| form == LinkForm::Anchor)
-                .map(|href| {
-                    let target = if self.external {
-                        Some(SharedString::from("_blank"))
-                    } else {
-                        self.target.clone()
-                    };
-                    (href, target, use_link_handler(cx))
-                });
+            let activate = activate.expect("an enabled link activates");
             el = el
                 .cursor_pointer()
                 .hover(move |_| hover)
                 .active(move |_| active)
-                .on_click(move |event, window, cx| {
-                    cx.stop_propagation();
-                    // A native anchor activates on Enter, not Space.
-                    if form == LinkForm::Anchor
-                        && let ClickEvent::Keyboard(key) = event
-                        && key.button == KeyboardButton::Space
-                    {
-                        return;
-                    }
-                    if let Some(f) = &on_click {
-                        f(event, window, cx);
-                        if window.default_prevented() {
-                            return;
-                        }
-                    }
-                    if let Some((href, target, handler)) = &navigation {
-                        handler.open(href, target.clone(), window, cx);
-                    }
-                });
+                .on_click(move |event, window, cx| activate(event, window, cx));
         }
         if is_focus_visible(&focus, window) {
             el = el.child(focus_ring(t, px(0.), rem));

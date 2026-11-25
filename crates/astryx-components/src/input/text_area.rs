@@ -9,7 +9,8 @@ use std::rc::Rc;
 
 use astryx_i18n::{LogicalStyled, current as i18n, use_direction};
 use astryx_primitives::editing::{
-    EditorStyle, FieldSettings, FocusFn, InsertFilter, PasteFn, TextEditState, text_editor,
+    EditorStyle, FieldSettings, FocusFn, InsertFilter, KeyboardHints, PasteFn, TextEditState,
+    text_editor,
 };
 use astryx_primitives::{
     ElementSize, Politeness, announce, is_focus_visible, prefers_reduced_motion, provide,
@@ -99,6 +100,8 @@ pub struct TextArea {
     label_tooltip: Option<SharedString>,
     start_icon: Option<AnyElement>,
     auto_focus: bool,
+    spell_check: Option<bool>,
+    keyboard: KeyboardHints,
     size: Option<ElementSize>,
     on_paste: Option<PasteFn>,
     on_focus: Option<FocusFn>,
@@ -139,6 +142,8 @@ impl TextArea {
             label_tooltip: None,
             start_icon: None,
             auto_focus: false,
+            spell_check: None,
+            keyboard: KeyboardHints::default(),
             size: None,
             on_paste: None,
             on_focus: None,
@@ -163,7 +168,7 @@ impl TextArea {
         /// Upstream `isReadOnly`: focusable and selectable, never changed.
         !read_only,
         /// Upstream `disabledMessage`: why the field is disabled. It
-        /// describes the field now; its tooltip lands with Tooltip (M5).
+        /// shown in a tooltip on hover and focus.
         ?disabled_message: SharedString,
         /// Upstream `isLoading`: a spinner, and the field reports busy.
         !loading,
@@ -171,9 +176,9 @@ impl TextArea {
         ?placeholder: SharedString,
         /// Upstream `status`.
         ?status: InputStatus,
-        /// Upstream `statusVariant` (`tooltip` lands with Tooltip, M5).
+        /// Upstream `statusVariant`.
         status_placement: StatusPlacement,
-        /// Upstream `labelTooltip`. The InfoTip lands with Tooltip (M5).
+        /// Upstream `labelTooltip`: help in an InfoTip after the label.
         ?label_tooltip: SharedString,
         /// Upstream `hasAutoFocus`: focuses the field when it first renders.
         !auto_focus,
@@ -200,6 +205,38 @@ impl TextArea {
     /// native attribute: typing and pasting stop there.
     pub fn html_max_length(mut self, limit: usize) -> Self {
         self.html_max_length = Some(limit);
+        self
+    }
+
+    /// Upstream `hasSpellCheck`: underlines misspelled words once the field
+    /// has had focus. On unless turned off; never in a password field.
+    pub fn spell_check(mut self, spell_check: bool) -> Self {
+        self.spell_check = Some(spell_check);
+        self
+    }
+
+    /// Upstream `inputMode`: which touch keyboard the field asks for,
+    /// without changing what it accepts.
+    pub fn input_mode(mut self, mode: gpui::TextInputMode) -> Self {
+        self.keyboard.input_mode = Some(mode);
+        self
+    }
+
+    /// Upstream `enterKeyHint`: what a touch keyboard's Return key says.
+    pub fn enter_key_hint(mut self, hint: gpui::TextInputAction) -> Self {
+        self.keyboard.enter_key_hint = Some(hint);
+        self
+    }
+
+    /// Upstream `autoCapitalize`: when a touch keyboard capitalizes.
+    pub fn auto_capitalize(mut self, capitalize: gpui::Autocapitalize) -> Self {
+        self.keyboard.autocapitalize = Some(capitalize);
+        self
+    }
+
+    /// Upstream `hasAutoCorrect`: whether a touch keyboard corrects words.
+    pub fn auto_correct(mut self, correct: bool) -> Self {
+        self.keyboard.autocorrect = Some(correct);
         self
     }
 
@@ -374,6 +411,8 @@ impl RenderOnce for TextArea {
                 read_only: self.read_only,
                 masked: false,
                 filter: self.html_max_length.map(utf16_limit),
+                spell_check: self.spell_check.unwrap_or(true),
+                keyboard: self.keyboard,
             });
             s.on_change = editable.then(|| {
                 let change = change.clone();
@@ -498,6 +537,7 @@ impl RenderOnce for TextArea {
             max_lines: Some(self.rows),
             height: user_height,
             reduced_motion: prefers_reduced_motion(cx),
+            spelling_color: t.color.error,
         };
         let mut editor = text_editor("editor", &state, style, cx)
             .py(block)

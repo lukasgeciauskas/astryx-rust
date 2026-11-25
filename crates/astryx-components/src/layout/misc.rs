@@ -51,6 +51,7 @@ impl CenterAxis {
 #[derive(IntoElement)]
 pub struct Center {
     axis: CenterAxis,
+    inline: bool,
     size: Sizing,
     padding: Padding,
     style: StyleRefinement,
@@ -61,6 +62,7 @@ impl Center {
     pub fn new() -> Self {
         Center {
             axis: CenterAxis::Both,
+            inline: false,
             size: Sizing::default(),
             padding: Padding::default(),
             style: StyleRefinement::default(),
@@ -71,6 +73,9 @@ impl Center {
     astryx_primitives::setters! {
         /// Upstream `axis`.
         axis: CenterAxis,
+        /// Upstream `isInline`: an inline-flex box that flows with the text
+        /// around it (fork patch R5), for text and icons.
+        !inline,
     }
 
     padding_setters!();
@@ -78,7 +83,11 @@ impl Center {
 
     pub(crate) fn root(&self, theme: &ResolvedTheme, dir: astryx_i18n::Direction) -> Div {
         let t = theme.tokens();
-        let mut el = div().flex();
+        let mut el = if self.inline {
+            div().inline_flex()
+        } else {
+            div().flex()
+        };
         el = match self.axis {
             CenterAxis::Both => el.justify_center().items_center(),
             CenterAxis::Horizontal => el.justify_center(),

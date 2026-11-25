@@ -840,6 +840,16 @@ impl RenderOnce for NumberInput {
                 read_only: self.read_only,
                 masked: false,
                 filter: None,
+                // A number pad: digits only for integers (upstream inputMode).
+                spell_check: false,
+                keyboard: astryx_primitives::editing::KeyboardHints {
+                    input_mode: Some(if rules.integer_only {
+                        gpui::TextInputMode::Numeric
+                    } else {
+                        gpui::TextInputMode::Decimal
+                    }),
+                    ..Default::default()
+                },
             });
             // FR2: typing only edits the draft.
             s.on_change = editable.then(|| {
@@ -1009,6 +1019,7 @@ impl RenderOnce for NumberInput {
             max_lines: Some(1),
             height: None,
             reduced_motion: prefers_reduced_motion(cx),
+            spelling_color: t.color.error,
         };
         let mut editor = text_editor("editor", &editor_state, style, cx)
             .flex_1()

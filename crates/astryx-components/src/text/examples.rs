@@ -51,5 +51,25 @@ pub fn examples() -> AnyElement {
         )
         // Tabular numbers keep digits aligned in columns.
         .child(Text::new("1,111.11  9,999.99").tabular_numbers(true))
+        // Inline content: spans, links and inline boxes share the lines.
+        .child(
+            div().w(px(320.)).child(
+                Text::new("Your trial ends on ")
+                    .child(Text::new("March 3").weight(TextWeight::Semibold))
+                    .child(". Read the ")
+                    .child(
+                        crate::link::Link::new(
+                            "inline-terms",
+                            "subscription terms and the cancellation policy",
+                        )
+                        .href("https://example.com/terms"),
+                    )
+                    .child(" before you upgrade, or ")
+                    .child(Text::new("keep the free plan").color(TextColor::Secondary))
+                    .child(" ")
+                    .child(crate::status::Badge::new("Free"))
+                    .child(" with its limits."),
+            ),
+        )
         .into_any_element()
 }

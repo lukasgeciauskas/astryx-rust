@@ -57,7 +57,10 @@ impl Heading {
     /// Upstream `level` and `children`.
     pub fn new(level: HeadingLevel, text: impl Into<SharedString>) -> Self {
         Heading {
-            common: Common::new(text.into()),
+            common: Common {
+                display: super::text::TextDisplay::Block,
+                ..Common::new(text.into())
+            },
             level,
             display_type: None,
             accessibility_level: None,
@@ -90,7 +93,7 @@ impl Heading {
         self
     }
 
-    /// Upstream `hasTruncateTooltip`. The tooltip itself lands with Tooltip (M5).
+    /// Upstream `hasTruncateTooltip`: the full text in a tooltip while it is cut.
     pub fn truncate_tooltip(mut self, tooltip: TruncateTooltip) -> Self {
         self.common.truncate_tooltip = tooltip;
         self
@@ -125,6 +128,36 @@ impl Heading {
     pub fn id(mut self, id: impl Into<ElementId>) -> Self {
         self.common.id = Some(id.into());
         self
+    }
+
+    /// Upstream `display`: block (the default) or inline.
+    pub fn display(mut self, display: super::text::TextDisplay) -> Self {
+        self.common.display = display;
+        self
+    }
+
+    /// Upstream `hasCapsize`: trims the box to the text's cap height and
+    /// baseline, for optical alignment.
+    pub fn capsize(mut self, capsize: bool) -> Self {
+        self.common.capsize = capsize;
+        self
+    }
+
+    /// Whether it joins an enclosing paragraph's lines.
+    pub(crate) fn flows_inline(&self) -> bool {
+        self.common.flows_inline()
+    }
+
+    /// Lays itself out inside an enclosing paragraph.
+    pub(crate) fn inline(
+        self,
+        flow: &mut super::inline::InlineBuilder,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let theme = current(window, cx);
+        let root = self.root(&theme);
+        self.common.inline(root, flow, window, cx);
     }
 }
 
@@ -181,13 +214,14 @@ impl Heading {
 impl RenderOnce for Heading {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
-        let el = self.root(&theme);
+        let mut el = self.root(&theme);
+        let trim = self.common.text_box_trim(&mut el, window);
         let id = self.common.id.clone();
         let label = self.common.text.clone();
         let level = self.accessibility_level.unwrap_or(self.level).number();
         let (el, measured) = self.common.measure_truncation(el, window, cx);
         let placement = self.common.truncate_tooltip;
-        let el = self.common.finish(el);
+        let el = self.common.finish(el, trim);
         let el = match id {
             Some(id) => el
                 .id(id)

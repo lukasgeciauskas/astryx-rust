@@ -34,6 +34,8 @@ pub struct EditorStyle {
     pub height: Option<Pixels>,
     /// No caret blink.
     pub reduced_motion: bool,
+    /// The wavy underline under misspelled words.
+    pub spelling_color: Hsla,
 }
 
 /// The caret blinks this often, after holding solid as long after a change.
@@ -164,6 +166,10 @@ impl Element for EditorElement {
         let font_size = text_style.font_size.to_pixels(window.rem_size());
         let line_height = window.line_height();
         let wrap = self.style.multiline.then_some(bounds.size.width);
+        let focused = gpui::Focusable::focus_handle(self.state.read(cx), cx).is_focused(window);
+        let misspelled = self
+            .state
+            .update(cx, |state, cx| state.spelling_errors(focused, cx));
         let state = self.state.read(cx);
         let display = state.display_text();
         let buffer = state.buffer();
@@ -171,37 +177,55 @@ impl Element for EditorElement {
             .marked()
             .map(|r| state.offset_to_display(r.start)..state.offset_to_display(r.end));
 
-        // The composition is underlined, as platform fields do.
+        // The composition is underlined, as platform fields do; misspelled
+        // words get a wavy line, as browsers draw them.
         let run = |len: usize| TextRun {
             len,
             ..text_style.to_run(len)
         };
-        let mut runs = Vec::new();
-        match &marked {
-            Some(marked) => {
-                runs.push(TextRun {
-                    color: self.style.text_color,
-                    ..run(marked.start)
-                });
-                runs.push(TextRun {
-                    color: self.style.text_color,
-                    underline: Some(UnderlineStyle {
-                        color: Some(self.style.text_color),
-                        thickness: px(1.),
-                        wavy: false,
-                    }),
-                    ..run(marked.end - marked.start)
-                });
-                runs.push(TextRun {
-                    color: self.style.text_color,
-                    ..run(display.len() - marked.end)
-                });
-            }
-            None => runs.push(TextRun {
-                color: self.style.text_color,
-                ..run(display.len())
-            }),
+        let mut decorations: Vec<(std::ops::Range<usize>, UnderlineStyle)> = Vec::new();
+        if let Some(marked) = &marked {
+            decorations.push((
+                marked.clone(),
+                UnderlineStyle {
+                    color: Some(self.style.text_color),
+                    thickness: px(1.),
+                    wavy: false,
+                },
+            ));
         }
+        for range in misspelled {
+            decorations.push((
+                range,
+                UnderlineStyle {
+                    color: Some(self.style.spelling_color),
+                    thickness: px(1.),
+                    wavy: true,
+                },
+            ));
+        }
+        let mut cuts: Vec<usize> = decorations
+            .iter()
+            .flat_map(|(r, _)| [r.start, r.end])
+            .chain([0, display.len()])
+            .filter(|at| *at <= display.len())
+            .collect();
+        cuts.sort_unstable();
+        cuts.dedup();
+        let mut runs: Vec<TextRun> = cuts
+            .windows(2)
+            .map(|pair| {
+                let (from, to) = (pair[0], pair[1]);
+                TextRun {
+                    color: self.style.text_color,
+                    underline: decorations
+                        .iter()
+                        .find(|(r, _)| r.start <= from && to <= r.end)
+                        .map(|(_, u)| *u),
+                    ..run(to - from)
+                }
+            })
+            .collect();
         runs.retain(|r| r.len > 0);
         let lines: Rc<[(usize, WrappedLine)]> =
             shape(&display, &runs, font_size, wrap, window).into();

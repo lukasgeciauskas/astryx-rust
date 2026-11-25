@@ -26,7 +26,6 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
 }
 
 const NO_ELEMENT_TYPE: &str = "GPUI has no HTML tags; the root is always a box";
-const NO_INLINE: &str = "GPUI has no inline formatting context";
 
 const PADDING: [PropMapping; 7] = [
     p("padding", RustApi::Method("padding")),
@@ -87,7 +86,7 @@ pub const CENTER_DOC: ComponentDoc = ComponentDoc {
         PADDING[4],
         PADDING[5],
         PADDING[6],
-        p("isInline", RustApi::Waived(NO_INLINE)),
+        p("isInline", RustApi::Method("inline")),
         p("children", RustApi::Trait("ParentElement")),
         p("xstyle", RustApi::Trait("Styled")),
     ],

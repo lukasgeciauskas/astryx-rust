@@ -58,6 +58,12 @@
   `disabledMessage` is `overlay::disabled_reason`, which shows on any focus; a tooltip
   status is `input::control::status_indicator`, a focusable glyph. A pressable inside a
   Tooltip reads `tooltip_description(cx)` for its `aria_description`.
+- **Inline content:** a Text with children is a paragraph (`text::inline`). A component
+  that can join a paragraph's lines gets a `flows_inline` check and an `inline(self,
+  flow, window, cx)` method, and `InlineBuilder::child` recognizes it through
+  `downcast_mut::<ViewElement<T>>()` (fork patch R10). Its text joins in its own style
+  (`flow.styled`), an interactive span is a `flow.grouped` group with a stand-in element
+  for focus, role and keyboard activation, and anything else stays an inline box.
 - **Measuring yourself:** a component that depends on its own size (Grid's responsive
   tracks, Stepper's compact mode, Text truncation tooltips) paints an absolute
   `canvas` probe over its box, keeps the size in keyed state and requests another frame

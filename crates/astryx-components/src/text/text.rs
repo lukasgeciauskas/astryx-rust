@@ -6,7 +6,8 @@ use std::sync::Arc;
 use astryx_theme::{ResolvedTheme, ThemeStyled, current};
 use gpui::{
     AnyElement, App, Div, ElementId, FontFeatures, InteractiveElement as _, IntoElement,
-    ParentElement, Refineable, RenderOnce, SharedString, StyleRefinement, Styled, Window, div,
+    ParentElement, Pixels, Refineable, RenderOnce, SharedString, StyleRefinement, Styled, Window,
+    div, px,
 };
 use smallvec::SmallVec;
 
@@ -41,6 +42,16 @@ pub enum TruncateTooltip {
 
 /// Upstream `wordBreak`. GPUI breaks an over-long word only when it cannot
 /// fit a line, which is `BreakWord`; `BreakAll` draws the same.
+/// Upstream `display`: an inline Text flows with the text around it inside a
+/// paragraph (a Text with children); a block one takes a line of its own.
+/// A line limit makes a Text a block, as upstream.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TextDisplay {
+    #[default]
+    Inline,
+    Block,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WordBreak {
     BreakWord,
@@ -60,6 +71,8 @@ pub(crate) struct Common {
     pub justify: Justify,
     pub strikethrough: bool,
     pub id: Option<ElementId>,
+    pub display: TextDisplay,
+    pub capsize: bool,
     pub style: StyleRefinement,
 }
 
@@ -77,8 +90,56 @@ impl Common {
             justify: Justify::Start,
             strikethrough: false,
             id: None,
+            display: TextDisplay::Inline,
+            capsize: false,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Whether it joins an enclosing paragraph's lines: inline, with no line
+    /// limit (upstream forces a limited Text to a block).
+    pub fn flows_inline(&self) -> bool {
+        self.display == TextDisplay::Inline && self.max_lines == 0 && !self.capsize
+    }
+
+    /// Upstream `hasCapsize` (`text-box: trim-both cap alphabetic`): how much
+    /// of the first line's box above the cap height, and of the last line's
+    /// below the baseline, `root`'s text trims.
+    pub fn text_box_trim(&self, root: &mut Div, window: &Window) -> Option<(Pixels, Pixels)> {
+        if !self.capsize {
+            return None;
+        }
+        let mut style = window.text_style();
+        style.refine(&root.style().text);
+        let rem = window.rem_size();
+        let font_size = style.font_size.to_pixels(rem);
+        let line_height = style.line_height_in_pixels(rem);
+        let text_system = window.text_system();
+        let font = text_system.resolve_font(&style.font());
+        let baseline = text_system.baseline_offset(font, font_size, line_height);
+        let cap = text_system.cap_height(font, font_size);
+        Some((
+            (baseline - cap).max(px(0.)),
+            (line_height - baseline).max(px(0.)),
+        ))
+    }
+
+    /// Lays the text and children out in an enclosing paragraph, in `root`'s
+    /// text style.
+    pub fn inline(
+        self,
+        mut root: Div,
+        flow: &mut super::inline::InlineBuilder,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let refinement = root.style().text.clone();
+        flow.styled(&refinement, |flow| {
+            flow.text(self.text);
+            for child in self.children {
+                flow.child(child, window, cx);
+            }
+        });
     }
 
     /// Applies color, weight, wrapping, alignment and truncation to `el`.
@@ -101,6 +162,8 @@ impl Common {
         el = match self.max_lines {
             0 => el,
             1 => el.min_w_0().truncate(),
+            // Upstream: a capsize block drops a multi-line clamp.
+            _ if self.capsize => el,
             lines => el
                 .min_w_0()
                 .overflow_hidden()
@@ -209,9 +272,21 @@ impl Common {
             .into_any_element()
     }
 
-    /// Adds the content.
-    pub fn finish(self, el: Div) -> Div {
-        el.child(self.text).children(self.children)
+    /// Adds the content: the text alone, or a paragraph whose children flow
+    /// inline with it; trimmed to `trim` (see [`Self::text_box_trim`]).
+    pub fn finish(self, el: Div, trim: Option<(Pixels, Pixels)>) -> Div {
+        let content = if self.children.is_empty() {
+            self.text.into_any_element()
+        } else {
+            let text = (!self.text.is_empty()).then(|| self.text.into_any_element());
+            super::inline::InlineFlow::new(text.into_iter().chain(self.children)).into_any_element()
+        };
+        match trim {
+            // The lines keep their height; the box around them loses the
+            // trimmed edges.
+            Some((top, bottom)) => el.child(div().mt(-top).mb(-bottom).child(content)),
+            None => el.child(content),
+        }
     }
 }
 
@@ -272,7 +347,7 @@ impl Text {
         self
     }
 
-    /// Upstream `hasTruncateTooltip`. The tooltip itself lands with Tooltip (M5).
+    /// Upstream `hasTruncateTooltip`: the full text in a tooltip while it is cut.
     pub fn truncate_tooltip(mut self, tooltip: TruncateTooltip) -> Self {
         self.common.truncate_tooltip = tooltip;
         self
@@ -306,6 +381,36 @@ impl Text {
     pub fn id(mut self, id: impl Into<ElementId>) -> Self {
         self.common.id = Some(id.into());
         self
+    }
+
+    /// Upstream `display`: inline (the default) or block.
+    pub fn display(mut self, display: TextDisplay) -> Self {
+        self.common.display = display;
+        self
+    }
+
+    /// Upstream `hasCapsize`: trims the box to the text's cap height and
+    /// baseline, for optical alignment. A capsize Text is a block.
+    pub fn capsize(mut self, capsize: bool) -> Self {
+        self.common.capsize = capsize;
+        self
+    }
+
+    /// Whether it joins an enclosing paragraph's lines.
+    pub(crate) fn flows_inline(&self) -> bool {
+        self.common.flows_inline()
+    }
+
+    /// Lays itself out inside an enclosing paragraph.
+    pub(crate) fn inline(
+        self,
+        flow: &mut super::inline::InlineBuilder,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let theme = current(window, cx);
+        let root = self.root(&theme);
+        self.common.inline(root, flow, window, cx);
     }
 }
 
@@ -370,11 +475,12 @@ impl Text {
 impl RenderOnce for Text {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
-        let el = self.root(&theme);
+        let mut el = self.root(&theme);
+        let trim = self.common.text_box_trim(&mut el, window);
         let (el, measured) = self.common.measure_truncation(el, window, cx);
         let (text, placement) = (self.common.text.clone(), self.common.truncate_tooltip);
         let id = self.common.id.clone();
-        let el = self.common.finish(el);
+        let el = self.common.finish(el, trim);
         let el = match id {
             Some(id) => el.id(id).into_any_element(),
             None => el.into_any_element(),

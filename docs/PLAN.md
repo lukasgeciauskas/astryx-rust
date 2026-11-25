@@ -245,11 +245,23 @@ The remaining primitives:
     value tooltips, ProgressBar marks, Thumbnail labels and Text/Heading truncation.
   - Also finished: Stepper's on-track indicators, compact horizontal mode and fill
     sweep; CheckboxList/RadioList container and control styles.
+  - Inline text flow (fork patch R10): a Text's text, inline Texts and Links share
+    its lines, breaking at UAX #14 opportunities; a Link wraps inside itself and hovers,
+    presses and takes focus as one; any other element is an inline box on the baseline.
+    Text `display`, Center `isInline`.
+  - Text `hasCapsize`: the box trimmed to cap height and baseline from font metrics.
+  - Spell checking (`astryx_primitives::spell`): the Windows system checker, Hunspell
+    dictionaries elsewhere; misspellings get a wavy underline once a field has had focus.
+    Suggestions and "Add to dictionary" arrive with ContextMenu (M5).
+  - Touch keyboards (fork patch R11): `inputMode`, `enterKeyHint`, `autoCapitalize`,
+    `hasAutoCorrect` and `hasSpellCheck` reach the web's IME mirror; NumberInput asks for
+    the number pad.
   - Carried into later milestones, recorded in each doc: FormLayout's
     `defaultEntryErrorBehavior` readers (M8).
 - **M5 Layer runtime & overlays:** Popover, HoverCard, Overlay,
   Dialog(+Header, imperative), AlertDialog, Drawer, Toast(+viewport/queue), DropdownMenu
-  (submenus, menu press), ContextMenu, MoreMenu, Lightbox, CommandPalette.
+  (submenus, menu press), ContextMenu (with spelling suggestions in text fields),
+  MoreMenu, Lightbox, CommandPalette.
 - **M6 Collections:** combobox, virtualization, tree/grid focus, reorderable.
   - Components: List, Item, Selector, MultiSelector, Typeahead, Tokenizer, ComplexSelector,
     TreeList, OverflowList, MetadataList, PowerSearch.

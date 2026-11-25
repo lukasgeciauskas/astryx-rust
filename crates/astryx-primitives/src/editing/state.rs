@@ -10,9 +10,10 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    Action, App, Bounds, ClipboardItem, Context, EntityInputHandler, FocusHandle, Focusable,
-    KeyBinding, KeyBindingContextPredicate, KeyDownEvent, OperatingSystem, Pixels, Point,
-    Subscription, UTF16Selection, Window, WrappedLine, actions, point, px,
+    Action, App, Autocapitalize, Bounds, ClipboardItem, Context, EntityInputHandler, FocusHandle,
+    Focusable, KeyBinding, KeyBindingContextPredicate, KeyDownEvent, OperatingSystem, Pixels,
+    Point, Subscription, TextInputAction, TextInputConfiguration, TextInputMode, UTF16Selection,
+    Window, WrappedLine, actions, point, px,
 };
 use unicode_segmentation::UnicodeSegmentation;
 use web_time::Instant;
@@ -175,6 +176,55 @@ pub struct FieldSettings {
     /// Shows a bullet per character, as password fields do.
     pub masked: bool,
     pub filter: Option<InsertFilter>,
+    /// Upstream `hasSpellCheck`: misspelled words get a wavy underline once
+    /// the field has had focus, as in browsers. Never in a masked field.
+    pub spell_check: bool,
+    /// What a touch keyboard offers for the field.
+    pub keyboard: KeyboardHints,
+}
+
+/// A field's touch keyboard (upstream `inputMode`, `enterKeyHint`,
+/// `autoCapitalize` and `hasAutoCorrect`); unset ones are the platform's
+/// defaults for a text field.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct KeyboardHints {
+    pub input_mode: Option<TextInputMode>,
+    pub enter_key_hint: Option<TextInputAction>,
+    pub autocapitalize: Option<Autocapitalize>,
+    pub autocorrect: Option<bool>,
+}
+
+impl FieldSettings {
+    /// What the platform's text input is asked for: no assistance in a
+    /// masked field; otherwise the hints, else a text field's defaults
+    /// (sentence capitals except for addresses, corrections, suggestions).
+    pub fn input_configuration(&self) -> TextInputConfiguration {
+        let hints = self.keyboard;
+        if self.masked {
+            return TextInputConfiguration {
+                input_mode: hints.input_mode.unwrap_or_default(),
+                input_action: hints.enter_key_hint.unwrap_or_default(),
+                spellcheck: Some(false),
+                ..TextInputConfiguration::default()
+            };
+        }
+        let address = matches!(
+            hints.input_mode,
+            Some(TextInputMode::Url | TextInputMode::Email)
+        );
+        TextInputConfiguration {
+            autocorrect: hints.autocorrect.unwrap_or(!address),
+            autocapitalize: hints.autocapitalize.unwrap_or(if address {
+                Autocapitalize::None
+            } else {
+                Autocapitalize::Sentences
+            }),
+            suggestions: true,
+            input_action: hints.enter_key_hint.unwrap_or_default(),
+            spellcheck: Some(self.spell_check),
+            input_mode: hints.input_mode.unwrap_or_default(),
+        }
+    }
 }
 
 /// The editing state of one text field.
@@ -202,6 +252,10 @@ pub struct TextEditState {
     pub on_paste: Option<PasteFn>,
     pub on_focus: Option<FocusFn>,
     pub on_blur: Option<FocusFn>,
+    /// The misspelled ranges last found, and the text they were found in.
+    spelling: Option<(String, Vec<Range<usize>>)>,
+    /// Whether the field has had focus: browsers check its text from then on.
+    spell_armed: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -250,8 +304,51 @@ impl TextEditState {
             on_paste: None,
             on_focus: None,
             on_blur: None,
+            spelling: None,
+            spell_armed: false,
             _subscriptions: vec![keys],
         }
+    }
+
+    /// The misspelled ranges of the text to underline: none until the field
+    /// has had focus, and not the word just typed while the caret ends it.
+    pub(crate) fn spelling_errors(&mut self, focused: bool, cx: &mut App) -> Vec<Range<usize>> {
+        if !self.settings.spell_check || self.settings.masked {
+            return Vec::new();
+        }
+        self.spell_armed |= focused;
+        if !self.spell_armed {
+            return Vec::new();
+        }
+        let stale = self
+            .spelling
+            .as_ref()
+            .is_none_or(|(text, _)| text != self.buffer.text());
+        if stale {
+            let Some(checker) = crate::spell::spell_checker(cx) else {
+                return Vec::new();
+            };
+            let text = self.buffer.text().to_string();
+            let errors = checker.check(&text);
+            self.spelling = Some((text, errors));
+        }
+        let caret = self.buffer.cursor();
+        let marked = self.buffer.marked();
+        self.spelling
+            .as_ref()
+            .map(|(_, errors)| {
+                errors
+                    .iter()
+                    .filter(|r| !(focused && r.end == caret))
+                    .filter(|r| {
+                        marked
+                            .as_ref()
+                            .is_none_or(|m| r.end <= m.start || r.start >= m.end)
+                    })
+                    .cloned()
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// A field's state that reports its changes: after each notify, a user
@@ -663,6 +760,14 @@ impl Focusable for TextEditState {
 }
 
 impl EntityInputHandler for TextEditState {
+    fn text_input_configuration(
+        &mut self,
+        _: &mut Window,
+        _: &mut Context<Self>,
+    ) -> TextInputConfiguration {
+        self.settings.input_configuration()
+    }
+
     fn text_for_range(
         &mut self,
         range_utf16: Range<usize>,

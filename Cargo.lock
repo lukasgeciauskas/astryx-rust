@@ -301,6 +301,7 @@ dependencies = [
  "gpui",
  "gpui_web",
  "smallvec",
+ "unicode-linebreak",
  "unicode-segmentation",
  "web-time",
 ]
@@ -370,8 +371,10 @@ dependencies = [
  "accesskit",
  "gpui",
  "icu_normalizer",
+ "spellbook",
  "unicode-segmentation",
  "web-time",
+ "windows 0.62.2",
 ]
 
 [[package]]
@@ -682,7 +685,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 [[package]]
 name = "bench_metrics"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "anyhow",
  "criterion",
@@ -1058,7 +1061,7 @@ dependencies = [
 [[package]]
 name = "collections"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "gpui_util",
  "indexmap",
@@ -1404,7 +1407,7 @@ dependencies = [
 [[package]]
 name = "derive_refineable"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2153,13 +2156,13 @@ dependencies = [
  "log",
  "presser",
  "thiserror 2.0.21",
- "windows 0.62.2",
+ "windows 0.57.0",
 ]
 
 [[package]]
 name = "gpui"
 version = "0.2.2"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "accesskit",
  "anyhow",
@@ -2235,7 +2238,7 @@ dependencies = [
 [[package]]
 name = "gpui_apple"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "anyhow",
  "async-task",
@@ -2274,7 +2277,7 @@ dependencies = [
 [[package]]
 name = "gpui_ios"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "anyhow",
  "block2 0.6.2",
@@ -2295,7 +2298,7 @@ dependencies = [
 [[package]]
 name = "gpui_linux"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "accesskit",
  "accesskit_unix",
@@ -2339,7 +2342,7 @@ dependencies = [
 [[package]]
 name = "gpui_macos"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "accesskit",
  "accesskit_macos",
@@ -2380,7 +2383,7 @@ dependencies = [
 [[package]]
 name = "gpui_macros"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -2391,7 +2394,7 @@ dependencies = [
 [[package]]
 name = "gpui_platform"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -2406,7 +2409,7 @@ dependencies = [
 [[package]]
 name = "gpui_shared_string"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "schemars",
  "serde",
@@ -2416,7 +2419,7 @@ dependencies = [
 [[package]]
 name = "gpui_util"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "anyhow",
  "log",
@@ -2426,7 +2429,7 @@ dependencies = [
 [[package]]
 name = "gpui_web"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -2454,7 +2457,7 @@ dependencies = [
 [[package]]
 name = "gpui_wgpu"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -2481,7 +2484,7 @@ dependencies = [
 [[package]]
 name = "gpui_windows"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "accesskit",
  "accesskit_windows",
@@ -2642,7 +2645,7 @@ dependencies = [
 [[package]]
 name = "http_client"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "anyhow",
  "bytes",
@@ -2675,7 +2678,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.57.0",
 ]
 
 [[package]]
@@ -4970,7 +4973,7 @@ dependencies = [
 [[package]]
 name = "refineable"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "derive_refineable",
 ]
@@ -5145,7 +5148,7 @@ dependencies = [
 [[package]]
 name = "scheduler"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "async-task",
  "backtrace",
@@ -5480,6 +5483,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "spellbook"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d204abcbdf8e88729306a8d0ca01a79d8a49969fe1f84696909d6dbc4321c1a"
+dependencies = [
+ "foldhash",
+ "hashbrown 0.17.2",
+]
+
+[[package]]
 name = "spin"
 version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5585,7 +5598,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 [[package]]
 name = "sum_tree"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "heapless",
  "rayon",
@@ -7582,7 +7595,7 @@ dependencies = [
 [[package]]
 name = "ztracing"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 dependencies = [
  "tracing",
  "ztracing_macro",
@@ -7591,7 +7604,7 @@ dependencies = [
 [[package]]
 name = "ztracing_macro"
 version = "0.1.0"
-source = "git+https://github.com/lukasgeciauskas/zed?rev=69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c#69dc0ba69cfbb4c6772f3c3c48094ed4d84d427c"
+source = "git+https://github.com/lukasgeciauskas/zed?rev=d8be0c9f3ae1f2dc316585c0389699118c133684#d8be0c9f3ae1f2dc316585c0389699118c133684"
 
 [[package]]
 name = "zune-core"
