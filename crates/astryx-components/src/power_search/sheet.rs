@@ -154,12 +154,15 @@ pub(crate) struct SheetProps {
     pub max_search_results: usize,
     pub save_label: Option<SharedString>,
     pub placeholder: SharedString,
+    /// Upstream `timezoneID`: the zone date values read in (FR25, FR26).
+    pub timezone_id: Option<SharedString>,
 }
 
 /// A row's two parts (FR12): "{field} {operator}" and the value, unbudgeted.
 pub(crate) fn row_parts(
     config: &PowerSearchConfig,
     filter: &PowerSearchFilter,
+    timezone_id: Option<&str>,
     cx: &App,
 ) -> (String, Option<String>) {
     let t18 = i18n(cx);
@@ -181,7 +184,9 @@ pub(crate) fn row_parts(
         )
         .to_string()
     };
-    let value = op.and_then(|o| format_token_value(&o.value, &filter.value, usize::MAX / 4, &t18));
+    let value = op.and_then(|o| {
+        format_token_value(&o.value, &filter.value, usize::MAX / 4, &t18, timezone_id)
+    });
     (label, value)
 }
 
@@ -270,7 +275,12 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
     // Choosing a field (FR13): an empty-only field adds at once; else the
     // value step opens on its default operator.
     let choose_field: KeyActFn = {
-        let (state, config, flow_id) = (state.clone(), config.clone(), p.id.clone());
+        let (state, config, flow_id, zone) = (
+            state.clone(),
+            config.clone(),
+            p.id.clone(),
+            p.timezone_id.clone(),
+        );
         Rc::new(
             move |key: SharedString, window: &mut Window, cx: &mut App| {
                 let Some(field) = config.find_field(&key) else {
@@ -284,7 +294,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                         field.operators[0].key.clone(),
                         FilterValue::Empty,
                     );
-                    let label = row_label_text(&config, &filter, cx);
+                    let label = row_label_text(&config, &filter, zone.as_deref(), cx);
                     state.update(cx, |s, _| {
                         s.draft.add(filter);
                         s.adding = false;
@@ -329,7 +339,12 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
     // any other opens the value step on its field and operator, a "More"
     // row carrying the typed text into a text field.
     let choose_suggestion: SuggestionFn = {
-        let (state, config, flow_id) = (state.clone(), config.clone(), p.id.clone());
+        let (state, config, flow_id, zone) = (
+            state.clone(),
+            config.clone(),
+            p.id.clone(),
+            p.timezone_id.clone(),
+        );
         Rc::new(
             move |item: super::source::PowerSearchItem, window: &mut Window, cx: &mut App| {
                 let data = item.data.clone();
@@ -342,7 +357,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                 };
                 if let (Some(value), Some(op)) = (data.filter_value.clone(), op) {
                     let filter = PowerSearchFilter::new(field.key.clone(), op.key.clone(), value);
-                    let label = row_label_text(&config, &filter, cx);
+                    let label = row_label_text(&config, &filter, zone.as_deref(), cx);
                     state.update(cx, |s, _| {
                         s.draft.add(filter);
                         s.adding = false;
@@ -425,12 +440,17 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
         })
     };
     let remove_row: IndexFn = {
-        let (state, config, flow_id) = (state.clone(), config.clone(), p.id.clone());
+        let (state, config, flow_id, zone) = (
+            state.clone(),
+            config.clone(),
+            p.id.clone(),
+            p.timezone_id.clone(),
+        );
         Rc::new(move |index: usize, window: &mut Window, cx: &mut App| {
             let Some(filter) = state.read(cx).draft.filters.get(index).cloned() else {
                 return;
             };
-            let label = row_label_text(&config, &filter, cx);
+            let label = row_label_text(&config, &filter, zone.as_deref(), cx);
             state.update(cx, |s, _| s.draft.remove(index));
             // FR16: the nearest remaining remove action, else Add filter.
             let rows = state.read(cx).draft.filters.clone();
@@ -495,7 +515,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                 .edge(ListEdge::Bleed)
                 .label(t18.t("@astryx.powersearch.sheet.filtersTitle"));
             for (index, filter) in rows.iter().enumerate() {
-                let (label, value) = row_parts(&config, filter, cx);
+                let (label, value) = row_parts(&config, filter, p.timezone_id.as_deref(), cx);
                 let editable = interactive && !filter.read_only;
                 let field_label = config
                     .find_field(&filter.field)
@@ -1145,6 +1165,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                         staged.value.clone(),
                         !interactive,
                         p.max_menu_items,
+                        p.timezone_id.clone(),
                         on_value,
                         window,
                         cx,
@@ -1155,6 +1176,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                         id: ElementId::Name(
                             format!("{}-sheet-value-{}-{}", p.id, staged.field, op.key).into(),
                         ),
+                        timezone_id: p.timezone_id.clone(),
                         op: op.value.clone(),
                         value: staged.value.clone(),
                         on_change: set_value,
@@ -1229,7 +1251,12 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
             }
         };
         let confirm_action = {
-            let (state, config, flow_id) = (state.clone(), config.clone(), p.id.clone());
+            let (state, config, flow_id, zone) = (
+                state.clone(),
+                config.clone(),
+                p.id.clone(),
+                p.timezone_id.clone(),
+            );
             let staged = staged.clone();
             move |window: &mut Window, cx: &mut App| {
                 let (Some(op), Some(value)) = (
@@ -1239,7 +1266,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                     return;
                 };
                 let filter = PowerSearchFilter::new(staged.field.clone(), op, value);
-                let label = row_label_text(&config, &filter, cx);
+                let label = row_label_text(&config, &filter, zone.as_deref(), cx);
                 let creating = staged.index.is_none();
                 state.update(cx, |s, _| {
                     match staged.index {
@@ -1461,7 +1488,12 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                 return None;
             };
             let on_save = {
-                let (state, config, flow_id) = (state.clone(), config.clone(), p.id.clone());
+                let (state, config, flow_id, zone) = (
+                    state.clone(),
+                    config.clone(),
+                    p.id.clone(),
+                    p.timezone_id.clone(),
+                );
                 let (field_key, op_key) = (field_key.clone(), op_key.clone());
                 move |items: Vec<crate::search::SearchItem>,
                       _: crate::tokenizer::TokenizerChange<crate::search::SearchItem>,
@@ -1485,7 +1517,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                         op_key.clone(),
                         FilterValue::EntityList(entities),
                     );
-                    let label = row_label_text(&config, &filter, cx);
+                    let label = row_label_text(&config, &filter, zone.as_deref(), cx);
                     state.update(cx, |s, _| {
                         s.draft.add(filter);
                         s.people = None;
@@ -1553,8 +1585,13 @@ fn focus_next_render(name: String, cx: &mut App) {
 }
 
 /// A filter's whole text, for announcements (AR6).
-fn row_label_text(config: &PowerSearchConfig, filter: &PowerSearchFilter, cx: &App) -> String {
-    let (label, value) = row_parts(config, filter, cx);
+fn row_label_text(
+    config: &PowerSearchConfig,
+    filter: &PowerSearchFilter,
+    timezone_id: Option<&str>,
+    cx: &App,
+) -> String {
+    let (label, value) = row_parts(config, filter, timezone_id, cx);
     match value {
         Some(v) => i18n(cx)
             .format(
@@ -1629,6 +1666,8 @@ pub(crate) struct TriggerProps {
     pub status: Option<crate::field::InputStatus>,
     pub status_placement: Option<crate::field::StatusPlacement>,
     pub token_override: TokenOverrideFn,
+    /// Upstream `timezoneID` (FR11, FR25).
+    pub timezone_id: Option<SharedString>,
 }
 
 /// The sheet presentation's field (FR11): display-only tokens, or the
@@ -1665,7 +1704,15 @@ pub(crate) fn trigger_field(p: TriggerProps, window: &mut Window, cx: &mut App) 
                 .max_token_length
                 .saturating_sub(field_label.chars().count() + op_label.chars().count())
                 .max(10);
-            let value = op.and_then(|o| format_token_value(&o.value, &filter.value, budget, &t18));
+            let value = op.and_then(|o| {
+                format_token_value(
+                    &o.value,
+                    &filter.value,
+                    budget,
+                    &t18,
+                    p.timezone_id.as_deref(),
+                )
+            });
             let full = match &value {
                 Some(v) => super::format::format_token_text(&label, v, &t18),
                 None => label.clone(),

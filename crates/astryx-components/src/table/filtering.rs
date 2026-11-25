@@ -3,9 +3,8 @@
 //! config, and the plugin renders that operator's control in the header, in
 //! a popover behind a funnel button or inline below the label.
 //!
-//! The `date_absolute` and `time` controls are DateInput and TimeInput, which
-//! M8 builds; until then those columns show no control (their values still
-//! convert in [`to_search_filters`]).
+//! The `date_absolute` and `time` controls are DateInput and TimeInput, whose
+//! ISO values the filter keeps; the other operators have no control.
 
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -437,7 +436,49 @@ fn filter_control(
                 })
                 .into_any_element()
         }
-        // DateInput and TimeInput come with M8; the rest have no control.
+        // Upstream `DateFilterControl`: a date reports as soon as it is
+        // complete, and the filter keeps its ISO text.
+        OperatorValue::DateAbsolute { .. } => {
+            let value = match &p.value {
+                Some(TableFilterValue::Text(t)) => astryx_i18n::date::PlainDate::from_iso(t),
+                _ => None,
+            };
+            crate::date_input::DateInput::new(p.id("date"), label, value)
+                .label_hidden(true)
+                .entry_error_behavior(crate::field::EntryErrorBehavior::Complete)
+                .size(p.size)
+                .clear(p.clear)
+                .on_change(move |next, window, cx| {
+                    on_change(
+                        next.map(|date| TableFilterValue::Text(date.to_string().into())),
+                        window,
+                        cx,
+                    )
+                })
+                .into_any_element()
+        }
+        // Upstream `TimeFilterControl`.
+        OperatorValue::Time { .. } => {
+            let value = match &p.value {
+                Some(TableFilterValue::Text(t)) => astryx_i18n::date::PlainTime::from_iso(t),
+                _ => None,
+            };
+            crate::time_input::TimeInput::new(p.id("time"), label, value)
+                .label_hidden(true)
+                .entry_error_behavior(crate::field::EntryErrorBehavior::Complete)
+                .size(p.size)
+                .clear(p.clear)
+                .on_change(move |next, window, cx| {
+                    on_change(
+                        next.map(|time| TableFilterValue::Text(time.to_iso(false).into())),
+                        window,
+                        cx,
+                    )
+                })
+                .into_any_element()
+        }
+        // Nested, empty, relative and range dates and custom values have no
+        // control.
         _ => return None,
     })
 }

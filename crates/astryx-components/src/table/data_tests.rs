@@ -243,8 +243,7 @@ fn inline_filters_widen_their_columns_and_sit_below_the_label(cx: &mut TestAppCo
     // The filtered column without a width takes a proportional one; the
     // pixel column keeps its 80.
     assert_eq!(f32::from(bounds(cx, "t-header-age").size.width), 80.);
-    // An unresolved filter still holds the row's height: date controls come
-    // with M8.
+    // A date filter's control is a DateInput.
     assert!(shown(cx, "table-filter-joined-inline"));
     // Every column gets a slot: without a filter, upstream's 32 px
     // placeholder (28 px when compact).
@@ -281,6 +280,27 @@ fn typing_in_an_inline_filter_changes_it_live(cx: &mut TestAppContext) {
     assert_eq!(
         changes.borrow().last(),
         Some(&("name".into(), Some("ad".into())))
+    );
+}
+
+#[gpui::test]
+fn a_date_filter_takes_a_typed_date_as_iso(cx: &mut TestAppContext) {
+    cx.update(astryx_primitives::editing::init);
+    astryx_i18n::date::set_today(Some(
+        astryx_i18n::date::PlainDate::new(2026, 11, 25).unwrap(),
+    ));
+    let changes = Changes::default();
+    let cx = host(
+        cx,
+        1200.,
+        filter_table(TableFilterVariant::Inline, changes.clone()),
+    );
+    click(cx, "table-filter-joined-inline");
+    cx.simulate_input("11/20/2026");
+    settle(cx);
+    assert_eq!(
+        changes.borrow().last(),
+        Some(&("joined".into(), Some("2026-11-20".into())))
     );
 }
 

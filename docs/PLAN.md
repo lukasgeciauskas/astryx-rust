@@ -582,6 +582,19 @@ The remaining primitives:
     FR6). Only disabled and loading lock the sheet; a pending Action still edits (FR9).
     Under a finger the month wheel moves a chosen date, keeping its day and time (FR14).
     SegmentedControl's segments now honour `request_focus` and carry debug selectors.
+  - Stage 8 (done, ahead of stage 7): the carried items.
+    - PowerSearch's date and time values: TimeInput for `time`; a calendar day as its day
+      in `timezoneID`, else UTC, stored as that day's midnight (FR25), or an instant's
+      wall-clock date and time in `timezoneID`, else the viewer's zone (FR26); a date range
+      as a DateRangeInput, or an inline range Calendar in the sheet (FR17), each part a
+      day. Tokens, rows and labels write the value in the provider's calendar and zone.
+      `timezone_id` reaches the editor, the sheet and its trigger.
+    - Table filtering's `date_absolute` and `time` controls: DateInput and TimeInput
+      keeping ISO values.
+    - FormLayout's `defaultEntryErrorBehavior`: read by DateInput, TimeInput and
+      DateTimeInput since stages 2 to 4.
+    - `astryx_i18n::datetime`: `day_of_instant`, `midnight_in_zone`,
+      `wall_clock_in_zone`, `instant_in_zone`.
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
     `entryErrorBehavior: complete` (`table/filtering.rs` shows none until then).
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

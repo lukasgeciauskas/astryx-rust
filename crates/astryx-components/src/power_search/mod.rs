@@ -74,13 +74,7 @@ pub const POWER_SEARCH_DOC: ComponentDoc = ComponentDoc {
         p("maxSearchResults", RustApi::Method("max_search_results")),
         p("menuWidth", RustApi::Method("menu_width")),
         p("popoverSaveButtonLabel", RustApi::Method("save_label")),
-        p(
-            "timezoneID",
-            RustApi::Pending(
-                "timezone_id",
-                "date values read their zone once M8 brings the date inputs and calendar systems",
-            ),
-        ),
+        p("timezoneID", RustApi::Method("timezone_id")),
         p(
             "handleRef",
             RustApi::Method("controller (a PowerSearchController)"),

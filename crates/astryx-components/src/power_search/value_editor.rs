@@ -6,19 +6,35 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use astryx_i18n::current as i18n;
-use gpui::{AnyElement, App, ElementId, IntoElement, SharedString, Styled, Window};
+use gpui::{
+    AnyElement, App, ElementId, InteractiveElement, IntoElement, ParentElement, SharedString,
+    Styled, Window,
+};
 
-use super::format::{format_date_absolute, relative_date_options};
-use super::model::{FilterValue, OperatorValue, PowerSearchEntity};
+use super::format::{relative_date_options, resolve_date_zone};
+use super::model::{
+    DateTimeRange, DateTimeRangePart, FilterValue, OperatorValue, PowerSearchEntity,
+};
+use crate::calendar::Calendar;
+use crate::date_input::DateInput;
+use crate::date_range_input::{DateRange, DateRangeInput};
+use crate::field::EntryErrorBehavior;
 use crate::input::{NumberInput, TextInput};
 use crate::search::{SearchItem, SearchSource, Searchable, static_source};
 use crate::selector::{Selector, SelectorEntry, SelectorOptionData};
+use crate::time_input::TimeInput;
 use crate::tokenizer::Tokenizer;
 use crate::typeahead::Typeahead;
+use astryx_i18n::TimeZoneChoice;
+use astryx_i18n::date::{PlainDate, PlainDateTime, PlainTime};
+use astryx_i18n::datetime::{
+    day_of_instant, instant_in_zone, midnight_in_zone, wall_clock_in_zone,
+};
 
 pub(crate) type ValueChangeFn = Rc<dyn Fn(FilterValue, bool, &mut Window, &mut App)>;
 pub(crate) type EnterFn = Rc<dyn Fn(&mut Window, &mut App)>;
 type CustomChangeFn = Rc<dyn Fn(Option<SharedString>, &mut Window, &mut App)>;
+type RangeFn = Rc<dyn Fn(DateRange, &mut Window, &mut App)>;
 
 /// Upstream's 150 ms wait before a value editor searches its source.
 pub(crate) const SOURCE_DEBOUNCE: Duration = Duration::from_millis(150);
@@ -41,6 +57,8 @@ pub(crate) struct ValueEditorProps {
     /// A "More" row's typed text, as a search editor's opening query
     /// (FR29, FR30, BaseTypeahead FR18, Tokenizer FR31).
     pub opening_query: Option<SharedString>,
+    /// Upstream `timezoneID`: the zone date values read and write in.
+    pub timezone_id: Option<SharedString>,
 }
 
 /// A source that matches nothing (a list editor without one: free text).
@@ -209,35 +227,141 @@ pub(crate) fn value_editor(
         OperatorValue::Float { min, max, units } => {
             number_editor(&p, false, *min, *max, units.clone(), cx)
         }
-        OperatorValue::Time { .. }
-        | OperatorValue::DateAbsolute { .. }
-        | OperatorValue::DateRange { .. } => {
-            // The date and time inputs come with M8; until then the value
-            // reads as text and cannot change.
-            let text = match &p.value {
-                Some(FilterValue::DateAbsolute { unix_seconds }) => format_date_absolute(
-                    *unix_seconds,
-                    !matches!(
-                        p.op,
-                        OperatorValue::DateAbsolute {
-                            date_only: Some(false)
+        // Upstream `TimeEditor`.
+        OperatorValue::Time { min, max } => {
+            let current = match &p.value {
+                Some(FilterValue::Time(t)) => PlainTime::from_iso(t),
+                _ => None,
+            };
+            let mut input = TimeInput::new(
+                id(&p.id, "value"),
+                t18.t("@astryx.powersearch.valueEditor.time"),
+                current,
+            )
+            .label_hidden(true)
+            .entry_error_behavior(EntryErrorBehavior::Complete)
+            .disabled(p.disabled)
+            .on_change(move |value, window, cx| {
+                if let Some(value) = value {
+                    on_change(
+                        FilterValue::Time(value.to_iso(false).into()),
+                        false,
+                        window,
+                        cx,
+                    )
+                }
+            });
+            if let Some(min) = min.as_deref().and_then(PlainTime::from_iso) {
+                input = input.min(min);
+            }
+            if let Some(max) = max.as_deref().and_then(PlainTime::from_iso) {
+                input = input.max(max);
+            }
+            if full {
+                input = input.width(gpui::relative(1.));
+            }
+            input.into_any_element()
+        }
+        // Upstream `DateAbsoluteEditor`: a calendar day in its zone (FR25),
+        // or an instant's wall clock beside it (FR26).
+        OperatorValue::DateAbsolute { date_only } => {
+            let label = t18.t("@astryx.powersearch.valueEditor.date");
+            let unix = match &p.value {
+                Some(FilterValue::DateAbsolute { unix_seconds }) => Some(*unix_seconds),
+                _ => None,
+            };
+            if *date_only == Some(false) {
+                let zone = resolve_date_zone(p.timezone_id.as_deref(), false);
+                date_time_editor(&p, label, unix, zone, window, cx)
+            } else {
+                let zone = resolve_date_zone(p.timezone_id.as_deref(), true);
+                let value = unix.map(|s| day_of_instant(s, &zone));
+                let mut input = DateInput::new(id(&p.id, "value"), label, value)
+                    .label_hidden(true)
+                    .entry_error_behavior(EntryErrorBehavior::Complete)
+                    .disabled(p.disabled)
+                    .on_change(move |value, window, cx| {
+                        if let Some(day) = value {
+                            let unix_seconds = midnight_in_zone(day, &zone);
+                            on_change(
+                                FilterValue::DateAbsolute { unix_seconds },
+                                false,
+                                window,
+                                cx,
+                            )
                         }
-                    ),
-                ),
-                Some(FilterValue::Time(t)) => t.to_string(),
-                Some(FilterValue::DateRange(_)) => t18
-                    .t("@astryx.powersearch.valueEditor.dateRange")
-                    .to_string(),
-                _ => String::new(),
+                    });
+                if full {
+                    input = input.width(gpui::relative(1.));
+                }
+                input.into_any_element()
+            }
+        }
+        // Upstream `DateRangeEditor`: each part a calendar day (FR25).
+        OperatorValue::DateRange { .. } => {
+            let zone = resolve_date_zone(p.timezone_id.as_deref(), true);
+            let now = web_time::SystemTime::now()
+                .duration_since(web_time::UNIX_EPOCH)
+                .map_or(0., |d| d.as_secs_f64());
+            let current = match &p.value {
+                Some(FilterValue::DateRange(range)) => Some(DateRange::new(
+                    day_of_instant(range.start.resolve(now), &zone),
+                    day_of_instant(range.end.resolve(now), &zone),
+                )),
+                _ => None,
             };
-            let label = match p.op {
-                OperatorValue::Time { .. } => t18.t("@astryx.powersearch.valueEditor.time"),
-                _ => t18.t("@astryx.powersearch.valueEditor.date"),
+            let set: RangeFn = {
+                let (on_change, zone) = (on_change.clone(), zone.clone());
+                Rc::new(move |range: DateRange, window: &mut Window, cx: &mut App| {
+                    let part = |day| DateTimeRangePart::Absolute {
+                        unix_seconds: midnight_in_zone(day, &zone),
+                    };
+                    on_change(
+                        FilterValue::DateRange(DateTimeRange {
+                            start: part(range.start),
+                            end: part(range.end),
+                        }),
+                        false,
+                        window,
+                        cx,
+                    )
+                })
             };
-            TextInput::new(id(&p.id, "value"), label, text)
-                .label_hidden(true)
-                .read_only(true)
-                .into_any_element()
+            if p.sheet {
+                // A sheet opens no popover over itself: an inline calendar,
+                // taking no input while disabled.
+                let mut calendar = Calendar::new(id(&p.id, "value")).range_value(current);
+                if !p.disabled {
+                    calendar =
+                        calendar.on_range_change(move |range, window, cx| set(range, window, cx));
+                }
+                calendar.into_any_element()
+            } else {
+                gpui::div()
+                    // The range input's own Enter must not reach the
+                    // editor's save shortcut first.
+                    .on_key_down(|event: &gpui::KeyDownEvent, _, cx| {
+                        if event.keystroke.key == "enter" {
+                            cx.stop_propagation();
+                        }
+                    })
+                    .child(
+                        DateRangeInput::new(
+                            id(&p.id, "value"),
+                            t18.t("@astryx.powersearch.valueEditor.dateRange"),
+                            current,
+                        )
+                        .label_hidden(true)
+                        .disabled(p.disabled)
+                        .clear(false)
+                        .on_change(move |range, window, cx| {
+                            if let Some(range) = range {
+                                set(range, window, cx)
+                            }
+                        }),
+                    )
+                    .into_any_element()
+            }
         }
         OperatorValue::DateRelative {
             past_allowed,
@@ -488,4 +612,80 @@ fn number_editor(
             });
     }
     input.into_any_element()
+}
+
+/// The parts of an instant a date-and-time editor holds until both exist.
+#[derive(Clone, Copy, Default)]
+struct PendingParts {
+    date: Option<PlainDate>,
+    time: Option<PlainTime>,
+}
+
+/// Upstream `DateTimeEditor`: the instant's wall clock in `zone`, as a date
+/// beside a time; a part picked first waits for the other (FR26).
+fn date_time_editor(
+    p: &ValueEditorProps,
+    label: SharedString,
+    unix_seconds: Option<i64>,
+    zone: TimeZoneChoice,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let t18 = i18n(cx);
+    let theme = astryx_theme::current(window, cx);
+    let parts = unix_seconds.map(|s| wall_clock_in_zone(s, &zone));
+    let pending = window.use_keyed_state(id(&p.id, "pending"), cx, |_, _| PendingParts::default());
+    let held = *pending.read(cx);
+    let date = parts.map(|v| v.date).or(held.date);
+    let time = parts.map(|v| v.time).or(held.time);
+    let commit = {
+        let on_change = p.on_change.clone();
+        move |date: Option<PlainDate>,
+              time: Option<PlainTime>,
+              window: &mut Window,
+              cx: &mut App| {
+            if let (Some(date), Some(time)) = (date, time) {
+                let unix_seconds = instant_in_zone(PlainDateTime::new(date, time), &zone);
+                on_change(
+                    FilterValue::DateAbsolute { unix_seconds },
+                    false,
+                    window,
+                    cx,
+                );
+            }
+        }
+    };
+    let (date_commit, time_commit) = (commit.clone(), commit);
+    let (date_pending, time_pending) = (pending.clone(), pending);
+    let mut date_input = DateInput::new(id(&p.id, "date"), label, date)
+        .label_hidden(true)
+        .entry_error_behavior(EntryErrorBehavior::Complete)
+        .disabled(p.disabled)
+        .on_change(move |value, window, cx| {
+            date_pending.update(cx, |s, _| s.date = value);
+            date_commit(value, time, window, cx);
+        });
+    let mut time_input = TimeInput::new(
+        id(&p.id, "time"),
+        t18.t("@astryx.powersearch.valueEditor.time"),
+        time,
+    )
+    .label_hidden(true)
+    .entry_error_behavior(EntryErrorBehavior::Complete)
+    .disabled(p.disabled)
+    .on_change(move |value, window, cx| {
+        time_pending.update(cx, |s, _| s.time = value);
+        time_commit(date, value, window, cx);
+    });
+    if p.sheet {
+        date_input = date_input.width(gpui::relative(1.));
+        time_input = time_input.width(gpui::relative(1.));
+    }
+    gpui::div()
+        .flex()
+        .flex_wrap()
+        .gap(theme.tokens().spacing.s2)
+        .child(date_input)
+        .child(time_input)
+        .into_any_element()
 }

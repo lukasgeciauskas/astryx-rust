@@ -5,7 +5,7 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M8 (Dates): stages 1 to 6 done._
+_Last updated: 2026-11-26, during M8 (Dates): stages 1 to 6 and 8 done; the native pickers remain._
 
 ## State
 
@@ -48,10 +48,7 @@ _Last updated: 2026-11-26, during M8 (Dates): stages 1 to 6 done._
 | Lightbox springs (it eases over 280ms now) | Motion layer (M11) |
 | Lightbox video playback and `hasAutoPlay` (a video opens in the system player now) | MediaPlayer's decoder (M13) |
 | Dialog content inset done by the dialog itself | Layout (M9) |
-| FormLayout's `defaultEntryErrorBehavior` readers | Date inputs (M8) |
 | Backdrop blur (Lightbox, scrims) | Fork patch R2 |
-| PowerSearch's date and time values (`time`, `date_absolute`, `date_relative`, `date_range`, `timezoneID`, FR25, FR26) | Calendar, date inputs and calendar systems (M8) |
-| Table filtering's `date_absolute` and `time` controls | DateInput and TimeInput (M8) |
 | Table row expansion's `animatedLayout` glide (FR15) | Motion layer (M11) |
 | TreeList's `animatedLayout` and expand glide (FR8, FR9) | Motion layer (M11) |
 
@@ -201,13 +198,10 @@ and jiff were already dependencies. Stage 2 added DateInput's pointer field (`cr
 shared entry-error report (`field/entry_report.rs`). Stage 3 added TimeInput's typed field (`time_input/`). Stage 4 added DateTimeInput's pointer field (`date_time_input/`), stage 5 DateRangeInput
 (`date_range_input/`), stage 6a the picker wheels (`wheel/`, with the motion math pulled forward
 into `astryx_primitives::motion`) and TimeInput's sheet, stage 6b DateInput's sheet (the month pager, the month and year
-wheels), stage 6c DateTimeInput's sheet. The remaining stages, in order: the native pickers (a fork patch: a hidden
+wheels), stage 6c DateTimeInput's sheet. The items carried into M8 are done (stage 8: PowerSearch's date and time values with
+`timezoneID`, Table filtering's date and time controls, FormLayout's
+`defaultEntryErrorBehavior` readers). The remaining stage: the native pickers (a fork patch: a hidden
 `<input type="date">` and `showPicker()` on the web, the Common Controls month calendar and
-date-time picker on Windows), then the carried items. Carried into M8:
-- PowerSearch's date and time values (`time`, `date_absolute`, `date_relative`,
-  `date_range`, `timezoneID`, FR25, FR26).
-- FormLayout's `defaultEntryErrorBehavior` readers.
-- Table filtering's `date_absolute` and `time` controls (`table/filtering.rs`'s
-  `filter_control`).
+date-time picker on Windows), closing M8.
 
 Ask the owner before adding the jiff or icu4x calendar crates (installing software).

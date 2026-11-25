@@ -117,6 +117,79 @@ fn with_calendar(locale: &Locale, calendar: CalendarSystem) -> Locale {
     locale
 }
 
+fn tz_of(zone: &TimeZoneChoice) -> jiff::tz::TimeZone {
+    match zone {
+        TimeZoneChoice::Local => jiff::tz::TimeZone::system(),
+        TimeZoneChoice::Iana(id) => jiff::tz::TimeZone::get(id).unwrap_or(jiff::tz::TimeZone::UTC),
+    }
+}
+
+/// The calendar day an instant falls on in `zone` (upstream
+/// `unixSecondsToISODate`).
+pub fn day_of_instant(unix_seconds: i64, zone: &TimeZoneChoice) -> crate::date::PlainDate {
+    let dt = wall_clock(unix_seconds, zone).zoned.datetime();
+    crate::date::PlainDate {
+        year: dt.year() as i32,
+        month: dt.month() as u8,
+        day: dt.day() as u8,
+    }
+}
+
+/// The instant of `date`'s midnight in `zone` (upstream
+/// `isoDateToUnixSeconds`).
+pub fn midnight_in_zone(date: crate::date::PlainDate, zone: &TimeZoneChoice) -> i64 {
+    instant_in_zone(
+        crate::date::PlainDateTime::new(
+            date,
+            crate::date::PlainTime {
+                hour: 0,
+                minute: 0,
+                second: 0,
+            },
+        ),
+        zone,
+    )
+}
+
+/// An instant's wall-clock date and time in `zone`, to the minute
+/// (upstream `unixSecondsToISODateTime`).
+pub fn wall_clock_in_zone(unix_seconds: i64, zone: &TimeZoneChoice) -> crate::date::PlainDateTime {
+    let dt = wall_clock(unix_seconds, zone).zoned.datetime();
+    crate::date::PlainDateTime::new(
+        crate::date::PlainDate {
+            year: dt.year() as i32,
+            month: dt.month() as u8,
+            day: dt.day() as u8,
+        },
+        crate::date::PlainTime {
+            hour: dt.hour() as u8,
+            minute: dt.minute() as u8,
+            second: 0,
+        },
+    )
+}
+
+/// The instant a wall-clock time names in `zone`; in a gap or an overlap
+/// the compatible reading, as `Date` and `Temporal` take it (upstream
+/// `isoDateTimeToUnixSeconds`).
+pub fn instant_in_zone(at: crate::date::PlainDateTime, zone: &TimeZoneChoice) -> i64 {
+    let civil = jiff::civil::date(
+        i16::try_from(at.date.year).unwrap_or(1970),
+        at.date.month as i8,
+        at.date.day as i8,
+    )
+    .at(
+        at.time.hour as i8,
+        at.time.minute as i8,
+        at.time.second as i8,
+        0,
+    );
+    civil
+        .to_zoned_datetime(tz_of(zone))
+        .map(|zoned| zoned.timestamp().as_second())
+        .unwrap_or(0)
+}
+
 /// Formats an instant, upstream `formatInstant`.
 pub fn format_instant(
     locale: &Locale,
@@ -321,6 +394,25 @@ pub fn format_relative(locale: &Locale, ago_seconds: i64, narrow: bool) -> Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn days_and_instants_read_in_a_zone() {
+        use crate::date::{PlainDate, PlainDateTime, PlainTime};
+        let la = TimeZoneChoice::Iana("America/Los_Angeles".into());
+        let utc = TimeZoneChoice::Iana("UTC".into());
+        // 2024-03-05T03:00Z is still the 4th in Los Angeles.
+        let t = 1_709_607_600;
+        assert_eq!(day_of_instant(t, &utc), PlainDate::new(2024, 3, 5).unwrap());
+        assert_eq!(day_of_instant(t, &la), PlainDate::new(2024, 3, 4).unwrap());
+        // A day stored as its midnight reads back as the same day.
+        let day = PlainDate::new(2024, 3, 10).unwrap();
+        for zone in [&la, &utc] {
+            assert_eq!(day_of_instant(midnight_in_zone(day, zone), zone), day);
+        }
+        assert_eq!(midnight_in_zone(day, &utc) % 86_400, 0);
+        let at = PlainDateTime::new(day, PlainTime::new(14, 30, 0).unwrap());
+        assert_eq!(wall_clock_in_zone(instant_in_zone(at, &la), &la), at);
+    }
 
     fn en() -> Locale {
         "en".parse().unwrap()

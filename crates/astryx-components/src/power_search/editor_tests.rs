@@ -198,3 +198,202 @@ fn a_field_whose_operator_takes_no_value_saves_when_chosen(cx: &mut TestAppConte
     click(cx, "e-field-option-starred");
     assert_eq!(log.borrow().last().unwrap(), "save starred is_true Empty");
 }
+
+// ---- Dates and times (FR25, FR26) ------------------------------------------
+
+fn dates_config() -> Rc<PowerSearchConfig> {
+    Rc::new(
+        PowerSearchConfig::new("events")
+            .field(
+                PowerSearchField::new("when", "When").operator(PowerSearchOperator::new(
+                    "on",
+                    "on",
+                    OperatorValue::DateAbsolute { date_only: None },
+                )),
+            )
+            .field(
+                PowerSearchField::new("at", "At").operator(PowerSearchOperator::new(
+                    "at",
+                    "at",
+                    OperatorValue::DateAbsolute {
+                        date_only: Some(false),
+                    },
+                )),
+            )
+            .field(
+                PowerSearchField::new("start", "Start").operator(PowerSearchOperator::new(
+                    "is",
+                    "is",
+                    OperatorValue::Time {
+                        min: None,
+                        max: None,
+                    },
+                )),
+            )
+            .field(
+                PowerSearchField::new("span", "Span").operator(PowerSearchOperator::new(
+                    "in",
+                    "in",
+                    OperatorValue::DateRange {
+                        interval_presets: Vec::new(),
+                        relative_presets: Vec::new(),
+                    },
+                )),
+            ),
+    )
+}
+
+struct ZoneHost {
+    log: Log,
+    filter: PartialFilter,
+    zone: Option<&'static str>,
+}
+
+impl Render for ZoneHost {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let save = self.log.clone();
+        let mut editor = PowerSearchFilterEditor::new(
+            "e",
+            dates_config(),
+            self.filter.clone(),
+            EditorMode::Create,
+            move |filter, _, _| {
+                save.borrow_mut().push(match filter {
+                    Some(f) => format!("save {} {} {:?}", f.field, f.operator, f.value),
+                    None => "delete".into(),
+                })
+            },
+            |_, _| {},
+        );
+        if let Some(zone) = self.zone {
+            editor = editor.timezone_id(zone);
+        }
+        div().p(px(40.)).w(px(600.)).child(editor)
+    }
+}
+
+fn zone_host<'a>(
+    cx: &'a mut TestAppContext,
+    filter: PartialFilter,
+    zone: Option<&'static str>,
+) -> (&'a mut VisualTestContext, Log) {
+    astryx_i18n::date::set_today(astryx_i18n::date::PlainDate::new(2026, 11, 25));
+    cx.update(|cx| {
+        astryx_theme::init(cx);
+        astryx_primitives::focus::init(cx);
+        astryx_primitives::editing::init(cx);
+    });
+    let log = Log::default();
+    let l = log.clone();
+    let (_, cx) = cx.add_window_view(move |_, _| ZoneHost {
+        log: l,
+        filter,
+        zone,
+    });
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    (cx, log)
+}
+
+/// Types into the date field: focus starts on its calendar toggle.
+fn type_date(cx: &mut VisualTestContext, text: &str) {
+    press(cx, "tab");
+    cx.simulate_input(text);
+    settle(cx);
+}
+
+#[gpui::test]
+fn fr25_a_picked_day_is_its_midnight_in_timezone_id(cx: &mut TestAppContext) {
+    let (cx, log) = zone_host(
+        cx,
+        partial("when", Some("on"), None),
+        Some("America/Los_Angeles"),
+    );
+    type_date(cx, "3/5/2024");
+    click(cx, "e-apply");
+    // 2024-03-05T00:00-08:00.
+    assert_eq!(
+        log.borrow().last().unwrap(),
+        "save when on DateAbsolute { unix_seconds: 1709625600 }"
+    );
+}
+
+#[gpui::test]
+fn fr25_without_a_zone_a_day_is_its_utc_midnight(cx: &mut TestAppContext) {
+    let (cx, log) = zone_host(cx, partial("when", Some("on"), None), None);
+    type_date(cx, "3/5/2024");
+    click(cx, "e-apply");
+    assert_eq!(
+        log.borrow().last().unwrap(),
+        "save when on DateAbsolute { unix_seconds: 1709596800 }"
+    );
+}
+
+#[gpui::test]
+fn fr25_reopening_a_day_keeps_its_instant(cx: &mut TestAppContext) {
+    // 2024-03-05T03:00Z: the 4th in Los Angeles, stored before the zone.
+    let stored = FilterValue::DateAbsolute {
+        unix_seconds: 1_709_607_600,
+    };
+    let (cx, log) = zone_host(
+        cx,
+        partial("when", Some("on"), Some(stored)),
+        Some("America/Los_Angeles"),
+    );
+    click(cx, "e-apply");
+    assert_eq!(
+        log.borrow().last().unwrap(),
+        "save when on DateAbsolute { unix_seconds: 1709607600 }",
+        "nothing rewrites the value"
+    );
+}
+
+#[gpui::test]
+fn fr26_an_instant_takes_the_wall_clock_in_timezone_id(cx: &mut TestAppContext) {
+    let (cx, log) = zone_host(cx, partial("at", Some("at"), None), Some("UTC"));
+    type_date(cx, "3/5/2024");
+    assert!(log.borrow().is_empty(), "the date waits for a time");
+    press(cx, "tab");
+    cx.simulate_input("2:30 PM");
+    settle(cx);
+    click(cx, "e-apply");
+    assert_eq!(
+        log.borrow().last().unwrap(),
+        "save at at DateAbsolute { unix_seconds: 1709649000 }"
+    );
+}
+
+#[gpui::test]
+fn a_time_value_saves_its_iso_time(cx: &mut TestAppContext) {
+    let (cx, log) = zone_host(cx, partial("start", Some("is"), None), None);
+    cx.simulate_input("2:30 PM");
+    settle(cx);
+    click(cx, "e-apply");
+    assert_eq!(
+        log.borrow().last().unwrap(),
+        "save start is Time(\"14:30\")"
+    );
+}
+
+#[gpui::test]
+fn fr25_a_picked_range_stores_each_day_s_midnight(cx: &mut TestAppContext) {
+    let (cx, log) = zone_host(cx, partial("span", Some("in"), None), None);
+    click(cx, "e-value-span-in-value-trigger");
+    let day = |d: u8| -> &'static str {
+        Box::leak(
+            crate::calendar::day_selector(
+                &"e-value-span-in-value-calendar".into(),
+                astryx_i18n::date::PlainDate::new(2026, 11, d).unwrap(),
+                false,
+            )
+            .into_boxed_str(),
+        )
+    };
+    click(cx, day(10));
+    click(cx, day(12));
+    click(cx, "e-apply");
+    assert_eq!(
+        log.borrow().last().unwrap(),
+        "save span in DateRange(DateTimeRange { start: Absolute { unix_seconds: 1794268800 }, end: Absolute { unix_seconds: 1794441600 } })"
+    );
+}

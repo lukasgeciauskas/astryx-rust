@@ -64,7 +64,7 @@ pub struct PowerSearchTokenProps {
     pub on_click: Option<ActFn>,
     pub on_remove: Option<ActFn>,
     pub disabled: bool,
-    /// Upstream `timezoneID` (read by date values from M8 on).
+    /// Upstream `timezoneID`: the zone date values read in (FR25, FR26).
     pub timezone_id: Option<SharedString>,
 }
 
@@ -605,7 +605,7 @@ impl RenderOnce for PowerSearch {
         // The token text (FR24): label, value, and the whole.
         let max_token_length = self.max_token_length;
         let token_text = {
-            let config = config.clone();
+            let (config, zone) = (config.clone(), timezone_id.clone());
             move |filter: &PowerSearchFilter, cx: &App| -> (String, Option<String>, String) {
                 let t18 = i18n(cx);
                 let field = config.find_field(&filter.field);
@@ -616,8 +616,9 @@ impl RenderOnce for PowerSearch {
                 let budget = max_token_length
                     .saturating_sub(field_label.chars().count() + op_label.chars().count())
                     .max(10);
-                let value =
-                    op.and_then(|o| format_token_value(&o.value, &filter.value, budget, &t18));
+                let value = op.and_then(|o| {
+                    format_token_value(&o.value, &filter.value, budget, &t18, zone.as_deref())
+                });
                 let full = match &value {
                     Some(v) => format_token_text(&label, v, &t18),
                     None => label.clone(),
@@ -700,6 +701,7 @@ impl RenderOnce for PowerSearch {
             };
             let trigger = super::sheet::trigger_field(
                 super::sheet::TriggerProps {
+                    timezone_id: timezone_id.clone(),
                     id: self.id.clone(),
                     config: config.clone(),
                     filters: filters.clone(),
@@ -722,6 +724,7 @@ impl RenderOnce for PowerSearch {
             );
             let flow = super::sheet::flow(
                 super::sheet::SheetProps {
+                    timezone_id: timezone_id.clone(),
                     id: self.id.clone(),
                     config: config.clone(),
                     filters: filters.clone(),
@@ -754,7 +757,15 @@ impl RenderOnce for PowerSearch {
                 let op_label = op.map(|o| o.label_text(cx).to_string()).unwrap_or_default();
                 let label = format_token_label(&field_label, &op_label, &t18);
                 let value = op
-                    .map(|o| format_filter_value(&o.value, &filter.value, max_token_length, &t18))
+                    .map(|o| {
+                        format_filter_value(
+                            &o.value,
+                            &filter.value,
+                            max_token_length,
+                            &t18,
+                            timezone_id.as_deref(),
+                        )
+                    })
                     .unwrap_or_default();
                 let display = if value.is_empty() {
                     label
@@ -1297,6 +1308,9 @@ impl RenderOnce for PowerSearch {
                 )
                 .save_label(save_label.clone())
                 .read_only(read_only);
+                if let Some(zone) = timezone_id.clone() {
+                    editor = editor.timezone_id(zone);
+                }
                 if let Some(q) = opening.clone() {
                     editor = editor.opening_query(q);
                 }

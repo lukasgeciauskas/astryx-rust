@@ -140,6 +140,8 @@ impl Draft {
 /// The editor's state, kept while one open lasts.
 pub(crate) struct EditorState {
     pub draft: Draft,
+    /// Upstream `timezoneID`, for the nested rows' date editors.
+    pub timezone_id: Option<SharedString>,
     /// The root, from which focus steps to the value editor once.
     root: gpui::FocusHandle,
     focused: bool,
@@ -159,6 +161,7 @@ pub struct PowerSearchFilterEditor {
     max_menu_items: Option<usize>,
     read_only: bool,
     opening_query: Option<SharedString>,
+    timezone_id: Option<SharedString>,
 }
 
 impl PowerSearchFilterEditor {
@@ -179,6 +182,7 @@ impl PowerSearchFilterEditor {
             mode,
             on_save: Rc::new(on_save),
             on_cancel: Rc::new(on_cancel),
+            timezone_id: None,
             save_label: None,
             max_menu_items: None,
             read_only: false,
@@ -208,6 +212,13 @@ impl PowerSearchFilterEditor {
     /// Upstream `isReadOnly`.
     pub fn read_only(mut self, read_only: bool) -> Self {
         self.read_only = read_only;
+        self
+    }
+
+    /// Upstream `timezoneID`: the zone date values read and write in
+    /// (FR25, FR26).
+    pub fn timezone_id(mut self, zone: impl Into<SharedString>) -> Self {
+        self.timezone_id = Some(zone.into());
         self
     }
 }
@@ -276,6 +287,7 @@ impl RenderOnce for PowerSearchFilterEditor {
                     }
                     EditorState {
                         draft,
+                        timezone_id: None,
                         root: cx.focus_handle(),
                         focused: false,
                     }
@@ -283,6 +295,10 @@ impl RenderOnce for PowerSearchFilterEditor {
             )
         };
         let draft = state.read(cx).draft.clone();
+        {
+            let zone = self.timezone_id.clone();
+            state.update(cx, |s, _| s.timezone_id = zone);
+        }
         let op = draft
             .operator
             .as_ref()
@@ -548,6 +564,7 @@ impl RenderOnce for PowerSearchFilterEditor {
                         id: ElementId::Name(
                             format!("{}-value-{}-{}", self.id, draft.field, op.key).into(),
                         ),
+                        timezone_id: self.timezone_id.clone(),
                         op: op.value.clone(),
                         value: draft.value.clone(),
                         on_change: on_value,
@@ -939,6 +956,7 @@ fn sub_row(
                 id: ElementId::Name(
                     format!("{id}-sub-value-{key}-{}-{}", sub.field, op.key).into(),
                 ),
+                timezone_id: state.read(cx).timezone_id.clone(),
                 op: op.value.clone(),
                 value: sub.value.clone(),
                 on_change: on_value,
@@ -970,6 +988,7 @@ pub(crate) fn nested_step(
     initial: Option<FilterValue>,
     read_only: bool,
     max_menu_items: Option<usize>,
+    timezone_id: Option<SharedString>,
     on_value: NestedValueFn,
     window: &mut Window,
     cx: &mut App,
@@ -989,11 +1008,13 @@ pub(crate) fn nested_step(
                         read_only: false,
                     },
                 ),
+                timezone_id: None,
                 root: cx.focus_handle(),
                 focused: true,
             },
         )
     };
+    state.update(cx, |s, _| s.timezone_id = timezone_id);
     if state.read(cx).draft.operator.as_ref() != Some(operator) {
         state.update(cx, |s, _| {
             s.draft.operator = Some(operator.clone());

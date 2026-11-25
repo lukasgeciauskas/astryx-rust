@@ -1,7 +1,7 @@
 //! How filters read as text, upstream `formatFilterValue.ts`,
 //! `formatTokenValue.ts` and `relativeDateOptions.ts`.
 
-use astryx_i18n::{Arg, I18n};
+use astryx_i18n::{Arg, I18n, InstantFormat, TimeZoneChoice};
 use gpui::SharedString;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -105,38 +105,38 @@ pub fn relative_date_label(op: &OperatorValue, value: &str, t18: &I18n) -> Strin
     }
 }
 
-/// A Unix time as its UTC civil date and time (Howard Hinnant's algorithm).
-fn civil(unix_seconds: i64) -> (i64, u32, u32, u32, u32) {
-    let days = unix_seconds.div_euclid(86_400);
-    let secs = unix_seconds.rem_euclid(86_400);
-    let z = days + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z.rem_euclid(146_097);
-    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = (doy - (153 * mp + 2) / 5 + 1) as u32;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
-    let year = yoe + era * 400 + i64::from(month <= 2);
-    (
-        year,
-        month,
-        day,
-        (secs / 3_600) as u32,
-        ((secs % 3_600) / 60) as u32,
-    )
+/// The zone a date value reads and writes in (upstream `resolveDateZone`):
+/// `timezoneID`, else UTC for a calendar day and the viewer's zone for an
+/// instant, so a day stored before a zone was given keeps its day (FR25,
+/// FR26).
+pub fn resolve_date_zone(timezone_id: Option<&str>, date_only: bool) -> TimeZoneChoice {
+    match timezone_id.filter(|zone| !zone.is_empty()) {
+        Some(zone) => TimeZoneChoice::Iana(zone.to_string()),
+        None if date_only => TimeZoneChoice::Iana("UTC".into()),
+        None => TimeZoneChoice::Local,
+    }
 }
 
-/// Upstream `formatDateAbsolute`, for now as an ISO date (and time) in UTC.
-/// The locale's calendar, its formats and `timezoneID` come with M8's
-/// calendar systems.
-pub fn format_date_absolute(unix_seconds: i64, date_only: bool) -> String {
-    let (y, m, d, hh, mm) = civil(unix_seconds);
-    if date_only {
-        format!("{y:04}-{m:02}-{d:02}")
+/// Upstream `formatDateAbsolute`: a calendar day as its day in its zone, or
+/// an instant as its date and time, in the provider's calendar.
+pub fn format_date_absolute(
+    unix_seconds: i64,
+    date_only: bool,
+    timezone_id: Option<&str>,
+    t18: &I18n,
+) -> String {
+    let format = if date_only {
+        InstantFormat::Date
     } else {
-        format!("{y:04}-{m:02}-{d:02} {hh:02}:{mm:02}")
-    }
+        InstantFormat::DateTime
+    };
+    t18.format_instant(
+        unix_seconds,
+        format,
+        &resolve_date_zone(timezone_id, date_only),
+        false,
+    )
+    .to_string()
 }
 
 fn date_only(op: &OperatorValue) -> bool {
@@ -170,6 +170,7 @@ pub fn format_filter_value(
     value: &FilterValue,
     max_length: usize,
     t18: &I18n,
+    timezone_id: Option<&str>,
 ) -> String {
     let list = |labels: Vec<String>, count_key: &str| -> String {
         match labels.len() {
@@ -220,7 +221,7 @@ pub fn format_filter_value(
         ),
         FilterValue::Time(v) => v.to_string(),
         FilterValue::DateAbsolute { unix_seconds } => truncate(
-            &format_date_absolute(*unix_seconds, date_only(op)),
+            &format_date_absolute(*unix_seconds, date_only(op), timezone_id, t18),
             max_length,
         ),
         FilterValue::DateRelative(v) => relative_date_label(op, v, t18),
@@ -298,6 +299,7 @@ pub fn format_token_value(
     value: &FilterValue,
     max_length: usize,
     t18: &I18n,
+    timezone_id: Option<&str>,
 ) -> Option<String> {
     let list = |labels: Vec<String>| -> Option<String> {
         match labels.len() {
@@ -349,7 +351,7 @@ pub fn format_token_value(
         }
         FilterValue::Time(v) => Some(v.to_string()),
         FilterValue::DateAbsolute { unix_seconds } => Some(truncate_token(
-            &format_date_absolute(*unix_seconds, date_only(op)),
+            &format_date_absolute(*unix_seconds, date_only(op), timezone_id, t18),
             max_length,
         )),
         FilterValue::DateRelative(v) => {
@@ -389,13 +391,31 @@ mod tests {
 
     #[test]
     fn civil_dates_follow_the_gregorian_calendar() {
-        assert_eq!(format_date_absolute(0, true), "1970-01-01");
-        assert_eq!(format_date_absolute(951_782_400, true), "2000-02-29");
+        let t = I18n::new("en");
+        assert_eq!(format_date_absolute(0, true, None, &t), "Jan 1, 1970");
         assert_eq!(
-            format_date_absolute(1_700_000_000, false),
-            "2023-11-14 22:13"
+            format_date_absolute(951_782_400, true, None, &t),
+            "Feb 29, 2000"
         );
-        assert_eq!(format_date_absolute(-86_400, true), "1969-12-31");
+        assert_eq!(
+            format_date_absolute(-86_400, true, None, &t),
+            "Dec 31, 1969"
+        );
+        // FR25: a calendar day reads in timezoneID, else UTC.
+        assert_eq!(
+            format_date_absolute(1_709_607_600, true, Some("America/Los_Angeles"), &t),
+            "Mar 4, 2024"
+        );
+        assert_eq!(
+            format_date_absolute(1_709_607_600, true, None, &t),
+            "Mar 5, 2024"
+        );
+        // FR26: an instant reads its date and time.
+        let instant = format_date_absolute(1_700_000_000, false, Some("UTC"), &t);
+        assert!(
+            instant.starts_with("Nov 14, 2023") && instant.contains("10:13"),
+            "{instant}"
+        );
     }
 
     #[gpui::test]
@@ -405,16 +425,16 @@ mod tests {
             values: vec![EnumItem::new("fiction", "Fiction")],
         };
         assert_eq!(
-            format_filter_value(&genres, &FilterValue::Enum("fiction".into()), 40, &t),
+            format_filter_value(&genres, &FilterValue::Enum("fiction".into()), 40, &t, None),
             "Fiction"
         );
         let list = FilterValue::StringList(vec!["a".into(), "b".into(), "c".into()]);
         assert_eq!(
-            format_filter_value(&OperatorValue::string_list(), &list, 40, &t),
+            format_filter_value(&OperatorValue::string_list(), &list, 40, &t, None),
             "a, b, c"
         );
         assert_eq!(
-            format_filter_value(&OperatorValue::string_list(), &list, 4, &t),
+            format_filter_value(&OperatorValue::string_list(), &list, 4, &t, None),
             "3 items"
         );
         let pages = OperatorValue::Float {
@@ -423,7 +443,7 @@ mod tests {
             units: Some("pages".into()),
         };
         assert_eq!(
-            format_filter_value(&pages, &FilterValue::Float(1200.), 40, &t),
+            format_filter_value(&pages, &FilterValue::Float(1200.), 40, &t, None),
             "1,200 pages"
         );
         let people = FilterValue::EntityList(vec![
@@ -444,7 +464,7 @@ mod tests {
             tokenization: None,
             render_item: None,
         };
-        assert_eq!(format_filter_value(&op, &people, 4, &t), "2 entities");
+        assert_eq!(format_filter_value(&op, &people, 4, &t, None), "2 entities");
         let relative = OperatorValue::DateRelative {
             past_allowed: None,
             future_allowed: Some(false),
@@ -454,7 +474,8 @@ mod tests {
                 &relative,
                 &FilterValue::DateRelative("3d_ago".into()),
                 40,
-                &t
+                &t,
+                None
             ),
             "3 days ago"
         );
@@ -475,8 +496,14 @@ mod tests {
         );
         assert!(token_text_keeps_parts(&t));
         assert_eq!(
-            format_token_value(&OperatorValue::float(), &FilterValue::Float(1234.5), 40, &t)
-                .as_deref(),
+            format_token_value(
+                &OperatorValue::float(),
+                &FilterValue::Float(1234.5),
+                40,
+                &t,
+                None
+            )
+            .as_deref(),
             Some("1234.5")
         );
         assert_eq!(
@@ -484,13 +511,14 @@ mod tests {
                 &OperatorValue::string(),
                 &FilterValue::String("abcdefghij".into()),
                 4,
-                &t
+                &t,
+                None
             )
             .as_deref(),
             Some("abcd...")
         );
         assert_eq!(
-            format_token_value(&OperatorValue::Empty, &FilterValue::Empty, 40, &t),
+            format_token_value(&OperatorValue::Empty, &FilterValue::Empty, 40, &t, None),
             None
         );
     }
