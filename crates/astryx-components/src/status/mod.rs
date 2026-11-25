@@ -623,13 +623,16 @@ impl RenderOnce for StatusDot {
             None,
         );
         el.style().refine(&self.style);
-        el.id(self.id)
+        let id = self.id.clone();
+        let el = el
+            .id(self.id)
             .role(Role::Image)
             .aria_label(self.label)
             .children(
                 self.icon
                     .map(|icon| provide(IconDefaultSize(IconSize::Xsm), icon)),
-            )
+            );
+        crate::overlay::with_tooltip(&id, self.tooltip, false, el)
     }
 }
 
@@ -683,10 +686,7 @@ pub const STATUS_DOT_DOC: ComponentDoc = ComponentDoc {
         p("variant", RustApi::Argument("variant")),
         p("label", RustApi::Argument("label")),
         p("isPulsing", RustApi::Method("pulsing")),
-        p(
-            "tooltip",
-            RustApi::Pending("tooltip", "the tooltip lands with Tooltip in M5"),
-        ),
+        p("tooltip", RustApi::Method("tooltip")),
         p("icon", RustApi::Method("icon")),
         p("xstyle", RustApi::Trait("Styled")),
     ],

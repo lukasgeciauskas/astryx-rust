@@ -474,6 +474,8 @@ impl RenderOnce for Slider {
             div().children([tick]).children(label)
         });
 
+        let value_display = self.value_display;
+        let dragging_now = state.dragging.get();
         let thumbs = values.iter().enumerate().map(|(i, &v)| {
             let f = fractions[i];
             let thumb_id = ElementId::Name(format!("{:?}-thumb-{i}", self.id).into());
@@ -530,7 +532,7 @@ impl RenderOnce for Slider {
                 (false, 0) => i18n.t("@astryx.slider.minimumThumb"),
                 (false, _) => i18n.t("@astryx.slider.maximumThumb"),
             };
-            thumb
+            let thumb = thumb
                 .role(Role::Slider)
                 .aria_label(name)
                 .aria_disabled(disabled)
@@ -538,7 +540,29 @@ impl RenderOnce for Slider {
                 .aria_min_numeric_value(scale.min)
                 .aria_max_numeric_value(scale.max)
                 .aria_numeric_value_step(scale.step)
-                .aria_value(format(v))
+                .aria_value(format(v));
+            if value_display != ValueDisplay::Tooltip {
+                return thumb.into_any_element();
+            }
+            // Upstream SliderValueTooltip: the value over the thumb, at once on
+            // hover and any focus; a drag holds its own thumb's open and
+            // closes the other's.
+            crate::overlay::Tooltip::new(
+                ElementId::Name(format!("{}-value-{i}", self.id).into()),
+                format(v),
+            )
+            .delay(std::time::Duration::ZERO)
+            .focus_trigger(crate::overlay::FocusTrigger::Always)
+            .placement(if vertical {
+                astryx_primitives::Placement::Start
+            } else {
+                astryx_primitives::Placement::Above
+            })
+            .open(dragging_now.map(|d| d == i))
+            .trigger_acts(false)
+            .press_closes(false)
+            .child(thumb)
+            .into_any_element()
         });
 
         // Records where the travel box landed, and while a thumb is
@@ -628,6 +652,14 @@ impl RenderOnce for Slider {
             );
         }
         let container = container.child(track).child(travel);
+        // Upstream disabledMessage: the reason over the track.
+        let container = crate::overlay::disabled_reason(
+            &self.id,
+            disabled,
+            self.disabled_message.as_ref(),
+            false,
+            container,
+        );
 
         let text = (self.value_display == ValueDisplay::Text).then(|| {
             let shown: SharedString = match self.value {
@@ -691,6 +723,9 @@ impl RenderOnce for Slider {
         if let Some(width) = self.width {
             field = field.width(width);
         }
+        if let Some(tooltip) = self.label_tooltip.clone() {
+            field = field.label_tooltip(tooltip);
+        }
         field.child(row)
     }
 }
@@ -701,8 +736,6 @@ impl RenderOnce for Slider {
 const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
-
-const TOOLTIP: &str = "the tooltip lands with Tooltip in M5";
 
 pub const SLIDER_DOC: ComponentDoc = ComponentDoc {
     name: "Slider",
@@ -717,7 +750,7 @@ pub const SLIDER_DOC: ComponentDoc = ComponentDoc {
         p("step", RustApi::Method("step")),
         p("orientation", RustApi::Method("orientation")),
         p("formatValue", RustApi::Method("format_value")),
-        p("valueDisplay", RustApi::Pending("value_display", TOOLTIP)),
+        p("valueDisplay", RustApi::Method("value_display")),
         p("marks", RustApi::Method("marks")),
         p(
             "minStepsBetweenThumbs",
@@ -725,16 +758,13 @@ pub const SLIDER_DOC: ComponentDoc = ComponentDoc {
         ),
         p("isDisabled", RustApi::Method("disabled")),
         p("htmlName", RustApi::Waived("GPUI has no HTML forms")),
-        p(
-            "disabledMessage",
-            RustApi::Pending("disabled_message", TOOLTIP),
-        ),
+        p("disabledMessage", RustApi::Method("disabled_message")),
         p("isOptional", RustApi::Method("optional")),
         p("isRequired", RustApi::Method("required")),
         p("isLabelHidden", RustApi::Method("label_hidden")),
         p("description", RustApi::Method("description")),
         p("status", RustApi::Method("status")),
-        p("labelTooltip", RustApi::Pending("label_tooltip", TOOLTIP)),
+        p("labelTooltip", RustApi::Method("label_tooltip")),
         p("width", RustApi::Method("width")),
         p(
             "containerXstyle",

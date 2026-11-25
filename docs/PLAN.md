@@ -220,10 +220,10 @@ The remaining primitives:
     Toolbar, Breadcrumbs, Pagination, Stepper/Step, TabList.
   - Pulled forward because M3 components need them: Field and FieldStatus (from M4), and
     Item's core (from M6; swipe actions wait for M11).
-  - Carried into later milestones, recorded in each doc: tooltips, InfoTips and disabled
-    messages (M5); TabMenu, BreadcrumbItem menus and Pagination's page-size selector (M5);
-    the SegmentedControl lens and Item swipe actions (M11);
-    Stepper's on-track indicators and collapsed horizontal mode (to schedule).
+  - Carried into later milestones, recorded in each doc: TabMenu, BreadcrumbItem menus
+    and Pagination's page-size selector (M5); the SegmentedControl lens and Item swipe
+    actions (M11). Tooltips, InfoTips, disabled messages and Stepper's on-track and compact
+    modes were finished with M4.
   - A gallery test renders every page, so an example that panics fails `cargo test`.
 - **M4 Editing engine & fields (done):**
   - GPUI fork patch R6 (ARIA states: disabled, read-only, required, invalid, busy, modal,
@@ -236,9 +236,18 @@ The remaining primitives:
     `conjunction` lists.
   - Components: TextInput, TextArea, NumberInput, InputGroup(+Text), FormLayout, FileInput,
     Field (attached, detached and tooltip status), Pagination's input box.
-  - Carried into later milestones, recorded in each doc: disabled-message, label and
-    status tooltips (M5); FormLayout's `defaultEntryErrorBehavior` readers (M8).
-- **M5 Layer runtime & overlays:** Tooltip, InfoTip, Popover, HoverCard, Overlay,
+  - GPUI fork patches R7 (display contents, grid tracks: FormLayout's horizontal-labels
+    grid), R8 (browser files: FileInput on the web) and R9 (`aria-current`).
+  - Pulled forward from M5 to finish every M3 and M4 prop: the anchored-layer runtime
+    (`position_layer`: flip, slide, RTL; `anchored_layer`), Tooltip (hover delay and
+    bridge, focus and touch triggers, controlled and pinned modes) and InfoTip, wired into
+    every `tooltip`, `labelTooltip`, `disabledMessage` and tooltip-status prop, Slider's
+    value tooltips, ProgressBar marks, Thumbnail labels and Text/Heading truncation.
+  - Also finished: Stepper's on-track indicators, compact horizontal mode and fill
+    sweep; CheckboxList/RadioList container and control styles.
+  - Carried into later milestones, recorded in each doc: FormLayout's
+    `defaultEntryErrorBehavior` readers (M8).
+- **M5 Layer runtime & overlays:** Popover, HoverCard, Overlay,
   Dialog(+Header, imperative), AlertDialog, Drawer, Toast(+viewport/queue), DropdownMenu
   (submenus, menu press), ContextMenu, MoreMenu, Lightbox, CommandPalette.
 - **M6 Collections:** combobox, virtualization, tree/grid focus, reorderable.

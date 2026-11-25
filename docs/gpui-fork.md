@@ -46,6 +46,7 @@ Each patch lands before the components that need it.
 | R6 | ARIA states (**landed**, `de7e405`) | `aria_disabled`, `aria_read_only`, `aria_required`, `aria_invalid`, `aria_busy`, `aria_modal` and `aria_multiselectable` on any stateful element, setting the matching AccessKit flags | Every form control (M4 onward): disabled, read-only, required and invalid fields; busy controls; modal dialogs and multi-select lists (M5) |
 | R7 | Display contents and grid tracks (**landed**, `7633ed6`) | `display: contents` (an element whose children lay out as its parent's), explicit grid track lists (`auto`, `min-content`, `max-content`, lengths, `fr`, `minmax`, `fit-content`), `grid-auto-flow`, `grid-auto-columns` and `grid-auto-rows` | FormLayout's `horizontal-labels` grid (M4); any upstream layout built on `display: contents` or track lists |
 | R8 | Browser files (**landed**, `cc84f94`) | On the web: `prompt_for_paths` opens the browser's file dialog, files dragged from the system drop as `ExternalPaths`, and `gpui_web::web_files` gives each browser file a virtual path with its name, size, type and bytes | FileInput on the web (M4); any app that opens or receives files in the browser |
+| R9 | `aria-current` (**landed**, `69dc0ba`) | `aria_current(AriaCurrent)` on any stateful element, setting AccessKit's aria-current; `AriaCurrent` is re-exported next to `Role` | The current page of Breadcrumbs and Pagination and the current step of a Stepper (M4); nav items (M9) |
 
 ### How each patch works
 
@@ -116,6 +117,8 @@ Each patch lands before the components that need it.
   - Dragging files over the canvas starts an `ExternalPaths` drag with no paths (the
     browser holds the files back), so `drag_over` styles apply; at the drop the files
     get virtual paths and replace the empty list before the drop lands.
+- **R9 (`aria-current`), as built:** one more ARIA property next to R6's states, kept
+  unset unless a component sets it. The R6 test covers it.
 
 - **R2 (backdrop blur):**
   - A new scene primitive.

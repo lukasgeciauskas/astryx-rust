@@ -62,6 +62,7 @@ impl LabelProps {
             optional: self.optional,
             required: self.required,
             icon: self.label_icon,
+            tooltip: None,
         }
     }
 }
@@ -268,7 +269,13 @@ impl RenderOnce for CheckboxInput {
             None,
         );
         el.style().refine(&self.style);
-        el
+        crate::overlay::disabled_reason(
+            &self.id,
+            self.disabled,
+            self.disabled_message.as_ref(),
+            false,
+            el,
+        )
     }
 }
 
@@ -468,7 +475,10 @@ impl RenderOnce for Switch {
             id: self.id.clone(),
             control: control.into_any_element(),
             ring_radius: px(h / 2.),
-            label: self.label.row(),
+            label: RowLabel {
+                tooltip: self.label_tooltip.clone(),
+                ..self.label.row()
+            },
             disabled: self.disabled,
             inert: busy,
             busy,
@@ -484,7 +494,13 @@ impl RenderOnce for Switch {
         let mut el = row.render(window, cx);
         theme.refine(el.style(), "switch", &[("size", self.size.as_str())], None);
         el.style().refine(&self.style);
-        el
+        crate::overlay::disabled_reason(
+            &self.id,
+            self.disabled,
+            self.disabled_message.as_ref(),
+            false,
+            el,
+        )
     }
 }
 
@@ -497,7 +513,6 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
 
 const NO_FORMS: &str = "GPUI has no HTML forms";
 const NO_REFS: &str = "GPUI elements have no refs";
-const TOOLTIP: &str = "the tooltip lands with Tooltip in M5";
 const FOCUS_EVENTS: &str =
     "observe the window's focus instead (GPUI has no per-element focus events here)";
 
@@ -515,10 +530,7 @@ pub const CHECKBOX_INPUT_DOC: ComponentDoc = ComponentDoc {
         p("isLoading", RustApi::Method("loading")),
         p("isDisabled", RustApi::Method("disabled")),
         p("htmlName", RustApi::Waived(NO_FORMS)),
-        p(
-            "disabledMessage",
-            RustApi::Pending("disabled_message", TOOLTIP),
-        ),
+        p("disabledMessage", RustApi::Method("disabled_message")),
         p("isReadOnly", RustApi::Method("read_only")),
         p("isOptional", RustApi::Method("optional")),
         p("isRequired", RustApi::Method("required")),
@@ -531,9 +543,6 @@ pub const CHECKBOX_INPUT_DOC: ComponentDoc = ComponentDoc {
     ],
     example: include_str!("examples.rs"),
 };
-
-const GROUP_CONTAINER: &str = "Styled reaches the field container";
-const GROUP_CONTROL: &str = "not yet: the inner control box takes no separate style";
 
 pub const RADIO_LIST_DOC: ComponentDoc = ComponentDoc {
     name: "RadioList",
@@ -548,19 +557,16 @@ pub const RADIO_LIST_DOC: ComponentDoc = ComponentDoc {
         p("orientation", RustApi::Method("orientation")),
         p("isDisabled", RustApi::Method("disabled")),
         p("htmlName", RustApi::Waived(NO_FORMS)),
-        p(
-            "disabledMessage",
-            RustApi::Pending("disabled_message", TOOLTIP),
-        ),
+        p("disabledMessage", RustApi::Method("disabled_message")),
         p("isRequired", RustApi::Method("required")),
         p("isOptional", RustApi::Method("optional")),
         p("status", RustApi::Method("status")),
         p("size", RustApi::Method("size")),
-        p("labelTooltip", RustApi::Pending("label_tooltip", TOOLTIP)),
+        p("labelTooltip", RustApi::Method("label_tooltip")),
         p("width", RustApi::Method("width")),
-        p("containerXstyle", RustApi::Waived(GROUP_CONTAINER)),
-        p("containerClassName", RustApi::Waived(GROUP_CONTAINER)),
-        p("containerStyle", RustApi::Waived(GROUP_CONTAINER)),
+        p("containerXstyle", RustApi::Method("container_style")),
+        p("containerClassName", RustApi::Method("container_style")),
+        p("containerStyle", RustApi::Method("container_style")),
         p("controlXstyle", RustApi::Trait("Styled")),
         p("controlClassName", RustApi::Trait("Styled")),
         p("controlStyle", RustApi::Trait("Styled")),
@@ -602,19 +608,16 @@ pub const CHECKBOX_LIST_DOC: ComponentDoc = ComponentDoc {
         p("density", RustApi::Method("density")),
         p("hasDividers", RustApi::Method("dividers")),
         p("isDisabled", RustApi::Method("disabled")),
-        p(
-            "disabledMessage",
-            RustApi::Pending("disabled_message", TOOLTIP),
-        ),
+        p("disabledMessage", RustApi::Method("disabled_message")),
         p("isReadOnly", RustApi::Method("read_only")),
         p("status", RustApi::Method("status")),
         p("width", RustApi::Method("width")),
-        p("containerXstyle", RustApi::Waived(GROUP_CONTAINER)),
-        p("containerClassName", RustApi::Waived(GROUP_CONTAINER)),
-        p("containerStyle", RustApi::Waived(GROUP_CONTAINER)),
-        p("controlXstyle", RustApi::Waived(GROUP_CONTROL)),
-        p("controlClassName", RustApi::Waived(GROUP_CONTROL)),
-        p("controlStyle", RustApi::Waived(GROUP_CONTROL)),
+        p("containerXstyle", RustApi::Method("container_style")),
+        p("containerClassName", RustApi::Method("container_style")),
+        p("containerStyle", RustApi::Method("container_style")),
+        p("controlXstyle", RustApi::Trait("Styled")),
+        p("controlClassName", RustApi::Trait("Styled")),
+        p("controlStyle", RustApi::Trait("Styled")),
     ],
     example: include_str!("examples.rs"),
 };
@@ -652,17 +655,14 @@ pub const SWITCH_DOC: ComponentDoc = ComponentDoc {
         p("isDisabled", RustApi::Method("disabled")),
         p("size", RustApi::Method("size")),
         p("htmlName", RustApi::Waived(NO_FORMS)),
-        p(
-            "disabledMessage",
-            RustApi::Pending("disabled_message", TOOLTIP),
-        ),
+        p("disabledMessage", RustApi::Method("disabled_message")),
         p("isOptional", RustApi::Method("optional")),
         p("isRequired", RustApi::Method("required")),
         p("status", RustApi::Method("status")),
         p("onFocus", RustApi::Waived(FOCUS_EVENTS)),
         p("onBlur", RustApi::Waived(FOCUS_EVENTS)),
         p("labelIcon", RustApi::Method("label_icon")),
-        p("labelTooltip", RustApi::Pending("label_tooltip", TOOLTIP)),
+        p("labelTooltip", RustApi::Method("label_tooltip")),
         p("labelPosition", RustApi::Method("label_position")),
         p("labelSpacing", RustApi::Method("label_spacing")),
         p("width", RustApi::Method("width")),

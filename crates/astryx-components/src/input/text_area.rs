@@ -23,7 +23,7 @@ use gpui::{
 };
 use unicode_segmentation::UnicodeSegmentation;
 
-use super::control::{Chrome, control_box, described_by, status_icon};
+use super::control::{Chrome, control_box, described_by, status_indicator};
 use super::text_input::selection_color;
 use crate::choice::action::{ActionFn, ChangeFn, Optimistic};
 use crate::field::{Field, InputStatus, StatusPlacement, StatusType};
@@ -430,9 +430,20 @@ impl RenderOnce for TextArea {
 
         let length = characters(&shown);
         let over = self.max_length.is_some_and(|limit| length > limit);
+        let status_message = self.status.as_ref().and_then(|s| s.message.clone());
         let status_glyph = status
             .filter(|_| self.status_placement != StatusPlacement::Detached)
-            .map(|status| status_icon(status, &part));
+            .map(|status| {
+                status_indicator(
+                    &self.id,
+                    status,
+                    self.status_placement,
+                    status_message.as_ref(),
+                    &part,
+                    window,
+                    cx,
+                )
+            });
 
         // FR7: the text keeps clear of the icons, spinner and counter.
         let inline = t.spacing.s2.to_pixels(rem);
@@ -632,6 +643,13 @@ impl RenderOnce for TextArea {
             Some(part) => scope(part, control).into_any_element(),
             None => control.into_any_element(),
         };
+        let control = crate::overlay::disabled_reason(
+            &self.id,
+            self.disabled,
+            self.disabled_message.as_ref(),
+            true,
+            control,
+        );
         let mut field = Field::new(self.id, self.label)
             .description_opt(self.description)
             .label_hidden(self.label_hidden)

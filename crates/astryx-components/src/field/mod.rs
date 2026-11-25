@@ -106,6 +106,7 @@ pub struct FieldLabel {
     optional: bool,
     required: bool,
     label_icon: Option<AnyElement>,
+    label_tooltip: Option<SharedString>,
     style: StyleRefinement,
 }
 
@@ -119,11 +120,14 @@ impl FieldLabel {
             optional: false,
             required: false,
             label_icon: None,
+            label_tooltip: None,
             style: StyleRefinement::default(),
         }
     }
 
     astryx_primitives::setters! {
+        /// Upstream `labelTooltip`: help in an InfoTip after the label.
+        ?label_tooltip: SharedString,
         /// Upstream `description`: supporting text under the label.
         ?description: SharedString,
         /// Upstream `isLabelHidden`: kept for assistive technology only.
@@ -153,6 +157,12 @@ impl FieldLabel {
         self.description = description;
         self
     }
+
+    /// Takes an optional label tooltip, for controls that forward theirs.
+    pub(crate) fn label_tooltip_opt(mut self, tooltip: Option<SharedString>) -> Self {
+        self.label_tooltip = tooltip;
+        self
+    }
 }
 
 impl Styled for FieldLabel {
@@ -166,12 +176,31 @@ impl RenderOnce for FieldLabel {
         let theme = current(window, cx);
         let t = theme.tokens();
         let i18n = i18n(cx);
+        // Upstream labelTooltip: an InfoTip named "About <label>" after the
+        // label. Under a hidden label it takes no room until keyboard focus
+        // reaches it.
+        let info = self.label_tooltip.clone().map(|help| {
+            crate::overlay::InfoTip::new(
+                ElementId::Name(format!("{}-label-tooltip", self.label).into()),
+                help,
+            )
+            .label(i18n.format(
+                "@astryx.field.labelTooltip",
+                &[("label", self.label.as_ref().into())],
+            ))
+            .hidden_until_focus(self.label_hidden)
+        });
         if self.label_hidden {
             let text = match &self.description {
                 Some(d) => format!("{}, {d}", self.label),
                 None => self.label.to_string(),
             };
-            return VisuallyHidden::new().child(text).into_any_element();
+            return div()
+                .flex()
+                .flex_col()
+                .child(VisuallyHidden::new().child(text))
+                .children(info)
+                .into_any_element();
         }
         // FR5 of FormLayout: the marker that restates the form's default
         // is left out; an optional marker wins over a required one.
@@ -212,6 +241,17 @@ impl RenderOnce for FieldLabel {
             }));
         theme.refine(label.style(), "field-label", &[], None);
         label.style().refine(&self.style);
+        let label = match info {
+            Some(info) => div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(t.spacing.s1)
+                .child(label)
+                .child(info)
+                .into_any_element(),
+            None => label.into_any_element(),
+        };
         div()
             .flex()
             .flex_col()
@@ -450,7 +490,7 @@ impl Field {
         !optional,
         /// Upstream `isRequired`.
         !required,
-        /// Upstream `labelTooltip`. The InfoTip lands with Tooltip (M5).
+        /// Upstream `labelTooltip`: help in an InfoTip after the label.
         ?label_tooltip: SharedString,
         /// Upstream `status`.
         ?status: InputStatus,
@@ -503,7 +543,8 @@ impl RenderOnce for Field {
             .disabled(self.disabled)
             .optional(self.optional)
             .required(self.required)
-            .label_icon_opt(self.label_icon);
+            .label_icon_opt(self.label_icon)
+            .label_tooltip_opt(self.label_tooltip.clone());
         let status = self.status.and_then(|status| {
             let message = status.message?;
             Some(
@@ -646,15 +687,9 @@ pub const FIELD_DOC: ComponentDoc = ComponentDoc {
         p("isOptional", RustApi::Method("optional")),
         p("isRequired", RustApi::Method("required")),
         p("labelIcon", RustApi::Method("label_icon")),
-        p(
-            "labelTooltip",
-            RustApi::Pending("label_tooltip", "the InfoTip lands with Tooltip in M5"),
-        ),
+        p("labelTooltip", RustApi::Method("label_tooltip")),
         p("status", RustApi::Method("status")),
-        p(
-            "statusVariant",
-            RustApi::Method("status_placement (tooltip lands with Tooltip in M5)"),
-        ),
+        p("statusVariant", RustApi::Method("status_placement")),
         p("width", RustApi::Method("width")),
         p("ref", RustApi::Waived("GPUI elements have no refs")),
         p("xstyle", RustApi::Trait("Styled")),

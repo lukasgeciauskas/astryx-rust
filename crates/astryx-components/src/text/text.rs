@@ -113,6 +113,102 @@ impl Common {
         el
     }
 
+    /// Upstream `hasTruncateTooltip`: for text with a line limit, a probe
+    /// that measures each frame whether the text overflows the limit. Returns
+    /// the element with the probe and what it measured last.
+    pub fn measure_truncation(
+        &self,
+        el: Div,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (Div, Option<(ElementId, gpui::Entity<bool>)>) {
+        if self.max_lines == 0
+            || self.truncate_tooltip == TruncateTooltip::Off
+            || self.text.is_empty()
+        {
+            return (el, None);
+        }
+        let base = format!(
+            "{}-{}",
+            self.id
+                .as_ref()
+                .map(|id| id.to_string())
+                .unwrap_or_default(),
+            self.text
+        );
+        let truncated = window.use_keyed_state(
+            ElementId::Name(format!("{base}-truncated").into()),
+            cx,
+            |_, _| false,
+        );
+        let (text, lines, state) = (self.text.clone(), self.max_lines, truncated.clone());
+        let probe = gpui::canvas(
+            move |bounds, window, cx| {
+                let style = window.text_style();
+                let rem = window.rem_size();
+                let font_size = style.font_size.to_pixels(rem);
+                let line_height = style.line_height_in_pixels(rem);
+                let runs = [style.to_run(text.len())];
+                let wrap = (lines > 1).then_some(bounds.size.width);
+                let shaped = window
+                    .text_system()
+                    .shape_text(text.clone(), font_size, &runs, wrap, None)
+                    .unwrap_or_default();
+                let over = if lines == 1 {
+                    shaped.iter().any(|line| {
+                        line.size(line_height).width > bounds.size.width + gpui::px(0.5)
+                    })
+                } else {
+                    shaped
+                        .iter()
+                        .map(|line| line.wrap_boundaries.len() + 1)
+                        .sum::<usize>()
+                        > lines
+                };
+                if *state.read(cx) != over {
+                    state.update(cx, |v, _| *v = over);
+                    window.on_next_frame(|window, _| window.refresh());
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full();
+        (
+            el.relative().child(probe),
+            Some((
+                ElementId::Name(format!("{base}-truncate-tooltip").into()),
+                truncated,
+            )),
+        )
+    }
+
+    /// The tooltip with the full text while it is truncated.
+    pub fn truncation_tooltip(
+        text: SharedString,
+        placement: TruncateTooltip,
+        measured: Option<(ElementId, gpui::Entity<bool>)>,
+        el: AnyElement,
+        cx: &App,
+    ) -> AnyElement {
+        let Some((id, truncated)) = measured else {
+            return el;
+        };
+        let placement = match placement {
+            TruncateTooltip::Below => astryx_primitives::Placement::Below,
+            TruncateTooltip::Start => astryx_primitives::Placement::Start,
+            TruncateTooltip::End => astryx_primitives::Placement::End,
+            _ => astryx_primitives::Placement::Above,
+        };
+        crate::overlay::Tooltip::new(id, text)
+            .enabled(*truncated.read(cx))
+            .placement(placement)
+            .child(el)
+            .into_any_element()
+    }
+
     /// Adds the content.
     pub fn finish(self, el: Div) -> Div {
         el.child(self.text).children(self.children)
@@ -275,11 +371,14 @@ impl RenderOnce for Text {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
         let el = self.root(&theme);
+        let (el, measured) = self.common.measure_truncation(el, window, cx);
+        let (text, placement) = (self.common.text.clone(), self.common.truncate_tooltip);
         let id = self.common.id.clone();
         let el = self.common.finish(el);
-        match id {
+        let el = match id {
             Some(id) => el.id(id).into_any_element(),
             None => el.into_any_element(),
-        }
+        };
+        Common::truncation_tooltip(text, placement, measured, el, cx)
     }
 }

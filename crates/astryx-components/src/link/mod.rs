@@ -277,7 +277,11 @@ impl RenderOnce for Link {
             LinkForm::Button => Role::Button,
         };
         let name = self.label.filter(|l| !l.is_empty()).unwrap_or(self.text);
-        el.role(role).aria_label(name)
+        let mut el = el.role(role).aria_label(name);
+        if let Some(description) = crate::overlay::tooltip_description(cx) {
+            el = el.aria_description(description);
+        }
+        crate::overlay::with_tooltip(&self.id, self.tooltip, true, el)
     }
 }
 
@@ -314,10 +318,7 @@ pub const LINK_DOC: ComponentDoc = ComponentDoc {
             RustApi::Waived("GPUI opens URLs without a referrer"),
         ),
         p("onClick", RustApi::Method("on_click")),
-        p(
-            "tooltip",
-            RustApi::Pending("tooltip", "the tooltip lands with Tooltip in M5"),
-        ),
+        p("tooltip", RustApi::Method("tooltip")),
         p("isStandalone", RustApi::Method("standalone")),
         p("type", RustApi::Method("text_type")),
         p("size", RustApi::Method("size")),

@@ -19,6 +19,7 @@ pub mod layout;
 pub mod link;
 pub mod media;
 mod motion;
+pub mod overlay;
 pub mod pagination;
 pub mod people;
 mod press;

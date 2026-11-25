@@ -296,7 +296,7 @@ impl RenderOnce for Avatar {
         });
 
         let el = el
-            .id(self.id)
+            .id(self.id.clone())
             .child(
                 div()
                     .size_full()
@@ -309,7 +309,10 @@ impl RenderOnce for Avatar {
             Some(name) => el.aria_label(name),
             None => el,
         };
-        if let Some(href) = self.href {
+        let tooltip_id = self.id.clone();
+        let tooltip = self.tooltip.clone();
+        let acts = self.href.is_some() || self.on_click.is_some();
+        let el = if let Some(href) = self.href {
             let handler = use_link_handler(cx);
             let target = self.target;
             el.role(Role::Link)
@@ -323,7 +326,8 @@ impl RenderOnce for Avatar {
                 .into_any_element()
         } else {
             el.role(Role::Image).into_any_element()
-        }
+        };
+        crate::overlay::with_tooltip(&tooltip_id, tooltip, acts, el)
     }
 }
 
@@ -566,7 +570,6 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
 
-const TOOLTIP: &str = "the tooltip lands with Tooltip in M5";
 const NO_LINK_COMPONENT: &str = "the link handler (link_provider) routes every href";
 
 pub const AVATAR_DOC: ComponentDoc = ComponentDoc {
@@ -580,7 +583,7 @@ pub const AVATAR_DOC: ComponentDoc = ComponentDoc {
         p("size", RustApi::Method("size")),
         p("shape", RustApi::Method("shape")),
         p("status", RustApi::Method("status")),
-        p("tooltip", RustApi::Pending("tooltip", TOOLTIP)),
+        p("tooltip", RustApi::Method("tooltip")),
         p("href", RustApi::Method("href")),
         p("as", RustApi::Waived(NO_LINK_COMPONENT)),
         p("target", RustApi::Method("target")),

@@ -45,6 +45,8 @@ pub(crate) struct RowLabel {
     pub optional: bool,
     pub required: bool,
     pub icon: Option<AnyElement>,
+    /// Upstream `labelTooltip`: an InfoTip after the label.
+    pub tooltip: Option<SharedString>,
 }
 
 /// One choice row.
@@ -106,7 +108,8 @@ impl ChoiceRow {
             .disabled(self.disabled)
             .optional(self.label.optional)
             .required(self.label.required)
-            .label_icon_opt(self.label.icon);
+            .label_icon_opt(self.label.icon)
+            .label_tooltip_opt(self.label.tooltip.clone());
         let label = div()
             .flex()
             .flex_col()

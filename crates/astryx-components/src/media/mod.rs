@@ -99,6 +99,8 @@ impl Styled for Thumbnail {
 
 impl RenderOnce for Thumbnail {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let tooltip_id = self.id.clone();
+        let tooltip = self.label.clone();
         let theme = current(window, cx);
         let t = theme.tokens();
         let dir = use_direction(cx);
@@ -255,7 +257,8 @@ impl RenderOnce for Thumbnail {
                     .group_hover(group.clone(), |s| s.opacity(1.)),
             }
         });
-        el.children(remove)
+        // Upstream: the label shows on hover.
+        crate::overlay::with_tooltip(&tooltip_id, tooltip, false, el.children(remove))
     }
 }
 
@@ -269,10 +272,7 @@ pub const THUMBNAIL_DOC: ComponentDoc = ComponentDoc {
     props: &[
         p("src", RustApi::Method("src")),
         p("alt", RustApi::Method("alt")),
-        p(
-            "label",
-            RustApi::Pending("label", "its hover tooltip lands with Tooltip in M5"),
-        ),
+        p("label", RustApi::Method("label")),
         p("onRemove", RustApi::Method("on_remove")),
         p("onClick", RustApi::Method("on_click")),
         p("isLoading", RustApi::Method("loading")),

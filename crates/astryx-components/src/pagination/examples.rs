@@ -2,13 +2,15 @@
 //! of Breadcrumbs, Pagination and Stepper.
 
 use astryx_primitives::ElementSize;
-use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Window};
+use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Styled, Window, div, px};
 
 use crate::breadcrumbs::{BreadcrumbItem, Breadcrumbs, BreadcrumbsVariant};
 use crate::layout::Orientation;
 use crate::layout::{SpacingStep, Stack};
 use crate::pagination::{Pagination, PaginationVariant};
-use crate::stepper::{Step, StepStatus, Stepper};
+use crate::stepper::{
+    CollapsedVariant, HorizontalOptions, IndicatorPosition, Step, StepStatus, Stepper,
+};
 use crate::text::{Text, TextType};
 
 fn store(entity: Entity<usize>) -> impl Fn(usize, &mut Window, &mut App) + 'static {
@@ -91,6 +93,55 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                         .child(Text::new("Didn't get it? Check your spam folder.")),
                 )
                 .step(Step::new("Invite your team")),
+        )
+        .child(label("Stepper: indicators on the track"))
+        .child(
+            Stepper::new("checkout-track", *step.read(cx))
+                .indicator_position(IndicatorPosition::OnTrack)
+                .on_step_click(store(step.clone()))
+                .step(Step::new("Cart").description("3 items"))
+                .step(Step::new("Shipping").description("Address and speed"))
+                .step(Step::new("Payment").optional(true))
+                .step(Step::new("Review").status(StepStatus::Warning)),
+        )
+        .child(
+            Stepper::new("setup-track", *step.read(cx))
+                .orientation(Orientation::Vertical)
+                .indicator_position(IndicatorPosition::OnTrack)
+                .on_step_click(store(step.clone()))
+                .step(Step::new("Cart").description("3 items"))
+                .step(
+                    Step::new("Shipping")
+                        .description("Address and speed")
+                        .child(Text::new("Free delivery on orders over $50.")),
+                )
+                .step(Step::new("Payment").optional(true))
+                .step(Step::new("Review")),
+        )
+        .child(label("Stepper: compact under 112px a step"))
+        .child(
+            div().w(px(360.)).child(
+                Stepper::new("checkout-compact", *step.read(cx))
+                    .on_step_click(store(step.clone()))
+                    .step(Step::new("Cart").description("3 items"))
+                    .step(Step::new("Shipping").description("Address and speed"))
+                    .step(Step::new("Payment").optional(true))
+                    .step(Step::new("Review").status(StepStatus::Warning)),
+            ),
+        )
+        .child(
+            div().w(px(360.)).child(
+                Stepper::new("checkout-compact-track", *step.read(cx))
+                    .indicator_position(IndicatorPosition::OnTrack)
+                    .horizontal_options(HorizontalOptions {
+                        collapsed_variant: CollapsedVariant::WithLabel,
+                        ..HorizontalOptions::default()
+                    })
+                    .step(Step::new("Cart"))
+                    .step(Step::new("Shipping"))
+                    .step(Step::new("Payment"))
+                    .step(Step::new("Review")),
+            ),
         )
         .into_any_element()
 }

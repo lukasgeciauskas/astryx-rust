@@ -19,7 +19,7 @@ use gpui::{
     StyleRefinement, Styled, Task, Window, div, prelude::*, px,
 };
 
-use super::control::{Chrome, control_box, described_by, status_icon};
+use super::control::{Chrome, control_box, described_by, status_indicator};
 use super::group::{group_context, group_disabled, group_place, inside_member};
 use crate::button::{ButtonVariant, IconButton};
 use crate::choice::action::{ActionFn, ChangeFn, Optimistic};
@@ -422,13 +422,30 @@ impl RenderOnce for TextInput {
             && self.status_placement != StatusPlacement::Detached
             && place.is_none()
         {
-            control = control.child(status_icon(status, &part));
+            let message = self.status.as_ref().and_then(|s| s.message.clone());
+            control = control.child(status_indicator(
+                &self.id,
+                status,
+                self.status_placement,
+                message.as_ref(),
+                &part,
+                window,
+                cx,
+            ));
         }
 
         let control = match part_override {
             Some(part) => scope(part, control).into_any_element(),
             None => control.into_any_element(),
         };
+        // FR7: a disabled field's reason, on hover and focus.
+        let control = crate::overlay::disabled_reason(
+            &self.id,
+            self.disabled,
+            self.disabled_message.as_ref(),
+            true,
+            control,
+        );
         // In a group the control is the member: no Field of its own.
         if place.is_some() {
             return inside_member(control).into_any_element();

@@ -21,7 +21,6 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
 
 const NO_INLINE: &str = "GPUI has no inline formatting context; Text is always a block box";
 const NO_CAPSIZE: &str = "GPUI has no text-box-trim";
-const TOOLTIP: &str = "the tooltip lands with Tooltip in M5";
 
 pub const TEXT_DOC: ComponentDoc = ComponentDoc {
     name: "Text",
@@ -35,10 +34,7 @@ pub const TEXT_DOC: ComponentDoc = ComponentDoc {
         p("display", RustApi::Waived(NO_INLINE)),
         p("as", RustApi::Method("element")),
         p("maxLines", RustApi::Method("max_lines")),
-        p(
-            "hasTruncateTooltip",
-            RustApi::Pending("truncate_tooltip", TOOLTIP),
-        ),
+        p("hasTruncateTooltip", RustApi::Method("truncate_tooltip")),
         p("wordBreak", RustApi::Method("word_break")),
         p("textWrap", RustApi::Method("text_wrap")),
         p("justify", RustApi::Method("justify")),
@@ -63,10 +59,7 @@ pub const HEADING_DOC: ComponentDoc = ComponentDoc {
         p("color", RustApi::Method("color")),
         p("display", RustApi::Waived(NO_INLINE)),
         p("maxLines", RustApi::Method("max_lines")),
-        p(
-            "hasTruncateTooltip",
-            RustApi::Pending("truncate_tooltip", TOOLTIP),
-        ),
+        p("hasTruncateTooltip", RustApi::Method("truncate_tooltip")),
         p("wordBreak", RustApi::Method("word_break")),
         p("textWrap", RustApi::Method("text_wrap")),
         p("justify", RustApi::Method("justify")),

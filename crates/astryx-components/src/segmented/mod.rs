@@ -338,11 +338,19 @@ impl RenderOnce for SegmentedControl {
             None,
         );
         el.style().refine(&self.style);
-        el.id(self.id.clone())
+        let el = el
+            .id(self.id.clone())
             .on_key_down(list.key_down_listener())
             .role(Role::RadioGroup)
             .aria_label(self.label)
-            .children(segments)
+            .children(segments);
+        crate::overlay::disabled_reason(
+            &self.id,
+            self.disabled,
+            self.disabled_message.as_ref(),
+            false,
+            el,
+        )
     }
 }
 
@@ -363,10 +371,7 @@ pub const SEGMENTED_CONTROL_DOC: ComponentDoc = ComponentDoc {
         p("size", RustApi::Method("size")),
         p("layout", RustApi::Method("layout")),
         p("isDisabled", RustApi::Method("disabled")),
-        p(
-            "disabledMessage",
-            RustApi::Pending("disabled_message", "the tooltip lands with Tooltip in M5"),
-        ),
+        p("disabledMessage", RustApi::Method("disabled_message")),
         p("children", RustApi::Method("item / items")),
         p("xstyle", RustApi::Trait("Styled")),
     ],

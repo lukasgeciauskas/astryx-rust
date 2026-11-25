@@ -379,6 +379,7 @@ impl RenderOnce for Pagination {
                                     .child(n.to_string());
                                     if current {
                                         button = button
+                                            .current(gpui::AriaCurrent::Page)
                                             .bg(t.color.neutral)
                                             .font_weight(t.font.weight.medium);
                                     }

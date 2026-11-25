@@ -221,3 +221,55 @@ pub(crate) fn described_by(
     parts.extend(disabled_reason.cloned());
     parts
 }
+
+/// The status glyph a control shows: under `tooltip` placement with a
+/// message, a focusable button whose tooltip carries the message (upstream
+/// `useInputStatusIcon`, FR9); otherwise a plain icon.
+pub(crate) fn status_indicator(
+    id: &gpui::ElementId,
+    status: StatusType,
+    placement: crate::field::StatusPlacement,
+    message: Option<&SharedString>,
+    part: &ResolvedTheme,
+    window: &mut Window,
+    cx: &mut App,
+) -> gpui::AnyElement {
+    use gpui::{InteractiveElement as _, IntoElement as _, StatefulInteractiveElement as _};
+    let icon = status_icon(status, part);
+    let Some(message) = message.filter(|_| placement == crate::field::StatusPlacement::Tooltip)
+    else {
+        return icon.into_any_element();
+    };
+    let button_id = gpui::ElementId::Name(format!("{id}-status-button").into());
+    let focus = astryx_primitives::control_focus(&button_id, window, cx);
+    let label = astryx_i18n::current(cx).t(match status {
+        StatusType::Error => "@astryx.input.statusButton.error",
+        StatusType::Warning => "@astryx.input.statusButton.warning",
+        StatusType::Success => "@astryx.input.statusButton.success",
+    });
+    let rem = window.rem_size();
+    let mut button = div()
+        .id(button_id)
+        .track_focus(&focus)
+        .relative()
+        .flex()
+        .flex_none()
+        .items_center()
+        .justify_center()
+        .rounded_full()
+        .role(gpui::Role::Button)
+        .aria_label(label)
+        .aria_description(message.clone())
+        .on_click(|_, _, cx| cx.stop_propagation())
+        .child(icon);
+    if astryx_primitives::is_focus_visible(&focus, window) {
+        button = button.child(crate::focus::focus_ring(part.tokens(), px(999.), rem));
+    }
+    crate::overlay::Tooltip::new(
+        gpui::ElementId::Name(format!("{id}-status-tooltip").into()),
+        message.clone(),
+    )
+    .trigger_acts(false)
+    .child(button)
+    .into_any_element()
+}

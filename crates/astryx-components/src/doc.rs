@@ -113,6 +113,8 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::input::INPUT_GROUP_TEXT_DOC,
     crate::field::FORM_LAYOUT_DOC,
     crate::input::FILE_INPUT_DOC,
+    crate::overlay::TOOLTIP_DOC,
+    crate::overlay::INFO_TIP_DOC,
 ];
 
 /// The registered doc for an upstream component name.

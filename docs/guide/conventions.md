@@ -45,7 +45,23 @@
   member reads; a member clears it for its own insides. A joined member's focus ring is
   painted `deferred` so the next member never covers it.
 - **Accessibility states:** set `aria_disabled`, `aria_read_only`, `aria_required`,
-  `aria_invalid` and `aria_busy` (fork patch R6) on the element that carries the role.
+  `aria_invalid` and `aria_busy` (fork patch R6) and `aria_current` (R9) on the element
+  that carries the role.
+- **Anchored layers** (tooltips now; popovers and menus in M5): wrap the trigger in
+  `astryx_primitives::anchored_layer(id, trigger)` and give it `.surface(content,
+  LayerOptions { placement, align, offset, margin, rtl, .. }, on_dismiss)`. The layer is
+  layout-transparent, measures the surface, places it with `position_layer` (flip to the
+  other side, then slide into the viewport, mirrored in RTL), paints it deferred and joins
+  the layer stack, so Escape and outside presses reach the topmost layer first.
+- **Tooltip props:** a component's `tooltip` goes through `overlay::with_tooltip(id,
+  text, acts, el)`; `labelTooltip` is an InfoTip in the label row (`FieldLabel`);
+  `disabledMessage` is `overlay::disabled_reason`, which shows on any focus; a tooltip
+  status is `input::control::status_indicator`, a focusable glyph. A pressable inside a
+  Tooltip reads `tooltip_description(cx)` for its `aria_description`.
+- **Measuring yourself:** a component that depends on its own size (Grid's responsive
+  tracks, Stepper's compact mode, Text truncation tooltips) paints an absolute
+  `canvas` probe over its box, keeps the size in keyed state and requests another frame
+  when it changes.
 - **Pressables** (Button and everything built on it) share `press::apply_press`, which
   provides:
   - a tab stop (`control_focus`);

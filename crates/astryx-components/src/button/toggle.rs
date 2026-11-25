@@ -84,7 +84,7 @@ impl ToggleButton {
         !loading,
         /// Upstream `isIconOnly`.
         !icon_only,
-        /// Upstream `tooltip`. The tooltip itself lands with Tooltip (M5).
+        /// Upstream `tooltip`: shown on hover and keyboard focus.
         ?tooltip: SharedString,
         /// Upstream `value`: this member's value in a ToggleButtonGroup.
         ?value: SharedString,

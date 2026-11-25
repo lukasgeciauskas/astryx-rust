@@ -164,6 +164,7 @@ pub struct Button {
     target: Option<SharedString>,
     pressed: Option<bool>,
     expanded: Option<bool>,
+    current: Option<gpui::AriaCurrent>,
     style: StyleRefinement,
     children: SmallVec<[AnyElement; 1]>,
 }
@@ -191,6 +192,7 @@ impl Button {
             target: None,
             pressed: None,
             expanded: None,
+            current: None,
             style: StyleRefinement::default(),
             children: SmallVec::new(),
         }
@@ -213,7 +215,7 @@ impl Button {
         !icon_only,
         /// Upstream `width`: else the content's width, capped at the container.
         ?width: Length,
-        /// Upstream `tooltip`. The tooltip itself lands with Tooltip (M5).
+        /// Upstream `tooltip`: shown on hover and keyboard focus.
         ?tooltip: SharedString,
         /// Upstream `href`: a link through the link handler.
         ?href: SharedString,
@@ -247,6 +249,13 @@ impl Button {
         f: impl Fn(&ClickEvent, &mut Window, &mut App) -> Task<()> + 'static,
     ) -> Self {
         self.click_action = Some(Rc::new(f));
+        self
+    }
+
+    /// Upstream `aria-current`: the current one of a set, such as the
+    /// current page of a pager.
+    pub fn current(mut self, current: gpui::AriaCurrent) -> Self {
+        self.current = Some(current);
         self
     }
 
@@ -386,6 +395,10 @@ impl RenderOnce for Button {
         let t = theme.tokens();
         let dir = use_direction(cx);
         let rem = window.rem_size();
+        let tooltip = self
+            .tooltip
+            .clone()
+            .map(|text| (ElementId::Name(format!("{}-tooltip", self.id).into()), text));
         let group = use_context::<GroupMember>(cx);
         // A direct InputGroup member is an addon joined to the row (FR4),
         // disabled with its group (FR6).
@@ -589,10 +602,23 @@ impl RenderOnce for Button {
                 gpui::Toggled::False
             });
         }
+        if let Some(current) = self.current {
+            el = el.aria_current(current);
+        }
         if let Some(expanded) = self.expanded {
             el = el.aria_expanded(expanded);
         }
-        el
+        // A tooltip around the button describes it.
+        if let Some(description) = crate::overlay::tooltip_description(cx) {
+            el = el.aria_description(description);
+        }
+        match tooltip {
+            Some((id, text)) => crate::overlay::Tooltip::new(id, text)
+                .trigger_acts(true)
+                .child(el)
+                .into_any_element(),
+            None => el.into_any_element(),
+        }
     }
 }
 
@@ -634,7 +660,7 @@ impl IconButton {
     pub fn interruptible(self, interruptible: bool) -> Self {
         Self(self.0.interruptible(interruptible))
     }
-    /// Upstream `tooltip`. The tooltip itself lands with Tooltip (M5).
+    /// Upstream `tooltip`: shown on hover and keyboard focus.
     pub fn tooltip(self, tooltip: impl Into<SharedString>) -> Self {
         Self(self.0.tooltip(tooltip))
     }
@@ -790,7 +816,6 @@ const NO_FORMS: &str = "GPUI has no HTML forms; handle submission in on_click";
 const NO_REFS: &str = "GPUI elements have no refs";
 const NO_LINK_COMPONENT: &str = "the link handler (link_provider) routes every href";
 const NO_REL: &str = "GPUI opens URLs without a referrer";
-const TOOLTIP: &str = "the tooltip lands with Tooltip in M5";
 const TEST_IDS: &str = "GPUI tests find elements by id";
 
 pub const BUTTON_DOC: ComponentDoc = ComponentDoc {
@@ -813,7 +838,7 @@ pub const BUTTON_DOC: ComponentDoc = ComponentDoc {
         p("width", RustApi::Method("width")),
         p("children", RustApi::Trait("ParentElement")),
         p("endContent", RustApi::Method("end_content")),
-        p("tooltip", RustApi::Pending("tooltip", TOOLTIP)),
+        p("tooltip", RustApi::Method("tooltip")),
         p("onClick", RustApi::Method("on_click")),
         p("clickAction", RustApi::Method("click_action")),
         p("href", RustApi::Method("href")),
@@ -836,7 +861,7 @@ pub const ICON_BUTTON_DOC: ComponentDoc = ComponentDoc {
         p("elevation", RustApi::Method("elevation")),
         p("isLoading", RustApi::Method("loading")),
         p("isDisabled", RustApi::Method("disabled")),
-        p("tooltip", RustApi::Pending("tooltip", TOOLTIP)),
+        p("tooltip", RustApi::Method("tooltip")),
         p("onClick", RustApi::Method("on_click")),
         p("clickAction", RustApi::Method("click_action")),
         p("isInterruptible", RustApi::Method("interruptible")),
@@ -872,7 +897,7 @@ pub const TOGGLE_BUTTON_DOC: ComponentDoc = ComponentDoc {
         p("isIconOnly", RustApi::Method("icon_only")),
         p("pressedIcon", RustApi::Method("pressed_icon")),
         p("children", RustApi::Trait("ParentElement")),
-        p("tooltip", RustApi::Pending("tooltip", TOOLTIP)),
+        p("tooltip", RustApi::Method("tooltip")),
         p("value", RustApi::Method("value")),
         p("data-testid", RustApi::Waived(TEST_IDS)),
     ],

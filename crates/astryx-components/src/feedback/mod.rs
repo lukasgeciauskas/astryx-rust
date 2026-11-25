@@ -260,14 +260,15 @@ impl RenderOnce for ProgressBar {
                 .bg(fill_color)
         };
 
-        let marks = self.marks.iter().map(|mark| {
+        let mark_id = self.id.clone();
+        let marks = self.marks.iter().enumerate().map(|(i, mark)| {
             let at = if self.max > 0. {
                 (mark.value / self.max).clamp(0., 1.)
             } else {
                 0.
             };
             let on_fill = !self.indeterminate && at <= fraction;
-            div()
+            let tick = div()
                 .absolute()
                 .top(relative(0.5))
                 .inset_start(dir, relative(at as f32))
@@ -282,6 +283,17 @@ impl RenderOnce for ProgressBar {
                 } else {
                     t.color.text_secondary
                 })
+                .id(ElementId::NamedInteger(
+                    format!("{mark_id}-mark").into(),
+                    i as u64,
+                ));
+            // Upstream: each mark names itself in a tooltip.
+            crate::overlay::with_tooltip(
+                &ElementId::NamedInteger(format!("{mark_id}-mark-tip").into(), i as u64),
+                Some(mark.label.clone()),
+                false,
+                tick,
+            )
         });
 
         let mut el = div().flex().flex_col().gap(t.spacing.s1).w_full();
@@ -696,10 +708,7 @@ pub const PROGRESS_BAR_DOC: ComponentDoc = ComponentDoc {
         p("formatValueLabel", RustApi::Method("format_value_label")),
         p("variant", RustApi::Method("variant")),
         p("isIndeterminate", RustApi::Method("indeterminate")),
-        p(
-            "marks",
-            RustApi::Pending("marks", "mark tooltips land with Tooltip in M5"),
-        ),
+        p("marks", RustApi::Method("marks")),
         p("isDisabled", RustApi::Method("disabled")),
         p("xstyle", RustApi::Trait("Styled")),
     ],
@@ -716,13 +725,7 @@ pub const BANNER_DOC: ComponentDoc = ComponentDoc {
         p("icon", RustApi::Method("icon")),
         p("isDismissable", RustApi::Method("dismissable")),
         p("onDismiss", RustApi::Method("on_dismiss")),
-        p(
-            "dismissLabel",
-            RustApi::Pending(
-                "dismiss_label",
-                "its visible tooltip lands with Tooltip in M5",
-            ),
-        ),
+        p("dismissLabel", RustApi::Method("dismiss_label")),
         p("endContent", RustApi::Method("end_content")),
         p("container", RustApi::Method("container")),
         p("elevation", RustApi::Method("elevation")),

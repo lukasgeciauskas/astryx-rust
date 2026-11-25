@@ -192,6 +192,9 @@ impl RenderOnce for Breadcrumbs {
                     content
                         .font_weight(t.font.weight.semibold)
                         .text_color(current_color)
+                        .id(item_id.clone())
+                        .aria_label(item.label.clone())
+                        .aria_current(gpui::AriaCurrent::Page)
                         .into_any_element()
                 } else if interactive {
                     let focus = control_focus(&item_id, window, cx);

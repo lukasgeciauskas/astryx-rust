@@ -32,6 +32,8 @@ struct GroupField {
     width: Option<Length>,
     label_tooltip: Option<SharedString>,
     disabled_message: Option<SharedString>,
+    /// Upstream `containerXstyle`: the Field box.
+    container_style: StyleRefinement,
 }
 
 impl GroupField {
@@ -47,6 +49,7 @@ impl GroupField {
             width: None,
             label_tooltip: None,
             disabled_message: None,
+            container_style: StyleRefinement::default(),
         }
     }
 
@@ -70,9 +73,13 @@ impl GroupField {
         if let Some(status) = self.status.clone() {
             field = field.status(status);
         }
+        if let Some(tooltip) = self.label_tooltip.clone() {
+            field = field.label_tooltip(tooltip);
+        }
         if let Some(width) = self.width {
             field = field.width(width);
         }
+        field.style().refine(&self.container_style);
         field
     }
 }
@@ -114,9 +121,15 @@ macro_rules! group_setters {
             self.field.width = Some(width.into());
             self
         }
-        /// Upstream `disabledMessage`. The tooltip lands with Tooltip (M5).
+        /// Upstream `disabledMessage`: why the list is disabled, in a tooltip.
         pub fn disabled_message(mut self, message: impl Into<SharedString>) -> Self {
             self.field.disabled_message = Some(message.into());
+            self
+        }
+        /// Upstream `containerXstyle`: styles the Field box around the list
+        /// (`Styled` styles the list itself, upstream `controlXstyle`).
+        pub fn container_style(mut self, style: StyleRefinement) -> Self {
+            self.field.container_style = style;
             self
         }
     };
@@ -226,7 +239,7 @@ impl RadioList {
         size: ChoiceSize,
     }
 
-    /// Upstream `labelTooltip`. The InfoTip lands with Tooltip (M5).
+    /// Upstream `labelTooltip`: help in an InfoTip after the label.
     pub fn label_tooltip(mut self, tooltip: impl Into<SharedString>) -> Self {
         self.field.label_tooltip = Some(tooltip.into());
         self
@@ -413,6 +426,13 @@ impl RenderOnce for RadioList {
             )
             .aria_invalid(self.field.invalid())
             .children(rows);
+        let group = crate::overlay::disabled_reason(
+            &self.id,
+            self.field.disabled,
+            self.field.disabled_message.as_ref(),
+            false,
+            group,
+        );
         self.field.field(&self.id).child(group)
     }
 }
@@ -734,6 +754,13 @@ impl RenderOnce for CheckboxList {
             .aria_disabled(self.field.disabled)
             .aria_invalid(self.field.invalid())
             .children(rows);
+        let list = crate::overlay::disabled_reason(
+            &self.id,
+            self.field.disabled,
+            self.field.disabled_message.as_ref(),
+            false,
+            list,
+        );
         self.field.field(&self.id).child(list)
     }
 }

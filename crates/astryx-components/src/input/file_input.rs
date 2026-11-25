@@ -21,7 +21,7 @@ use gpui::{
     RenderOnce, Role, SharedString, StyleRefinement, Styled, Task, Window, div, prelude::*, px,
 };
 
-use super::control::{described_by, status_icon};
+use super::control::{described_by, status_indicator};
 use crate::button::{ButtonVariant, IconButton};
 use crate::choice::action::{ActionFn, ChangeFn, Optimistic};
 use crate::field::{Field, InputStatus, StatusPlacement, StatusType, resolve};
@@ -754,10 +754,19 @@ impl RenderOnce for FileInput {
                 has_files,
                 false,
             ));
-            if let Some(status) = status_type
+            if let Some(kind) = status_type
                 && placement != StatusPlacement::Detached
             {
-                surface = surface.child(status_icon(status, &part));
+                let message = status.as_ref().and_then(|s| s.message.clone());
+                surface = surface.child(status_indicator(
+                    &self.id,
+                    kind,
+                    placement,
+                    message.as_ref(),
+                    &part,
+                    window,
+                    cx,
+                ));
             }
         }
         if has_files && !self.disabled && !busy {
@@ -790,6 +799,13 @@ impl RenderOnce for FileInput {
             Some(part) => scope(part, surface).into_any_element(),
             None => surface.into_any_element(),
         };
+        let surface = crate::overlay::disabled_reason(
+            &self.id,
+            self.disabled,
+            self.disabled_message.as_ref(),
+            false,
+            surface,
+        );
         let mut field = Field::new(self.id, self.label)
             .description_opt(self.description)
             .label_hidden(self.label_hidden)

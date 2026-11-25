@@ -185,15 +185,18 @@ impl RenderOnce for Heading {
         let id = self.common.id.clone();
         let label = self.common.text.clone();
         let level = self.accessibility_level.unwrap_or(self.level).number();
+        let (el, measured) = self.common.measure_truncation(el, window, cx);
+        let placement = self.common.truncate_tooltip;
         let el = self.common.finish(el);
-        match id {
+        let el = match id {
             Some(id) => el
                 .id(id)
                 .role(Role::Heading)
                 .aria_level(level)
-                .aria_label(label)
+                .aria_label(label.clone())
                 .into_any_element(),
             None => el.into_any_element(),
-        }
+        };
+        super::text::Common::truncation_tooltip(label, placement, measured, el, cx)
     }
 }

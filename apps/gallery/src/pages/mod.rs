@@ -26,6 +26,7 @@ pub enum Page {
     Links,
     Choices,
     Inputs,
+    Overlays,
     Navigation,
     Wayfinding,
 }
@@ -48,6 +49,7 @@ impl Page {
         Page::Links,
         Page::Choices,
         Page::Inputs,
+        Page::Overlays,
         Page::Navigation,
         Page::Wayfinding,
     ];
@@ -70,6 +72,7 @@ impl Page {
             Page::Links => "Links",
             Page::Choices => "Choices",
             Page::Inputs => "Inputs",
+            Page::Overlays => "Overlays",
             Page::Navigation => "Navigation",
             Page::Wayfinding => "Wayfinding",
         }
@@ -93,6 +96,7 @@ impl Page {
             Page::Links => astryx::components::link::examples::examples(window, cx),
             Page::Choices => astryx::components::choice::examples::examples(window, cx),
             Page::Inputs => astryx::components::input::examples::examples(window, cx),
+            Page::Overlays => astryx::components::overlay::examples::examples(window, cx),
             Page::Navigation => astryx::components::segmented::examples::examples(window, cx),
             Page::Wayfinding => astryx::components::pagination::examples::examples(window, cx),
         }

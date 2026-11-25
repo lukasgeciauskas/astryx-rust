@@ -10,8 +10,10 @@
 //! - closes on Escape (`EscapeBehavior::Close`), or swallows it (`Block`);
 //! - closes on a press outside it and outside the layers nested in it.
 //!
-//! Anchored positioning, focus trapping and entrance motion come with the
-//! components that need them (Popover, Dialog).
+//! [`anchored_layer`] wraps a trigger without changing its layout and draws a
+//! layer on one side of it, placed by [`crate::anchored::position_layer`].
+//! Focus trapping and entrance motion come with the components that need
+//! them (Popover, Dialog, Tooltip).
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
@@ -24,6 +26,7 @@ use gpui::{
     Subscription, Window, WindowId, anchored, deferred,
 };
 
+use crate::anchored::{LayerOptions, LayerPosition, position_layer};
 use crate::{provide, use_context};
 
 /// What Escape does to the topmost layer, upstream `LayerEscapeBehavior`.
@@ -348,4 +351,211 @@ impl Element for Layer {
         });
         child.paint(window, cx);
     }
+}
+
+// ----------------------------------------------------------------------------
+// Anchored layers
+
+type PlacedFn = Rc<dyn Fn(LayerPosition, &mut Window, &mut App)>;
+
+/// A trigger and, while open, a layer on one side of it. See
+/// [`anchored_layer`].
+pub struct AnchoredLayer {
+    id: ElementId,
+    trigger: AnyElement,
+    surface: Option<(AnyElement, Dismiss, LayerOptions)>,
+    escape: EscapeBehavior,
+    on_placed: Option<PlacedFn>,
+    depth: usize,
+}
+
+/// Wraps `trigger` without changing its layout: it is laid out as if
+/// unwrapped, and its bounds anchor the layer [`AnchoredLayer::surface`]
+/// opens. The layer joins the window's layer stack like [`layer`]: Escape
+/// and presses outside it and its trigger call its `on_dismiss`.
+pub fn anchored_layer(id: impl Into<ElementId>, trigger: impl IntoElement) -> AnchoredLayer {
+    AnchoredLayer {
+        id: id.into(),
+        trigger: trigger.into_any_element(),
+        surface: None,
+        escape: EscapeBehavior::Close,
+        on_placed: None,
+        depth: 0,
+    }
+}
+
+impl AnchoredLayer {
+    /// Opens `content` as a layer next to the trigger. Keep passing it while
+    /// the layer is open; stop to close it.
+    pub fn surface(
+        mut self,
+        content: impl IntoElement,
+        options: LayerOptions,
+        on_dismiss: impl Fn(&mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.surface = Some((content.into_any_element(), Rc::new(on_dismiss), options));
+        self
+    }
+
+    /// What Escape does while this layer is topmost.
+    pub fn escape(mut self, behavior: EscapeBehavior) -> Self {
+        self.escape = behavior;
+        self
+    }
+
+    /// Told where the layer landed each frame (the side, after any flip).
+    pub fn on_placed(mut self, f: impl Fn(LayerPosition, &mut Window, &mut App) + 'static) -> Self {
+        self.on_placed = Some(Rc::new(f));
+        self
+    }
+}
+
+/// What an anchored layer keeps from layout to prepaint.
+pub struct AnchoredState {
+    surface: Option<(AnyElement, Rc<Entry>, LayerOptions)>,
+}
+
+impl Element for AnchoredLayer {
+    type RequestLayoutState = AnchoredState;
+    type PrepaintState = Option<LayerState>;
+
+    fn id(&self) -> Option<ElementId> {
+        Some(self.id.clone())
+    }
+
+    fn source_location(&self) -> Option<&'static Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        id: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, AnchoredState) {
+        // Transparent: the trigger's node stands in the parent's layout.
+        let layout_id = self.trigger.request_layout(window, cx);
+        let Some((content, dismiss, options)) = self.surface.take() else {
+            return (layout_id, AnchoredState { surface: None });
+        };
+        self.depth = use_context::<LayerDepth>(cx).map_or(1, |d| d.0 + 1);
+        let id = id.expect("anchored layers have an element id");
+        let escape = self.escape;
+        let depth = self.depth;
+        let entry = window.with_element_state::<Registration, _>(id, |registration, window| {
+            let registration = registration.unwrap_or_else(|| {
+                let stack = window_stack(window, cx);
+                let mut stack = stack.borrow_mut();
+                let entry = Rc::new(Entry {
+                    depth,
+                    seq: stack.next_seq,
+                    escape: Cell::new(escape),
+                    dismiss: RefCell::new(dismiss.clone()),
+                    bounds: Cell::new(None),
+                    inside: RefCell::new(Vec::new()),
+                });
+                stack.next_seq += 1;
+                stack.entries.push(Rc::downgrade(&entry));
+                Registration(entry)
+            });
+            let entry = registration.0.clone();
+            entry.escape.set(escape);
+            *entry.dismiss.borrow_mut() = dismiss.clone();
+            (entry, registration)
+        });
+        let surface = provide(
+            LayerDepth(depth),
+            Measured {
+                entry: entry.clone(),
+                child: content,
+            },
+        )
+        .into_any_element();
+        (
+            layout_id,
+            AnchoredState {
+                surface: Some((surface, entry, options)),
+            },
+        )
+    }
+
+    fn prepaint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        state: &mut AnchoredState,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<LayerState> {
+        self.trigger.prepaint(window, cx);
+        let (mut surface, entry, options) = state.surface.take()?;
+        // The trigger is never outside its own layer.
+        *entry.inside.borrow_mut() = vec![window.element_transform().apply_bounds(bounds)];
+        let measured = surface.layout_as_root(
+            gpui::size(
+                gpui::AvailableSpace::MaxContent,
+                gpui::AvailableSpace::MaxContent,
+            ),
+            window,
+            cx,
+        );
+        let viewport = Bounds::new(Point::default(), window.viewport_size());
+        let position = position_layer(bounds, measured, viewport, &options);
+        if let Some(f) = &self.on_placed {
+            f(position, window, cx);
+        }
+        window.defer_draw(
+            surface,
+            position.origin,
+            options.priority.max(self.depth),
+            None,
+        );
+        Some(LayerState(entry))
+    }
+
+    fn paint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut AnchoredState,
+        entry: &mut Option<LayerState>,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        if let Some(entry) = entry.as_ref() {
+            dismiss_on_outside_press(&entry.0, window, cx);
+        }
+        self.trigger.paint(window, cx);
+    }
+}
+
+/// Closes the layer of `entry` on a press outside it, its trigger, and the
+/// layers above it, while it is topmost.
+fn dismiss_on_outside_press(entry: &Rc<Entry>, window: &mut Window, cx: &mut App) {
+    let stack = window_stack(window, cx);
+    let entry = Rc::downgrade(entry);
+    window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
+        if phase != DispatchPhase::Capture {
+            return;
+        }
+        let Some(entry) = entry.upgrade() else { return };
+        let live = stack.borrow_mut().live();
+        let Some(top) = live.iter().max_by_key(|e| (e.depth, e.seq)) else {
+            return;
+        };
+        if !Rc::ptr_eq(top, &entry) {
+            return;
+        }
+        let position = event.position;
+        let inside = entry.bounds.get().is_some_and(|b| b.contains(&position))
+            || entry.inside.borrow().iter().any(|b| b.contains(&position));
+        if inside {
+            return;
+        }
+        let dismiss = entry.dismiss.borrow().clone();
+        dismiss(window, cx);
+    });
 }
