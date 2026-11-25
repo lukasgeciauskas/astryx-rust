@@ -5,7 +5,11 @@ use gpui::{AnyElement, App, IntoElement, ParentElement, Styled, Window, div, px}
 use crate::containers::Card;
 use crate::layout::{SpacingStep, Stack};
 use crate::people::{Avatar, AvatarSize};
+use crate::power_search::{
+    EnumItem, FieldDefinition, FieldKind, FilterRow, RowValue, create_power_search_config,
+};
 use crate::status::{StatusDot, StatusDotVariant};
+use crate::table::TableFilterVariant;
 use crate::table::{
     Record, Table, TableBody, TableCell, TableColumn, TableColumnAlign, TableDensity,
     TableDividers, TableFooter, TableHeader, TableHeaderCell, TableRecord, TableRow,
@@ -36,6 +40,29 @@ impl TableRecord for Person {
             _ => TableValue::Null,
         }
     }
+}
+
+impl FilterRow for Person {
+    fn value(&self, field: &str) -> Option<RowValue> {
+        Some(match field {
+            "name" => RowValue::String(self.name.into()),
+            "role" => RowValue::String(self.role.into()),
+            "age" => RowValue::Number(self.age as f64),
+            _ => return None,
+        })
+    }
+}
+
+/// Rows numbered from `start`, for the paged and loaded tables.
+fn items(start: usize, count: usize) -> Vec<Record> {
+    (start..start + count)
+        .map(|n| {
+            Record::new()
+                .with("id", n as i64)
+                .with("item", format!("Item {n}"))
+                .with("owner", ["Ada", "Grace", "Alan", "Katherine"][n % 4])
+        })
+        .collect()
 }
 
 pub fn people() -> Vec<Person> {
@@ -154,6 +181,18 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
             "Activation: press a row, or focus it and press Enter, to show it beside the table",
         ))
         .child(activation(window, cx))
+        .child(label("Pagination: five rows a page"))
+        .child(paginated(window, cx))
+        .child(label(
+            "Filtering in popovers: the funnel opens each column's filter",
+        ))
+        .child(filtered(TableFilterVariant::Popover, window, cx))
+        .child(label("Filtering inline, below the headers"))
+        .child(filtered(TableFilterVariant::Inline, window, cx))
+        .child(label(
+            "Infinite scroll: the next batch loads as the end comes into view",
+        ))
+        .child(infinite(window, cx))
         .child(label(
             "Compact, grid dividers; a date reads as its ISO time",
         ))
@@ -234,6 +273,130 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
             TableColumn::new("name").header("Name"),
             TableColumn::new("role").header("Role"),
         ]))
+        .into_any_element()
+}
+
+/// The caller pages the rows; the plugin draws the controls.
+fn paginated(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::table::{TablePagination, paginate_data};
+    let page = window.use_keyed_state("items-page", cx, |_, _| 1usize);
+    let current = *page.read(cx);
+    let all = items(1, 23);
+    Table::new("items-paged")
+        .label("Items, paged")
+        .data(paginate_data(&all, current, 5))
+        .columns(vec![
+            TableColumn::new("item").header("Item"),
+            TableColumn::new("owner").header("Owner"),
+        ])
+        .id_key("id")
+        .plugin(
+            "pagination",
+            TablePagination::new(current, move |next, window, cx| {
+                page.update(cx, |p, _| *p = next);
+                window.refresh();
+            })
+            .total_items(all.len())
+            .page_size(5),
+        )
+        .into_any_element()
+}
+
+/// Filters from a PowerSearch config, applied with `apply_filters`.
+fn filtered(variant: TableFilterVariant, window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::table::{TableFilterRef, TableFiltering, to_search_filters, use_table_filter_state};
+    let search = create_power_search_config(
+        [
+            FieldDefinition::new("name", FieldKind::String).label("Name"),
+            FieldDefinition::new("role", FieldKind::Enum)
+                .label("Role")
+                .enum_values(
+                    ["Analyst", "Admiral", "Mathematician", "Programmer"]
+                        .map(|r| EnumItem::new(r, r)),
+                ),
+            FieldDefinition::new("age", FieldKind::Number).label("Age"),
+        ],
+        None,
+    );
+    let id = match variant {
+        TableFilterVariant::Popover => "people-filters-popover",
+        _ => "people-filters-inline",
+    };
+    let state = use_table_filter_state(id, None, window, cx);
+    let columns = vec![
+        TableColumn::new("name")
+            .header("Name")
+            .width(proportional(2.))
+            .filter(TableFilterRef::Field("name".into())),
+        TableColumn::new("role")
+            .header("Role")
+            .filter(TableFilterRef::Field("role".into())),
+        TableColumn::new("age")
+            .header("Age")
+            .align(TableColumnAlign::End)
+            .filter(TableFilterRef::Field("age".into())),
+    ];
+    let filters = to_search_filters(&state.filters, &columns, &search.config);
+    let rows = search.apply_filters(&filters, &people());
+    Table::new(id)
+        .label("People, filterable")
+        .data(rows)
+        .columns(columns)
+        .id_key("id")
+        .plugin(
+            "filter",
+            TableFiltering::new(
+                state.filters.clone(),
+                state.on_filter_change(),
+                search.config.clone(),
+            )
+            .variant(variant),
+        )
+        .into_any_element()
+}
+
+/// Batches of five, up to twenty rows, each after a short wait.
+fn infinite(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::table::use_table_infinite_scroll;
+    let rows = window.use_keyed_state("items-loaded", cx, |_, _| items(1, 5));
+    let loading = window.use_keyed_state("items-loading", cx, |_, _| false);
+    let count = rows.read(cx).len();
+    let (r, l) = (rows.clone(), loading.clone());
+    let plugin = use_table_infinite_scroll(
+        "items-infinite",
+        count < 20,
+        *loading.read(cx),
+        move |window, cx| {
+            let (rows, loading) = (r.clone(), l.clone());
+            loading.update(cx, |v, _| *v = true);
+            let wait = cx
+                .background_executor()
+                .timer(std::time::Duration::from_millis(600));
+            window.spawn(cx, async move |cx| {
+                wait.await;
+                cx.update(|window, cx| {
+                    rows.update(cx, |v, _| {
+                        let next = items(v.len() + 1, 5);
+                        v.extend(next);
+                    });
+                    loading.update(cx, |v, _| *v = false);
+                    window.refresh();
+                })
+                .map_err(|_| ())
+            })
+        },
+        window,
+        cx,
+    );
+    Table::new("items-infinite-table")
+        .label("Items, loaded in batches")
+        .data(rows.read(cx).clone())
+        .columns(vec![
+            TableColumn::new("item").header("Item"),
+            TableColumn::new("owner").header("Owner"),
+        ])
+        .id_key("id")
+        .plugin("infiniteScroll", plugin)
         .into_any_element()
 }
 

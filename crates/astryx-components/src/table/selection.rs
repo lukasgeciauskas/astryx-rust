@@ -17,9 +17,10 @@ use super::model::{IdKey, TableColumn, TableItem, TableRecord, pixel};
 use super::plugin::{BodyRowProps, RowModel, TablePlugin, TableRowContext};
 use crate::button::{Button, ButtonVariant};
 use crate::choice::CheckboxInput;
-use crate::containers::SectionVariant;
+use crate::containers::{SectionSide, SectionVariant};
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
 use crate::indicator::{ChoiceSize, IndicatorState};
+use crate::layout::{Orientation, SpacingStep};
 use crate::toolbar::Toolbar;
 
 /// The selection column's key, prefixed to stay clear of the caller's.
@@ -439,6 +440,10 @@ pub struct TableSelectionToolbar {
     clear_label: Option<SharedString>,
     size: ElementSize,
     variant: SectionVariant,
+    gap: Option<SpacingStep>,
+    orientation: Option<Orientation>,
+    center_content: Option<AnyElement>,
+    dividers: Vec<SectionSide>,
     style: StyleRefinement,
 }
 
@@ -455,8 +460,37 @@ impl TableSelectionToolbar {
             clear_label: None,
             size: ElementSize::Sm,
             variant: SectionVariant::Muted,
+            gap: None,
+            orientation: None,
+            center_content: None,
+            dividers: Vec::new(),
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Toolbar's `gap`, passed through (FR3).
+    pub fn gap(mut self, gap: SpacingStep) -> Self {
+        self.gap = Some(gap);
+        self
+    }
+
+    /// Toolbar's `orientation`, passed through.
+    pub fn orientation(mut self, orientation: Orientation) -> Self {
+        self.orientation = Some(orientation);
+        self
+    }
+
+    /// Toolbar's `centerContent`, passed through. Its end lane holds the
+    /// count and the clear button (no `endContent`).
+    pub fn center_content(mut self, content: impl IntoElement) -> Self {
+        self.center_content = Some(content.into_any_element());
+        self
+    }
+
+    /// Toolbar's `dividers`, passed through.
+    pub fn dividers(mut self, sides: impl IntoIterator<Item = SectionSide>) -> Self {
+        self.dividers = sides.into_iter().collect();
+        self
     }
 
     /// Upstream `startContent`: the product's bulk actions.
@@ -552,6 +586,18 @@ impl RenderOnce for TableSelectionToolbar {
             );
         if let Some(content) = self.start_content {
             bar = bar.start_content(content);
+        }
+        if let Some(content) = self.center_content {
+            bar = bar.center_content(content);
+        }
+        if let Some(gap) = self.gap {
+            bar = bar.gap(gap);
+        }
+        if let Some(orientation) = self.orientation {
+            bar = bar.orientation(orientation);
+        }
+        if !self.dividers.is_empty() {
+            bar = bar.dividers(self.dividers);
         }
         bar.style().refine(&self.style);
         bar.into_any_element()

@@ -4,8 +4,11 @@
 mod activation;
 mod cells;
 pub mod examples;
+mod filtering;
+mod infinite_scroll;
 pub(crate) mod menu;
 pub mod model;
+mod pagination;
 mod parts;
 pub mod plugin;
 mod row_index;
@@ -17,11 +20,23 @@ mod table;
 
 pub use activation::{TableActivation, USE_TABLE_ACTIVATION_DOC, use_table_activation};
 pub use cells::{TableDensity, TableDividers, TableTextOverflow, TableVerticalAlign};
+pub use filtering::{
+    TableFilterState, TableFilterStateHandle, TableFilterValue, TableFilterVariant, TableFiltering,
+    USE_TABLE_FILTER_STATE_DOC, USE_TABLE_FILTERING_DOC, to_search_filters, use_table_filter_state,
+    use_table_filtering,
+};
+pub use infinite_scroll::{
+    TableInfiniteScroll, USE_TABLE_INFINITE_SCROLL_DOC, use_table_infinite_scroll,
+};
 pub use model::{
     ColumnHeader, ColumnWidth, IdKey, IdentityStatus, Record, RowKey, SortableColumn, TableColumn,
     TableColumnAlign, TableFilterRef, TableItem, TableRecord, TableValue, capitalize,
     generate_columns, pixel, proportional, proportional_min, resolve_column_floor_widths,
     resolve_table_min_width,
+};
+pub use pagination::{
+    TablePagination, TablePaginationAlign, TablePaginationPosition, USE_TABLE_PAGINATION_DOC,
+    paginate_data, use_table_pagination,
 };
 pub use parts::{TableBody, TableCell, TableFooter, TableHeader, TableHeaderCell, TableRow};
 pub use plugin::{
@@ -48,6 +63,8 @@ pub use sortable::{
 };
 pub use table::Table;
 
+#[cfg(test)]
+mod data_tests;
 #[cfg(test)]
 mod row_tests;
 #[cfg(test)]

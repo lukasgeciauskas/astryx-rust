@@ -284,7 +284,9 @@ impl<T: TableRecord> RenderOnce for Table<T> {
         // ---- The table ---------------------------------------------------
         let (table, render_context) = if data_mode {
             let data = self.data.clone().unwrap_or_else(|| Rc::from(Vec::new()));
-            render_data(&mut self, &data, &plugins, &style, &scroll, window, cx)
+            render_data(
+                &mut self, &data, &plugins, &style, &scroll, &focus, window, cx,
+            )
         } else {
             let context = TableRenderContext {
                 mode: TableMode::Children,
@@ -292,6 +294,7 @@ impl<T: TableRecord> RenderOnce for Table<T> {
                 logical_row_count: 0,
                 header_row_count: 0,
                 viewport: scroll.clone(),
+                viewport_focus: Some(focus.clone()),
                 whole_row_owners: 0,
             };
             let tracks = match self.text_overflow {
@@ -417,12 +420,14 @@ trait LogicalMargins: Styled + Sized {
 impl<E: Styled> LogicalMargins for E {}
 
 /// A data-driven table's element and render context.
+#[allow(clippy::too_many_arguments)]
 fn render_data<T: TableRecord>(
     this: &mut Table<T>,
     data: &Rc<[T]>,
     plugins: &[Rc<dyn TablePlugin<T>>],
     style: &TableStyle,
     scroll: &ScrollHandle,
+    focus: &FocusHandle,
     window: &mut Window,
     cx: &mut App,
 ) -> (AnyElement, TableRenderContext) {
@@ -454,13 +459,17 @@ fn render_data<T: TableRecord>(
         logical_row_count: data.len(),
         header_row_count: header_rows,
         viewport: scroll.clone(),
+        viewport_focus: Some(focus.clone()),
         whole_row_owners: plugins
             .iter()
             .filter(|p| p.whole_row_owner().is_some())
             .count(),
     };
-    let loading = plugins.iter().any(|p| p.is_loading(cx) == Some(true));
-    let has_more = plugins.iter().any(|p| p.has_more(cx) == Some(true));
+    // A loading source counts only where the table admits loading: flat
+    // product rows (FR22).
+    let admitted = row_model == super::plugin::RowModel::Flat;
+    let loading = admitted && plugins.iter().any(|p| p.is_loading(cx) == Some(true));
+    let has_more = admitted && plugins.iter().any(|p| p.has_more(cx) == Some(true));
 
     // ---- The table's props -------------------------------------------------
     let mut table_props = TableRenderProps::default();
@@ -652,7 +661,14 @@ fn render_data<T: TableRecord>(
         .role(Role::RowGroup);
     theme.refine(body_el.style(), "table-body", &[], None);
     let body_el = match empty {
-        Some(empty) => body_el.child(div().w_full().py(t.spacing.s4.to_pixels(rem)).child(empty)),
+        Some(empty) => body_el.child({
+            let selector = format!("{name}-empty");
+            div()
+                .debug_selector(move || selector)
+                .w_full()
+                .py(t.spacing.s4.to_pixels(rem))
+                .child(empty)
+        }),
         None => body_el.children(body),
     };
     let table = table

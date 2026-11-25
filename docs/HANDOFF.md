@@ -157,8 +157,9 @@ Stages, each a commit:
 2. ~~Sorting~~ (done: `table/sortable.rs`, fork patch R14 for `aria-sort`).
 3. ~~Selection, activation, row status and row numbers~~ (done: `table/selection.rs`,
    `activation.rs`, `row_status.rs`, `row_index.rs`; tests in `table/row_tests.rs`).
-4. Pagination, filtering (`useTableFilterState`, `useTableFiltering` over PowerSearch's
-   config) and infinite scroll (the loading source, FR22).
+4. ~~Pagination, filtering and infinite scroll~~ (done: `table/pagination.rs`,
+   `filtering.rs`, `infinite_scroll.rs`; tests in `table/data_tests.rs`; the date and time
+   filter controls wait for M8).
 5. Tree (`useTableTreeData`, `useTableTreeState`), grouped rows and row expansion (FR7;
    its `animatedLayout`, FR15, waits for M11's motion layer).
 6. Column resize, column settings (with its state) and sticky columns (FR14's dividers in

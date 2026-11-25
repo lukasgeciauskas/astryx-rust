@@ -451,8 +451,22 @@ The remaining primitives:
     invalid key or a press on a nested control leaves it inert. `use_table_row_status` and
     `TableRowIndex` (`useTableRowIndex`) add the status gutter and row numbers. Cells and
     body transforms receive rows as `TableItem` handles a callback can keep.
+  - Pagination, filtering and infinite scroll (done): `TablePagination`
+    (`useTablePagination`, with `paginate_data`) places the Pagination controls above,
+    below or around the table and hides them for a single page. `TableFiltering`
+    (`useTableFiltering`) resolves each column's `filter` against a PowerSearch config and
+    renders the operator's control, in a popover behind a funnel button (Apply and Reset
+    over a draft) or inline below the label; `use_table_filter_state` keeps the filters and
+    `to_search_filters` turns them into PowerSearch filters for `apply_filters`.
+    `use_table_infinite_scroll` adds the sentinel and Load more button after the table: a
+    request latch, completion after the caller's loading flag clears, rearming while the
+    sentinel stays in view, a failure pausing automatic loading, and focus handed to the
+    table's region when the last batch removes a focused button. A table counts a plugin's
+    loading only for flat product rows (FR22).
 - **M8 Dates:** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
   DateRangeInput, DateTimeInput, TimeInput.
+  - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
+    `entryErrorBehavior: complete` (`table/filtering.rs` shows none until then).
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and
     `date_range` editors, `timezoneID`, and calendar-day text in the locale's calendar
     (FR25, FR26, DEC-5, DEC-6). Until then `power_search::format` writes ISO dates in UTC.

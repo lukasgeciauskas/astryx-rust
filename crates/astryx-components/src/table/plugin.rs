@@ -14,7 +14,10 @@
 
 use std::rc::Rc;
 
-use gpui::{AnyElement, App, Div, ScrollHandle, SharedString, Stateful, StyleRefinement, Window};
+use gpui::{
+    AnyElement, App, Div, FocusHandle, ScrollHandle, SharedString, Stateful, StyleRefinement,
+    Window,
+};
 
 use super::model::{IdentityStatus, RowKey, TableColumn, TableItem};
 use crate::icon::IconSource;
@@ -85,6 +88,9 @@ pub struct TableRenderContext {
     pub header_row_count: usize,
     /// The scroll container around the table.
     pub viewport: ScrollHandle,
+    /// The scroll container's focus: where focus goes when chrome that held
+    /// it goes away (infinite scroll's exhausted command).
+    pub viewport_focus: Option<FocusHandle>,
     /// The plugins that claim a whole row's action (activation, row
     /// expansion): more than one neutralizes activation (FR17).
     pub whole_row_owners: usize,

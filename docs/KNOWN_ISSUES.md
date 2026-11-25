@@ -43,6 +43,12 @@
   table cell holds no selectable text, so FR6's text-selection gate never applies.
   Upstream's development warnings print once to stderr in debug builds.
 
+- **Infinite scroll has no IntersectionObserver.** The sentinel checks, as it paints,
+  whether it shows inside every clip above it, which is what the observer reports with
+  its default root. `on_load_more` returns a `Task` of a `Result`, so FR4's non-Promise
+  case cannot happen. The Load more button stays in view while the table scrolls sideways
+  by following the region's scroll offset (upstream's sticky button).
+
 - **The keyboard hint anchors to a focus ring.** GPUI tells no element's bounds by its
   focus, so the arrow-key hint (TabList, Toolbar, SegmentedControl) sits below the
   innermost focus ring drawn inside its composite, one frame after focus enters. A
