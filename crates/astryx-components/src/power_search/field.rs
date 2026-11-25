@@ -564,9 +564,11 @@ impl RenderOnce for PowerSearch {
         let on_change = self.on_change.clone();
         let components = Rc::new(self.components.clone());
         let timezone_id = self.timezone_id.clone();
-        // The sheet presentation (FR10-FR21) is stage C; until then every
-        // presentation draws the popover field.
-        let _ = self.presentation;
+        // FR10: adaptive resolves to the sheet on compact touch screens; an
+        // open flow keeps it until it closes.
+        let sheet_state = super::sheet::flow_state(&self.id, window, cx);
+        let sheet = crate::overlay::presents_as_sheet(self.presentation, window)
+            || sheet_state.read(cx).open;
 
         // Opening and closing the editor.
         let set_editing: SetEditingFn = {
@@ -618,6 +620,103 @@ impl RenderOnce for PowerSearch {
                 (label, value, full)
             }
         };
+
+        if sheet {
+            let count_text: Option<SharedString> = self.result_count.as_ref().map(|c| match c {
+                ResultCount::Count(n) => t18.format(
+                    "@astryx.powersearch.resultCount",
+                    &[("count", Arg::Num(*n as f64))],
+                ),
+                ResultCount::Text(text) => text.clone(),
+            });
+            let end_lane = match (count_text, self.end_content.take()) {
+                (None, None) => None,
+                (count, content) => Some(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(t.spacing.s2)
+                        .children(count.map(|c| {
+                            div()
+                                .text_size(t.text.supporting.size)
+                                .line_height(relative(t.text.supporting.leading))
+                                .text_color(t.color.text_secondary)
+                                .whitespace_nowrap()
+                                .child(c)
+                        }))
+                        .children(content)
+                        .into_any_element(),
+                ),
+            };
+            let token_override: super::sheet::TokenOverrideFn = {
+                let (config, components, zone) =
+                    (config.clone(), components.clone(), timezone_id.clone());
+                let max = self.max_token_length;
+                Rc::new(
+                    move |filter: &PowerSearchFilter, window: &mut Window, cx: &mut App| {
+                        let field = config.find_field(&filter.field)?.clone();
+                        let op = field.find_operator(&filter.operator)?.clone();
+                        let token = components.get(op.value.kind())?.token.clone()?;
+                        Some(token(
+                            PowerSearchTokenProps {
+                                config: config.clone(),
+                                filter: filter.clone(),
+                                field,
+                                operator: op,
+                                max_length: max,
+                                on_click: None,
+                                on_remove: None,
+                                disabled,
+                                timezone_id: zone.clone(),
+                            },
+                            window,
+                            cx,
+                        ))
+                    },
+                )
+            };
+            let trigger = super::sheet::trigger_field(
+                super::sheet::TriggerProps {
+                    id: self.id.clone(),
+                    config: config.clone(),
+                    filters: filters.clone(),
+                    label: label.clone(),
+                    label_hidden: self.label_hidden,
+                    placeholder: placeholder.clone(),
+                    disabled,
+                    read_only,
+                    disabled_message: self.disabled_message.clone(),
+                    size: self.size,
+                    max_token_length: self.max_token_length,
+                    start_icon: self.start_icon.take(),
+                    end_lane,
+                    status: self.status.clone(),
+                    status_placement: self.status_placement,
+                    token_override,
+                },
+                window,
+                cx,
+            );
+            let flow = super::sheet::flow(
+                super::sheet::SheetProps {
+                    id: self.id.clone(),
+                    config: config.clone(),
+                    filters: filters.clone(),
+                    on_change: on_change.clone(),
+                    read_only,
+                    disabled,
+                    clear: self.clear,
+                    max_menu_items: self.max_operator_menu_items,
+                    max_search_results: self.max_search_results,
+                    save_label: self.save_label.clone(),
+                },
+                window,
+                cx,
+            );
+            let mut root = div().w_full().child(trigger).child(flow);
+            root.style().refine(&self.style);
+            return root.into_any_element();
+        }
 
         // The Tokenizer's items: one per filter.
         let items: Vec<PowerSearchItem> = filters
@@ -1245,6 +1344,7 @@ impl RenderOnce for PowerSearch {
             })
             .content_fn(content)
             .child(field_box)
+            .into_any_element()
     }
 }
 

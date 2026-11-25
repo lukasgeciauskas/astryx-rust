@@ -358,7 +358,14 @@ The remaining primitives:
     `components` overrides and `PowerSearchController`. Next: the sheet flow (stage C), which
     starts with BottomSheet's stack (done: covered sheets recede a step and leave the
     stack's one dim to the top sheet, BottomSheet FR5-FR6; Escape reaches the top sheet
-    and focus returns into the revealed one, FR7, FR9).
+    and focus returns into the revealed one, FR7, FR9). Stage C so far: the adaptive
+    resolution and its hold while the flow is open (FR10), the trigger field (FR11), the
+    Filters sheet over a draft with rows, remove actions, the empty state, Clear all and
+    discard confirmations and Done's replay (FR12, FR15b, FR15c), Add filter's grouped
+    and searchable fields (FR13) and the value step with its Operator group and choice
+    lists (FR14, FR17). Remaining: the content search's inline suggestions and FR30's
+    value-only rows, nested groups and staged numbers in the value step, the FR16
+    focus rules and the sheets' announcements (AR6, FR19).
   - TreeList (done): data-driven rows with chevrons, guides, start and end content,
     density and variants; row actions (FR7); the WAI-ARIA tree keys as the
     `astryx_primitives::tree_focus` primitive (upstream `useTreeFocus`) with one tab stop

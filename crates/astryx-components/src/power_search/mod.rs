@@ -3,9 +3,11 @@
 //! A structured filter bar: each token is a filter (a field, an operator
 //! and a value). Pick a field from the main rows, set its operator and
 //! value in the editor popover; tokens open their editor and remove their
-//! filter. The bottom-sheet flow (stage C) follows.
+//! filter. On a compact touch screen (or with `presentation`) the field is a
+//! trigger that opens a flow of sheets over a draft (`sheet`).
 
 pub mod config;
+pub(crate) mod draft;
 pub mod editor;
 #[cfg(test)]
 mod editor_tests;
@@ -15,6 +17,9 @@ mod field;
 mod field_tests;
 pub mod format;
 pub mod model;
+mod sheet;
+#[cfg(test)]
+mod sheet_tests;
 pub mod source;
 pub(crate) mod value_editor;
 
@@ -88,13 +93,7 @@ pub const POWER_SEARCH_DOC: ComponentDoc = ComponentDoc {
         p("onFocus", RustApi::Method("on_focus")),
         p("onBlur", RustApi::Method("on_blur")),
         p("xstyle", RustApi::Trait("Styled")),
-        p(
-            "presentation",
-            RustApi::Pending(
-                "presentation",
-                "the bottom-sheet flow is PowerSearch's next M6 commit (stage C)",
-            ),
-        ),
+        p("presentation", RustApi::Method("presentation")),
     ],
     example: include_str!("examples.rs"),
 };
