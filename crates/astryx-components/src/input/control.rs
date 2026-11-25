@@ -120,8 +120,10 @@ pub(crate) fn control_box(
         None => t.color.accent,
     };
     let border = mix_srgb(rest, focused_border, eased);
+    let selector = chrome.id.to_string();
     let mut el = div()
         .id(chrome.id.clone())
+        .debug_selector(|| selector)
         .relative()
         .flex()
         .flex_row()

@@ -275,3 +275,6 @@ mod number;
 
 #[path = "group_tests.rs"]
 mod group;
+
+#[path = "form_tests.rs"]
+mod form;

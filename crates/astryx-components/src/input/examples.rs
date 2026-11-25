@@ -1,13 +1,15 @@
 //! Text entry examples: the gallery's Inputs page and the doc example of
-//! TextInput, TextArea, NumberInput and InputGroup.
+//! TextInput, TextArea, NumberInput, InputGroup and FormLayout.
 
 use std::time::Duration;
 
 use astryx_primitives::ElementSize;
-use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, SharedString, Task, Window, px};
+use gpui::{
+    AnyElement, App, Entity, IntoElement, ParentElement, SharedString, Styled, Task, Window, px,
+};
 
 use crate::button::{Button, ButtonVariant};
-use crate::field::{InputStatus, StatusPlacement};
+use crate::field::{FormDirection, FormLayout, InputStatus, Optionality, StatusPlacement};
 use crate::icon::Icon;
 use crate::input::{InputGroup, InputGroupText, InputType, NumberInput, TextArea, TextInput};
 use crate::layout::{SpacingStep, Stack};
@@ -83,6 +85,11 @@ Leave the parcel with the neighbor at number 12.",
     let site = text("site", "astryx", window, cx);
     let amount = number("amount", Some(25.), window, cx);
     let coupon = text("coupon", "", window, cx);
+    let first = text("first", "Ada", window, cx);
+    let last = text("last", "Lovelace", window, cx);
+    let display = text("display", "Ada L.", window, cx);
+    let email2 = text("email2", "", window, cx);
+    let notes2 = text("notes2", "", window, cx);
 
     Stack::vertical()
         .gap(SpacingStep::S4)
@@ -267,6 +274,51 @@ Leave the parcel with the neighbor at number 12.",
                         .child(TextInput::new("q", "Query", "").placeholder("Search is offline"))
                         .child(Button::new("go", "Go")),
                 ),
+        )
+        .child(label("FormLayout"))
+        .child(
+            FormLayout::new("profile")
+                .optionality(Optionality::Required)
+                .w(px(480.))
+                .child(
+                    FormLayout::new("name-row")
+                        .direction(FormDirection::Horizontal)
+                        .child(
+                            TextInput::new("first", "First name", first.read(cx).clone())
+                                .on_change(store(first.clone())),
+                        )
+                        .child(
+                            TextInput::new("last", "Last name", last.read(cx).clone())
+                                .on_change(store(last.clone())),
+                        ),
+                )
+                .child(
+                    TextInput::new("email2", "Email", email2.read(cx).clone())
+                        .input_type(InputType::Email)
+                        .on_change(store(email2.clone())),
+                )
+                .child(
+                    TextArea::new("notes2", "Notes", notes2.read(cx).clone())
+                        .optional(true)
+                        .rows(2)
+                        .on_change(store(notes2.clone())),
+                ),
+        )
+        .child(
+            FormLayout::new("settings")
+                .direction(FormDirection::HorizontalLabels)
+                .w(px(480.))
+                .child(
+                    TextInput::new("display", "Display name", display.read(cx).clone())
+                        .description("Shown on posts and comments.")
+                        .on_change(store(display.clone())),
+                )
+                .child(
+                    NumberInput::new("session", "Session timeout", Some(30.))
+                        .units("min")
+                        .min(5.),
+                )
+                .child(TextInput::new("org", "Organization", "Astryx").read_only(true)),
         )
         .child(label("Sizes"))
         .child(

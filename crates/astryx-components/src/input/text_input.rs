@@ -299,7 +299,7 @@ impl RenderOnce for TextInput {
 
         let status = self.status.as_ref().map(|s| s.status);
         let chrome = Chrome {
-            id: ElementId::Name(format!("{:?}-control", self.id).into()),
+            id: ElementId::Name(format!("{}-control", self.id).into()),
             target: "text-input",
             size,
             status,
@@ -373,7 +373,7 @@ impl RenderOnce for TextInput {
             .aria_label(name)
             .aria_disabled(self.disabled)
             .aria_read_only(!editable)
-            .aria_required(self.required)
+            .aria_required(crate::field::resolve(self.required, self.optional, cx).required)
             .aria_invalid(status == Some(StatusType::Error))
             .aria_busy(busy);
         if !masked {

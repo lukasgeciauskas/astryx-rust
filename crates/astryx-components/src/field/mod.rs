@@ -1,6 +1,13 @@
-//! Field parts shared by form controls: FieldLabel and FieldStatus.
-//! Upstream: `Field/FieldLabel`, `FieldStatus/`. The full Field container
-//! lands with the text inputs (M4).
+//! Field parts shared by form controls: FieldLabel, FieldStatus and the
+//! Field container, and FormLayout. Upstream: `Field/`, `FieldStatus/`,
+//! `FormLayout/`.
+
+mod form_layout;
+
+#[cfg(test)]
+pub(crate) use form_layout::resolved;
+pub use form_layout::{EntryErrorBehavior, FormDirection, FormLayout, Optionality};
+pub(crate) use form_layout::{FormContext, form_context, resolve};
 
 use astryx_i18n::current as i18n;
 use astryx_primitives::{Politeness, announce};
@@ -166,10 +173,13 @@ impl RenderOnce for FieldLabel {
             };
             return VisuallyHidden::new().child(text).into_any_element();
         }
-        let marker = if self.required {
-            Some(i18n.t("@astryx.field.required"))
-        } else if self.optional {
+        // FR5 of FormLayout: the marker that restates the form's default
+        // is left out; an optional marker wins over a required one.
+        let resolved = resolve(self.required, self.optional, cx);
+        let marker = if resolved.shows_optional {
             Some(i18n.t("@astryx.field.optional"))
+        } else if resolved.shows_required {
+            Some(i18n.t("@astryx.field.required"))
         } else {
             None
         };
@@ -463,8 +473,17 @@ impl RenderOnce for Field {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
         let t = theme.tokens();
+        let form = form_context(cx);
+        let beside = form.direction == FormDirection::HorizontalLabels;
+        // Beside its control, a label goes without its description, which
+        // moves above the control.
+        let (label_description, description) = if beside {
+            (None, self.description.clone())
+        } else {
+            (self.description.clone(), None)
+        };
         let label = FieldLabel::new(self.label)
-            .description_opt(self.description)
+            .description_opt(label_description)
             .label_hidden(self.label_hidden)
             .disabled(self.disabled)
             .optional(self.optional)
@@ -500,6 +519,21 @@ impl RenderOnce for Field {
                 .children(status)
                 .into_any_element(),
         };
+        if beside {
+            return horizontal_labels(
+                self.id,
+                label,
+                description,
+                self.label_hidden,
+                control,
+                &form,
+                &theme,
+                &self.style,
+                form.labels.as_ref().and_then(|l| l.read(cx).width),
+                window,
+            )
+            .into_any_element();
+        }
         let mut el = div().flex().flex_col().min_w_0();
         if !self.label_hidden {
             el = el.gap(t.spacing.s1);
@@ -509,8 +543,80 @@ impl RenderOnce for Field {
         }
         theme.refine(el.style(), "field", &[], None);
         el.style().refine(&self.style);
-        el.id(self.id).child(label).child(control)
+        el.id(self.id)
+            .child(label)
+            .child(control)
+            .into_any_element()
     }
+}
+
+/// A Field in a `horizontal-labels` FormLayout: its label in the layout's
+/// shared label column, then the description, control and status.
+#[allow(clippy::too_many_arguments)]
+fn horizontal_labels(
+    id: ElementId,
+    label: FieldLabel,
+    description: Option<SharedString>,
+    label_hidden: bool,
+    control: AnyElement,
+    form: &FormContext,
+    theme: &astryx_theme::ResolvedTheme,
+    style: &StyleRefinement,
+    label_width: Option<gpui::Pixels>,
+    window: &mut Window,
+) -> impl IntoElement {
+    let t = theme.tokens();
+    let rem = window.rem_size();
+    // The label's first line meets the control's text line.
+    let mut cell = div()
+        .flex_none()
+        .pt(t.border.width.to_pixels(rem) + t.spacing.s1.to_pixels(rem))
+        .child(div().w_max().child(label));
+    if let Some(labels) = &form.labels {
+        if let Some(width) = label_width {
+            cell = cell.w(width);
+        }
+        let labels = labels.clone();
+        cell = cell.on_children_prepainted(move |bounds, _, cx| {
+            if let Some(natural) = bounds.first().map(|b| b.size.width) {
+                labels.update(cx, |l, _| l.measured = l.measured.max(natural));
+            }
+        });
+    }
+    let description = description.map(|description| {
+        if label_hidden {
+            VisuallyHidden::new().child(description).into_any_element()
+        } else {
+            div()
+                .text_style(&t.text.supporting)
+                .text_color(t.color.text_secondary)
+                .child(description)
+                .into_any_element()
+        }
+    });
+    let column = div()
+        .flex()
+        .flex_col()
+        .flex_1()
+        .min_w_0()
+        .children(description)
+        .child(control);
+    let mut el = div().id(id).flex().min_w_0();
+    // Collapsed, the label stacks above its control (upstream's grid cells
+    // in one flex column).
+    el = if form.collapsed {
+        el.flex_col().gap(t.spacing.s4)
+    } else {
+        el.flex_row().items_start().gap(t.spacing.s4)
+    };
+    theme.refine(
+        el.style(),
+        "field",
+        &[("layout", "horizontal-labels")],
+        None,
+    );
+    el.style().refine(style);
+    el.child(cell).child(column)
 }
 
 // ----------------------------------------------------------------------------
@@ -566,4 +672,20 @@ pub const FIELD_STATUS_DOC: ComponentDoc = ComponentDoc {
         p("variant", RustApi::Method("variant")),
     ],
     example: include_str!("../choice/examples.rs"),
+};
+
+pub const FORM_LAYOUT_DOC: ComponentDoc = ComponentDoc {
+    name: "FormLayout",
+    rust_type: "astryx::components::field::FormLayout",
+    props: &[
+        p("direction", RustApi::Method("direction")),
+        p("defaultOptionality", RustApi::Method("optionality")),
+        p(
+            "defaultEntryErrorBehavior",
+            RustApi::Method("entry_error_behavior"),
+        ),
+        p("children", RustApi::Trait("ParentElement")),
+        p("xstyle", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("../input/examples.rs"),
 };
