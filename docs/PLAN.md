@@ -463,6 +463,16 @@ The remaining primitives:
     sentinel stays in view, a failure pausing automatic loading, and focus handed to the
     table's region when the last batch removes a focused button. A table counts a plugin's
     loading only for flat product rows (FR22).
+  - Tree, grouped rows and row expansion (done): `use_table_tree_state` flattens nested
+    rows to the visible ones (cycles skipped, siblings sortable, its own expanded set or
+    the caller's); `TableTreeData` puts the indent and expander on the tree column, an
+    expand-all toggle in its header, and names each expanded row's children with
+    `aria-controls` (fork patch R15, named nodes). `use_table_grouped_rows` heads each
+    group with a synthetic row through a new row plan (`TablePlugin::row_plan`): product
+    rows by index with a plugin's synthetic rows among them. `TableRowExpansion` adds the
+    chevron column, the detail panel that takes its row's divider (FR5) and the toggle in
+    every cell's menu; each body cell now has its own right-click menu, as upstream's
+    TableCell does (FR4). The glide (FR15) waits for M11.
 - **M8 Dates:** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
   DateRangeInput, DateTimeInput, TimeInput.
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
@@ -484,6 +494,9 @@ The remaining primitives:
   touch events, keyboard clearance, dragToSnapPoints.
   - Components: BottomSheet(+Switcher), Swipe, coarse-pointer variants (sheet-backed
     Popover/Selector).
+  - Table row expansion's `animatedLayout`: opening or closing a panel glides the rows
+    after it, with the chevron on the glide's spring (Table FR15; Pending in
+    `USE_TABLE_ROW_EXPANSION_DOC`).
 - **M12 Theme authoring parity:** a Rust `defineTheme` builder with type/radius/motion scale
   expansion, OKLCH palette engine (`palette/`), HCT generator (`theme/hct.ts`), status-role
   derivation, contrast, `onDark`/`onLight`, adaptations, per-theme icons.

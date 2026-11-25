@@ -43,6 +43,14 @@
   table cell holds no selectable text, so FR6's text-selection gate never applies.
   Upstream's development warnings print once to stderr in debug builds.
 
+- **Tree and grouped tables take their structure in Rust's terms.** A tree's
+  `childrenKey` is a function returning a row's children (`TreeStateConfig::new`).
+  Grouped rows cannot put header objects into the caller's data as upstream does: the
+  hook returns the visible product rows as `data` and the plugin plans the headers among
+  them, so other plugins' row and cell transforms never see a header. Row-click expansion
+  (tree and row expansion) leaves a press to a nested control that stops its click
+  (buttons, checkboxes, links); a table cell holds no selectable text to guard.
+
 - **Infinite scroll has no IntersectionObserver.** The sentinel checks, as it paints,
   whether it shows inside every clip above it, which is what the observer reports with
   its default root. `on_load_more` returns a `Task` of a `Result`, so FR4's non-Promise

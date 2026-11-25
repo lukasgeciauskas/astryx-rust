@@ -186,6 +186,10 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::table::USE_TABLE_FILTERING_DOC,
     crate::table::USE_TABLE_FILTER_STATE_DOC,
     crate::table::USE_TABLE_INFINITE_SCROLL_DOC,
+    crate::table::USE_TABLE_TREE_DATA_DOC,
+    crate::table::USE_TABLE_TREE_STATE_DOC,
+    crate::table::USE_TABLE_GROUPED_ROWS_DOC,
+    crate::table::USE_TABLE_ROW_EXPANSION_DOC,
 ];
 
 /// Modules upstream has specified (an accepted contract) but not yet built,

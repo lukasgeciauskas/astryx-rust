@@ -53,6 +53,66 @@ impl FilterRow for Person {
     }
 }
 
+/// A file or folder, for the tree.
+#[derive(Clone)]
+pub struct Node {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub size: &'static str,
+    pub children: Vec<Node>,
+}
+
+impl TableRecord for Node {
+    fn value(&self, key: &str) -> TableValue {
+        match key {
+            "id" => self.id.into(),
+            "name" => self.name.into(),
+            "size" => self.size.into(),
+            _ => TableValue::Null,
+        }
+    }
+}
+
+fn leaf(id: &'static str, name: &'static str, size: &'static str) -> Node {
+    Node {
+        id,
+        name,
+        size,
+        children: Vec::new(),
+    }
+}
+
+fn folder(id: &'static str, name: &'static str, children: Vec<Node>) -> Node {
+    Node {
+        id,
+        name,
+        size: "",
+        children,
+    }
+}
+
+fn files() -> Vec<Node> {
+    vec![
+        folder(
+            "src",
+            "src",
+            vec![
+                folder(
+                    "components",
+                    "components",
+                    vec![
+                        leaf("button", "button.rs", "12 KB"),
+                        leaf("table", "table.rs", "48 KB"),
+                    ],
+                ),
+                leaf("lib", "lib.rs", "2 KB"),
+            ],
+        ),
+        folder("docs", "docs", vec![leaf("plan", "PLAN.md", "30 KB")]),
+        leaf("readme", "README.md", "4 KB"),
+    ]
+}
+
 /// Rows numbered from `start`, for the paged and loaded tables.
 fn items(start: usize, count: usize) -> Vec<Record> {
     (start..start + count)
@@ -194,6 +254,14 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
         ))
         .child(infinite(window, cx))
         .child(label(
+            "Tree data: nested rows with expanders and expand-all",
+        ))
+        .child(tree(window, cx))
+        .child(label("Grouped rows: collapsible sections by role"))
+        .child(grouped(window, cx))
+        .child(label("Row expansion: a detail panel below its row"))
+        .child(expansion(window, cx))
+        .child(label(
             "Compact, grid dividers; a date reads as its ISO time",
         ))
         .child(
@@ -273,6 +341,124 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
             TableColumn::new("name").header("Name"),
             TableColumn::new("role").header("Role"),
         ]))
+        .into_any_element()
+}
+
+/// Nested rows with their own expanded state.
+fn tree(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::table::{TreeStateConfig, use_table_tree_state};
+    let state = use_table_tree_state(
+        "files-tree",
+        TreeStateConfig::new(files(), "id", |n: &Node| &n.children[..])
+            .default_expanded_ids(["src"]),
+        window,
+        cx,
+    );
+    Table::new("files")
+        .label("Files")
+        .data(state.visible_data.clone())
+        .columns(vec![
+            TableColumn::new("name")
+                .header("Name")
+                .width(proportional(2.)),
+            TableColumn::new("size")
+                .header("Size")
+                .align(TableColumnAlign::End),
+        ])
+        .id_key("id")
+        .plugin(
+            "tree",
+            state
+                .plugin
+                .expand_all_control(true)
+                .row_label(|n: &Node| n.name.into()),
+        )
+        .into_any_element()
+}
+
+/// People in sections by role; a header click collapses its section.
+fn grouped(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::table::{GroupedRowsConfig, use_table_grouped_rows};
+    let collapsed = window.use_keyed_state("people-collapsed", cx, |_, _| {
+        std::collections::HashSet::from([gpui::SharedString::from("Programmer")])
+    });
+    let current = collapsed.read(cx).clone();
+    let grouped = use_table_grouped_rows(
+        GroupedRowsConfig::new(
+            people(),
+            |p: &Person| p.role.into(),
+            current,
+            move |key, window, cx| {
+                collapsed.update(cx, |set, _| {
+                    if !set.remove(&key) {
+                        set.insert(key);
+                    }
+                });
+                window.refresh();
+            },
+        )
+        .row_key(|p: &Person| p.id.to_string().into()),
+    );
+    Table::new("people-grouped")
+        .label("People by role")
+        .data(grouped.data.clone())
+        .columns(vec![
+            TableColumn::new("name")
+                .header("Name")
+                .width(proportional(2.)),
+            TableColumn::new("age")
+                .header("Age")
+                .align(TableColumnAlign::End),
+        ])
+        .id_key_with(grouped.id_key)
+        .plugin("grouped", grouped.plugin)
+        .into_any_element()
+}
+
+/// A panel with the person's details below their row.
+fn expansion(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::table::{PanelVariant, TableRowExpansion};
+    let open = window.use_keyed_state("people-open", cx, |_, _| {
+        std::collections::HashSet::from([gpui::SharedString::from("2")])
+    });
+    let current = open.read(cx).clone();
+    Table::new("people-expandable")
+        .label("People, expandable")
+        .data(people())
+        .columns(vec![
+            TableColumn::new("name")
+                .header("Name")
+                .width(proportional(2.)),
+            TableColumn::new("role").header("Role"),
+        ])
+        .id_key("id")
+        .plugin(
+            "expansion",
+            TableRowExpansion::new(
+                current,
+                move |key, window, cx| {
+                    open.update(cx, |set, _| {
+                        if !set.remove(&key) {
+                            set.insert(key);
+                        }
+                    });
+                    window.refresh();
+                },
+                |p: &Person| p.id.to_string().into(),
+                |p, _, _| {
+                    Text::new(format!(
+                        "{} is {} and {}.",
+                        p.name,
+                        p.age,
+                        if p.active { "active" } else { "away" }
+                    ))
+                    .text_type(TextType::Supporting)
+                    .into_any_element()
+                },
+            )
+            .row_label(|p: &Person| p.name.into())
+            .panel_variant(PanelVariant::Muted),
+        )
         .into_any_element()
 }
 

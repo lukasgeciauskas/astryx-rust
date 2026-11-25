@@ -5,7 +5,8 @@ mod slots;
 
 pub(crate) use slots::component_icon;
 pub use slots::{
-    ComponentIconChoice, TABLE_SORT_INDICATOR, clear_component_icon, set_component_icon,
+    ComponentIconChoice, TABLE_ROW_EXPAND, TABLE_SORT_INDICATOR, clear_component_icon,
+    set_component_icon,
 };
 
 use astryx_primitives::use_context;

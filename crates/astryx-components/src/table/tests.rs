@@ -1,5 +1,5 @@
 //! Table's tests: layout (FR2, FR13, FR24), the empty state (FR8), the
-//! plugin pipeline (FR9-FR11), children mode (FR3) and row menus.
+//! plugin pipeline (FR9-FR11), children mode (FR3) and cell menus.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -368,7 +368,7 @@ fn fr9_fr10_fr11_the_pipeline_runs_in_order_and_composes(cx: &mut TestAppContext
 }
 
 #[gpui::test]
-fn a_rows_menu_gathers_its_cells_actions(cx: &mut TestAppContext) {
+fn a_cells_menu_holds_its_own_actions(cx: &mut TestAppContext) {
     let calls: Calls = Rc::default();
     let c = calls.clone();
     let cx = host(cx, 700., move |_, _| {
@@ -388,16 +388,22 @@ fn a_rows_menu_gathers_its_cells_actions(cx: &mut TestAppContext) {
             )
             .into_any_element()
     });
-    let at = bounds(cx, "t-cell-sb-age").center();
-    cx.simulate_mouse_down(at, MouseButton::Right, Modifiers::none());
-    cx.simulate_mouse_up(at, MouseButton::Right, Modifiers::none());
-    for _ in 0..3 {
-        cx.update(|window, _| window.refresh());
-        cx.run_until_parked();
-    }
+    let right_click = |cx: &mut VisualTestContext, s: &str| {
+        let at = bounds(cx, s).center();
+        cx.simulate_mouse_down(at, MouseButton::Right, Modifiers::none());
+        cx.simulate_mouse_up(at, MouseButton::Right, Modifiers::none());
+        for _ in 0..3 {
+            cx.update(|window, _| window.refresh());
+            cx.run_until_parked();
+        }
+    };
+    // The age cell contributed nothing: no menu.
+    right_click(cx, "t-cell-sb-age");
+    assert!(!shown(cx, "t-cell-sb-age-menu-list-delete"));
+    right_click(cx, "t-cell-sb-name");
     assert!(
-        shown(cx, "t-row-sb-menu-list-delete"),
-        "the row's menu, from the name cell's action"
+        shown(cx, "t-cell-sb-name-menu-list-delete"),
+        "the name cell's menu, with its action"
     );
 }
 

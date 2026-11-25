@@ -21,6 +21,9 @@ use super::IconSource;
 /// and `none`.
 pub const TABLE_SORT_INDICATOR: &str = "table-sort-indicator";
 
+/// Row expansion's chevron; states `expanded` and `collapsed`.
+pub const TABLE_ROW_EXPAND: &str = "table-row-expand";
+
 /// What a theme draws for a slot in a state.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ComponentIconChoice {

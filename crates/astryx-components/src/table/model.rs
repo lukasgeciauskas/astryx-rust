@@ -262,6 +262,10 @@ pub enum TableFilterRef {
 }
 
 pub(crate) type CellFn<T> = Rc<dyn Fn(&TableItem<T>, &mut Window, &mut App) -> AnyElement>;
+/// Decorates a cell's content, its renderer's or the default text (a tree's
+/// indent and expander).
+pub(crate) type CellWrapFn<T> =
+    Rc<dyn Fn(&TableItem<T>, AnyElement, &mut Window, &mut App) -> AnyElement>;
 
 /// One row of a table's data, as a handle a callback can keep (upstream
 /// hands the item object itself to cells and plugins). It reads as the row
@@ -329,6 +333,7 @@ pub struct TableColumn<T> {
     pub resizable: bool,
     pub filter: Option<TableFilterRef>,
     pub(crate) render_cell: Option<CellFn<T>>,
+    pub(crate) wrappers: Vec<CellWrapFn<T>>,
 }
 
 impl<T> Clone for TableColumn<T> {
@@ -342,6 +347,7 @@ impl<T> Clone for TableColumn<T> {
             resizable: self.resizable,
             filter: self.filter.clone(),
             render_cell: self.render_cell.clone(),
+            wrappers: self.wrappers.clone(),
         }
     }
 }
@@ -358,6 +364,7 @@ impl<T> TableColumn<T> {
             resizable: true,
             filter: None,
             render_cell: None,
+            wrappers: Vec::new(),
         }
     }
 

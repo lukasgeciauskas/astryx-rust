@@ -20,7 +20,7 @@ _Last updated: 2026-11-25, at the end of M6 (Collections)._
   ubuntu, windows and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
-  `d436e06b539a99c5f27605a2d17954f3102af92e` (patches R1 and R5 to R14; see
+  `52f785921072e000e31d957c7008cde0a01f7afd` (patches R1 and R5 to R15; see
   [`gpui-fork.md`](gpui-fork.md)). The `[patch.crates-io]` block in
   `Cargo.toml` (async-task, calloop) is legitimate and stays.
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
@@ -160,8 +160,9 @@ Stages, each a commit:
 4. ~~Pagination, filtering and infinite scroll~~ (done: `table/pagination.rs`,
    `filtering.rs`, `infinite_scroll.rs`; tests in `table/data_tests.rs`; the date and time
    filter controls wait for M8).
-5. Tree (`useTableTreeData`, `useTableTreeState`), grouped rows and row expansion (FR7;
-   its `animatedLayout`, FR15, waits for M11's motion layer).
+5. ~~Tree, grouped rows and row expansion~~ (done: `table/tree.rs`, `grouped.rs`,
+   `row_expansion.rs`; tests in `table/structure_tests.rs`; fork patch R15; the glide,
+   FR15, waits for M11).
 6. Column resize, column settings (with its state) and sticky columns (FR14's dividers in
    pinned cells).
 7. Virtualization: rows and columns on `astryx_primitives::list_window` (FR18-FR20, FR23,

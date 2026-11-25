@@ -5,18 +5,21 @@ mod activation;
 mod cells;
 pub mod examples;
 mod filtering;
+mod grouped;
 mod infinite_scroll;
 pub(crate) mod menu;
 pub mod model;
 mod pagination;
 mod parts;
 pub mod plugin;
+mod row_expansion;
 mod row_index;
 mod row_status;
 mod selection;
 mod sortable;
 #[allow(clippy::module_inception)]
 mod table;
+mod tree;
 
 pub use activation::{TableActivation, USE_TABLE_ACTIVATION_DOC, use_table_activation};
 pub use cells::{TableDensity, TableDividers, TableTextOverflow, TableVerticalAlign};
@@ -24,6 +27,10 @@ pub use filtering::{
     TableFilterState, TableFilterStateHandle, TableFilterValue, TableFilterVariant, TableFiltering,
     USE_TABLE_FILTER_STATE_DOC, USE_TABLE_FILTERING_DOC, to_search_filters, use_table_filter_state,
     use_table_filtering,
+};
+pub use grouped::{
+    GroupedRows, GroupedRowsConfig, TableGroupedRows, USE_TABLE_GROUPED_ROWS_DOC,
+    use_table_grouped_rows,
 };
 pub use infinite_scroll::{
     TableInfiniteScroll, USE_TABLE_INFINITE_SCROLL_DOC, use_table_infinite_scroll,
@@ -40,9 +47,14 @@ pub use pagination::{
 };
 pub use parts::{TableBody, TableCell, TableFooter, TableHeader, TableHeaderCell, TableRow};
 pub use plugin::{
-    BodyCellProps, BodyRowProps, ElementHook, HeaderCellProps, HeaderRowProps, RowAction, RowKind,
-    RowModel, RowPaint, ScrollWrapperProps, TableContextAction, TableContextActions, TableMode,
-    TablePlugin, TableRenderContext, TableRenderProps, TableRowContext, WholeRowOwner,
+    BodyCellProps, BodyRowProps, ElementHook, HeaderCellProps, HeaderRowProps, PlanRow, RowAction,
+    RowKind, RowModel, RowPaint, ScrollWrapperProps, SyntheticRow, SyntheticRowFn,
+    SyntheticRowProps, TableContextAction, TableContextActions, TableMode, TablePlugin,
+    TableRenderContext, TableRenderProps, TableRowContext, WholeRowOwner,
+};
+pub use row_expansion::{
+    EXPANSION_COLUMN_KEY, PanelVariant, TableRowExpansion, USE_TABLE_ROW_EXPANSION_DOC,
+    use_table_row_expansion,
 };
 pub use row_index::{
     ROW_INDEX_COLUMN_KEY, TableRowIndex, USE_TABLE_ROW_INDEX_DOC, use_table_row_index,
@@ -62,11 +74,17 @@ pub use sortable::{
     use_table_sortable_state,
 };
 pub use table::Table;
+pub use tree::{
+    AllExpanded, TableTreeData, TableTreeRowMeta, TreeIndent, TreeState, TreeStateConfig,
+    USE_TABLE_TREE_DATA_DOC, USE_TABLE_TREE_STATE_DOC, use_table_tree_data, use_table_tree_state,
+};
 
 #[cfg(test)]
 mod data_tests;
 #[cfg(test)]
 mod row_tests;
+#[cfg(test)]
+mod structure_tests;
 #[cfg(test)]
 mod tests;
 

@@ -52,6 +52,7 @@ Each patch lands before the components that need it.
 | R12 | Focus traps and `aria-haspopup` (**landed**, `93e506e`) | `tab_trap()`: Tab and Shift-Tab from inside an element cycle among its tab stops; `Window::with_tab_scope`; `aria_has_popup(HasPopup)` | Every M5 layer: Popover's focus region, dialogs, drawers and menus; popup triggers |
 | R13 | Active descendants across layers (**landed**, `01da1ad`) | `aria_active_descendant_of(&FocusHandle)`: an element is the active descendant of the element tracking that handle while it is focused, wherever it sits in the tree | Selector's listbox options (M6), and every combobox popup after it |
 | R14 | `aria-sort` (**landed**, `d436e06`) | `aria_sort(SortDirection)` on any stateful element, setting AccessKit's sort direction; `SortDirection` is re-exported | A sortable Table column's header (M7) |
+| R15 | Named nodes and `aria-controls` (**landed**, `52f7859`) | `aria_id(name)` names an element's node as an HTML `id` does; `aria_controls(names)` points at named nodes. Both are collected per frame and resolved when the tree is finished, so a relation may name a node that comes later; unknown names are skipped | A tree table's expanders and row expansion's toggles (M7) |
 
 ### How each patch works
 

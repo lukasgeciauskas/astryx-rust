@@ -149,6 +149,7 @@ fn row_context(key: Option<RowKey>, status: IdentityStatus, owners: usize) -> Ta
         logical_row_count: 3,
         header_row_count: 1,
         render: TableRenderContext {
+            table: "t".into(),
             mode: TableMode::Data,
             row_model: RowModel::Flat,
             logical_row_count: 3,

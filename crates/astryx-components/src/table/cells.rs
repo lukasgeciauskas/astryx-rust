@@ -69,6 +69,11 @@ pub enum TableTextOverflow {
     Truncate,
 }
 
+/// A data-driven table's density, for controls its cells render lazily
+/// (upstream reads `TableContext`'s `density`).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct CellDensity(pub TableDensity, pub TableDividers);
+
 /// What a table tells its parts (upstream `TableContext`).
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct TableStyle {

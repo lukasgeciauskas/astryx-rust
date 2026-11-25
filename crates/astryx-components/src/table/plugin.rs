@@ -80,6 +80,9 @@ pub enum RowKind {
 /// (upstream `TableRenderContext`).
 #[derive(Clone)]
 pub struct TableRenderContext {
+    /// The table's id, as text: a prefix for names that must be unique in
+    /// the window (accessibility relations).
+    pub table: SharedString,
     pub mode: TableMode,
     pub row_model: RowModel,
     /// The product rows in the complete data.
@@ -257,6 +260,36 @@ pub struct BodyRowProps {
     pub hooks: Vec<ElementHook>,
 }
 
+/// A row a plugin adds among the product rows (a group's header): one cell
+/// across every column. Other plugins' row and cell transforms never see it.
+#[derive(Clone)]
+pub struct SyntheticRow {
+    /// Unique among the synthetic rows (its selector reads `g` and this).
+    pub key: SharedString,
+    pub render: SyntheticRowFn,
+}
+
+/// Builds a synthetic row's props.
+pub type SyntheticRowFn =
+    Rc<dyn Fn(&TableRenderContext, &mut Window, &mut App) -> SyntheticRowProps>;
+
+/// What a synthetic row renders: its row's style and hooks, and its one
+/// cell's style and content.
+pub struct SyntheticRowProps {
+    pub style: StyleRefinement,
+    pub cell_style: StyleRefinement,
+    pub content: AnyElement,
+    pub hooks: Vec<ElementHook>,
+}
+
+/// One body row of a plan (upstream's render plan): a product row by its
+/// index in the data, or a plugin's synthetic row.
+#[derive(Clone)]
+pub enum PlanRow {
+    Product(usize),
+    Synthetic(SyntheticRow),
+}
+
 /// A whole row's action ([`BodyRowProps::row_action`]).
 pub type RowAction = Rc<dyn Fn(&mut Window, &mut App)>;
 
@@ -309,6 +342,13 @@ pub trait TablePlugin<T> {
     /// Whether it transforms body rows or cells (for the row model).
     fn transforms_body(&self) -> bool {
         false
+    }
+
+    /// The body's rows, when it plans them (grouped rows): product rows by
+    /// index, with its synthetic rows among them. The first plugin with a
+    /// plan decides.
+    fn row_plan(&self) -> Option<Rc<[PlanRow]>> {
+        None
     }
 
     /// The whole-row action it claims, if any (FR17): more than one owner

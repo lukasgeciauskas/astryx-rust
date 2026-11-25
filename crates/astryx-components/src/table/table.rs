@@ -30,9 +30,9 @@ use super::model::{
     generate_columns, resolve_identity, resolve_table_min_width,
 };
 use super::plugin::{
-    BodyCellProps, BodyRowProps, HeaderCellProps, HeaderRowProps, RowKind, ScrollWrapperProps,
-    TableMode, TablePlugin, TableRenderContext, TableRenderProps, TableRowContext,
-    admitted_row_model, order_plugins,
+    BodyCellProps, BodyRowProps, HeaderCellProps, HeaderRowProps, PlanRow, RowKind,
+    ScrollWrapperProps, SyntheticRow, TableMode, TablePlugin, TableRenderContext, TableRenderProps,
+    TableRowContext, admitted_row_model, order_plugins,
 };
 use crate::containers::EmptyState;
 use crate::layout::{ContainerChild, ContainerCorners, ContainerPadding};
@@ -120,6 +120,13 @@ impl<T: TableRecord> Table<T> {
     /// it is.
     pub fn id_key_fn(mut self, f: impl Fn(&T) -> super::model::TableValue + 'static) -> Self {
         self.id_key = Some(IdKey::Fn(Rc::new(f)));
+        self
+    }
+
+    /// Upstream `idKey` as a ready key (a field or a function), or none:
+    /// what a state hook hands back.
+    pub fn id_key_with(mut self, key: Option<IdKey<T>>) -> Self {
+        self.id_key = key;
         self
     }
 
@@ -284,11 +291,21 @@ impl<T: TableRecord> RenderOnce for Table<T> {
         // ---- The table ---------------------------------------------------
         let (table, render_context) = if data_mode {
             let data = self.data.clone().unwrap_or_else(|| Rc::from(Vec::new()));
-            render_data(
+            let (table, context) = render_data(
                 &mut self, &data, &plugins, &style, &scroll, &focus, window, cx,
+            );
+            // What a cell's lazily rendered controls read (a tree's expander).
+            (
+                provide(
+                    super::cells::CellDensity(style.density, style.dividers),
+                    table,
+                )
+                .into_any_element(),
+                context,
             )
         } else {
             let context = TableRenderContext {
+                table: name.clone().into(),
                 mode: TableMode::Children,
                 row_model: admitted_row_model(&plugins),
                 logical_row_count: 0,
@@ -406,6 +423,44 @@ impl<T: TableRecord> RenderOnce for Table<T> {
     }
 }
 
+/// A plugin's synthetic row: one cell across every column.
+#[allow(clippy::too_many_arguments)]
+fn synthetic_row(
+    table: &str,
+    row: &SyntheticRow,
+    context: &TableRenderContext,
+    tracks: Vec<GridTrack>,
+    count: usize,
+    aria_row_index: Option<usize>,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let props = (row.render)(context, window, cx);
+    let selector = format!("{table}-row-g{}", row.key);
+    let mut el = div()
+        .id(ElementId::Name(selector.clone().into()))
+        .debug_selector(move || selector.clone())
+        .grid()
+        .grid_template_columns(tracks)
+        .w_full()
+        .role(Role::Row);
+    if let Some(i) = aria_row_index {
+        el = el.aria_row_index(i);
+    }
+    el.style().refine(&props.style);
+    for hook in props.hooks {
+        el = hook(el);
+    }
+    let mut cell = div()
+        .id(ElementId::Name(format!("{table}-cell-g{}", row.key).into()))
+        .col_start(1)
+        .col_end((count.max(1) + 1) as i16)
+        .min_w_0()
+        .role(Role::Cell);
+    cell.style().refine(&props.cell_style);
+    el.child(cell.child(props.content)).into_any_element()
+}
+
 /// Logical margins, for the bleed.
 trait LogicalMargins: Styled + Sized {
     fn margin_start_logical(self, dir: astryx_i18n::Direction, v: Pixels) -> Self {
@@ -454,6 +509,7 @@ fn render_data<T: TableRecord>(
     let identity = resolve_identity(data, this.id_key.as_ref(), canonical);
     let header_rows = usize::from(count > 0);
     let context = TableRenderContext {
+        table: name.clone().into(),
         mode: TableMode::Data,
         row_model,
         logical_row_count: data.len(),
@@ -532,7 +588,32 @@ fn render_data<T: TableRecord>(
     let aria_indexes = this.row_index_start.is_some() || this.row_count.is_some();
     let first_index = this.row_index_start.unwrap_or(1);
     let mut body: Vec<AnyElement> = Vec::new();
-    for (i, id) in identity.iter().enumerate() {
+    // The body's rows: a plugin's plan (synthetic rows among the product
+    // rows), else every product row in order.
+    let plan: Rc<[PlanRow]> = plugins
+        .iter()
+        .find_map(|p| p.row_plan())
+        .unwrap_or_else(|| (0..data.len()).map(PlanRow::Product).collect());
+    let rows_shown = plan.len();
+    for (display, entry) in plan.iter().enumerate() {
+        let i = match entry {
+            PlanRow::Product(i) if *i < data.len() => *i,
+            PlanRow::Product(_) => continue,
+            PlanRow::Synthetic(row) => {
+                body.push(synthetic_row(
+                    &name,
+                    row,
+                    &context,
+                    tracks.clone(),
+                    count,
+                    aria_indexes.then_some(first_index + display),
+                    window,
+                    cx,
+                ));
+                continue;
+            }
+        };
+        let id = &identity[i];
         let item = &TableItem::new(data.clone(), i);
         let row_context = TableRowContext {
             key: id.key.clone(),
@@ -548,7 +629,7 @@ fn render_data<T: TableRecord>(
             render: context.clone(),
         };
         let row_key = id.key.as_ref().map_or_else(|| format!("i{i}"), key_text);
-        let cells: Vec<(AnyElement, Vec<super::plugin::TableContextActions>)> = columns
+        let cells: Vec<AnyElement> = columns
             .iter()
             .enumerate()
             .map(|(ci, col)| {
@@ -571,23 +652,18 @@ fn render_data<T: TableRecord>(
                     props,
                     ci,
                     count,
-                    i + 1 == data.len(),
+                    display + 1 == rows_shown,
                     style,
                     window,
                     cx,
                 )
             })
             .collect();
-        // A row's menu gathers its cells' actions (one menu per row).
-        let (cells, actions): (
-            Vec<AnyElement>,
-            Vec<Vec<super::plugin::TableContextActions>>,
-        ) = cells.into_iter().unzip();
         let mut props = BodyRowProps {
             style: StyleRefinement::default(),
             children: cells,
             after_row: Vec::new(),
-            aria_row_index: aria_indexes.then_some(first_index + i),
+            aria_row_index: aria_indexes.then_some(first_index + display),
             paint: super::plugin::RowPaint::default(),
             tab_stop: None,
             key_shortcuts: Vec::new(),
@@ -598,21 +674,21 @@ fn render_data<T: TableRecord>(
             props = p.transform_body_row(props, item, &row_context, window, cx);
         }
         let after_row = std::mem::take(&mut props.after_row);
-        let row = body_row(&name, &row_key, i, tracks.clone(), props, style, window, cx);
-        body.push(
-            menu::with_actions(
-                row,
-                ElementId::Name(format!("{name}-row-{row_key}-menu").into()),
-                actions.into_iter().flatten().collect(),
-                None,
-                window,
-                cx,
-            )
-            .into_any_element(),
+        let row = body_row(
+            &name,
+            &row_key,
+            display,
+            tracks.clone(),
+            props,
+            style,
+            window,
+            cx,
         );
+        body.push(row.into_any_element());
         body.extend(after_row);
     }
-    let empty = if data.is_empty() {
+    // Empty when no row shows: collapsed groups' headers still count.
+    let empty = if rows_shown == 0 {
         match std::mem::replace(&mut this.empty, EmptyChoice::Off) {
             EmptyChoice::Custom(el) => Some(el),
             // While the first rows load, "No data" would be wrong (FR22).
@@ -867,7 +943,7 @@ fn body_cell<T: TableRecord>(
     style: &TableStyle,
     window: &mut Window,
     cx: &mut App,
-) -> (AnyElement, Vec<super::plugin::TableContextActions>) {
+) -> AnyElement {
     let theme = current(window, cx);
     let rem = window.rem_size();
     let content: Option<AnyElement> = if props.content_suppressed {
@@ -886,6 +962,17 @@ fn body_cell<T: TableRecord>(
                 }
             }
         }
+    };
+    // Plugins' decorations wrap the content, empty or not (a tree's indent
+    // and expander).
+    let content = if props.content_suppressed || col.wrappers.is_empty() {
+        content
+    } else {
+        let mut el = content.unwrap_or_else(|| div().into_any_element());
+        for wrap in &col.wrappers {
+            el = wrap(item, el, window, cx);
+        }
+        Some(el)
     };
     let place = CellPlace {
         header: false,
@@ -909,7 +996,16 @@ fn body_cell<T: TableRecord>(
     for hook in props.hooks {
         el = hook(el);
     }
-    (el.children(content).into_any_element(), props.context_menu)
+    // The cell's own menu, over the whole cell (TableCell FR4).
+    menu::with_actions(
+        el.children(content),
+        ElementId::Name(format!("{table}-cell-{row_key}-{}-menu", col.key).into()),
+        props.context_menu,
+        None,
+        window,
+        cx,
+    )
+    .into_any_element()
 }
 
 /// A body row: the column grid, its paint (selection's wash, the hover
