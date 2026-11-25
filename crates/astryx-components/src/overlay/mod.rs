@@ -2,6 +2,7 @@
 //! family as it lands.
 
 mod alert_dialog;
+mod command_palette;
 mod context_menu;
 mod dialog;
 mod disclosure;
@@ -10,6 +11,7 @@ mod dropdown;
 pub mod examples;
 mod hover_card;
 mod info_tip;
+mod lightbox;
 mod menu;
 mod modal;
 mod motion;
@@ -18,17 +20,26 @@ mod scrim;
 mod sheet;
 mod toast;
 mod tooltip;
+mod zoom_stage;
 
 #[cfg(test)]
 mod dialog_tests;
 #[cfg(test)]
+mod lightbox_tests;
+#[cfg(test)]
 mod menu_tests;
+#[cfg(test)]
+mod palette_tests;
 #[cfg(test)]
 mod popover_tests;
 #[cfg(test)]
 mod tests;
 
 pub use alert_dialog::{AlertDialog, AlertDialogController, AlertOptions};
+pub use command_palette::{
+    CommandPalette, CommandPaletteEmpty, CommandPaletteFooter, CommandPaletteGroup,
+    CommandPaletteInput, CommandPaletteItem, CommandPaletteList,
+};
 pub use context_menu::ContextMenu;
 pub(crate) use context_menu::{ContextSpec, InvokeFn, with_context_menu};
 pub(crate) use dialog::focus_scope;
@@ -41,6 +52,9 @@ pub(crate) use dropdown::MenuTrigger;
 pub use dropdown::{DropdownMenu, MoreMenu};
 pub use hover_card::HoverCard;
 pub use info_tip::InfoTip;
+pub use lightbox::{
+    Lightbox, LightboxHandle, LightboxMedia, LightboxMediaKind, LightboxTrigger, use_lightbox,
+};
 #[cfg(test)]
 pub(crate) use menu::in_safe_triangle;
 pub use menu::{
@@ -616,6 +630,143 @@ pub const MORE_MENU_DOC: ComponentDoc = ComponentDoc {
         p("presentation", RustApi::Method("presentation")),
         p("isMenuOpen", RustApi::Method("open")),
         p("onOpenChange", RustApi::Method("on_open_change")),
+        p("xstyle", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+const VIDEO: &str = "video plays through MediaPlayer's decoder (M13); until then a video item opens in the system player";
+
+pub const LIGHTBOX_DOC: ComponentDoc = ComponentDoc {
+    name: "Lightbox",
+    rust_type: "astryx::components::overlay::Lightbox",
+    props: &[
+        p("isOpen", RustApi::Argument("open")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p("media", RustApi::Argument("media")),
+        p("index", RustApi::Method("index")),
+        p("onIndexChange", RustApi::Method("on_index_change")),
+        p("hasZoom", RustApi::Method("has_zoom")),
+        p("defaultIndex", RustApi::Method("default_index")),
+        p("hasAutoPlay", RustApi::Pending("has_auto_play", VIDEO)),
+        p("xstyle", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const USE_LIGHTBOX_DOC: ComponentDoc = ComponentDoc {
+    name: "useLightbox",
+    rust_type: "astryx::components::overlay::use_lightbox",
+    props: &[
+        p(
+            "options",
+            RustApi::Method("use_lightbox(id, media, window, cx)"),
+        ),
+        p("options.media", RustApi::Argument("media")),
+        p("options.hasZoom", RustApi::Method("element(cx).has_zoom")),
+        p(
+            "options.hasAutoPlay",
+            RustApi::Pending("element(cx).has_auto_play", VIDEO),
+        ),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const COMMAND_PALETTE_DOC: ComponentDoc = ComponentDoc {
+    name: "CommandPalette",
+    rust_type: "astryx::components::overlay::CommandPalette",
+    props: &[
+        p("isOpen", RustApi::Argument("open")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p(
+            "searchSource",
+            RustApi::Argument("source (new / from_rc; source_key)"),
+        ),
+        p("input", RustApi::Method("input")),
+        p("footer", RustApi::Method("footer")),
+        p("renderItem", RustApi::Method("render_item")),
+        p(
+            "emptySearchText",
+            RustApi::Method("empty_search_text / empty_search"),
+        ),
+        p(
+            "emptyBootstrapText",
+            RustApi::Method("empty_bootstrap_text / empty_bootstrap"),
+        ),
+        p("value", RustApi::Method("value")),
+        p("onValueChange", RustApi::Method("on_value_change")),
+        p("label", RustApi::Method("label")),
+        p("width", RustApi::Method("width")),
+        p("maxHeight", RustApi::Method("max_height")),
+        p("isInline", RustApi::Method("inline")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const COMMAND_PALETTE_INPUT_DOC: ComponentDoc = ComponentDoc {
+    name: "CommandPaletteInput",
+    rust_type: "astryx::components::overlay::CommandPaletteInput",
+    props: &[
+        p("placeholder", RustApi::Method("placeholder")),
+        p("label", RustApi::Method("label")),
+        p("hasAutoFocus", RustApi::Method("auto_focus")),
+        p("endContent", RustApi::Method("end_content")),
+        p("value", RustApi::Method("value")),
+        p("onValueChange", RustApi::Method("on_value_change")),
+        p("xstyle", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const COMMAND_PALETTE_FOOTER_DOC: ComponentDoc = ComponentDoc {
+    name: "CommandPaletteFooter",
+    rust_type: "astryx::components::overlay::CommandPaletteFooter",
+    props: &[
+        p("children", RustApi::Trait("ParentElement")),
+        p("xstyle", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const COMMAND_PALETTE_ITEM_DOC: ComponentDoc = ComponentDoc {
+    name: "CommandPaletteItem",
+    rust_type: "astryx::components::overlay::CommandPaletteItem",
+    props: &[
+        p("value", RustApi::Argument("value")),
+        p("children", RustApi::Argument("content")),
+        p("onSelect", RustApi::Method("on_select")),
+        p("isHighlighted", RustApi::Method("highlighted")),
+        p("isSelected", RustApi::Method("selected")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("xstyle", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const COMMAND_PALETTE_GROUP_DOC: ComponentDoc = ComponentDoc {
+    name: "CommandPaletteGroup",
+    rust_type: "astryx::components::overlay::CommandPaletteGroup",
+    props: &[
+        p("heading", RustApi::Argument("heading")),
+        p("children", RustApi::Trait("ParentElement")),
+        p("xstyle", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const COMMAND_PALETTE_EMPTY_DOC: ComponentDoc = ComponentDoc {
+    name: "CommandPaletteEmpty",
+    rust_type: "astryx::components::overlay::CommandPaletteEmpty",
+    props: &[p("children", RustApi::Argument("content"))],
+    example: include_str!("examples.rs"),
+};
+
+pub const COMMAND_PALETTE_LIST_DOC: ComponentDoc = ComponentDoc {
+    name: "CommandPaletteList",
+    rust_type: "astryx::components::overlay::CommandPaletteList",
+    props: &[
+        p("children", RustApi::Trait("ParentElement")),
+        p("label", RustApi::Method("label")),
         p("xstyle", RustApi::Trait("Styled")),
     ],
     example: include_str!("examples.rs"),

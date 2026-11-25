@@ -300,6 +300,7 @@ dependencies = [
  "astryx-themes",
  "gpui",
  "gpui_web",
+ "image",
  "smallvec",
  "unicode-linebreak",
  "unicode-segmentation",

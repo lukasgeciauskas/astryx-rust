@@ -141,6 +141,15 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::overlay::CONTEXT_MENU_DOC,
     crate::overlay::CONTEXT_MENU_ITEM_DOC,
     crate::overlay::MORE_MENU_DOC,
+    crate::overlay::LIGHTBOX_DOC,
+    crate::overlay::USE_LIGHTBOX_DOC,
+    crate::overlay::COMMAND_PALETTE_DOC,
+    crate::overlay::COMMAND_PALETTE_INPUT_DOC,
+    crate::overlay::COMMAND_PALETTE_FOOTER_DOC,
+    crate::overlay::COMMAND_PALETTE_ITEM_DOC,
+    crate::overlay::COMMAND_PALETTE_GROUP_DOC,
+    crate::overlay::COMMAND_PALETTE_EMPTY_DOC,
+    crate::overlay::COMMAND_PALETTE_LIST_DOC,
 ];
 
 /// The registered doc for an upstream component name.

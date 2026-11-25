@@ -265,8 +265,17 @@ The remaining primitives:
   (+Header, imperative; done: modal layers drawn above earlier ones, purpose-based
   dismissal, focus entry and return), AlertDialog (done), BottomSheet (+Switcher; done:
   snap points, drag and swipe-to-dismiss from the grab handle), Drawer (+Header; done),
-  Popover's sheet presentations (done), Toast (+viewport/queue; done), Lightbox,
-  CommandPalette.
+  Popover's sheet presentations (done), Toast (+viewport/queue; done).
+  - Lightbox and `use_lightbox` (done): galleries that page by button, key or drag (40px
+    apart); drag down to close; zoom by key, double click, Ctrl+wheel or trackpad pinch
+    (with UIKit's overshoot and release), pan with rubber-band edges; the caption band
+    with "more"; touch taps that hide the controls, and the touch exit. The zoom math
+    (`zoom_stage.rs`) ports upstream's with its tests. Video waits for MediaPlayer's
+    decoder (M13); until then a video item opens in the system player.
+  - CommandPalette and its parts (done) on `search::SearchSource`, which M6's Typeahead
+    and Tokenizer will share: async answers with stale ones dropped, partial lists, a
+    failed answer as an empty one, groups, the result keys kept in the query field, picker
+    mode, announcements.
   - Menus (done): DropdownMenu with every part (items, checkbox and radio rows, sections,
     dividers, submenus), MoreMenu, ContextMenu, TabList's TabMenu and BreadcrumbItem
     menus, all on one menu list.

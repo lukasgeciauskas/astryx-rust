@@ -2,7 +2,9 @@
 //! the overlays and menus.
 
 use astryx_primitives::{LayerAlign, Placement};
-use gpui::{AnyElement, App, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
+use gpui::{
+    AnyElement, App, IntoElement, ParentElement, SharedString, Styled, Window, div, prelude::*, px,
+};
 
 use crate::button::{Button, ButtonVariant, IconButton};
 use crate::choice::Switch;
@@ -16,9 +18,10 @@ use crate::overlay::{
     SheetHeight, SnapPoint, ToastOptions, ToastType, Tooltip, show_toast,
 };
 use crate::overlay::{
-    ContextMenu, DropdownMenu, MenuCheckboxItem, MenuEntry, MenuItem, MenuRadioGroup,
-    MenuRadioItem, MoreMenu,
+    CommandPalette, ContextMenu, DropdownMenu, LightboxMedia, MenuCheckboxItem, MenuEntry,
+    MenuItem, MenuRadioGroup, MenuRadioItem, MoreMenu, use_lightbox,
 };
+use crate::search::{SearchItem, static_source};
 use crate::text::{Text, TextType};
 
 pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
@@ -259,6 +262,10 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
         )
         .child(label("DropdownMenu, MoreMenu and ContextMenu"))
         .child(menus(window, cx))
+        .child(label("Lightbox"))
+        .child(lightbox(window, cx))
+        .child(label("CommandPalette"))
+        .child(command_palette(window, cx))
         .child(label("Toast"))
         .child(
             Stack::horizontal()
@@ -563,6 +570,123 @@ fn menus(window: &mut Window, cx: &mut App) -> AnyElement {
                 "Teh quick brwon fox",
             )
             .width(px(320.)),
+        )
+        .into_any_element()
+}
+
+/// A photo drawn in memory: a two-colour gradient, `w` × `h` pixels.
+fn gradient(w: u32, h: u32, from: [u8; 3], to: [u8; 3]) -> std::sync::Arc<gpui::RenderImage> {
+    let buffer = image::RgbaImage::from_fn(w, h, |x, y| {
+        let t = (x as f32 / w as f32 + y as f32 / h as f32) / 2.;
+        let mix = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t) as u8;
+        // BGRA, as GPUI's render images are.
+        image::Rgba([
+            mix(from[2], to[2]),
+            mix(from[1], to[1]),
+            mix(from[0], to[0]),
+            255,
+        ])
+    });
+    std::sync::Arc::new(gpui::RenderImage::new(smallvec::smallvec![
+        image::Frame::new(buffer)
+    ]))
+}
+
+type Photo = (std::sync::Arc<gpui::RenderImage>, &'static str);
+
+fn lightbox(window: &mut Window, cx: &mut App) -> AnyElement {
+    let photos = window.use_keyed_state("lightbox-photos", cx, |_, _| -> Vec<Photo> {
+        vec![
+            (
+                gradient(1600, 1000, [36, 77, 140], [214, 120, 64]),
+                "Dusk over the bay",
+            ),
+            (gradient(900, 1200, [20, 110, 80], [230, 220, 150]), "Fern"),
+            (
+                gradient(2000, 1100, [120, 40, 90], [250, 190, 120]),
+                "Dunes at noon",
+            ),
+        ]
+    });
+    let photos = photos.read(cx).clone();
+    let media = photos.iter().enumerate().map(|(i, (photo, alt))| {
+        let item = LightboxMedia::from_source(photo.clone(), *alt);
+        match i {
+            0 => item.caption("Taken from the ridge an hour after sunset."),
+            2 => item.caption(
+                "The dunes shift a few metres every year. This one, photographed at noon in \
+                 late summer, had moved far enough to cover the old trail markers on its \
+                 eastern face, which the park later replaced with taller posts.",
+            ),
+            _ => item,
+        }
+    });
+    let lightbox = use_lightbox("lightbox", media, window, cx);
+    let thumbs: Vec<AnyElement> = photos
+        .iter()
+        .enumerate()
+        .map(|(i, (photo, _))| {
+            lightbox
+                .trigger(
+                    i,
+                    div()
+                        .w(px(96.))
+                        .h(px(72.))
+                        .rounded(px(8.))
+                        .overflow_hidden()
+                        .child(
+                            gpui::img(gpui::ImageSource::Render(photo.clone()))
+                                .size_full()
+                                .object_fit(gpui::ObjectFit::Cover),
+                        ),
+                )
+                .into_any_element()
+        })
+        .collect();
+    Stack::horizontal()
+        .gap(SpacingStep::S2)
+        .children(thumbs)
+        .child(lightbox.element(cx).has_zoom(true))
+        .into_any_element()
+}
+
+fn command_palette(window: &mut Window, cx: &mut App) -> AnyElement {
+    let open = window.use_keyed_state("palette-open", cx, |_, _| false);
+    let shown = *open.read(cx);
+    let (show, report) = (open.clone(), open.clone());
+    let commands = [
+        SearchItem::new("new-file", "New file").group("File"),
+        SearchItem::new("open-file", "Open file…").group("File"),
+        SearchItem::new("save", "Save").group("File"),
+        SearchItem::new("theme", "Toggle theme")
+            .group("View")
+            .keywords(["dark", "light"]),
+        SearchItem::new("zoom-in", "Zoom in").group("View"),
+        SearchItem::new("shortcuts", "Keyboard shortcuts"),
+    ];
+    Stack::horizontal()
+        .gap(SpacingStep::S2)
+        .child(
+            Button::new("palette-open", "Open the command palette")
+                .variant(ButtonVariant::Secondary)
+                .on_click(move |_, window, cx| {
+                    show.update(cx, |v, _| *v = true);
+                    window.refresh();
+                }),
+        )
+        .child(
+            CommandPalette::new(
+                "palette",
+                shown,
+                static_source(commands).with_item_keywords(),
+            )
+            .on_open_change(move |value, window, cx| {
+                report.update(cx, |v, _| *v = value);
+                window.refresh();
+            })
+            .on_value_change(|id, window, cx| {
+                show_toast(ToastOptions::new(format!("Ran {id}")), window, cx);
+            }),
         )
         .into_any_element()
 }

@@ -52,6 +52,15 @@
   blurs as it opens (its `onBlur` runs) and focus comes back when it closes. Its strings
   ("Cut", "Add to dictionary"...) are the port's own, not upstream's, and ship in
   English: an app translates the `@astryx.textField.*` keys with its catalogs.
+- **Lightbox settles on eased timing, not springs, until M11.** Its zoom, paging and
+  drag-to-close settle over 280ms on the `move` easing; upstream uses UIKit's measured
+  springs, which arrive with the motion layer (M11). Lightbox has no backdrop blur (GPUI
+  has none; see `astryx docs effects`), and video items open in the system player until
+  MediaPlayer's decoder (M13).
+- **A CommandPalette source has no identity across renders.** React compares the
+  `searchSource` object; a Rust value built in `render` is new every frame. A source kept
+  in an `Rc` (`CommandPalette::from_rc`) or named with `source_key` re-runs the open
+  palette's query when it changes (FR9); a plain `new(source)` never does.
 - **The Menu key's name depends on the platform.** ContextMenu opens on Shift+F10 and on
   a key GPUI names `menu`, `contextmenu` or `apps`; a platform that names the Menu key
   otherwise opens it only with Shift+F10.

@@ -23,6 +23,7 @@ pub mod overlay;
 pub mod pagination;
 pub mod people;
 mod press;
+pub mod search;
 pub mod segmented;
 pub mod slider;
 pub mod status;
