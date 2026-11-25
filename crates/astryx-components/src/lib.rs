@@ -5,6 +5,7 @@ pub mod breadcrumbs;
 pub mod button;
 pub mod choice;
 pub mod collapsible;
+pub mod complex_selector;
 pub mod containers;
 pub mod content;
 pub mod doc;

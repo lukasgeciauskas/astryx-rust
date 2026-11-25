@@ -66,6 +66,9 @@
   strings, which the live region speaks. A trigger whose search makes it a button is always described as
   required when it is, since its name is the bare label (upstream's name can carry the
   label's marker).
+- **A ComplexSelector's trigger has no separate value.** `trigger_label` and
+  `placeholder` are elements, as upstream's nodes are, so the combobox carries the shown
+  value as the text inside it rather than as an accessible value.
 - **Enter on a MultiSelector action cell presses Astryx buttons only.** Upstream clicks
   the first focusable control in the cell. GPUI cannot click an element from code, so
   the cell presses what registered with it: controls on the shared press path (Button,

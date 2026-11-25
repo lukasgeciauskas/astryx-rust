@@ -77,6 +77,8 @@ pub(crate) struct PopoverState {
     pub(crate) open: bool,
     /// What had focus when it opened, to return focus to.
     return_to: Option<FocusHandle>,
+    /// Where lost focus returns instead (a selector's trigger).
+    return_override: Option<FocusHandle>,
     /// The surface: the focus region, and the fallback for initial focus.
     pub(crate) surface: FocusHandle,
     shown_at: Option<Instant>,
@@ -93,6 +95,7 @@ impl PopoverState {
         PopoverState {
             open: false,
             return_to: None,
+            return_override: None,
             surface: cx.focus_handle().tab_stop(false),
             shown_at: None,
             side: Placement::Below,
@@ -129,7 +132,7 @@ fn transition(state: &Entity<PopoverState>, open: bool, window: &mut Window, cx:
         state.update(cx, |s, _| {
             s.open = true;
             s.shown_at = None;
-            s.return_to = focused;
+            s.return_to = s.return_override.clone().or(focused);
             s.pending_focus = s.auto_focus;
         });
     } else {
@@ -266,6 +269,10 @@ pub struct Popover {
     style: StyleRefinement,
     /// The owner's handle on the popover's state (a menu drives it).
     controller: Option<PopoverController>,
+    /// The painted surface's theme target.
+    surface_target: &'static str,
+    /// Where focus that would be lost returns on close.
+    return_focus: Option<FocusHandle>,
 }
 
 impl Popover {
@@ -294,6 +301,8 @@ impl Popover {
             presentation: PopoverPresentation::Popover,
             style: StyleRefinement::default(),
             controller: None,
+            surface_target: "popover",
+            return_focus: None,
         }
     }
 
@@ -332,6 +341,20 @@ impl Popover {
     /// popover (a component that renders a Popover reads a different scope).
     pub(crate) fn controller(mut self, controller: PopoverController) -> Self {
         self.controller = Some(controller);
+        self
+    }
+
+    /// The surface's theme target (`complex-selector-popup`, say); `popover`
+    /// by default.
+    pub(crate) fn surface_target(mut self, target: &'static str) -> Self {
+        self.surface_target = target;
+        self
+    }
+
+    /// Focus that would be lost on close returns to `focus`, not to what
+    /// had it at open.
+    pub(crate) fn return_focus(mut self, focus: FocusHandle) -> Self {
+        self.return_focus = Some(focus);
         self
     }
 
@@ -390,6 +413,7 @@ impl RenderOnce for Popover {
             s.controlled = self.open.is_some();
             s.auto_focus = self.auto_focus;
             s.on_open_change = self.on_open_change.clone();
+            s.return_override = self.return_focus.clone();
         });
         if let Some(open) = self.open
             && state.read(cx).open != open
@@ -541,7 +565,7 @@ impl RenderOnce for Popover {
                 surface = surface.aria_label(label.clone());
             }
         }
-        theme.refine(surface.style(), "popover", &[], None);
+        theme.refine(surface.style(), self.surface_target, &[], None);
         surface.style().refine(&self.style);
         let surface = entrance(surface, since, side, rtl, t, window, cx);
 

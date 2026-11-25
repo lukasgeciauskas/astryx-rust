@@ -6,16 +6,16 @@ milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
 _Last updated: 2026-11-25, during M6 (Selector, List and its relatives, Typeahead,
-Tokenizer and MultiSelector done)._
+Tokenizer, MultiSelector and ComplexSelector done)._
 
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4 and M5; M6 is in progress (Selector,
   Pagination's page-size selector, List, MetadataList, OverflowList, Typeahead and
-  Tokenizer and MultiSelector are done; ComplexSelector is next). Details and dates are in
+  Tokenizer, MultiSelector and ComplexSelector are done; PowerSearch is next). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 79 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 80 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** the commit that added this file; `af61065` docs: M5 is done; `f8b5551` Lightbox,
   use_lightbox, CommandPalette and search sources; `9af8f12` menus. CI is green
@@ -28,9 +28,9 @@ Tokenizer and MultiSelector done)._
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (31)
+### Not yet ported (30)
 
-- **M6 Collections (in progress):** ComplexSelector, TreeList,
+- **M6 Collections (in progress):** TreeList,
   PowerSearch. Item's swipe actions wait for M11.
 - **M7:** Table. **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
   TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
@@ -135,9 +135,9 @@ Suggested order, each a commit:
    fork patch R13; Selector filters its own options, as upstream does).
 2. ~~**List** (and Item's remaining props), then **MetadataList**,
    **OverflowList**~~ (done; List's `reorderable` comes with step 4).
-3. ~~**Typeahead** and **Tokenizer** (share `search::`), **MultiSelector**~~ (done:
-   `typeahead/`, `tokenizer/`, `multi_selector/`), then **ComplexSelector**,
-   **PowerSearch**.
+3. ~~**Typeahead** and **Tokenizer** (share `search::`), **MultiSelector**,
+   **ComplexSelector**~~ (done: `typeahead/`, `tokenizer/`, `multi_selector/`,
+   `complex_selector/`), then **PowerSearch**.
 4. **TreeList** (tree focus), virtualization for long lists, reordering.
 
 Before starting, read PLAN.md's M6 entry and the upstream `Selector/`,

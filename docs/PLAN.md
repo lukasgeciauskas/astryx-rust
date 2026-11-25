@@ -338,6 +338,12 @@ The remaining primitives:
     action cell; Enter presses its control), announcements, busy and read-only states,
     and the shared sheet presentation (FR1-FR18). Selector and MultiSelector share the
     panel's search row (`selector::search_row`).
+  - ComplexSelector (done): the combobox trigger (input, secondary, ghost) or a caller's
+    control, and a dialog popover (the ported Popover) around the caller's content, which
+    gets the value, a commit helper (`on_change`, then `change_action` with the value shown
+    while it runs), a close helper and the shell's state; ArrowDown opens, the content or
+    `ComplexSelectorController` closes, every route reports through `on_open_change`, and
+    focus returns to the trigger only when it would be lost (FR1-FR13).
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.

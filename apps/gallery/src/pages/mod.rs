@@ -119,6 +119,9 @@ impl Page {
                 .child(astryx::components::multi_selector::examples::examples(
                     window, cx,
                 ))
+                .child(astryx::components::complex_selector::examples::examples(
+                    window, cx,
+                ))
                 .into_any_element(),
         }
     }
