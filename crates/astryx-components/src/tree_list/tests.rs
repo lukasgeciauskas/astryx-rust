@@ -42,6 +42,14 @@ fn tree(log: &Log) -> Vec<TreeListItemData> {
             .selected(true)
             .on_click(click("blog")),
         TreeListItemData::new("site", "Site").href("https://example.com"),
+        TreeListItemData::new("group", "Group")
+            .label_content(|_, _| {
+                div()
+                    .debug_selector(|| "group-control".into())
+                    .child(Button::new("group-button", "Pick"))
+                    .into_any_element()
+            })
+            .children([TreeListItemData::new("member", "Member")]),
     ]
 }
 
@@ -194,8 +202,9 @@ fn ar1_one_tab_stop_and_the_tree_keys(cx: &mut TestAppContext) {
         !shown(cx, "t-row-guide"),
         "Home reached Docs, Left collapsed it"
     );
-    press(cx, "end");
-    press(cx, "up");
+    press(cx, "end"); // Group
+    press(cx, "up"); // Site
+    press(cx, "up"); // Blog
     press(cx, "enter");
     assert_eq!(log_of(&log).last().unwrap(), "click blog");
     // Typeahead finds a label.
@@ -205,7 +214,9 @@ fn ar1_one_tab_stop_and_the_tree_keys(cx: &mut TestAppContext) {
         log_of(&log).last().unwrap(),
         "open https://example.com None"
     );
-    // Tab leaves the tree: one stop only.
+    // Tab leaves the rows: one stop among them (the Group row's button,
+    // a control of its own, is the next stop).
+    press(cx, "tab");
     press(cx, "tab");
     press(cx, "enter");
     assert_eq!(log_of(&log).last().unwrap(), "after");
@@ -244,4 +255,25 @@ fn fr10_a_theme_disclosure_mark_replaces_the_chevron(cx: &mut TestAppContext) {
     });
     assert!(shown(cx, "mark-expanded"), "Docs");
     assert!(shown(cx, "mark-collapsed"), "API");
+}
+
+#[gpui::test]
+fn fr7_a_press_on_a_control_in_a_row_is_the_control_s(cx: &mut TestAppContext) {
+    let (cx, _) = host(cx);
+    assert!(!shown(cx, "t-row-member"));
+    settle(cx);
+    // On the button, at the start of its full-width wrapper.
+    let b = cx.debug_bounds("group-control").unwrap();
+    let at = gpui::point(b.left() + px(12.), b.center().y);
+    cx.simulate_click(at, Modifiers::none());
+    settle(cx);
+    assert!(
+        !shown(cx, "t-row-member"),
+        "the control's press does not toggle the row"
+    );
+    click(cx, "t-row-group");
+    assert!(
+        shown(cx, "t-row-member"),
+        "a press elsewhere in the row does"
+    );
 }

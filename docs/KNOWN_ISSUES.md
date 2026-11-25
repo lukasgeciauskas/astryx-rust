@@ -78,8 +78,9 @@
   focus-in listener does not fire when focus moves between an element and its
   descendants, and the clear button sits inside the trigger's box. A press on the clear
   button also focuses the trigger first, where upstream leaves focus as it was.
-- **TreeList labels are text, and a header does not name the tree.** Upstream's
-  `label` takes any node (typeahead reads its text); here it is a string. Upstream
+- **A TreeList row's name is its text `label`, and a header does not name the tree.**
+  Upstream's `label` takes any node and names the row by its text; here `label` is the
+  name (and typeahead text) and `label_content` the node shown in its place. Upstream
   points `aria-labelledby` at the header; a GPUI element cannot name another, so pass
   `aria_label`.
 - **A List is named by `label`, not its header.** Upstream points `aria-labelledby` at

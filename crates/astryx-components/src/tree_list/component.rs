@@ -67,7 +67,10 @@ impl TreeListVariant {
 #[derive(Clone)]
 pub struct TreeListItemData {
     pub id: SharedString,
+    /// The row's name and typeahead text, shown unless `label_content` is set.
     pub label: SharedString,
+    /// Upstream's `label` node: rich content in the label's place.
+    pub label_content: Option<SlotFn>,
     pub description: Option<SharedString>,
     pub start_content: Option<SlotFn>,
     pub end_content: Option<SlotFn>,
@@ -88,6 +91,7 @@ impl TreeListItemData {
         TreeListItemData {
             id: id.into(),
             label: label.into(),
+            label_content: None,
             description: None,
             start_content: None,
             end_content: None,
@@ -100,6 +104,16 @@ impl TreeListItemData {
             expanded: false,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Upstream `label` as a node: shown in the label's place; `label` stays
+    /// the row's name.
+    pub fn label_content(
+        mut self,
+        f: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        self.label_content = Some(Rc::new(f));
+        self
     }
 
     /// Upstream `description`.
@@ -186,6 +200,8 @@ struct TreeState {
     tab_stop: Option<SharedString>,
     typeahead: Typeahead,
     focus: HashMap<SharedString, FocusHandle>,
+    /// The last press began on a control inside a row (FR7).
+    press_in_control: bool,
 }
 
 /// One visible row.
@@ -310,6 +326,7 @@ impl RenderOnce for TreeList {
                 tab_stop: None,
                 typeahead: tree_typeahead(),
                 focus: HashMap::new(),
+                press_in_control: false,
             },
         );
         // The visible rows, in order.
@@ -679,9 +696,13 @@ impl RenderOnce for TreeList {
                 } else {
                     px(0.)
                 };
-            let mut label = div()
-                .text_color(t.color.text_primary)
-                .child(item.label.clone());
+            let mut label =
+                div()
+                    .text_color(t.color.text_primary)
+                    .child(match &item.label_content {
+                        Some(f) => f(window, cx),
+                        None => item.label.clone().into_any_element(),
+                    });
             theme.refine(
                 label.style(),
                 "tree-list-item-label",
@@ -767,8 +788,20 @@ impl RenderOnce for TreeList {
                     .cursor_pointer()
                     .hover(move |s| s.bg(astryx_theme::color::composite(base, hover)))
                     .active(move |s| s.bg(astryx_theme::color::composite(base, pressed)));
-                let act = activate.clone();
+                // A press that a control inside the row took (it focused,
+                // preventing the default) is the control's, not the row's.
+                {
+                    let state = state.clone();
+                    content = content.on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                        let taken = window.default_prevented();
+                        state.update(cx, |s, _| s.press_in_control = taken);
+                    });
+                }
+                let (act, pressed) = (activate.clone(), state.clone());
                 content = content.on_click(move |event, window, cx| {
+                    if !event.is_keyboard() && pressed.read(cx).press_in_control {
+                        return;
+                    }
                     let m = event.modifiers();
                     act(index, m.platform || m.control || m.shift, event, window, cx)
                 });
