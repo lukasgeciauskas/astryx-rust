@@ -2,12 +2,15 @@
 //! family as it lands.
 
 mod alert_dialog;
+mod context_menu;
 mod dialog;
 mod disclosure;
 mod drawer;
+mod dropdown;
 pub mod examples;
 mod hover_card;
 mod info_tip;
+mod menu;
 mod modal;
 mod motion;
 mod popover;
@@ -19,19 +22,31 @@ mod tooltip;
 #[cfg(test)]
 mod dialog_tests;
 #[cfg(test)]
+mod menu_tests;
+#[cfg(test)]
 mod popover_tests;
 #[cfg(test)]
 mod tests;
 
 pub use alert_dialog::{AlertDialog, AlertDialogController, AlertOptions};
+pub use context_menu::ContextMenu;
+pub(crate) use context_menu::{ContextSpec, InvokeFn, with_context_menu};
 pub(crate) use dialog::focus_scope;
 pub use dialog::{
     AutoFocus, Dialog, DialogController, DialogHeader, DialogPosition, DialogPurpose, DialogVariant,
 };
 pub(crate) use disclosure::disclosure;
 pub use drawer::{Drawer, DrawerHeader, DrawerSide};
+pub(crate) use dropdown::MenuTrigger;
+pub use dropdown::{DropdownMenu, MoreMenu};
 pub use hover_card::HoverCard;
 pub use info_tip::InfoTip;
+#[cfg(test)]
+pub(crate) use menu::in_safe_triangle;
+pub use menu::{
+    MenuAction, MenuCheckboxItem, MenuEntry, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSize,
+    SubmenuPresentation,
+};
 pub use popover::{Popover, PopoverController, PopoverPresentation, PopoverRole};
 pub use scrim::{Overlay, OverlayAlign, OverlayPosition, OverlayScrim, OverlayShowOn};
 pub use sheet::{BottomSheet, BottomSheetSwitcher, SheetHeight, SnapPoint};
@@ -392,5 +407,216 @@ pub const USE_TOAST_DOC: ComponentDoc = ComponentDoc {
         "show",
         RustApi::Method("show_toast(ToastOptions, window, cx)"),
     )],
+    example: include_str!("examples.rs"),
+};
+
+const NO_REFS: &str = "GPUI elements have no refs";
+const NO_REL: &str = "GPUI opens URLs without a referrer";
+const ROW_STYLE: &str = "rows are themed with dropdown-menu-item rules";
+const TEST_IDS: &str = "GPUI tests find elements by id";
+
+pub const DROPDOWN_MENU_DOC: ComponentDoc = ComponentDoc {
+    name: "DropdownMenu",
+    rust_type: "astryx::components::overlay::DropdownMenu",
+    props: &[
+        p(
+            "button",
+            RustApi::Method(
+                "button_label / button_variant / button_size / button_icon / icon_only / button",
+            ),
+        ),
+        p("renderTrigger", RustApi::Method("trigger")),
+        p("items", RustApi::Method("items")),
+        p("presentation", RustApi::Method("presentation")),
+        p("isMenuOpen", RustApi::Method("open")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p("menuWidth", RustApi::Method("menu_width")),
+        p("menuMaxHeight", RustApi::Method("menu_max_height")),
+        p("header", RustApi::Method("header")),
+        p("footer", RustApi::Method("footer")),
+        p("placement", RustApi::Method("placement")),
+        p("alignment", RustApi::Method("alignment")),
+        p("onClick", RustApi::Method("on_click")),
+        p("hasChevron", RustApi::Method("chevron")),
+        p("children", RustApi::Method("entry")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const DROPDOWN_MENU_ITEM_DOC: ComponentDoc = ComponentDoc {
+    name: "DropdownMenuItem",
+    rust_type: "astryx::components::overlay::MenuItem",
+    props: &[
+        p("icon", RustApi::Method("icon")),
+        p("label", RustApi::Argument("label")),
+        p("description", RustApi::Method("description")),
+        p("onClick", RustApi::Method("on_click")),
+        p("href", RustApi::Method("href")),
+        p("target", RustApi::Method("target")),
+        p("rel", RustApi::Waived(NO_REL)),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("endContent", RustApi::Method("end_content")),
+        p("hasCloseOnSelect", RustApi::Method("close_on_select")),
+        p("variant", RustApi::Method("destructive")),
+        p("xstyle", RustApi::Waived(ROW_STYLE)),
+        p("ref", RustApi::Waived(NO_REFS)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const DROPDOWN_MENU_CHECKBOX_ITEM_DOC: ComponentDoc = ComponentDoc {
+    name: "DropdownMenuCheckboxItem",
+    rust_type: "astryx::components::overlay::MenuCheckboxItem",
+    props: &[
+        p("label", RustApi::Argument("label")),
+        p("description", RustApi::Method("description")),
+        p("icon", RustApi::Method("icon")),
+        p("value", RustApi::Argument("checked")),
+        p("onChange", RustApi::Method("on_change")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("hasCloseOnSelect", RustApi::Method("close_on_select")),
+        p("ref", RustApi::Waived(NO_REFS)),
+        p("endContent", RustApi::Method("end_content")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const DROPDOWN_MENU_RADIO_GROUP_DOC: ComponentDoc = ComponentDoc {
+    name: "DropdownMenuRadioGroup",
+    rust_type: "astryx::components::overlay::MenuRadioGroup",
+    props: &[
+        p("value", RustApi::Argument("value")),
+        p("onChange", RustApi::Method("on_change")),
+        p("label", RustApi::Method("title")),
+        p("hasCloseOnSelect", RustApi::Method("close_on_select")),
+        p("ref", RustApi::Waived(NO_REFS)),
+        p("children", RustApi::Method("item")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const DROPDOWN_MENU_RADIO_ITEM_DOC: ComponentDoc = ComponentDoc {
+    name: "DropdownMenuRadioItem",
+    rust_type: "astryx::components::overlay::MenuRadioItem",
+    props: &[
+        p("value", RustApi::Argument("value")),
+        p("label", RustApi::Argument("label")),
+        p("description", RustApi::Method("description")),
+        p("icon", RustApi::Method("icon")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("endContent", RustApi::Method("end_content")),
+        p("ref", RustApi::Waived(NO_REFS)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const DROPDOWN_MENU_GROUP_DOC: ComponentDoc = ComponentDoc {
+    name: "DropdownMenuGroup",
+    rust_type: "astryx::components::overlay::MenuEntry::section",
+    props: &[
+        p("title", RustApi::Argument("title")),
+        p("children", RustApi::Argument("entries")),
+        p(
+            "xstyle",
+            RustApi::Waived("sections are themed with dropdown-menu-section-heading rules"),
+        ),
+        p("className", RustApi::Waived(ROW_STYLE)),
+        p("style", RustApi::Waived(ROW_STYLE)),
+        p("ref", RustApi::Waived(NO_REFS)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const DROPDOWN_MENU_DIVIDER_DOC: ComponentDoc = ComponentDoc {
+    name: "DropdownMenuDivider",
+    rust_type: "astryx::components::overlay::MenuEntry::Divider",
+    props: &[p(
+        "xstyle",
+        RustApi::Waived("dividers are themed with dropdown-menu-divider rules"),
+    )],
+    example: include_str!("examples.rs"),
+};
+
+pub const DROPDOWN_MENU_SUB_MENU_DOC: ComponentDoc = ComponentDoc {
+    name: "DropdownMenuSubMenu",
+    rust_type: "astryx::components::overlay::MenuItem",
+    props: &[
+        p("label", RustApi::Argument("label")),
+        p("icon", RustApi::Method("icon")),
+        p("description", RustApi::Method("description")),
+        p("children", RustApi::Method("submenu")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("hasSpinner", RustApi::Method("spinner")),
+        p("menuWidth", RustApi::Method("submenu_width")),
+        p("onOpenChange", RustApi::Method("on_submenu_open_change")),
+        p("presentation", RustApi::Method("submenu_presentation")),
+        p("delay", RustApi::Method("submenu_delay")),
+        p("hideDelay", RustApi::Method("submenu_hide_delay")),
+        p("header", RustApi::Method("submenu_header")),
+        p("footer", RustApi::Method("submenu_footer")),
+        p("menuDataTestId", RustApi::Waived(TEST_IDS)),
+        p("xstyle", RustApi::Waived(ROW_STYLE)),
+        p("ref", RustApi::Waived(NO_REFS)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const CONTEXT_MENU_DOC: ComponentDoc = ComponentDoc {
+    name: "ContextMenu",
+    rust_type: "astryx::components::overlay::ContextMenu",
+    props: &[
+        p("children", RustApi::Trait("ParentElement")),
+        p("items", RustApi::Method("items")),
+        p("menuContent", RustApi::Method("entry")),
+        p("menuWidth", RustApi::Method("menu_width")),
+        p("size", RustApi::Method("size")),
+        p("label", RustApi::Method("label")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p("presentation", RustApi::Method("presentation")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("triggerXstyle", RustApi::Trait("Styled")),
+        p("triggerAs", RustApi::Method("inline")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const CONTEXT_MENU_ITEM_DOC: ComponentDoc = ComponentDoc {
+    name: "ContextMenuItem",
+    rust_type: "astryx::components::overlay::MenuItem",
+    props: &[
+        p("icon", RustApi::Method("icon")),
+        p("label", RustApi::Argument("label")),
+        p("description", RustApi::Method("description")),
+        p("onClick", RustApi::Method("on_click")),
+        p("href", RustApi::Method("href")),
+        p("target", RustApi::Method("target")),
+        p("rel", RustApi::Waived(NO_REL)),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("endContent", RustApi::Method("end_content")),
+        p("hasCloseOnSelect", RustApi::Method("close_on_select")),
+        p("variant", RustApi::Method("destructive")),
+        p("xstyle", RustApi::Waived(ROW_STYLE)),
+        p("ref", RustApi::Waived(NO_REFS)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const MORE_MENU_DOC: ComponentDoc = ComponentDoc {
+    name: "MoreMenu",
+    rust_type: "astryx::components::overlay::MoreMenu",
+    props: &[
+        p("items", RustApi::Argument("entries")),
+        p("label", RustApi::Method("label")),
+        p("variant", RustApi::Method("variant")),
+        p("size", RustApi::Method("size")),
+        p("icon", RustApi::Method("icon")),
+        p("isDisabled", RustApi::Method("disabled")),
+        p("placement", RustApi::Method("placement")),
+        p("alignment", RustApi::Method("alignment")),
+        p("presentation", RustApi::Method("presentation")),
+        p("isMenuOpen", RustApi::Method("open")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p("xstyle", RustApi::Trait("Styled")),
+    ],
     example: include_str!("examples.rs"),
 };

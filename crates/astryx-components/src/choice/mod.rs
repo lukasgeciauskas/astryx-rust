@@ -172,7 +172,7 @@ impl CheckboxInput {
         ?status: InputStatus,
         /// Upstream `width`.
         ?width: Length,
-        /// Upstream `disabledMessage`. The tooltip lands with Tooltip (M5).
+        /// Upstream `disabledMessage`: the reason, in a tooltip on hover and focus.
         ?disabled_message: SharedString,
     }
 
@@ -363,9 +363,9 @@ impl Switch {
         label_spacing: LabelSpacing,
         /// Upstream `width`.
         ?width: Length,
-        /// Upstream `disabledMessage`. The tooltip lands with Tooltip (M5).
+        /// Upstream `disabledMessage`: the reason, in a tooltip on hover and focus.
         ?disabled_message: SharedString,
-        /// Upstream `labelTooltip`. The InfoTip lands with Tooltip (M5).
+        /// Upstream `labelTooltip`: an InfoTip beside the label.
         ?label_tooltip: SharedString,
     }
 

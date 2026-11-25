@@ -36,3 +36,37 @@ fn arrows_page_the_strip_and_stop_at_its_ends() {
     assert_eq!(paged_offset(-300., 200., 300., -1.), -140.);
     assert_eq!(paged_offset(-100., 200., 300., -1.), 0.);
 }
+
+#[gpui::test]
+fn a_tab_menu_opens_its_options_and_selects_through_the_tab_list(cx: &mut TestAppContext) {
+    let log = Rc::new(RefCell::new(Vec::new()));
+    let cx = host(cx, {
+        let log = log.clone();
+        move || {
+            let log = log.clone();
+            TabList::new("t", "a")
+                .on_change(move |value, _, _| log.borrow_mut().push(value))
+                .tab(Tab::new("a", "Alpha"))
+                .menu(TabMenu::new(
+                    "More",
+                    [
+                        TabMenuOption::new("c", "Gamma"),
+                        TabMenuOption::new("d", "Delta"),
+                    ],
+                ))
+                .into_any_element()
+        }
+    });
+    // Alpha is the tab stop; ArrowRight reaches the menu without opening it.
+    press(cx, "tab");
+    press(cx, "right");
+    assert!(log.borrow().is_empty());
+    press(cx, "enter");
+    press(cx, "down");
+    press(cx, "enter");
+    assert_eq!(
+        *log.borrow(),
+        [SharedString::from("d")],
+        "the second option"
+    );
+}

@@ -569,11 +569,7 @@ impl RenderOnce for Tooltip {
                 // A labeled card tells a button trigger it opens a dialog
                 // (HoverCard FR3).
                 (None, Surface::Card { label: Some(_) }) => provide(
-                    super::disclosure::Disclosure {
-                        expanded: visible,
-                        popup: gpui::HasPopup::Dialog,
-                        toggle: None,
-                    },
+                    super::disclosure::Disclosure::new(visible, gpui::HasPopup::Dialog, None),
                     trigger,
                 )
                 .into_any_element(),

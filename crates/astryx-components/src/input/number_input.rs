@@ -366,17 +366,18 @@ impl NumberInput {
         !disabled,
         /// Upstream `isReadOnly`: focusable, never edited or stepped.
         !read_only,
-        /// Upstream `disabledMessage`: why the field is disabled. It
-        /// describes the field now; its tooltip lands with Tooltip (M5).
+        /// Upstream `disabledMessage`: why the field is disabled, in a
+        /// tooltip on hover and focus; it also describes the field.
         ?disabled_message: SharedString,
         /// Upstream `placeholder`.
         ?placeholder: SharedString,
-        /// Upstream `labelTooltip`. The InfoTip lands with Tooltip (M5).
+        /// Upstream `labelTooltip`: an InfoTip beside the label.
         ?label_tooltip: SharedString,
         /// Upstream `status`. An `error` with a message shows instead of the
         /// field's own invalid-number message.
         ?status: InputStatus,
-        /// Upstream `statusVariant` (`tooltip` lands with Tooltip, M5).
+        /// Upstream `statusVariant`; `tooltip` puts the message in the status
+        /// icon's tooltip.
         status_placement: StatusPlacement,
         /// Upstream `min`.
         ?min: f64,
@@ -961,6 +962,16 @@ impl RenderOnce for NumberInput {
                 window.focus(&focus, cx)
             });
         }
+        // The browser's text-field context menu.
+        control = super::field_menu::with_field_menu(
+            control,
+            &self.id,
+            &editor_state,
+            &focus,
+            self.disabled,
+            window,
+            cx,
+        );
         // FR4: the wheel over the focused field steps it instead of scrolling.
         if self.wheel_enabled && editable && focused {
             let ctx = ctx.clone();

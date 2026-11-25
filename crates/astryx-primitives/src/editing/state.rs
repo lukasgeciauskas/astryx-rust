@@ -227,6 +227,19 @@ impl FieldSettings {
     }
 }
 
+/// What a field's context menu can offer, from
+/// [`TextEditState::context_menu_at`].
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FieldMenu {
+    /// The misspelled word under the pointer: its range, its text and the
+    /// checker's suggestions.
+    pub misspelling: Option<(Range<usize>, String, Vec<String>)>,
+    pub can_cut: bool,
+    pub can_copy: bool,
+    pub can_paste: bool,
+    pub can_select_all: bool,
+}
+
 /// The editing state of one text field.
 pub struct TextEditState {
     focus: FocusHandle,
@@ -538,12 +551,15 @@ impl TextEditState {
         self.touched(Self::now(cx), window, cx);
     }
 
-    pub(crate) fn select_all(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Selects all the text (the Select all command).
+    pub fn select_all(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.buffer.select_all();
         self.touched(Self::now(cx), window, cx);
     }
 
-    pub(crate) fn copy(&mut self, cut: bool, window: &mut Window, cx: &mut Context<Self>) {
+    /// Copies the selection to the clipboard, and with `cut` deletes it (the
+    /// Copy and Cut commands). A masked field copies nothing.
+    pub fn copy(&mut self, cut: bool, window: &mut Window, cx: &mut Context<Self>) {
         // A masked field never gives its text away.
         if self.buffer.is_collapsed() || self.settings.masked {
             return;
@@ -561,7 +577,8 @@ impl TextEditState {
         }
     }
 
-    pub(crate) fn paste(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Inserts the clipboard's text (the Paste command).
+    pub fn paste(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.editable() {
             return;
         }
@@ -617,6 +634,102 @@ impl TextEditState {
         if self.buffer.insert(&text) {
             self.edited(Self::now(cx), window, cx);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // The context menu
+
+    /// Readies a context menu invoked at `position` (window coordinates;
+    /// `None` from the keyboard, at the caret), as a browser's text field
+    /// does: a press on a misspelled word selects it, a press outside the
+    /// selection moves the caret there. Returns what the menu can offer.
+    pub fn context_menu_at(
+        &mut self,
+        position: Option<Point<Pixels>>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> FieldMenu {
+        let offset = match position {
+            Some(position) => self.offset_for_window(position),
+            None => self.buffer.cursor(),
+        };
+        let misspelling = self.misspelling_at(offset, cx);
+        if position.is_some() {
+            let selection = self.buffer.selection();
+            let inside =
+                !self.buffer.is_collapsed() && offset >= selection.start && offset <= selection.end;
+            match &misspelling {
+                Some((range, _, _)) => self.buffer.select(range.clone(), false),
+                None if !inside => self.buffer.move_to(offset),
+                None => {}
+            }
+            self.touched(Self::now(cx), window, cx);
+        }
+        let editable = self.editable();
+        let selected = !self.buffer.is_collapsed() && !self.settings.masked;
+        FieldMenu {
+            misspelling: misspelling.filter(|_| editable),
+            can_cut: selected && editable,
+            can_copy: selected,
+            can_paste: editable,
+            can_select_all: !self.buffer.text().is_empty(),
+        }
+    }
+
+    /// The misspelled word containing `offset`, with the checker's
+    /// suggestions.
+    fn misspelling_at(
+        &mut self,
+        offset: usize,
+        cx: &mut App,
+    ) -> Option<(Range<usize>, String, Vec<String>)> {
+        if !self.settings.spell_check || self.settings.masked {
+            return None;
+        }
+        let checker = crate::spell::spell_checker(cx)?;
+        let stale = self
+            .spelling
+            .as_ref()
+            .is_none_or(|(text, _)| text != self.buffer.text());
+        if stale {
+            let text = self.buffer.text().to_string();
+            let errors = checker.check(&text);
+            self.spelling = Some((text, errors));
+        }
+        let (_, errors) = self.spelling.as_ref()?;
+        let range = errors
+            .iter()
+            .find(|r| r.start <= offset && offset <= r.end)?
+            .clone();
+        let word = self.buffer.text()[range.clone()].to_string();
+        let suggestions = checker.suggest(&word);
+        Some((range, word, suggestions))
+    }
+
+    /// Replaces `range` with `with`, as typing would (undoable, reported):
+    /// a spelling suggestion picked from the context menu.
+    pub fn replace_range(
+        &mut self,
+        range: Range<usize>,
+        with: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if range.end > self.buffer.text().len() {
+            return;
+        }
+        self.buffer.select(range, false);
+        self.insert(with, window, cx);
+        cx.notify();
+    }
+
+    /// Adds `word` to the spell checker's dictionary, so no field marks it.
+    pub fn add_to_dictionary(&mut self, word: &str, cx: &mut Context<Self>) {
+        if let Some(checker) = crate::spell::spell_checker(cx) {
+            checker.add(word);
+        }
+        self.spelling = None;
+        cx.notify();
     }
 
     // ------------------------------------------------------------------

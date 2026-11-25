@@ -576,7 +576,7 @@ impl StatusDot {
     astryx_primitives::setters! {
         /// Upstream `isPulsing`: a slow pulse, off under reduced motion.
         !pulsing,
-        /// Upstream `tooltip`. The tooltip itself lands with Tooltip (M5).
+        /// Upstream `tooltip`: shown on hover and keyboard focus.
         ?tooltip: SharedString,
     }
 

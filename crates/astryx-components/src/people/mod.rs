@@ -156,7 +156,7 @@ impl Avatar {
         size: AvatarSize,
         /// Upstream `shape`.
         shape: AvatarShape,
-        /// Upstream `tooltip`. The tooltip itself lands with Tooltip (M5).
+        /// Upstream `tooltip`: shown on hover and keyboard focus.
         ?tooltip: SharedString,
         /// Upstream `href`: makes the avatar a link through the link handler.
         ?href: SharedString,

@@ -106,7 +106,7 @@ impl Link {
         ?new_tab_label: SharedString,
         /// Upstream `target`. `external` sets `_blank`.
         ?target: SharedString,
-        /// Upstream `tooltip`. The tooltip itself lands with Tooltip (M5).
+        /// Upstream `tooltip`: shown on hover and keyboard focus.
         ?tooltip: SharedString,
         /// Upstream `isStandalone`: body size and leading, for a link outside
         /// running text.

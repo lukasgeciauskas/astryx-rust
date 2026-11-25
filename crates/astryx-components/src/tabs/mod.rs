@@ -1,8 +1,9 @@
 //! TabList and Tab. Upstream: `TabList/`.
 //!
 //! A strip of tabs that scrolls when it is wider than its container, with
-//! round arrows at the overflowing edges. TabMenu (an overflow menu tab)
-//! lands with DropdownMenu (M5).
+//! round arrows at the overflowing edges. A TabMenu is a tab that opens a
+//! menu of more tabs: it shows the selected one's label, and selects through
+//! the TabList's `onChange`.
 
 #[cfg(test)]
 mod tests;
@@ -23,8 +24,10 @@ use gpui::{
 use crate::button::element_height;
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
 use crate::focus::focus_ring;
+use crate::icon::IconSource;
 use crate::icon::{Icon, IconDefaultSize, IconSize};
 use crate::layout::ContainerPadding;
+use crate::overlay::{DropdownMenu, MenuRadioGroup, MenuRadioItem, MenuTrigger};
 
 /// Upstream TabList `layout`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -122,6 +125,77 @@ impl Styled for Tab {
     }
 }
 
+/// One option of a [`TabMenu`], upstream `TabMenuOption`.
+#[derive(Clone)]
+pub struct TabMenuOption {
+    value: SharedString,
+    label: SharedString,
+    icon: Option<IconSource>,
+}
+
+impl TabMenuOption {
+    /// Upstream `value` and `label`.
+    pub fn new(value: impl Into<SharedString>, label: impl Into<SharedString>) -> Self {
+        TabMenuOption {
+            value: value.into(),
+            label: label.into(),
+            icon: None,
+        }
+    }
+
+    /// Upstream `icon`.
+    pub fn icon(mut self, icon: impl Into<IconSource>) -> Self {
+        self.icon = Some(icon.into());
+        self
+    }
+}
+
+/// A tab that opens a menu of more tabs, upstream `TabMenu`. Its trigger
+/// shows the selected option's label (else `label`), carries the selection
+/// indicator while one of its options is selected, and picks through the
+/// TabList's `onChange`.
+pub struct TabMenu {
+    label: SharedString,
+    options: Vec<TabMenuOption>,
+    style: StyleRefinement,
+}
+
+impl TabMenu {
+    /// Upstream `label` (the trigger's text when no option is selected, and
+    /// the menu's heading) and `options`.
+    pub fn new(
+        label: impl Into<SharedString>,
+        options: impl IntoIterator<Item = TabMenuOption>,
+    ) -> Self {
+        TabMenu {
+            label: label.into(),
+            options: options.into_iter().collect(),
+            style: StyleRefinement::default(),
+        }
+    }
+}
+
+impl Styled for TabMenu {
+    fn style(&mut self) -> &mut StyleRefinement {
+        &mut self.style
+    }
+}
+
+/// A tab or a TabMenu in the strip.
+enum TabItem {
+    Tab(Tab),
+    Menu(TabMenu),
+}
+
+impl TabItem {
+    fn holds(&self, value: &SharedString) -> bool {
+        match self {
+            TabItem::Tab(tab) => tab.value == *value,
+            TabItem::Menu(menu) => menu.options.iter().any(|o| o.value == *value),
+        }
+    }
+}
+
 /// A strip of tabs, upstream `TabList`.
 ///
 /// ```ignore
@@ -142,7 +216,7 @@ pub struct TabList {
     pattern: TabPattern,
     overflow: TabOverflow,
     label: Option<SharedString>,
-    tabs: Vec<Tab>,
+    tabs: Vec<TabItem>,
     style: StyleRefinement,
 }
 
@@ -190,13 +264,19 @@ impl TabList {
 
     /// Upstream `children`: one tab.
     pub fn tab(mut self, tab: Tab) -> Self {
-        self.tabs.push(tab);
+        self.tabs.push(TabItem::Tab(tab));
         self
     }
 
     /// Upstream `children`: tabs.
     pub fn tabs(mut self, tabs: impl IntoIterator<Item = Tab>) -> Self {
-        self.tabs.extend(tabs);
+        self.tabs.extend(tabs.into_iter().map(TabItem::Tab));
+        self
+    }
+
+    /// Upstream `children`: a TabMenu.
+    pub fn menu(mut self, menu: TabMenu) -> Self {
+        self.tabs.push(TabItem::Menu(menu));
         self
     }
 }
@@ -224,8 +304,8 @@ impl RenderOnce for TabList {
         let rem = window.rem_size();
         let dir = use_direction(cx);
         let size = resolve_size(self.size, ElementSize::Md, cx);
-        let values: Rc<[SharedString]> = self.tabs.iter().map(|t| t.value.clone()).collect();
-        let selected = values.iter().position(|v| *v == self.value);
+        let selected = self.tabs.iter().position(|item| item.holds(&self.value));
+        let any_tabs = !self.tabs.is_empty();
         let is_tablist = self.pattern == TabPattern::TabList;
         let scrolls = self.overflow != TabOverflow::Visible;
 
@@ -257,10 +337,116 @@ impl RenderOnce for TabList {
         let height = element_height(size, t);
         let (hover, pressed) = (t.color.overlay_hover, t.color.overlay_pressed);
         let radius = t.radius.element.to_pixels(rem);
+        let t_gap = t.spacing.s1;
 
-        let tabs = self.tabs.into_iter().enumerate().map(|(i, tab)| {
+        let tabs = self.tabs.into_iter().enumerate().map(|(i, item)| {
             let is_selected = selected == Some(i);
             let handle = list.item_handle(i, tab_stop);
+            let tab = match item {
+                TabItem::Tab(tab) => tab,
+                TabItem::Menu(menu) => {
+                    let shown = menu
+                        .options
+                        .iter()
+                        .find(|o| o.value == self.value)
+                        .map(|o| o.label.clone())
+                        .unwrap_or_else(|| menu.label.clone());
+                    let semibold = t.font.weight.semibold;
+                    let label_el = div()
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .child(div().child(shown.clone()))
+                        .child(
+                            div()
+                                .h_0()
+                                .invisible()
+                                .font_weight(semibold)
+                                .child(shown.clone()),
+                        );
+                    let indicator = div()
+                        .absolute()
+                        .bottom(indicator_bottom)
+                        .inset_start(dir, t.spacing.s3)
+                        .inset_end(dir, t.spacing.s3)
+                        .h(px(2.))
+                        .rounded_full()
+                        .when(is_selected, |el| el.bg(t.color.accent));
+                    let content = move |open: bool| {
+                        let chevron = Icon::new("chevronDown").size(IconSize::Sm);
+                        // Open, the chevron turns over.
+                        let chevron = if open {
+                            chevron.scale_xy(1., -1.)
+                        } else {
+                            chevron
+                        };
+                        div()
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap(t_gap)
+                            .child(label_el)
+                            .child(chevron)
+                            .child(indicator)
+                            .into_any_element()
+                    };
+                    let mut trigger = MenuTrigger::new(
+                        ElementId::Name(format!("{:?}-menu-{i}", self.id).into()),
+                        shown,
+                        content,
+                    )
+                    .focus_handle(handle)
+                    .arrow_keys(false)
+                    .hover_tint()
+                    .flex()
+                    .flex_row()
+                    .flex_none()
+                    .items_center()
+                    .justify_center()
+                    .px(t.spacing.s3)
+                    .min_h(height)
+                    .rounded(t.radius.element)
+                    .text_size(t.text.label.size)
+                    .line_height(relative(t.text.label.leading))
+                    .font_weight(t.font.weight.normal)
+                    .text_color(t.color.text_secondary)
+                    .whitespace_nowrap();
+                    if fill {
+                        trigger = trigger.flex_1();
+                    }
+                    if is_selected {
+                        trigger = trigger
+                            .text_color(t.color.text_primary)
+                            .font_weight(t.font.weight.semibold);
+                    }
+                    theme.refine(trigger.style(), "tab-menu", &[], None);
+                    trigger.style().refine(&menu.style);
+                    let select = self.on_change.clone();
+                    let mut group = MenuRadioGroup::new(self.value.clone())
+                        .title(menu.label.clone())
+                        .check_marks()
+                        .on_change(move |value, window, cx| {
+                            if let Some(f) = &select {
+                                f(value, window, cx);
+                            }
+                        });
+                    for option in &menu.options {
+                        let mut row =
+                            MenuRadioItem::new(option.value.clone(), option.label.clone());
+                        if let Some(icon) = &option.icon {
+                            row = row.icon(icon.clone());
+                        }
+                        group = group.item(row);
+                    }
+                    return DropdownMenu::new(ElementId::Name(
+                        format!("{:?}-tab-menu-{i}", self.id).into(),
+                    ))
+                    .button_label(menu.label.clone())
+                    .trigger(trigger)
+                    .entry(group)
+                    .into_any_element();
+                }
+            };
             let icon = if is_selected {
                 tab.selected_icon.or(tab.icon)
             } else {
@@ -373,9 +559,9 @@ impl RenderOnce for TabList {
             };
             let el = el.role(role).aria_label(tab.label);
             if is_tablist {
-                el.aria_selected(is_selected)
+                el.aria_selected(is_selected).into_any_element()
             } else {
-                el
+                el.into_any_element()
             }
         });
 
@@ -410,7 +596,7 @@ impl RenderOnce for TabList {
         let offset = scroll.offset().x;
         let max = scroll.max_offset().x;
         let visible = scroll.bounds().size.width;
-        if scrolls && visible == px(0.) && !values.is_empty() {
+        if scrolls && visible == px(0.) && any_tabs {
             // Measured after the first layout: draw again to place arrows.
             window.request_animation_frame();
         }
@@ -517,7 +703,7 @@ pub const TAB_LIST_DOC: ComponentDoc = ComponentDoc {
         p("isFullBleed", RustApi::Method("full_bleed")),
         p("role", RustApi::Method("pattern")),
         p("overflow", RustApi::Method("overflow")),
-        p("children", RustApi::Method("tab / tabs")),
+        p("children", RustApi::Method("tab / tabs / menu")),
         p("xstyle", RustApi::Trait("Styled")),
     ],
     example: include_str!("../segmented/examples.rs"),
@@ -543,6 +729,16 @@ pub const TAB_DOC: ComponentDoc = ComponentDoc {
         p("selectedIcon", RustApi::Method("selected_icon")),
         p("endContent", RustApi::Method("end_content")),
         p("xstyle", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("../segmented/examples.rs"),
+};
+
+pub const TAB_MENU_DOC: ComponentDoc = ComponentDoc {
+    name: "TabMenu",
+    rust_type: "astryx::components::tabs::TabMenu",
+    props: &[
+        p("label", RustApi::Argument("label")),
+        p("options", RustApi::Argument("options")),
     ],
     example: include_str!("../segmented/examples.rs"),
 };

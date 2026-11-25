@@ -1,6 +1,6 @@
 //! Breadcrumbs and BreadcrumbItem. Upstream: `Breadcrumbs/`.
 //!
-//! An item's `menu` (a DropdownMenu trigger) lands with DropdownMenu (M5).
+//! An item's `menu` makes it a link-styled DropdownMenu trigger.
 
 use std::rc::Rc;
 
@@ -14,7 +14,8 @@ use gpui::{
 
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
 use crate::focus::focus_ring;
-use crate::icon::{IconDefaultSize, IconSize};
+use crate::icon::{Icon, IconDefaultSize, IconSize};
+use crate::overlay::{DropdownMenu, MenuEntry, MenuSize, MenuTrigger};
 
 /// Upstream Breadcrumbs `variant`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -35,6 +36,8 @@ pub struct BreadcrumbItem {
     on_click: Option<ClickFn>,
     current: Option<bool>,
     start_icon: Option<AnyElement>,
+    menu: Vec<MenuEntry>,
+    menu_size: Option<MenuSize>,
 }
 
 impl BreadcrumbItem {
@@ -46,6 +49,8 @@ impl BreadcrumbItem {
             on_click: None,
             current: None,
             start_icon: None,
+            menu: Vec::new(),
+            menu_size: None,
         }
     }
 
@@ -65,6 +70,21 @@ impl BreadcrumbItem {
     /// Upstream `startIcon`: before the label.
     pub fn start_icon(mut self, icon: impl IntoElement) -> Self {
         self.start_icon = Some(icon.into_any_element());
+        self
+    }
+
+    /// Upstream `menu`: the item becomes a link-styled menu trigger with a
+    /// chevron, opening these entries below it (the DropdownMenu item API).
+    /// It takes precedence over `href` and `onClick`.
+    pub fn menu(mut self, entries: impl IntoIterator<Item = MenuEntry>) -> Self {
+        self.menu = entries.into_iter().collect();
+        self
+    }
+
+    /// Upstream `menuSize`: the menu rows' density; small in a supporting
+    /// trail, else medium.
+    pub fn menu_size(mut self, size: MenuSize) -> Self {
+        self.menu_size = Some(size);
         self
     }
 }
@@ -188,7 +208,37 @@ impl RenderOnce for Breadcrumbs {
                     .child(item.label.clone());
                 let interactive = !is_current && (item.href.is_some() || item.on_click.is_some());
                 let item_id = ElementId::Name(format!("{id:?}-{i}").into());
-                let body = if is_current {
+                let body = if !item.menu.is_empty() {
+                    // The menu trigger: a link-styled button with a chevron.
+                    let size = item.menu_size.unwrap_or(if supporting {
+                        MenuSize::Sm
+                    } else {
+                        MenuSize::Md
+                    });
+                    let chevron = Icon::new("chevronDown").size(IconSize::Xsm);
+                    let content = content.child(chevron);
+                    let mut trigger =
+                        MenuTrigger::new(item_id.clone(), item.label.clone(), move |_| {
+                            content.into_any_element()
+                        })
+                        .current(is_current)
+                        .py(t.spacing.s1);
+                    trigger = if is_current {
+                        trigger
+                            .font_weight(t.font.weight.semibold)
+                            .text_color(current_color)
+                    } else {
+                        trigger
+                            .text_color(t.color.text_secondary)
+                            .underline_on_hover()
+                    };
+                    DropdownMenu::new(ElementId::Name(format!("{id:?}-{i}-menu").into()))
+                        .button_label(item.label.clone())
+                        .trigger(trigger)
+                        .size(size)
+                        .items(item.menu)
+                        .into_any_element()
+                } else if is_current {
                     content
                         .font_weight(t.font.weight.semibold)
                         .text_color(current_color)
@@ -295,14 +345,8 @@ pub const BREADCRUMB_ITEM_DOC: ComponentDoc = ComponentDoc {
         p("onClick", RustApi::Method("on_click")),
         p("isCurrent", RustApi::Method("current")),
         p("startIcon", RustApi::Method("start_icon")),
-        p(
-            "menu",
-            RustApi::Waived("not yet: the item menu lands with DropdownMenu (M5)"),
-        ),
-        p(
-            "menuSize",
-            RustApi::Waived("not yet: the item menu lands with DropdownMenu (M5)"),
-        ),
+        p("menu", RustApi::Method("menu")),
+        p("menuSize", RustApi::Method("menu_size")),
         p(
             "as",
             RustApi::Waived("the link handler (link_provider) routes every href"),

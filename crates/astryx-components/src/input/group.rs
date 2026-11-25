@@ -166,7 +166,7 @@ impl InputGroup {
         ?size: ElementSize,
         /// Upstream `status`: its message shows below the row.
         ?status: InputStatus,
-        /// Upstream `labelTooltip`. The InfoTip lands with Tooltip (M5).
+        /// Upstream `labelTooltip`: an InfoTip beside the label.
         ?label_tooltip: SharedString,
     }
 }

@@ -335,8 +335,8 @@ impl FileInput {
         !required,
         /// Upstream `isDisabled`.
         !disabled,
-        /// Upstream `disabledMessage`: why it is disabled. It describes the
-        /// field now; its tooltip lands with Tooltip (M5).
+        /// Upstream `disabledMessage`: why it is disabled, in a tooltip on
+        /// hover and focus; it also describes the field.
         ?disabled_message: SharedString,
         /// Upstream `isLoading`.
         !loading,
@@ -347,9 +347,9 @@ impl FileInput {
         /// Upstream `status`. A rejected pick shows its own error status.
         ?status: InputStatus,
         /// Upstream `statusVariant`: attached in input mode, detached in a
-        /// dropzone (`tooltip` lands with Tooltip, M5).
+        /// dropzone; `tooltip` puts the message in the status icon's tooltip.
         ?status_placement: StatusPlacement,
-        /// Upstream `labelTooltip`. The InfoTip lands with Tooltip (M5).
+        /// Upstream `labelTooltip`: an InfoTip beside the label.
         ?label_tooltip: SharedString,
         /// Upstream `width`.
         ?width: Length,

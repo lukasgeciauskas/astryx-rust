@@ -134,7 +134,7 @@ impl SegmentedControl {
         layout: SegmentLayout,
         /// Upstream `isDisabled`: every segment.
         !disabled,
-        /// Upstream `disabledMessage`. The tooltip lands with Tooltip (M5).
+        /// Upstream `disabledMessage`: the reason, in a tooltip on hover and focus.
         ?disabled_message: SharedString,
     }
 

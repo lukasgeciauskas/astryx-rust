@@ -29,3 +29,23 @@ pub fn focus_ring(t: &Tokens, radius: Pixels, rem: Pixels) -> Div {
         ring
     }
 }
+
+/// The ring drawn inside an element by its own width, for rows a menu or
+/// list paints edge to edge (upstream's negative outline offset).
+pub fn focus_ring_inset(t: &Tokens, radius: Pixels, rem: Pixels) -> Div {
+    let width = t.focus.outline_width.to_pixels(rem);
+    let ring = div()
+        .absolute()
+        .top_0()
+        .left_0()
+        .right_0()
+        .bottom_0()
+        .border(width)
+        .border_color(t.focus.outline_color)
+        .rounded(radius);
+    if t.focus.outline_style.0 == "dashed" {
+        ring.border_dashed()
+    } else {
+        ring
+    }
+}

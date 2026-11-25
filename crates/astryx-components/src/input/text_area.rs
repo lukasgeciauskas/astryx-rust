@@ -466,6 +466,16 @@ impl RenderOnce for TextArea {
                 window.focus(&focus, cx)
             });
         }
+        // The browser's text-field context menu.
+        control = super::field_menu::with_field_menu(
+            control,
+            &self.id,
+            &state,
+            &focus,
+            self.disabled,
+            window,
+            cx,
+        );
 
         let length = characters(&shown);
         let over = self.max_length.is_some_and(|limit| length > limit);

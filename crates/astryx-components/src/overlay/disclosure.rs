@@ -2,14 +2,18 @@
 //! trigger button to add `aria-expanded`, `aria-haspopup` and a click
 //! handler. Here the popup provides a [`Disclosure`] around its trigger, and
 //! Button (and everything built on it) reads it: it reports the popup's state
-//! and toggles it after its own click handler.
+//! and toggles it after its own click handler. A menu also hears the
+//! trigger's press-down, hover and keys (its press model and arrow keys).
 
 use std::rc::Rc;
 
 use astryx_primitives::use_context;
-use gpui::{App, HasPopup, Window};
+use gpui::{App, HasPopup, KeyDownEvent, Window};
 
 type ToggleFn = Rc<dyn Fn(&mut Window, &mut App)>;
+type HoverFn = Rc<dyn Fn(bool, &mut Window, &mut App)>;
+/// Returns whether it handled the key.
+type KeyFn = Rc<dyn Fn(&KeyDownEvent, &mut Window, &mut App) -> bool>;
 
 /// What a popup tells the button that opens it.
 #[derive(Clone)]
@@ -20,6 +24,30 @@ pub(crate) struct Disclosure {
     pub popup: HasPopup,
     /// Opens or closes it; `None` while the popup ignores its trigger.
     pub toggle: Option<ToggleFn>,
+    /// A left press-down on an enabled trigger.
+    pub on_press: Option<ToggleFn>,
+    /// The pointer entered (`true`) or left an enabled trigger.
+    pub on_hover: Option<HoverFn>,
+    /// A key down on an enabled, focused trigger.
+    pub on_key: Option<KeyFn>,
+    /// The trigger shows the pressed tint while the popup is open
+    /// (upstream DropdownMenu's `triggerOpen`).
+    pub open_tint: bool,
+}
+
+impl Disclosure {
+    /// A popup that only reports its state and toggles.
+    pub fn new(expanded: bool, popup: HasPopup, toggle: Option<ToggleFn>) -> Self {
+        Disclosure {
+            expanded,
+            popup,
+            toggle,
+            on_press: None,
+            on_hover: None,
+            on_key: None,
+            open_tint: false,
+        }
+    }
 }
 
 /// The popup a button opens, if it is one's trigger.

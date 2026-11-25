@@ -433,8 +433,8 @@ pub enum StatusPlacement {
     /// Its own box below the control.
     Detached,
     /// No message box: the control's status icon carries it, and the
-    /// message describes the field and announces itself. The icon's tooltip
-    /// lands with Tooltip (M5).
+    /// message describes the field and announces itself, and the icon's
+    /// tooltip shows it.
     Tooltip,
 }
 

@@ -9,7 +9,7 @@ use crate::icon::Icon;
 use crate::layout::{SpacingStep, Stack};
 use crate::segmented::{SegmentLayout, SegmentedControl, SegmentedControlItem};
 use crate::status::Badge;
-use crate::tabs::{Tab, TabList};
+use crate::tabs::{Tab, TabList, TabMenu, TabMenuOption};
 use crate::text::{Text, TextType};
 use crate::toolbar::Toolbar;
 use astryx_primitives::ElementSize;
@@ -55,7 +55,15 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                 .on_change(store(tab.clone()))
                 .tab(Tab::new("overview", "Overview"))
                 .tab(Tab::new("activity", "Activity").end_content(Badge::new("3")))
-                .tab(Tab::new("settings", "Settings").icon(Icon::new("wrench"))),
+                .tab(Tab::new("settings", "Settings").icon(Icon::new("wrench")))
+                .menu(TabMenu::new(
+                    "More",
+                    [
+                        TabMenuOption::new("members", "Members"),
+                        TabMenuOption::new("billing", "Billing"),
+                        TabMenuOption::new("audit", "Audit log").icon("clock"),
+                    ],
+                )),
         )
         .child(
             gpui::div().w(gpui::px(320.)).child(

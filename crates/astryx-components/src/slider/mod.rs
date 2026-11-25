@@ -3,7 +3,8 @@
 //! Thumbs travel inside a box inset by half a thumb, so positions are plain
 //! fractions. A press on the track moves the nearest thumb there and drags
 //! it; arrows, Page Up/Down and Home/End move the focused thumb. The
-//! `tooltip` value display lands with Tooltip (M5).
+//! `tooltip` value display shows the value over the thumb on hover, focus
+//! and drag.
 
 #[cfg(test)]
 mod tests;
@@ -61,7 +62,7 @@ impl SliderValue {
 /// Upstream `valueDisplay`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ValueDisplay {
-    /// A tooltip over the thumb (lands with Tooltip, M5; nothing shows yet).
+    /// A tooltip over the thumb, on hover, focus and drag.
     #[default]
     Tooltip,
     /// The value as text after the track.
@@ -243,7 +244,7 @@ impl Slider {
         value_display: ValueDisplay,
         /// Upstream `isDisabled`.
         !disabled,
-        /// Upstream `disabledMessage`. The tooltip lands with Tooltip (M5).
+        /// Upstream `disabledMessage`: the reason, in a tooltip on hover and focus.
         ?disabled_message: SharedString,
         /// Upstream `isOptional`.
         !optional,
@@ -255,7 +256,7 @@ impl Slider {
         ?description: SharedString,
         /// Upstream `status`.
         ?status: InputStatus,
-        /// Upstream `labelTooltip`. The InfoTip lands with Tooltip (M5).
+        /// Upstream `labelTooltip`: an InfoTip beside the label.
         ?label_tooltip: SharedString,
         /// Upstream `width`: the whole field.
         ?width: gpui::Length,

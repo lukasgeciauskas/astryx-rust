@@ -451,6 +451,16 @@ impl RenderOnce for Button {
         }
 
         let mut el = self.root(&theme, size, group, dir, rem);
+        // An open menu's trigger keeps the pressed tint.
+        if self.pressed != Some(true)
+            && crate::overlay::disclosure(cx).is_some_and(|d| d.open_tint && d.expanded)
+        {
+            let (fill, _) = self.variant.colors(theme.tokens());
+            el = el.bg(astryx_theme::color::composite(
+                fill.unwrap_or(Hsla::transparent_black()),
+                theme.tokens().color.overlay_pressed,
+            ));
+        }
         if let Some(place) = addon {
             el = crate::input::group::join_addon(el, place, t.radius.element.to_pixels(rem), dir);
         }
@@ -609,6 +619,24 @@ impl RenderOnce for Button {
             .aria_label(self.label)
             .aria_disabled(disabled)
             .aria_busy(busy);
+        // A menu's trigger: its press-down, hover and keys.
+        if let Some(d) = disclosure.as_ref().filter(|_| !disabled) {
+            if let Some(press) = d.on_press.clone() {
+                el = el.on_mouse_down(gpui::MouseButton::Left, move |_, window, cx| {
+                    press(window, cx)
+                });
+            }
+            if let Some(hover) = d.on_hover.clone() {
+                el = el.on_hover(move |hovered, window, cx| hover(*hovered, window, cx));
+            }
+            if let Some(key) = d.on_key.clone() {
+                el = el.on_key_down(move |event, window, cx| {
+                    if key(event, window, cx) {
+                        cx.stop_propagation();
+                    }
+                });
+            }
+        }
         if let Some(pressed) = self.pressed {
             el = el.aria_toggled(if pressed {
                 gpui::Toggled::True

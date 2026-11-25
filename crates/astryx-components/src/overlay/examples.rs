@@ -1,8 +1,8 @@
 //! Overlay examples: the gallery's Overlays page and the doc example of
-//! Tooltip and InfoTip.
+//! the overlays and menus.
 
 use astryx_primitives::{LayerAlign, Placement};
-use gpui::{AnyElement, App, IntoElement, ParentElement, Window};
+use gpui::{AnyElement, App, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
 
 use crate::button::{Button, ButtonVariant, IconButton};
 use crate::choice::Switch;
@@ -14,6 +14,10 @@ use crate::overlay::{
     AlertDialog, BottomSheet, Dialog, DialogHeader, DialogPurpose, Drawer, DrawerHeader, HoverCard,
     InfoTip, Overlay, OverlayPosition, OverlayShowOn, Popover, PopoverPresentation, PopoverRole,
     SheetHeight, SnapPoint, ToastOptions, ToastType, Tooltip, show_toast,
+};
+use crate::overlay::{
+    ContextMenu, DropdownMenu, MenuCheckboxItem, MenuEntry, MenuItem, MenuRadioGroup,
+    MenuRadioItem, MoreMenu,
 };
 use crate::text::{Text, TextType};
 
@@ -253,6 +257,8 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                         .child(Button::new("share-mail", "Email").variant(ButtonVariant::Ghost)),
                 ),
         )
+        .child(label("DropdownMenu, MoreMenu and ContextMenu"))
+        .child(menus(window, cx))
         .child(label("Toast"))
         .child(
             Stack::horizontal()
@@ -387,4 +393,176 @@ fn cover_art(color: gpui::Hsla) -> impl IntoElement {
         .h(gpui::px(120.))
         .rounded(gpui::px(8.))
         .bg(color)
+}
+
+/// A toast for a menu pick.
+fn picked(text: &'static str) -> impl Fn(&mut Window, &mut App) + 'static {
+    move |window, cx| {
+        show_toast(ToastOptions::new(text), window, cx);
+    }
+}
+
+fn menus(window: &mut Window, cx: &mut App) -> AnyElement {
+    let sort = window.use_keyed_state("menu-sort", cx, |_, _| SharedString::from("newest"));
+    let wrap = window.use_keyed_state("menu-wrap", cx, |_, _| true);
+    let (sort_value, wrap_value) = (sort.read(cx).clone(), *wrap.read(cx));
+    let border = astryx_theme::current(window, cx).tokens().color.border;
+
+    let view = DropdownMenu::new("menu-view")
+        .button_label("View")
+        .entry(
+            MenuCheckboxItem::new("wrap", "Word wrap", wrap_value).on_change(
+                move |on, window, cx| {
+                    wrap.update(cx, |w, _| *w = on);
+                    window.refresh();
+                },
+            ),
+        )
+        .entry(MenuEntry::Divider)
+        .entry(
+            MenuRadioGroup::new(sort_value)
+                .title("Sort by")
+                .on_change(move |value, window, cx| {
+                    sort.update(cx, |s, _| *s = value);
+                    window.refresh();
+                })
+                .item(MenuRadioItem::new("newest", "Newest").icon("clock"))
+                .item(MenuRadioItem::new("oldest", "Oldest"))
+                .item(MenuRadioItem::new("name", "Name")),
+        );
+
+    let actions = DropdownMenu::new("menu-actions")
+        .button_label("Actions")
+        .entry(
+            MenuItem::new("duplicate", "Duplicate")
+                .icon("copy")
+                .end_content(|_, _| crate::content::Kbd::new("mod+d").into_any_element())
+                .on_click(picked("Duplicated")),
+        )
+        .entry(
+            MenuItem::new("move", "Move to").submenu([
+                MenuItem::new("inbox", "Inbox")
+                    .on_click(picked("Moved to Inbox"))
+                    .into(),
+                MenuItem::new("archive", "Archive")
+                    .on_click(picked("Archived"))
+                    .into(),
+                MenuItem::new("later", "Later")
+                    .submenu([
+                        MenuItem::new("tomorrow", "Tomorrow")
+                            .on_click(picked("Snoozed until tomorrow"))
+                            .into(),
+                        MenuItem::new("next-week", "Next week")
+                            .on_click(picked("Snoozed until next week"))
+                            .into(),
+                    ])
+                    .into(),
+            ]),
+        )
+        .entry(
+            MenuItem::new("labels", "Labels")
+                .spinner(true)
+                .submenu([MenuItem::new("loading", "Loading…").disabled(true).into()]),
+        )
+        .entry(
+            MenuItem::new("share", "Share")
+                .description("Anyone with the link can view")
+                .disabled(true),
+        )
+        .entry(MenuEntry::Divider)
+        .entry(
+            MenuItem::new("delete", "Delete")
+                .destructive(true)
+                .on_click(picked("Deleted")),
+        );
+
+    let filters = DropdownMenu::new("menu-filters")
+        .button_label("Filters")
+        .header(Text::new("Show conversations").text_type(TextType::Supporting))
+        .footer(Button::new("menu-filters-reset", "Reset filters").variant(ButtonVariant::Ghost))
+        .items([
+            MenuEntry::section(
+                "Status",
+                [
+                    MenuItem::new("open", "Open").into(),
+                    MenuItem::new("closed", "Closed").into(),
+                ],
+            ),
+            MenuEntry::section(
+                "Owner",
+                [
+                    MenuItem::new("mine", "Assigned to me").into(),
+                    MenuItem::new("anyone", "Anyone").into(),
+                ],
+            ),
+        ]);
+
+    let more = MoreMenu::new(
+        "menu-more",
+        [
+            MenuItem::new("rename", "Rename")
+                .on_click(picked("Renamed"))
+                .into(),
+            MenuItem::new("pin", "Pin")
+                .on_click(picked("Pinned"))
+                .into(),
+            MenuEntry::Divider,
+            MenuItem::new("leave", "Leave")
+                .destructive(true)
+                .on_click(picked("Left the conversation"))
+                .into(),
+        ],
+    );
+
+    let area = ContextMenu::new("menu-context")
+        .items([
+            MenuItem::new("open", "Open")
+                .on_click(picked("Opened"))
+                .into(),
+            MenuItem::new("copy-link", "Copy link")
+                .icon("copy")
+                .on_click(picked("Link copied"))
+                .into(),
+            MenuEntry::Divider,
+            MenuItem::new("remove", "Remove")
+                .destructive(true)
+                .on_click(picked("Removed"))
+                .into(),
+        ])
+        .child(
+            div()
+                .w(px(320.))
+                .h(px(96.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .border_1()
+                .border_dashed()
+                .border_color(border)
+                .rounded(px(8.))
+                .child(
+                    Text::new("Right-click, or Shift+F10, here").text_type(TextType::Supporting),
+                ),
+        );
+
+    Stack::vertical()
+        .gap(SpacingStep::S3)
+        .child(
+            Stack::horizontal()
+                .gap(SpacingStep::S3)
+                .child(view)
+                .child(actions)
+                .child(filters)
+                .child(more),
+        )
+        .child(area)
+        .child(
+            TextInput::new(
+                "menu-spelling",
+                "Right-click a misspelled word",
+                "Teh quick brwon fox",
+            )
+            .width(px(320.)),
+        )
+        .into_any_element()
 }

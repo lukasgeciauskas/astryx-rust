@@ -11,6 +11,7 @@
 
 mod catalog;
 pub mod datetime;
+mod local;
 mod locale;
 mod logical;
 pub mod message;
@@ -193,7 +194,9 @@ impl I18n {
                 return Some(message.into());
             }
         }
-        catalog::english(key).map(SharedString::from)
+        catalog::english(key)
+            .or_else(|| local::english(key))
+            .map(SharedString::from)
     }
 
     /// A message with no arguments, upstream `t(key)`. A key no catalog has

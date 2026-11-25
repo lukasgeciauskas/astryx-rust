@@ -94,6 +94,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::segmented::SEGMENTED_CONTROL_ITEM_DOC,
     crate::tabs::TAB_LIST_DOC,
     crate::tabs::TAB_DOC,
+    crate::tabs::TAB_MENU_DOC,
     crate::toolbar::TOOLBAR_DOC,
     crate::containers::CLICKABLE_CARD_DOC,
     crate::containers::SELECTABLE_CARD_DOC,
@@ -129,6 +130,17 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::overlay::BOTTOM_SHEET_SWITCHER_DOC,
     crate::overlay::TOAST_DOC,
     crate::overlay::USE_TOAST_DOC,
+    crate::overlay::DROPDOWN_MENU_DOC,
+    crate::overlay::DROPDOWN_MENU_ITEM_DOC,
+    crate::overlay::DROPDOWN_MENU_CHECKBOX_ITEM_DOC,
+    crate::overlay::DROPDOWN_MENU_RADIO_GROUP_DOC,
+    crate::overlay::DROPDOWN_MENU_RADIO_ITEM_DOC,
+    crate::overlay::DROPDOWN_MENU_GROUP_DOC,
+    crate::overlay::DROPDOWN_MENU_DIVIDER_DOC,
+    crate::overlay::DROPDOWN_MENU_SUB_MENU_DOC,
+    crate::overlay::CONTEXT_MENU_DOC,
+    crate::overlay::CONTEXT_MENU_ITEM_DOC,
+    crate::overlay::MORE_MENU_DOC,
 ];
 
 /// The registered doc for an upstream component name.

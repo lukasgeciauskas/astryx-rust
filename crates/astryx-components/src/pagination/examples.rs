@@ -7,6 +7,7 @@ use gpui::{AnyElement, App, Entity, IntoElement, ParentElement, Styled, Window, 
 use crate::breadcrumbs::{BreadcrumbItem, Breadcrumbs, BreadcrumbsVariant};
 use crate::layout::Orientation;
 use crate::layout::{SpacingStep, Stack};
+use crate::overlay::MenuItem;
 use crate::pagination::{Pagination, PaginationVariant};
 use crate::stepper::{
     CollapsedVariant, HorizontalOptions, IndicatorPosition, Step, StepStatus, Stepper,
@@ -41,6 +42,16 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                 .variant(BreadcrumbsVariant::Supporting)
                 .item(BreadcrumbItem::new("Settings").on_click(|_, _, _| {}))
                 .item(BreadcrumbItem::new("Notifications")),
+        )
+        .child(
+            Breadcrumbs::new("trail-menu")
+                .item(BreadcrumbItem::new("Home").href("/"))
+                .item(BreadcrumbItem::new("Projects").menu([
+                    MenuItem::new("apollo", "Apollo").into(),
+                    MenuItem::new("gemini", "Gemini").into(),
+                    MenuItem::new("mercury", "Mercury").into(),
+                ]))
+                .item(BreadcrumbItem::new("Apollo")),
         )
         .child(label("Pagination: pages, input, count, compact, dots"))
         .child(

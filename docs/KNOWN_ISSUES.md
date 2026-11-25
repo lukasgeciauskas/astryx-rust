@@ -47,6 +47,14 @@
 - **A popup trigger has no `aria-controls`.** AccessKit links nodes by id, and GPUI does
   not expose the node id of another element, so a trigger reports `aria-expanded` and
   `aria-haspopup` but not which surface it controls.
+- **A text field's context menu takes focus from the field.** Browsers keep focus in a
+  field while their native menu is open. Here the menu is an Astryx menu, so the field
+  blurs as it opens (its `onBlur` runs) and focus comes back when it closes. Its strings
+  ("Cut", "Add to dictionary"...) are the port's own, not upstream's, and ship in
+  English: an app translates the `@astryx.textField.*` keys with its catalogs.
+- **The Menu key's name depends on the platform.** ContextMenu opens on Shift+F10 and on
+  a key GPUI names `menu`, `contextmenu` or `apps`; a platform that names the Menu key
+  otherwise opens it only with Shift+F10.
 
 ## Tooling
 

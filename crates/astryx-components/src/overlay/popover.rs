@@ -57,6 +57,21 @@ pub enum PopoverPresentation {
     Adaptive,
 }
 
+/// A compact touch screen: where the adaptive presentations use a sheet,
+/// and menus drill into submenus.
+pub(crate) fn compact_touch(window: &Window) -> bool {
+    window.viewport_size().width <= gpui::px(640.) && window.last_input_was_touch()
+}
+
+/// Whether `presentation` shows as a BottomSheet now.
+pub(crate) fn presents_as_sheet(presentation: PopoverPresentation, window: &Window) -> bool {
+    match presentation {
+        PopoverPresentation::Popover => false,
+        PopoverPresentation::BottomSheet => true,
+        PopoverPresentation::Adaptive => compact_touch(window),
+    }
+}
+
 /// A popover's state between frames.
 pub(crate) struct PopoverState {
     pub(crate) open: bool,
@@ -249,6 +264,8 @@ pub struct Popover {
     escape_dismiss: bool,
     presentation: PopoverPresentation,
     style: StyleRefinement,
+    /// The owner's handle on the popover's state (a menu drives it).
+    controller: Option<PopoverController>,
 }
 
 impl Popover {
@@ -276,6 +293,7 @@ impl Popover {
             escape_dismiss: true,
             presentation: PopoverPresentation::Popover,
             style: StyleRefinement::default(),
+            controller: None,
         }
     }
 
@@ -308,6 +326,13 @@ impl Popover {
         escape_dismiss: bool,
         /// Upstream `presentation`.
         presentation: PopoverPresentation,
+    }
+
+    /// Shares `controller`'s state, so the owner that made it drives this
+    /// popover (a component that renders a Popover reads a different scope).
+    pub(crate) fn controller(mut self, controller: PopoverController) -> Self {
+        self.controller = Some(controller);
+        self
     }
 
     /// Upstream `children`: the trigger, a Button or anything built on it.
@@ -353,11 +378,14 @@ impl Styled for Popover {
 }
 
 impl RenderOnce for Popover {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
         let t = theme.tokens();
         let rtl = use_direction(cx).is_rtl();
-        let state = popover_state(&self.id, window, cx);
+        let state = match self.controller.take() {
+            Some(controller) => controller.state,
+            None => popover_state(&self.id, window, cx),
+        };
         state.update(cx, |s, _| {
             s.controlled = self.open.is_some();
             s.auto_focus = self.auto_focus;
@@ -378,25 +406,19 @@ impl RenderOnce for Popover {
             }) as Rc<dyn Fn(&mut Window, &mut App)>
         });
         let trigger = provide(
-            Disclosure {
-                expanded: open,
-                popup: match self.role {
+            Disclosure::new(
+                open,
+                match self.role {
                     PopoverRole::Dialog => HasPopup::Dialog,
                     PopoverRole::None => HasPopup::Menu,
                 },
                 toggle,
-            },
+            ),
             self.trigger.unwrap_or_else(|| div().into_any_element()),
         );
         // The sheet presentations: the trigger stays where it is, and a
         // BottomSheet holds the content.
-        let sheet = match self.presentation {
-            PopoverPresentation::Popover => false,
-            PopoverPresentation::BottomSheet => true,
-            PopoverPresentation::Adaptive => {
-                window.viewport_size().width <= gpui::px(640.) && window.last_input_was_touch()
-            }
-        };
+        let sheet = presents_as_sheet(self.presentation, window);
         if sheet {
             let content = self.content;
             let sheet_state = state.clone();

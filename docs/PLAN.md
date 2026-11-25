@@ -220,9 +220,9 @@ The remaining primitives:
     Toolbar, Breadcrumbs, Pagination, Stepper/Step, TabList.
   - Pulled forward because M3 components need them: Field and FieldStatus (from M4), and
     Item's core (from M6; swipe actions wait for M11).
-  - Carried into later milestones, recorded in each doc: TabMenu, BreadcrumbItem menus
-    and Pagination's page-size selector (M5); the SegmentedControl lens and Item swipe
-    actions (M11). Tooltips, InfoTips, disabled messages and Stepper's on-track and compact
+  - Carried into later milestones, recorded in each doc: TabMenu and BreadcrumbItem
+    menus (finished in M5 with DropdownMenu), Pagination's page-size selector (M6, with
+    Selector); the SegmentedControl lens and Item swipe actions (M11). Tooltips, InfoTips, disabled messages and Stepper's on-track and compact
     modes were finished with M4.
   - A gallery test renders every page, so an example that panics fails `cargo test`.
 - **M4 Editing engine & fields (done):**
@@ -252,7 +252,7 @@ The remaining primitives:
   - Text `hasCapsize`: the box trimmed to cap height and baseline from font metrics.
   - Spell checking (`astryx_primitives::spell`): the Windows system checker, Hunspell
     dictionaries elsewhere; misspellings get a wavy underline once a field has had focus.
-    Suggestions and "Add to dictionary" arrive with ContextMenu (M5).
+    Suggestions and "Add to dictionary" came with ContextMenu (M5).
   - Touch keyboards (fork patch R11): `inputMode`, `enterKeyHint`, `autoCapitalize`,
     `hasAutoCorrect` and `hasSpellCheck` reach the web's IME mirror; NumberInput asks for
     the number pad.
@@ -265,9 +265,21 @@ The remaining primitives:
   (+Header, imperative; done: modal layers drawn above earlier ones, purpose-based
   dismissal, focus entry and return), AlertDialog (done), BottomSheet (+Switcher; done:
   snap points, drag and swipe-to-dismiss from the grab handle), Drawer (+Header; done),
-  Popover's sheet presentations (done), Toast (+viewport/queue; done), DropdownMenu
-  (submenus, menu press), ContextMenu (with spelling suggestions in text fields),
-  MoreMenu, Lightbox, CommandPalette.
+  Popover's sheet presentations (done), Toast (+viewport/queue; done), Lightbox,
+  CommandPalette.
+  - Menus (done): DropdownMenu with every part (items, checkbox and radio rows, sections,
+    dividers, submenus), MoreMenu, ContextMenu, TabList's TabMenu and BreadcrumbItem
+    menus, all on one menu list.
+    - Keys: arrows wrap, Home/End, PageUp/PageDown by the visible rows, typeahead;
+      disabled rows are reached and stay inert; Tab leaves the menu.
+    - Pointer: rows take focus under the pointer; submenus open on hover with the safe
+      triangle and the 150/200 ms delays.
+    - The press model: the trigger opens on press-down and the release picks the row
+      under it once settled; a right press does the same for a ContextMenu.
+    - Drill-in submenus behind a Back row; the sheet presentations as touch rows.
+    - Header and footer regions make the menu, or a submenu's flyout, a modal dialog.
+  - Text fields gain the browser's context menu, which GPUI lacks: spelling suggestions
+    for the word under the pointer, "Add to dictionary", Cut, Copy, Paste and Select all.
 - **M6 Collections:** combobox, virtualization, tree/grid focus, reorderable.
   - Components: List, Item, Selector, MultiSelector, Typeahead, Tokenizer, ComplexSelector,
     TreeList, OverflowList, MetadataList, PowerSearch.

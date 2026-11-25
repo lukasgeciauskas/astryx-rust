@@ -371,6 +371,16 @@ impl RenderOnce for TextInput {
                 window.focus(&focus, cx)
             });
         }
+        // The browser's text-field context menu.
+        control = super::field_menu::with_field_menu(
+            control,
+            &self.id,
+            &state,
+            &focus,
+            self.disabled,
+            window,
+            cx,
+        );
         if let Some(icon) = self.start_icon {
             control = control.child(
                 div()

@@ -1,6 +1,6 @@
 //! Pagination. Upstream: `Pagination/`.
 //!
-//! The page-size selector lands with Selector (M5).
+//! The page-size selector lands with Selector (M6).
 
 pub mod examples;
 
@@ -647,7 +647,7 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
 
-const SELECTOR: &str = "not yet: the page-size selector lands with Selector (M5)";
+const SELECTOR: &str = "not yet: the page-size selector lands with Selector (M6)";
 
 pub const PAGINATION_DOC: ComponentDoc = ComponentDoc {
     name: "Pagination",
