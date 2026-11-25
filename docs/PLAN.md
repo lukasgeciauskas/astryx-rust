@@ -261,8 +261,10 @@ The remaining primitives:
 - **M5 Layer runtime & overlays:** Popover (done: focus region through fork patch R12,
   focus entry and return, light and Escape dismissal, the disclosure contract with its
   trigger; its sheet presentations wait for BottomSheet), HoverCard (done: Tooltip's
-  engine with a card surface; Timestamp's copyable hover card), BottomSheet, Overlay,
-  Dialog(+Header, imperative), AlertDialog, Drawer, Toast(+viewport/queue), DropdownMenu
+  engine with a card surface; Timestamp's copyable hover card), Overlay (done), Dialog
+  (+Header, imperative; done: modal layers drawn above earlier ones, purpose-based
+  dismissal, focus entry and return), AlertDialog (done), BottomSheet, Drawer,
+  Toast(+viewport/queue), DropdownMenu
   (submenus, menu press), ContextMenu (with spelling suggestions in text fields),
   MoreMenu, Lightbox, CommandPalette.
 - **M6 Collections:** combobox, virtualization, tree/grid focus, reorderable.

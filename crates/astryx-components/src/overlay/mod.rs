@@ -1,22 +1,33 @@
 //! Overlays (M5): Tooltip and InfoTip, Popover, and the rest of the layer
 //! family as it lands.
 
+mod alert_dialog;
+mod dialog;
 mod disclosure;
 pub mod examples;
 mod hover_card;
 mod info_tip;
 mod motion;
+mod scrim;
 mod popover;
 mod tooltip;
 
+#[cfg(test)]
+mod dialog_tests;
 #[cfg(test)]
 mod popover_tests;
 #[cfg(test)]
 mod tests;
 
+pub use alert_dialog::{AlertDialog, AlertDialogController, AlertOptions};
+pub(crate) use dialog::focus_scope;
+pub use dialog::{
+    AutoFocus, Dialog, DialogController, DialogHeader, DialogPosition, DialogPurpose, DialogVariant,
+};
 pub(crate) use disclosure::disclosure;
 pub use hover_card::HoverCard;
 pub use info_tip::InfoTip;
+pub use scrim::{Overlay, OverlayAlign, OverlayPosition, OverlayScrim, OverlayShowOn};
 pub use popover::{Popover, PopoverController, PopoverRole};
 pub(crate) use tooltip::tooltip_description;
 pub use tooltip::{FocusTrigger, Tooltip, TooltipContent, TooltipController, TouchTrigger};
@@ -171,6 +182,104 @@ pub const HOVER_CARD_DOC: ComponentDoc = ComponentDoc {
         p("xstyle", RustApi::Trait("Styled")),
         p("className", RustApi::Trait("Styled")),
         p("style", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const DIALOG_DOC: ComponentDoc = ComponentDoc {
+    name: "Dialog",
+    rust_type: "astryx::components::overlay::Dialog",
+    props: &[
+        p("isOpen", RustApi::Argument("open")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p("children", RustApi::Trait("ParentElement")),
+        p("width", RustApi::Method("width")),
+        p("maxHeight", RustApi::Method("max_height")),
+        p("position", RustApi::Method("position")),
+        p("variant", RustApi::Method("variant")),
+        p("purpose", RustApi::Method("purpose")),
+        p("padding", RustApi::Method("padding")),
+        p("isInline", RustApi::Method("inline")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const DIALOG_HEADER_DOC: ComponentDoc = ComponentDoc {
+    name: "DialogHeader",
+    rust_type: "astryx::components::overlay::DialogHeader",
+    props: &[
+        p("title", RustApi::Argument("title")),
+        p("subtitle", RustApi::Method("subtitle")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p("startContent", RustApi::Method("start_content")),
+        p("endContent", RustApi::Method("end_content")),
+        p(
+            "endContentEdgeCompensation",
+            RustApi::Waived("the header compensates its end slot from its own layout"),
+        ),
+        p("hasDivider", RustApi::Method("divider")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const USE_IMPERATIVE_DIALOG_DOC: ComponentDoc = ComponentDoc {
+    name: "useImperativeDialog",
+    rust_type: "astryx::components::overlay::DialogController",
+    props: &[
+        p("show", RustApi::Method("show")),
+        p("hide", RustApi::Method("hide")),
+        p("isOpen", RustApi::Method("is_open")),
+        p("element", RustApi::Method("element")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const ALERT_DIALOG_DOC: ComponentDoc = ComponentDoc {
+    name: "AlertDialog",
+    rust_type: "astryx::components::overlay::AlertDialog",
+    props: &[
+        p("isOpen", RustApi::Argument("open")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p("title", RustApi::Argument("title")),
+        p("description", RustApi::Argument("description")),
+        p("actionLabel", RustApi::Argument("action_label")),
+        p("onAction", RustApi::Method("on_action")),
+        p("cancelLabel", RustApi::Method("cancel_label")),
+        p("actionVariant", RustApi::Method("action_variant")),
+        p("isActionLoading", RustApi::Method("action_loading")),
+        p("width", RustApi::Method("width")),
+        p("isInline", RustApi::Method("inline")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const USE_IMPERATIVE_ALERT_DIALOG_DOC: ComponentDoc = ComponentDoc {
+    name: "useImperativeAlertDialog",
+    rust_type: "astryx::components::overlay::AlertDialogController",
+    props: &[
+        p("show", RustApi::Method("show")),
+        p("hide", RustApi::Method("hide")),
+        p("isOpen", RustApi::Method("is_open")),
+        p("element", RustApi::Method("element")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const OVERLAY_DOC: ComponentDoc = ComponentDoc {
+    name: "Overlay",
+    rust_type: "astryx::components::overlay::Overlay",
+    props: &[
+        p("content", RustApi::Method("content")),
+        p("children", RustApi::Trait("ParentElement")),
+        p("showOn", RustApi::Method("show_on")),
+        p("isOpen", RustApi::Method("open")),
+        p("scrim", RustApi::Method("scrim")),
+        p("position", RustApi::Method("position")),
+        p("align", RustApi::Method("align")),
+        p("xstyle", RustApi::Trait("Styled")),
+        p("className", RustApi::Trait("Styled")),
+        p("style", RustApi::Trait("Styled")),
+        p("ref", RustApi::Waived("GPUI elements have no refs")),
     ],
     example: include_str!("examples.rs"),
 };

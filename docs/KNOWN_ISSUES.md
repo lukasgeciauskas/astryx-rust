@@ -37,6 +37,10 @@
   `astryx_primitives::spell::set_spell_checker(DictionaryChecker::new(aff, dic))`.
   `spellbook`, which reads the dictionaries, is MPL-2.0.
 
+- **Dialogs pad their own content until Layout lands (M9).** Upstream's Dialog holds a
+  Layout whose header, content and footer take the dialog's inset; here the dialog pads
+  its children by that inset (`spacing-4`) and DialogHeader reaches to the edges for its
+  divider. Long content scrolls the whole surface rather than a LayoutContent region.
 - **A popup trigger has no `aria-controls`.** AccessKit links nodes by id, and GPUI does
   not expose the node id of another element, so a trigger reports `aria-expanded` and
   `aria-haspopup` but not which surface it controls.

@@ -442,6 +442,13 @@ impl RenderOnce for Button {
         }
         let busy = (self.loading || pending) && !self.interruptible;
         let focus = control_focus(&self.id, window, cx);
+        // Asked for the initial focus of the dialog it is in (upstream
+        // `data-autofocus`).
+        if astryx_primitives::use_context::<crate::overlay::AutoFocus>(cx).is_some()
+            && let Some(scope) = crate::overlay::focus_scope(cx)
+        {
+            scope.request(focus.clone());
+        }
 
         let mut el = self.root(&theme, size, group, dir, rem);
         if let Some(place) = addon {

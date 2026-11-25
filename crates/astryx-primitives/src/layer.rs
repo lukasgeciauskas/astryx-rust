@@ -106,6 +106,9 @@ fn window_stack(window: &Window, cx: &mut App) -> Rc<RefCell<WindowStack>> {
     stack
 }
 
+/// The least depth of a modal layer, above any non-modal nesting.
+const MODAL_DEPTH: usize = 100;
+
 /// The nesting depth a layer gives its content.
 #[derive(Clone, Copy)]
 struct LayerDepth(usize);
@@ -136,6 +139,7 @@ pub fn layer(
         anchor: None,
         source: Location::caller(),
         depth: 0,
+        min_depth: 0,
     }
 }
 
@@ -148,6 +152,7 @@ pub struct Layer {
     anchor: Option<(Point<Pixels>, Anchor)>,
     source: &'static Location<'static>,
     depth: usize,
+    min_depth: usize,
 }
 
 impl Layer {
@@ -161,6 +166,13 @@ impl Layer {
     /// What Escape does while this layer is topmost.
     pub fn escape(mut self, behavior: EscapeBehavior) -> Self {
         self.escape = behavior;
+        self
+    }
+
+    /// A modal layer (a dialog): it draws above every layer that opened
+    /// before it, and layers opened inside it draw above it.
+    pub fn modal(mut self) -> Self {
+        self.min_depth = MODAL_DEPTH;
         self
     }
 
@@ -253,7 +265,9 @@ impl Element for Layer {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, AnyElement) {
-        self.depth = use_context::<LayerDepth>(cx).map_or(1, |d| d.0 + 1);
+        self.depth = use_context::<LayerDepth>(cx)
+            .map_or(1, |d| d.0 + 1)
+            .max(self.min_depth);
         let id = id.expect("layers have an element id");
         let entry = window.with_element_state::<Registration, _>(id, |registration, window| {
             let registration = registration.unwrap_or_else(|| {
