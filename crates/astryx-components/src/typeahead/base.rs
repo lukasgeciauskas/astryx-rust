@@ -125,6 +125,9 @@ pub(crate) struct Requests {
     /// What had focus when the dialog was asked to open.
     return_to: Option<FocusHandle>,
     pending_dialog_focus: bool,
+    /// A wrapper's controller asked to focus or blur the field.
+    pub(crate) focus: bool,
+    pub(crate) blur: bool,
 }
 
 impl TypeaheadController {
@@ -144,6 +147,18 @@ impl TypeaheadController {
             r.close = false;
             r.return_to = focused;
         });
+        window.refresh();
+    }
+
+    /// Focuses the field (a Tokenizer handle's `focus()`).
+    pub(crate) fn focus(&self, window: &mut Window, cx: &mut App) {
+        self.requests.update(cx, |r, _| r.focus = true);
+        window.refresh();
+    }
+
+    /// Moves focus out of the field (a Tokenizer handle's `blur()`).
+    pub(crate) fn blur(&self, window: &mut Window, cx: &mut App) {
+        self.requests.update(cx, |r, _| r.blur = true);
         window.refresh();
     }
 
@@ -222,6 +237,11 @@ pub struct BaseTypeahead<T: Searchable> {
     /// Runs after the built-in keys (a wrapper's caller `onKeyDown`).
     pub(crate) trailing_key: Option<TrailingFn>,
     chrome: Option<ChromeFn>,
+    /// Tokenizer FR14: a pick from the focus list keeps it open on the next
+    /// choice.
+    pub(crate) keep_open_on_pick: bool,
+    /// The label of the rows appended after the source's (a create row).
+    pub(crate) entry_label: Option<SharedString>,
     pub(crate) style: StyleRefinement,
 }
 
@@ -270,6 +290,8 @@ impl<T: Searchable> BaseTypeahead<T> {
             query_entries: None,
             trailing_key: None,
             chrome: None,
+            keep_open_on_pick: false,
+            entry_label: None,
             style: StyleRefinement::default(),
         }
     }
@@ -460,6 +482,7 @@ impl<T: Searchable> BaseTypeahead<T> {
             entries_on_focus: self.entries_on_focus,
             exclude: self.exclude.clone(),
             query_entries: self.query_entries.clone(),
+            entry_label: self.entry_label.clone(),
         });
 
         // FR3: a new source invalidates the old one's work.
@@ -535,6 +558,22 @@ impl<T: Searchable> BaseTypeahead<T> {
         if close_request {
             requests.update(cx, |r, _| r.close = false);
             search.hide(window, cx);
+        }
+        let (focus_request, blur_request) = {
+            let r = requests.read(cx);
+            (r.focus, r.blur)
+        };
+        if focus_request || blur_request {
+            requests.update(cx, |r, _| {
+                r.focus = false;
+                r.blur = false;
+            });
+            if focus_request {
+                let focus = input_focus.clone();
+                window.defer(cx, move |window, cx| window.focus(&focus, cx));
+            } else if input_focus.is_focused(window) {
+                window.blur(cx);
+            }
         }
         // A dialog shows only while opened by the controller.
         let dialog_open = dialog_menu && requests.read(cx).dialog && engine.read(cx).open;
@@ -830,18 +869,40 @@ impl<T: Searchable> BaseTypeahead<T> {
         let (search, editor) = (search.clone(), editor.clone());
         let report = self.on_change.clone();
         let inert = self.inert();
+        let keep_open = self.keep_open_on_pick;
         let focus = editor.read(cx).focus_handle(cx);
         let _ = window;
         Rc::new(move |item: T, window: &mut Window, cx: &mut App| {
             if inert {
                 return;
             }
-            editor.update(cx, |e, cx| e.set_text("", cx));
-            search.reset(window, cx);
-            window.focus(&focus, cx);
+            // Tokenizer FR14: picking from the focus list keeps it open with
+            // the next remaining choice active (the previous one when the
+            // pick was last).
+            let kept = keep_open && {
+                let e = search.engine.read(cx);
+                e.query.is_empty() && e.list_query.as_deref() == Some("") && e.results.len() > 1
+            };
+            if kept {
+                search.engine.update(cx, |e, _| {
+                    if let Some(at) = e.results.iter().position(|i| i.id() == item.id()) {
+                        e.results.remove(at);
+                        e.highlight = Some(at.min(e.results.len().saturating_sub(1)));
+                    }
+                });
+                window.focus(&focus, cx);
+                if let Some(f) = &report {
+                    f(Some(item), window, cx);
+                }
+                window.refresh();
+                return;
+            }
             if let Some(f) = &report {
                 f(Some(item), window, cx);
             }
+            editor.update(cx, |e, cx| e.set_text("", cx));
+            search.reset(window, cx);
+            window.focus(&focus, cx);
         })
     }
 }
@@ -857,6 +918,7 @@ impl<T: Searchable> Search<T> {
             entries_on_focus: self.entries_on_focus,
             exclude: self.exclude.clone(),
             query_entries: self.query_entries.clone(),
+            entry_label: self.entry_label.clone(),
         })
     }
 }
@@ -1008,6 +1070,8 @@ fn listbox<T: Searchable>(
     rows.update(cx, |r, _| r.rows.resize(results.len(), None));
     let scroll = rows.read(cx).scroll.clone();
     let label = i18n(cx).t("@astryx.typeahead.searchResults");
+    let source_end = results.len() - search.engine.read(cx).entry_count;
+    let entry_label = search.entry_label.clone();
     let mut list = div()
         .id(ElementId::Name(format!("{id}-typeahead-listbox").into()))
         .debug_selector({
@@ -1046,9 +1110,12 @@ fn listbox<T: Searchable>(
     let row = |index: usize, item: &T, window: &mut Window, cx: &mut App| -> AnyElement {
         let lit = highlight == Some(index);
         let selected = value_id == Some(&item.id());
-        let content = match render_item {
-            Some(f) => f(item, window, cx),
-            None => TypeaheadItem::new(item.label()).into_any_element(),
+        let content = match (render_item, &entry_label) {
+            (_, Some(label)) if index >= source_end => {
+                TypeaheadItem::new(label.clone()).into_any_element()
+            }
+            (Some(f), _) => f(item, window, cx),
+            (None, _) => TypeaheadItem::new(item.label()).into_any_element(),
         };
         let selector = format!("{id}-option-{}", item.id());
         let mut el = div()
@@ -1140,7 +1207,6 @@ fn listbox<T: Searchable>(
     };
     // Groups in order of first appearance, ungrouped results first; the
     // caller's appended rows last.
-    let source_end = results.len() - search.engine.read(cx).entry_count;
     let mut ungrouped: Vec<usize> = Vec::new();
     let mut groups: Vec<(SharedString, Vec<usize>)> = Vec::new();
     for (i, item) in results[..source_end].iter().enumerate() {

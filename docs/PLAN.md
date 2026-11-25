@@ -322,6 +322,12 @@ The remaining primitives:
     results and the announced empty message (FR4), wrapping keys (FR5), the listbox and
     dialog menus with `TypeaheadController` (FR13-FR16), the selected Token with edit
     mode and Backspace (Typeahead FR8, FR12), focusable-disabled fields (FR9).
+  - Tokenizer, inline presentation (done): tokens with remove and Backspace, chosen items
+    never offered (FR13), the focus list kept open across picks (FR14), the create row,
+    `max_entries` with the field kept mounted (FR1, FR15), Clear all, the folded
+    `UnfocusedInline` and `UnfocusedLayer` overflow (FR3), announcements, and
+    `TokenizerController` (focus, blur, open, close). Its bottom-sheet presentation
+    (FR16-FR27) is next.
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.

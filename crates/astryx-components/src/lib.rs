@@ -36,6 +36,7 @@ pub mod tabs;
 pub mod text;
 pub mod time;
 pub mod token;
+pub mod tokenizer;
 pub mod toolbar;
 pub mod typeahead;
 

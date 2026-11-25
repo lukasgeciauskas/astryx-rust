@@ -98,6 +98,8 @@ pub(crate) struct Search<T: Searchable> {
     /// Ids already chosen (a Tokenizer's tokens): never offered.
     pub exclude: Vec<SharedString>,
     pub query_entries: Option<EntriesFn<T>>,
+    /// The label of appended rows (a create row's "Create …").
+    pub entry_label: Option<SharedString>,
 }
 
 impl<T: Searchable> Search<T> {
@@ -510,6 +512,21 @@ impl<T: Searchable> Search<T> {
             entries_on_focus: self.entries_on_focus,
             exclude: self.exclude.clone(),
             query_entries: self.query_entries.clone(),
+            entry_label: self.entry_label.clone(),
         })
     }
+}
+
+/// The engine of the typeahead with element id `id`, in the render scope
+/// that draws it (a wrapper reads the same one).
+pub(crate) fn engine_of<T: Searchable>(
+    id: &gpui::ElementId,
+    window: &mut Window,
+    cx: &mut App,
+) -> Entity<Engine<T>> {
+    window.use_keyed_state(
+        gpui::ElementId::Name(format!("{id}-typeahead").into()),
+        cx,
+        |_, _| Engine::default(),
+    )
 }
