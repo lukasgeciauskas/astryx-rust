@@ -5,21 +5,19 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-25, during M6 (Selector, List and its relatives, Typeahead,
-Tokenizer, MultiSelector and ComplexSelector done)._
+_Last updated: 2026-11-25, at the end of M6 (Collections)._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4 and M5; M6 is in progress (Selector,
-  Pagination's page-size selector, List, MetadataList, OverflowList, Typeahead and
-  Tokenizer, MultiSelector and ComplexSelector are done; PowerSearch is next). Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5 and M6. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
 - **Parity:** 82 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
-- **Last commits on `main`:** the commit that added this file; `af61065` docs: M5 is done; `f8b5551` Lightbox,
-  use_lightbox, CommandPalette and search sources; `9af8f12` menus. CI is green
-  on all three (ubuntu, windows, wasm).
+- **Last commits on `main`:** M6's stages, ending with the keyboard hint and this
+  file's update; before it `7713d53` reordering's shift feedback, positions and
+  attach, `844a27e` List reordering, `276323d` long-list windowing. CI runs on
+  ubuntu, windows and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
   `01da1adfa69364e9df02b39d897e24d001cf6fde` (patches R1 and R5 to R13; see
@@ -30,10 +28,6 @@ Tokenizer, MultiSelector and ComplexSelector done)._
 
 ### Not yet ported (28)
 
-- **M6 Collections (in progress):** `useKeyboardHint` (not ported; TabList, Toolbar,
-  SegmentedControl and AvatarGroup lack it, and reorder mode's hint shares its anchored
-  layer). Item's swipe actions wait for M11; PowerSearch's date and time values wait
-  for M8.
 - **M7:** Table. **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
   TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
@@ -54,6 +48,8 @@ Tokenizer, MultiSelector and ComplexSelector done)._
 | Dialog content inset done by the dialog itself | Layout (M9) |
 | FormLayout's `defaultEntryErrorBehavior` readers | Date inputs (M8) |
 | Backdrop blur (Lightbox, scrims) | Fork patch R2 |
+| PowerSearch's date and time values (`time`, `date_absolute`, `date_relative`, `date_range`, `timezoneID`, FR25, FR26) | Calendar, date inputs and calendar systems (M8) |
+| TreeList's `animatedLayout` and expand glide (FR8, FR9) | Motion layer (M11) |
 
 ## The owner's standing instructions
 
@@ -129,45 +125,48 @@ time:
   Read announcements with `astryx_primitives::announce::announcement(..)`.
   Background `spawn` needs `Send`; items holding an `Rc` use `cx.spawn`.
 
-## Next: M6 Collections
+## Lessons from M6
 
-Suggested order, each a commit:
+- **Element paths hold state.** `use_keyed_state` keys by the element id path, so
+  wrapping a subtree in an element with an id (an `AnchoredLayer`) only some frames
+  gives its controls new focus handles and drops focus. Wrap always, and add the
+  layer's surface only when it shows (`keyboard_hint::KeyboardHint::wrap`). Keep
+  state that must outlive a move between parents (a dragged row's handle) in a
+  session keyed by data, not by path.
+- **Geometry comes from probes.** GPUI tells no element's bounds by focus or id:
+  read them in prepaint with a `canvas` (or `on_children_prepainted` on a `Div`)
+  and use them next frame. `window.content_mask()` in prepaint is the clip of every
+  scroller above, which is how `WindowedList` windows in any scroller.
+- **Focus after a frame's own moves:** a deferral that defers again
+  (`request_focus`) runs after a closing layer's focus return; `on_next_frame`
+  never runs under the test platform.
+- **GPUI clicks on Enter's release:** tests send the key-up themselves
+  (`simulate_event(KeyUpEvent { .. })`) after `simulate_keystrokes`.
+- **The live region coalesces:** an announcement already waiting is not repeated;
+  advance the clock past its clear delay before asserting the same text again.
+- **Temporary injections for screenshots:** a drag or reorder mode can be shown by
+  starting it from the example after a few frames (and reverting the code); a real
+  app's window receives the OS's pointer events, so hold the injected state against
+  them.
 
-1. ~~**Selector**, then Pagination's page-size selector~~ (done: `selector/`,
-   fork patch R13; Selector filters its own options, as upstream does).
-2. ~~**List** (and Item's remaining props), then **MetadataList**,
-   **OverflowList**~~ (done; List's `reorderable` comes with step 4).
-3. ~~**Typeahead** and **Tokenizer** (share `search::`), **MultiSelector**,
-   **ComplexSelector**~~ (done: `typeahead/`, `tokenizer/`, `multi_selector/`,
-   `complex_selector/`), then **PowerSearch**, in stages, each a commit:
-   - A: the model (`power_search/model.rs`: config, operators, filter values,
-     `create_power_search_config` with `apply_filters`), operator labels, value and
-     token formatting, and the main search source (field, field-and-operator and
-     field-prefixed value rows; the content-search row; FR27-FR29's value-only rows,
-     source calls held 150 ms, "More" rows). Upstream's source lacks FR27-FR30
-     (marked "implementation gap" in its spec); build them from the spec.
-   - Stage A is done, and so is TreeList (`tree_list/`), which stage B's nested
-     filter editor renders.
-   - B (done): the popover presentation: the Tokenizer-based field, filter tokens (FR24),
-     the editor popover with its 400-720 px width and edge rules (FR1-FR9), the
-     filter and value editors for every non-date value type, Clear all (FR22,
-     FR23), the result count (FR19), `components` overrides.
-   - C (done): the sheet flow (FR10-FR21, FR30, DEC-7, AR5, AR6), in parts:
-     C1 adaptive resolution (FR10) and the trigger field with display-only tokens and
-     the end lane (FR11); C2 the Filters sheet over a draft (FR12, FR15b, FR15c: rows,
-     remove actions, empty state, Clear all and discard confirmations, Done replaying
-     the draft's edits onto the latest filters); C3 the Add filter sheet (FR13, FR18,
-     FR30: grouped fields, field search from eight fields, the content search's inline
-     suggestions and value-only rows); C4 the value step (FR14, FR17, FR20, FR21:
-     Operator radio group, RadioList/CheckboxList choices, staged numbers, list values
-     through the Tokenizer's sheet, the nested editor, the unavailable state); C5 the
-     stack and focus rules (FR15a, FR16), announcements (AR6), FR19's no-mount rule.
-     Upstream: `PowerSearchBottomSheet.tsx` and `powerSearchSheetUtils.ts`.
-   - The date and time value types (`time`, `date_absolute`, `date_relative`,
-     `date_range`, `timezoneID`, FR25, FR26) need M8's Calendar, date inputs and
-     calendar systems: record them as M8 work in PLAN.md and the doc's Pending notes.
-4. ~~**TreeList** (tree focus)~~ (done), virtualization for long lists, reordering.
+## Next: M7 Table
 
-Before starting, read PLAN.md's M6 entry and the upstream `Selector/`,
-`Typeahead/` and `List/` folders; `Selector/hooks.ts` holds the combobox
-behavior that CommandPalette already follows.
+PLAN.md's M7 entry: BaseTable and Table parts, then the 14 plugins as a trait-based
+pipeline (columnResize, columnSettings, filtering, groupedRows, infiniteScroll,
+pagination, rowExpansion, rowIndex, rowStatus, selection, sortable, stickyColumns,
+tree, virtualization). Suggested order, each a commit:
+
+1. The table model and BaseTable's layout (columns, cells, header, the sticky
+   header), with Table's props and its doc.
+2. Row virtualization and column virtualization on `astryx_primitives::list_window`
+   (`useTableRowsVirtualization`'s `initialViewportHeight`, DEC-6; the column window's
+   insets from pinned columns): the module is built and tested for both axes.
+3. The plugins, in the spec's order, grouping those that share state (selection and
+   rowStatus; tree, groupedRows and rowExpansion; columnResize, columnSettings and
+   stickyColumns; sortable, filtering and pagination; infiniteScroll; rowIndex).
+4. Table's `reorderable` (columnSettings' column order) on `reorderable::attach` or a
+   Table adapter of the session, as upstream's Table adopts `createReorderable`.
+
+Before starting, read `../Astryx/packages/core/src/Table/` (its `tableRuntime.ts`,
+`BaseTable.tsx` and `plugins/`), the Table specs under
+`docs/specs/components/Table/`, and `architecture/list-windowing.md`.

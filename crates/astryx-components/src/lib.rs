@@ -16,6 +16,7 @@ pub mod icon;
 pub mod indicator;
 pub mod input;
 pub mod item;
+pub mod keyboard_hint;
 pub mod layout;
 pub mod link;
 pub mod list;

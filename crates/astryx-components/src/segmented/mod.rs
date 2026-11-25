@@ -196,6 +196,13 @@ impl RenderOnce for SegmentedControl {
             }
         });
         let tab_stop = list.tab_stop(selected, window);
+        let hint = crate::keyboard_hint::use_keyboard_hint(
+            &self.id,
+            crate::keyboard_hint::KeyboardHintOptions::default().enabled(!self.disabled),
+            list.focused(window).is_some(),
+            window,
+            cx,
+        );
 
         let pad = t.spacing.s0_5.to_pixels(rem);
         let radius = t.radius.element.to_pixels(rem);
@@ -344,6 +351,7 @@ impl RenderOnce for SegmentedControl {
             .role(Role::RadioGroup)
             .aria_label(self.label)
             .children(segments);
+        let el = hint.wrap(el, window, cx);
         crate::overlay::disabled_reason(
             &self.id,
             self.disabled,

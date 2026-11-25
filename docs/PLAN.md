@@ -289,7 +289,7 @@ The remaining primitives:
     - Header and footer regions make the menu, or a submenu's flyout, a modal dialog.
   - Text fields gain the browser's context menu, which GPUI lacks: spelling suggestions
     for the word under the pointer, "Add to dictionary", Cut, Copy, Paste and Select all.
-- **M6 Collections (in progress):** combobox, virtualization, tree/grid focus, reorderable.
+- **M6 Collections (done):** combobox, virtualization, tree/grid focus, reorderable.
   - Components: List, Item, Selector, MultiSelector, Typeahead, Tokenizer, ComplexSelector,
     TreeList, OverflowList, MetadataList, PowerSearch.
   - Selector and SelectorOption (done): the input, secondary and ghost triggers; options,
@@ -405,6 +405,14 @@ The remaining primitives:
     Right and a wrapping grid by all four arrows with its row and column announced, and a
     move the app does not apply is refused). A tree's `{parent, index}` moves wait for a
     tree collection that adopts the object; none does upstream, TreeList included.
+  - `useKeyboardHint` (`keyboard_hint::use_keyboard_hint`), which no earlier milestone had
+    ported: the arrow-key hint on keyboard entry into TabList, Toolbar and SegmentedControl,
+    gone at the first arrow, Escape or focus leaving, not shown again, in the anchored hint
+    layer reorder mode shares. GPUI tells no element's bounds by its focus, so it anchors
+    to the focused control's focus ring, which records where it draws. Carried from People:
+    AvatarGroup's one tab stop across its interactive members with wrapping arrows, Home
+    and End (FR4) and its spoken hint (FR5), interactive Avatars taking focus, and
+    AvatarGroupOverflow's `onClick` and `children`.
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.

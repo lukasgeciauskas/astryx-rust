@@ -158,6 +158,20 @@ impl RovingScope {
         }
     }
 
+    /// Whether any control joined it last frame.
+    pub fn has_controls(&self) -> bool {
+        !self.state.borrow().controls.is_empty()
+    }
+
+    /// Whether one of its controls holds focus (as of the last frame's).
+    pub fn contains_focus(&self, window: &Window) -> bool {
+        self.state
+            .borrow()
+            .controls
+            .iter()
+            .any(|h| h.is_focused(window))
+    }
+
     /// The container's key-down listener: arrows (by the scope's keys),
     /// Home and End move focus among the controls.
     pub fn key_down_listener(

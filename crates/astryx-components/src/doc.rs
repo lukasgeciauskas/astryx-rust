@@ -66,6 +66,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::content::CITATION_DOC,
     crate::people::AVATAR_DOC,
     crate::people::AVATAR_GROUP_DOC,
+    crate::people::AVATAR_GROUP_OVERFLOW_DOC,
     crate::containers::CARD_DOC,
     crate::containers::SECTION_DOC,
     crate::containers::EMPTY_STATE_DOC,
@@ -166,6 +167,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::tree_list::TREE_LIST_DOC,
     crate::power_search::POWER_SEARCH_DOC,
     crate::reorderable::CREATE_REORDERABLE_DOC,
+    crate::keyboard_hint::USE_KEYBOARD_HINT_DOC,
 ];
 
 /// The registered doc for an upstream component name.

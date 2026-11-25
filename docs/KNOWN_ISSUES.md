@@ -25,6 +25,11 @@
   drag, which upstream's mouse drag has no key for. Under shift feedback the passed items
   jump to their slots; their slide waits for the motion layer (M11).
 
+- **The keyboard hint anchors to a focus ring.** GPUI tells no element's bounds by its
+  focus, so the arrow-key hint (TabList, Toolbar, SegmentedControl) sits below the
+  innermost focus ring drawn inside its composite, one frame after focus enters. A
+  control that draws no Astryx focus ring puts the hint below the composite's start.
+
 - **A windowed list needs its scroller to hold its anchor.** `WindowedList` windows from
   the clips above it wherever it sits. To keep its first visible row (or its end, or a
   given item) in place as rows change, it must move the scroller, so it needs a

@@ -114,6 +114,17 @@ impl RenderOnce for Toolbar {
         }
         .rtl(dir.is_rtl());
         let scope = RovingScope::begin(&self.id, keys, window, cx);
+        let hint = crate::keyboard_hint::use_keyboard_hint(
+            &self.id,
+            crate::keyboard_hint::KeyboardHintOptions::new(if vertical {
+                crate::keyboard_hint::KeyboardHintOrientation::Vertical
+            } else {
+                crate::keyboard_hint::KeyboardHintOrientation::Horizontal
+            }),
+            scope.contains_focus(window),
+            window,
+            cx,
+        );
         let gap = self.gap.token(t);
         let lane = |content: Option<AnyElement>| {
             div()
@@ -159,6 +170,7 @@ impl RenderOnce for Toolbar {
             .on_key_down(scope.key_down_listener())
             .role(Role::Toolbar)
             .aria_label(self.label);
+        let bar = hint.wrap(bar, window, cx);
 
         let mut section = Section::new()
             .variant(self.variant)

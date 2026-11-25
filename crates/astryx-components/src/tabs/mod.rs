@@ -327,6 +327,14 @@ impl RenderOnce for TabList {
             .rtl(dir.is_rtl())
             .on_move(move |index, _, _| follow.scroll_to_item(index));
         let tab_stop = list.tab_stop(selected, window);
+        // Core's keyboard hint, on keyboard entry (upstream useKeyboardHint()).
+        let hint = crate::keyboard_hint::use_keyboard_hint(
+            &self.id,
+            crate::keyboard_hint::KeyboardHintOptions::default(),
+            list.focused(window).is_some(),
+            window,
+            cx,
+        );
 
         let indicator_bottom = if self.divider {
             -(t.spacing.s1.to_pixels(rem) + t.border.width.to_pixels(rem))
@@ -678,7 +686,7 @@ impl RenderOnce for TabList {
                 Role::Navigation
             })
             .aria_label(name)
-            .child(strip)
+            .child(hint.wrap(strip, window, cx))
             .when(at_start, |el| el.child(arrow(-1., "chevronLeft")))
             .when(at_end, |el| el.child(arrow(1., "chevronRight")))
     }

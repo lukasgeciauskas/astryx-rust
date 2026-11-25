@@ -6,7 +6,9 @@ pub mod examples;
 use std::f32::consts::SQRT_2;
 
 use astryx_i18n::{LogicalStyled, current as i18n, use_direction};
-use astryx_primitives::{provide, use_context, use_link_handler};
+use astryx_primitives::{
+    ListKeys, RovingScope, control_focus, is_focus_visible, provide, use_context, use_link_handler,
+};
 use astryx_theme::{ThemeStyled, Tokens, current};
 use gpui::{
     AnyElement, App, ClickEvent, ElementId, Hsla, ImageSource, IntoElement, ObjectFit,
@@ -312,6 +314,17 @@ impl RenderOnce for Avatar {
         let tooltip_id = self.id.clone();
         let tooltip = self.tooltip.clone();
         let acts = self.href.is_some() || self.on_click.is_some();
+        // A link or button avatar takes focus (and, in a group, joins its
+        // one tab stop: AvatarGroup FR4); Enter and Space activate it.
+        let el = if acts {
+            let focus = control_focus(&self.id, window, cx);
+            let rem = window.rem_size();
+            let ring = is_focus_visible(&focus, window)
+                .then(|| crate::focus::focus_ring(t, radius.to_pixels(rem), rem));
+            el.track_focus(&focus).children(ring)
+        } else {
+            el
+        };
         let el = if let Some(href) = self.href {
             let handler = use_link_handler(cx);
             let target = self.target;
@@ -506,11 +519,34 @@ impl RenderOnce for AvatarGroup {
             size: self.size,
             shape: self.shape,
         };
+        // FR4: link and button avatars and a clickable overflow form one
+        // horizontal roving set with a single tab stop: arrows follow the
+        // rendered direction and wrap, Home and End jump to the ends.
+        let scope = RovingScope::begin(
+            &self.id,
+            ListKeys::horizontal()
+                .wrap(true)
+                .home_end(true)
+                .rtl(dir.is_rtl()),
+            window,
+            cx,
+        );
+        let interactive = scope.has_controls();
         let mut el = div().flex_row_logical(dir).inline_flex().items_center();
         theme.refine(el.style(), "avatar-group", &[], None);
         el.style().refine(&self.style);
         let label = i18n(cx).t("@astryx.avatarGroup.label");
-        el.id(self.id).role(Role::Group).aria_label(label).children(
+        let mut el = el
+            .id(self.id)
+            .role(Role::Group)
+            .aria_label(label)
+            .on_key_down(scope.key_down_listener());
+        // FR5: while a member is interactive, the group describes its keys.
+        if interactive {
+            el = el.aria_description(i18n(cx).t("@astryx.avatarGroup.keyboardHint"));
+        }
+        let scope_for_children = scope.clone();
+        el.children(
             self.children
                 .into_iter()
                 .enumerate()
@@ -521,7 +557,7 @@ impl RenderOnce for AvatarGroup {
                     } else {
                         slot.margin_start(dir, -overlap)
                     };
-                    slot.child(provide(context, child))
+                    slot.child(provide(scope_for_children.clone(), provide(context, child)))
                 }),
         )
     }
@@ -531,12 +567,45 @@ impl RenderOnce for AvatarGroup {
 #[derive(IntoElement)]
 pub struct AvatarGroupOverflow {
     count: usize,
+    children: SmallVec<[AnyElement; 1]>,
+    on_click: Option<OverflowClick>,
+    style: StyleRefinement,
 }
+
+type OverflowClick = Box<dyn Fn(&ClickEvent, &mut Window, &mut App) + 'static>;
 
 impl AvatarGroupOverflow {
     /// Upstream `count`: how many avatars are not shown.
     pub fn new(count: usize) -> Self {
-        AvatarGroupOverflow { count }
+        AvatarGroupOverflow {
+            count,
+            children: SmallVec::new(),
+            on_click: None,
+            style: StyleRefinement::default(),
+        }
+    }
+
+    /// Upstream `onClick`: the indicator becomes a button, in its group's
+    /// roving set.
+    pub fn on_click(
+        mut self,
+        handler: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_click = Some(Box::new(handler));
+        self
+    }
+}
+
+impl ParentElement for AvatarGroupOverflow {
+    /// Upstream `children`: count text in place of "+N".
+    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
+        self.children.extend(elements);
+    }
+}
+
+impl Styled for AvatarGroupOverflow {
+    fn style(&mut self) -> &mut StyleRefinement {
+        &mut self.style
     }
 }
 
@@ -547,7 +616,14 @@ impl RenderOnce for AvatarGroupOverflow {
         let group = use_context::<GroupContext>(cx);
         let size: Pixels = px(group.map_or(AvatarSize::Md, |g| g.size).pixels());
         let shape = group.map_or(AvatarShape::Circle, |g| g.shape);
-        div()
+        let rem = window.rem_size();
+        let radius = shape.radius(t);
+        let label = i18n(cx).format(
+            "@astryx.avatarGroup.overflow",
+            &[("count", astryx_i18n::Arg::Num(self.count as f64))],
+        );
+        let mut el = div()
+            .relative()
             .flex()
             .flex_none()
             .items_center()
@@ -555,14 +631,36 @@ impl RenderOnce for AvatarGroupOverflow {
             .h(size)
             .min_w(size)
             .px(t.spacing.s2)
-            .rounded(shape.radius(t))
+            .rounded(radius)
             .border_2()
             .border_color(t.color.background_surface)
             .bg(t.color.neutral)
             .text_color(t.color.text_secondary)
             .text_style(&t.text.supporting)
-            .font_weight(t.font.weight.medium)
-            .child(format!("+{}", self.count))
+            .font_weight(t.font.weight.medium);
+        el.style().refine(&self.style);
+        let el = if self.children.is_empty() {
+            el.child(format!("+{}", self.count))
+        } else {
+            el.children(self.children)
+        };
+        match self.on_click {
+            None => el.into_any_element(),
+            Some(on_click) => {
+                let id = ElementId::Name("avatar-group-overflow".into());
+                let focus = control_focus(&id, window, cx);
+                let ring = is_focus_visible(&focus, window)
+                    .then(|| crate::focus::focus_ring(t, radius.to_pixels(rem), rem));
+                el.id(id)
+                    .track_focus(&focus)
+                    .role(Role::Button)
+                    .aria_label(label)
+                    .cursor_pointer()
+                    .on_click(on_click)
+                    .children(ring)
+                    .into_any_element()
+            }
+        }
     }
 }
 
@@ -609,6 +707,125 @@ pub const AVATAR_GROUP_DOC: ComponentDoc = ComponentDoc {
     ],
     example: include_str!("examples.rs"),
 };
+
+pub const AVATAR_GROUP_OVERFLOW_DOC: ComponentDoc = ComponentDoc {
+    name: "AvatarGroupOverflow",
+    rust_type: "astryx::components::people::AvatarGroupOverflow",
+    props: &[
+        p("count", RustApi::Argument("count")),
+        p("children", RustApi::Trait("ParentElement")),
+        p("onClick", RustApi::Method("on_click")),
+        p("ref", RustApi::Waived("GPUI elements have no refs")),
+        p("xstyle", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+#[cfg(test)]
+mod group_tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use gpui::{Context, Render, TestAppContext, VisualTestContext};
+
+    use super::*;
+    use crate::button::Button;
+
+    type Log = Rc<RefCell<Vec<&'static str>>>;
+
+    struct Host {
+        log: Log,
+    }
+
+    impl Render for Host {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let press = |name: &'static str, log: &Log| {
+                let log = log.clone();
+                move |_: &ClickEvent, _: &mut Window, _: &mut App| log.borrow_mut().push(name)
+            };
+            div()
+                .p(px(20.))
+                .flex()
+                .gap(px(20.))
+                .child(Button::new("before", "Before"))
+                .child(
+                    AvatarGroup::new("team")
+                        .child(
+                            Avatar::new("ada")
+                                .name("Ada Lovelace")
+                                .on_click(press("ada", &self.log)),
+                        )
+                        .child(
+                            Avatar::new("grace")
+                                .name("Grace Hopper")
+                                .on_click(press("grace", &self.log)),
+                        )
+                        .child(Avatar::new("plain").name("Alan Turing"))
+                        .child(AvatarGroupOverflow::new(4).on_click(press("more", &self.log))),
+                )
+                .child(Button::new("after", "After"))
+        }
+    }
+
+    fn host(cx: &mut TestAppContext) -> (&mut VisualTestContext, Log) {
+        cx.update(|cx| {
+            astryx_theme::init(cx);
+            astryx_primitives::focus::init(cx);
+        });
+        let log: Log = Rc::default();
+        let l = log.clone();
+        let (_, cx) = cx.add_window_view(move |_, _| Host { log: l });
+        cx.update(|window, _| window.activate_window());
+        for _ in 0..3 {
+            cx.update(|window, _| window.refresh());
+            cx.run_until_parked();
+        }
+        (cx, log)
+    }
+
+    /// Each key down and up, as a person presses it (GPUI activates on
+    /// Enter's release).
+    fn press(cx: &mut VisualTestContext, keys: &'static str) {
+        for key in keys.split(' ') {
+            let keystroke = gpui::Keystroke::parse(key).unwrap();
+            cx.simulate_keystrokes(key);
+            cx.simulate_event(gpui::KeyUpEvent { keystroke });
+            for _ in 0..2 {
+                cx.update(|window, _| window.refresh());
+                cx.run_until_parked();
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn fr4_interactive_members_share_one_tab_stop_and_the_arrows(cx: &mut TestAppContext) {
+        let (cx, log) = host(cx);
+        // Before, then the group's one stop (Ada), then After.
+        press(cx, "tab tab enter");
+        assert_eq!(*log.borrow(), ["ada"]);
+        press(cx, "right enter");
+        assert_eq!(log.borrow().last(), Some(&"grace"));
+        // The static avatar is skipped: the overflow button is next.
+        press(cx, "right enter");
+        assert_eq!(log.borrow().last(), Some(&"more"));
+        // The arrows wrap; Home and End reach the ends.
+        press(cx, "right enter");
+        assert_eq!(log.borrow().last(), Some(&"ada"));
+        press(cx, "end enter");
+        assert_eq!(log.borrow().last(), Some(&"more"));
+        press(cx, "home enter");
+        assert_eq!(log.borrow().last(), Some(&"ada"));
+        // One tab stop: Tab leaves the group.
+        press(cx, "tab");
+        let before = log.borrow().len();
+        press(cx, "enter");
+        assert_eq!(
+            log.borrow().len(),
+            before,
+            "focus is on After, outside the group"
+        );
+    }
+}
 
 #[cfg(test)]
 mod tests {
