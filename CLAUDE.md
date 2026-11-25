@@ -1,15 +1,21 @@
 # Astryx for GPUI — agent guide
 
 A 1:1 Rust port of Meta's Astryx design system (`../Astryx`, React) onto Zed's
-GPUI, pinned to Zed git rev `2b248e6`. The roadmap is `docs/PLAN.md` (milestones
-M0–M15); known problems are in `docs/KNOWN_ISSUES.md`.
+GPUI, through the owner's fork (`docs/gpui-fork.md`) pinned to one revision. The
+roadmap is `docs/PLAN.md` (milestones M0–M15); known problems are in
+`docs/KNOWN_ISSUES.md`.
+
+**Starting a session:** read `docs/HANDOFF.md` first. It records where the work
+stands, the owner's standing instructions (a 1:1 replica; build what GPUI lacks;
+finish whole milestones), the per-stage workflow and what comes next.
+`docs/MAINTENANCE.md` is the monthly Zed and upstream update.
 
 ## Before writing code, look things up
 
 Don't guess. GPUI changes often, and upstream Astryx is the specification.
 
 - `cargo run -q -p astryx-cli -- docs`: guides.
-  - `gpui`: a cheat sheet verified at the pinned rev.
+  - `gpui`: a cheat sheet verified at the pinned rev, with the test patterns.
   - `conventions`, `customization`, `effects`, `porting`.
 - `cargo run -q -p astryx-cli -- component <Name> --dense`: upstream props and guidance,
   plus the Rust API once ported. `component --list` lists everything; `parity` shows what

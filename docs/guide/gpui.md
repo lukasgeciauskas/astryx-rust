@@ -1,7 +1,7 @@
-# GPUI cheat sheet (Zed rev 2b248e6)
+# GPUI cheat sheet (fork rev 93e506e, Zed base 2b248e6)
 
 Every API here is used by code in this repository and compiles at the pinned
-revision. For anything else, read the real source, not memory:
+revision of our fork (`docs/gpui-fork.md`). For anything else, read the real source, not memory:
 `cargo xtask gpui-src` prints the local checkout; grep `crates/gpui/src` and
 `crates/gpui/examples` (Apache-2.0). GPUI changes often, so an API you remember
 from another version may not exist here.
@@ -20,6 +20,16 @@ from another version may not exist here.
   a blanket impl for every `Element`.
 - **Uncontrolled state in a component:** `window.use_keyed_state(id, cx, |window, cx| init)`
   returns an `Entity<S>` that lives as long as an element with that id is drawn.
+  - The key is resolved in the scope where `render` runs. A component that makes keyed
+    state meant for another component it renders reads a different entity: hand the
+    entity over instead (`Popover::controller(..)` takes its owner's
+    `PopoverController`).
+  - Reading keyed state outside an element phase panics ("can only be called during
+    request_layout, prepaint, or paint"); in tests, observe through callbacks or debug
+    selectors instead.
+- **`role(..)` and the `aria_*` setters** are on stateful elements: give the div an
+  `.id(..)` first. `.when(..)`, `.object_fit(..)` and the interactive methods come from
+  `gpui::prelude::*`.
 
 ## Events, actions, focus
 
@@ -36,7 +46,24 @@ from another version may not exist here.
   `cx.intercept_keystrokes(..)` (it runs before actions; `cx.stop_propagation()` there
   cancels the action). The editing engine does this for `on_key_down`.
 - Enter and Space on a focused element with `on_click` arrive as a keyboard click
-  (`ClickEvent::Keyboard`); do not also handle them in `on_key_down`.
+  (`ClickEvent::Keyboard`); do not also handle them in `on_key_down`. The click fires on
+  key up, and only when the key went down on the same element, so the key that opens a
+  menu never activates the row that takes focus.
+- An element's `on_action` handler stops the action unless it calls `cx.propagate()`;
+  the app-level `cx.on_action` handlers (Astryx's Tab traversal) run only if every
+  element handler propagates.
+- `cx.observe_keystrokes` runs after dispatch, whatever the elements did: the layer
+  stack's Escape works this way, so an element cannot stop it. Block the layer's Escape
+  (`EscapeBehavior::Block`) while a surface handles Escape itself.
+- Held keys repeat as `KeyDownEvent { is_held: true, .. }`.
+- Window-wide listeners: `window.on_mouse_event(|e: &MouseMoveEvent, phase, window, cx| ..)`
+  registered while painting (from a `canvas` paint closure) hear every event for one
+  frame. Bubble-phase listeners run in reverse paint order: later-painted (deferred)
+  layers first. `on_mouse_move`/`on_mouse_up` on an element fire only while it is
+  hovered.
+- `MouseDownEvent::click_count` is 2 on a double click. Scrolling is `ScrollEvent` and
+  `.on_scroll(..)` (`ScrollWheelEvent`/`on_scroll_wheel` are deprecated); its
+  `delta.pixel_delta(line_height).y` is positive when scrolling up.
 - `cx.on_focus` and `cx.on_blur` (and every focus listener) fire only in the active
   window. Test windows start inactive: call `window.activate_window()` first.
 
@@ -66,6 +93,17 @@ from another version may not exist here.
   `fit_content()`, `min_content()`, `max_content()` wherever a `Length` goes. A custom
   measured element can report its first baseline with `window.set_layout_baseline(id, y)`.
 - Overlays: `deferred(anchored().position(point).child(..))` draws above later siblings.
+  Astryx wraps this in `astryx_primitives::layer` and `anchored_layer` (see
+  conventions).
+- Images: `img(source)` with `.object_fit(ObjectFit::Contain)`. The natural size of a
+  loaded image: `window.use_asset::<ImgResourceLoader>(&resource, cx)` (or the
+  `RenderImage` of `ImageSource::Render`), then `image.size(0)`. A `RenderImage` built
+  from an `image::RgbaImage` takes its bytes as BGRA.
+- Async: `cx.background_executor().spawn(..)` needs `Send`; work that holds an `Rc`
+  runs on the foreground with `cx.spawn(async move |cx| ..)` or
+  `window.spawn(cx, async move |cx| ..)`. Timers:
+  `cx.background_executor().timer(duration)`, and `background_executor().now()` is the
+  clock tests advance.
 - Virtual lists: `uniform_list(id, count, |range, window, cx| items)` and `list(..)`.
   They need a view: drawing one through the test `cx.draw` helper panics in
   `Window::current_view`.
@@ -83,8 +121,20 @@ from another version may not exist here.
   - Elements: `cx.add_empty_window().draw(origin, space, |window, cx| element)`.
   - Working examples: `crates/astryx-primitives/src/tests.rs`,
     `crates/astryx-theme/src/tests.rs`.
-  - Layout: give an element `.debug_selector(|| "name".into())` (a no-op in release) and
-    read `cx.debug_bounds("name")`. Astryx's text controls carry `<id>-control`.
+  - Layout: give an element `.debug_selector(|| "name".into())` (a no-op in release, so
+    components may carry them) and read `cx.debug_bounds("name")`. Astryx's text
+    controls carry `<id>-control`, menu rows `<list id>-<row key>` (a DropdownMenu
+    `m` has list `m-list`), CommandPalette rows `command-palette-item-<id>`.
+  - Frames: `window.on_next_frame` never runs in tests. To act after the frame that first
+    drew something, paint a `canvas` probe whose paint calls `window.defer(cx, ..)`.
+  - Time: `cx.executor().advance_clock(duration)` moves timers and
+    `background_executor().now()`; follow it with a few `refresh` +
+    `run_until_parked` rounds.
+  - Pointer: `simulate_mouse_down`, `simulate_mouse_move(point, button, mods)` and
+    `simulate_mouse_up` drive drags and press-and-release gestures; a moved pointer
+    updates hover, a down or up alone does not.
+  - Announcements: render `astryx_primitives::announcer()` in the host, then read
+    `astryx_primitives::announce::announcement(Politeness::Polite, window, cx)`.
   - Text input: `cx.simulate_input("abc")`; file dialogs:
     `cx.simulate_path_prompt_response(|_| Some(paths))`; OS file drops:
     `cx.simulate_event(FileDropEvent::Entered { position, paths })`, then `Pending` and

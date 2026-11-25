@@ -5,13 +5,14 @@ design system, built on [GPUI](https://github.com/zed-industries/zed/tree/main/c
 Zed's GPU-accelerated UI framework. It runs natively on Windows and Linux and
 in the browser (WebAssembly), with no React or web view.
 
-> **Status: early development.** Done: the workspace and GPUI pin (M0), the
-> theme pipeline (M1: all of Astryx's tokens, core's defaults and the seven
-> published themes, with their fonts and icons, generated from upstream), and
-> the developer tooling (M1.5: hot reload, the `astryx` CLI, agent guides).
-> Components start in M2. See [`docs/PLAN.md`](docs/PLAN.md) for the
-> full-parity roadmap, [`UPSTREAM.md`](UPSTREAM.md) for the synced upstream
-> commit, and [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md).
+> **Status: in development.** Milestones M0 to M5 are done: the theme pipeline,
+> the developer tooling, foundations, actions and controls, the editing engine
+> and fields, and the layer runtime with every overlay and menu. 72 of
+> upstream's 110 core components are ported; collections (M6) are next. See
+> [`docs/PLAN.md`](docs/PLAN.md) for the full-parity roadmap,
+> [`docs/HANDOFF.md`](docs/HANDOFF.md) for the current state,
+> [`UPSTREAM.md`](UPSTREAM.md) for the synced upstream commit, and
+> [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md).
 
 ## Crates
 

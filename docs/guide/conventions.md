@@ -47,7 +47,7 @@
 - **Accessibility states:** set `aria_disabled`, `aria_read_only`, `aria_required`,
   `aria_invalid` and `aria_busy` (fork patch R6) and `aria_current` (R9) on the element
   that carries the role.
-- **Anchored layers** (tooltips now; popovers and menus in M5): wrap the trigger in
+- **Anchored layers** (tooltips, popovers, menu flyouts): wrap the trigger in
   `astryx_primitives::anchored_layer(id, trigger)` and give it `.surface(content,
   LayerOptions { placement, align, offset, margin, rtl, .. }, on_dismiss)`. The layer is
   layout-transparent, measures the surface, places it with `position_layer` (flip to the
@@ -59,6 +59,28 @@
   that takes focus makes its surface a `tab_trap()` with a non-tab-stop focus handle,
   moves focus in right after the frame that first draws it (a deferred call from a
   probe painted in the surface), and returns focus that would be lost on close.
+  - A menu's Disclosure also carries `on_press`, `on_hover`, `on_key` and `open_tint`:
+    Button calls them on an enabled trigger (press-down opens a menu, ArrowDown/ArrowUp
+    open it on the first or last row, the trigger keeps the pressed tint while open).
+    A trigger that is not a Button (a breadcrumb's link) is `overlay::MenuTrigger`.
+- **Modal surfaces** (Dialog, Drawer, BottomSheet, Lightbox) share `overlay::modal`:
+  `modal_state`, `sync_open`, `phase` (enter and exit progress), `backdrop`, `probes`
+  (focus entry) and `modal_layer`.
+- **Menus** all draw `overlay::menu::MenuList` over a `MenuTree` (the root state, the
+  close action, size, and whether Tab leaves, rows are touch rows or submenus drill in).
+  - Entries are data: `MenuEntry` (`MenuItem`, `MenuCheckboxItem`, `MenuRadioGroup`,
+    `Divider`, `Section`); a `MenuItem` with `submenu(..)` is upstream's
+    DropdownMenuSubMenu.
+  - The owner (DropdownMenu, ContextMenu) keeps a `MenuRoot` (`menu_root`,
+    `sync_root`), records its surfaces with `surface_probe`, and passes `regions`
+    (whether submenus may hold a header and footer).
+  - Any element can carry a context menu: `overlay::with_context_menu(area, ContextSpec
+    { .. }, window, cx)`; text fields do it through `input::field_menu`.
+- **Search sources** (`crate::search`): `Searchable` items, a `SearchSource` that
+  answers `Ready` or `Pending(Task)` and may show partial lists through its
+  `SearchContext`, and `static_source(items)`. CommandPalette uses them; Typeahead,
+  Tokenizer and Selector (M6) should too. A source built in `render` has no identity:
+  keep it in an `Rc` or name it with a key when a change must re-run a query.
 - **Tooltip props:** a component's `tooltip` goes through `overlay::with_tooltip(id,
   text, acts, el)`; `labelTooltip` is an InfoTip in the label row (`FieldLabel`);
   `disabledMessage` is `overlay::disabled_reason`, which shows on any focus; a tooltip
@@ -81,6 +103,11 @@
   - the press scale, skipped under reduced motion;
   - the focus ring;
   - the disabled and busy guards: focusable, but inert.
+
+- **The port's own strings** (text for what upstream leaves to the browser, such as a
+  text field's context menu) live in `astryx-i18n/src/local.rs`, English only, as the
+  catalog's last fallback. Use the `@astryx.<area>.<name>` key style; a test fails if
+  upstream ever ships the same key.
 
 ## Code
 
