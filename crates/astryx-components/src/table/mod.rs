@@ -3,6 +3,8 @@
 
 mod activation;
 mod cells;
+mod column_resize;
+mod column_settings;
 pub mod examples;
 mod filtering;
 mod grouped;
@@ -17,12 +19,22 @@ mod row_index;
 mod row_status;
 mod selection;
 mod sortable;
+mod sticky;
 #[allow(clippy::module_inception)]
 mod table;
 mod tree;
 
 pub use activation::{TableActivation, USE_TABLE_ACTIVATION_DOC, use_table_activation};
 pub use cells::{TableDensity, TableDividers, TableTextOverflow, TableVerticalAlign};
+pub use column_resize::{
+    ColumnResizeConfig, TableColumnResize, USE_TABLE_COLUMN_RESIZE_DOC, resolve_column_min_width,
+    use_table_column_resize,
+};
+pub use column_settings::{
+    ColumnSettingsConfig, ColumnSettingsOption, ColumnSettingsState, TableColumnSettings,
+    USE_TABLE_COLUMN_SETTINGS_DOC, USE_TABLE_COLUMN_SETTINGS_STATE_DOC, use_table_column_settings,
+    use_table_column_settings_state,
+};
 pub use filtering::{
     TableFilterState, TableFilterStateHandle, TableFilterValue, TableFilterVariant, TableFiltering,
     USE_TABLE_FILTER_STATE_DOC, USE_TABLE_FILTERING_DOC, to_search_filters, use_table_filter_state,
@@ -47,10 +59,10 @@ pub use pagination::{
 };
 pub use parts::{TableBody, TableCell, TableFooter, TableHeader, TableHeaderCell, TableRow};
 pub use plugin::{
-    BodyCellProps, BodyRowProps, ElementHook, HeaderCellProps, HeaderRowProps, PlanRow, RowAction,
-    RowKind, RowModel, RowPaint, ScrollWrapperProps, SyntheticRow, SyntheticRowFn,
-    SyntheticRowProps, TableContextAction, TableContextActions, TableMode, TablePlugin,
-    TableRenderContext, TableRenderProps, TableRowContext, WholeRowOwner,
+    BodyCellProps, BodyRowProps, CellPin, ElementHook, HeaderCellProps, HeaderRowProps, PinEdge,
+    PlanRow, RowAction, RowKind, RowModel, RowPaint, ScrollWrapperProps, SyntheticRow,
+    SyntheticRowFn, SyntheticRowProps, TableContextAction, TableContextActions, TableMode,
+    TablePlugin, TableRenderContext, TableRenderProps, TableRowContext, WholeRowOwner,
 };
 pub use row_expansion::{
     EXPANSION_COLUMN_KEY, PanelVariant, TableRowExpansion, USE_TABLE_ROW_EXPANSION_DOC,
@@ -73,12 +85,15 @@ pub use sortable::{
     USE_TABLE_SORTABLE_DOC, USE_TABLE_SORTABLE_STATE_DOC, next_direction, next_sort,
     use_table_sortable_state,
 };
+pub use sticky::{TableStickyColumns, USE_TABLE_STICKY_COLUMNS_DOC, use_table_sticky_columns};
 pub use table::Table;
 pub use tree::{
     AllExpanded, TableTreeData, TableTreeRowMeta, TreeIndent, TreeState, TreeStateConfig,
     USE_TABLE_TREE_DATA_DOC, USE_TABLE_TREE_STATE_DOC, use_table_tree_data, use_table_tree_state,
 };
 
+#[cfg(test)]
+mod column_tests;
 #[cfg(test)]
 mod data_tests;
 #[cfg(test)]

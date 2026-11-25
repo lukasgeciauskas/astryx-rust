@@ -163,8 +163,8 @@ Stages, each a commit:
 5. ~~Tree, grouped rows and row expansion~~ (done: `table/tree.rs`, `grouped.rs`,
    `row_expansion.rs`; tests in `table/structure_tests.rs`; fork patch R15; the glide,
    FR15, waits for M11).
-6. Column resize, column settings (with its state) and sticky columns (FR14's dividers in
-   pinned cells).
+6. ~~Column resize, column settings and sticky columns~~ (done: `table/column_resize.rs`,
+   `column_settings.rs`, `sticky.rs`; tests in `table/column_tests.rs`).
 7. Virtualization: rows and columns on `astryx_primitives::list_window` (FR18-FR20, FR23,
    DEC-5, DEC-6), then the `virtualization` builder (Pending in TABLE_DOC until then).
    It brings upstream's column admission: the selection column and a row-number column

@@ -230,9 +230,28 @@ pub struct HeaderCellProps {
     pub context_menu: Vec<TableContextActions>,
     /// The header's accessible name, when a plugin names it.
     pub aria_label: Option<SharedString>,
+    /// Pinned to an edge (sticky columns).
+    pub pinned: Option<CellPin>,
     /// Its place among the final columns.
     pub column_index: usize,
     pub hooks: Vec<ElementHook>,
+}
+
+/// Which edge a pinned cell stays at (upstream `useTableStickyColumns`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PinEdge {
+    Start,
+    End,
+}
+
+/// A pinned cell: it stays at its edge while the table scrolls sideways,
+/// over the cells that scroll under it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CellPin {
+    pub edge: PinEdge,
+    /// The pinned run's inner edge: it casts the shadow over scrolled
+    /// content.
+    pub boundary: bool,
 }
 
 /// A body row's props: its cells, built (upstream `BodyRowRenderProps`).
@@ -316,6 +335,8 @@ pub struct BodyCellProps {
     /// The cell renders empty: neither the column's renderer nor the default
     /// one runs (a row a plugin replaces wholesale).
     pub content_suppressed: bool,
+    /// Pinned to an edge (sticky columns).
+    pub pinned: Option<CellPin>,
     pub hooks: Vec<ElementHook>,
 }
 

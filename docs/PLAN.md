@@ -473,6 +473,16 @@ The remaining primitives:
     chevron column, the detail panel that takes its row's divider (FR5) and the toggle in
     every cell's menu; each body cell now has its own right-click menu, as upstream's
     TableCell does (FR4). The glide (FR15) waits for M11.
+  - Column settings, sticky columns and column resize (done): `TableColumnSettings` and
+    `use_table_column_settings_state` choose and order the columns (always-visible ones
+    stay). `TableStickyColumns` pins contiguous runs to either edge: with no `position:
+    sticky` in GPUI, a pinned cell follows the region's sideways scroll, paints over the
+    cells under it with an opaque base and its row's fill, and casts a shadow while
+    content is under it. `use_table_column_resize` puts a boundary at each resizable
+    column's edge, drawn deferred through the body rows (FR2): hinted while the pointer is
+    in the header row, accent under the pointer, on focus or in a drag, quiet while the
+    region scrolls (FR10); a drag or the arrow keys resize, a proportional column trading
+    width with its neighbor; it announces a splitter with the rendered width (AR7, AR8).
 - **M8 Dates:** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
   DateRangeInput, DateTimeInput, TimeInput.
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with

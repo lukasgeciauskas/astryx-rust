@@ -261,6 +261,12 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
         .child(grouped(window, cx))
         .child(label("Row expansion: a detail panel below its row"))
         .child(expansion(window, cx))
+        .child(label("Column settings: pick the columns (Name always shows)"))
+        .child(column_settings(window, cx))
+        .child(label(
+            "Sticky and resizable columns: Name and Status stay put as the table scrolls; drag a header's edge",
+        ))
+        .child(sticky_resizable(window, cx))
         .child(label(
             "Compact, grid dividers; a date reads as its ISO time",
         ))
@@ -458,6 +464,119 @@ fn expansion(window: &mut Window, cx: &mut App) -> AnyElement {
             )
             .row_label(|p: &Person| p.name.into())
             .panel_variant(PanelVariant::Muted),
+        )
+        .into_any_element()
+}
+
+/// Checkboxes choose the columns the table shows.
+fn column_settings(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::choice::CheckboxInput;
+    use crate::table::{
+        ColumnSettingsConfig, ColumnSettingsOption, use_table_column_settings,
+        use_table_column_settings_state,
+    };
+    let active = window.use_keyed_state("people-columns", cx, |_, _| {
+        vec![gpui::SharedString::from("name"), "role".into()]
+    });
+    let current = active.read(cx).clone();
+    let state = use_table_column_settings_state(ColumnSettingsConfig::new(
+        [
+            ColumnSettingsOption::new("name", "Name").always_visible(true),
+            ColumnSettingsOption::new("role", "Role"),
+            ColumnSettingsOption::new("age", "Age"),
+        ],
+        current,
+        move |keys, window, cx| {
+            active.update(cx, |a, _| *a = keys);
+            window.refresh();
+        },
+    ));
+    let picker = state.config.columns.iter().fold(
+        Stack::horizontal().gap(SpacingStep::S4),
+        |row, option| {
+            let (state, key) = (state.clone(), option.key.clone());
+            row.child(
+                CheckboxInput::new(
+                    gpui::SharedString::from(format!("column-{}", option.key)),
+                    option.label.clone(),
+                    state.is_column_active(&option.key),
+                )
+                .disabled(!state.is_column_toggleable(&option.key))
+                .on_change(move |_, window, cx| state.toggle_column(&key, window, cx)),
+            )
+        },
+    );
+    Stack::vertical()
+        .gap(SpacingStep::S2)
+        .child(picker)
+        .child(
+            Table::new("people-columns-table")
+                .label("People, chosen columns")
+                .data(people())
+                .columns(vec![
+                    TableColumn::new("name")
+                        .header("Name")
+                        .width(proportional(2.)),
+                    TableColumn::new("role").header("Role"),
+                    TableColumn::new("age")
+                        .header("Age")
+                        .align(TableColumnAlign::End),
+                ])
+                .id_key("id")
+                .plugin("columnSettings", use_table_column_settings(&state.config)),
+        )
+        .into_any_element()
+}
+
+/// A narrow table: pinned start and end columns, and drag-resizable widths.
+fn sticky_resizable(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::table::{ColumnResizeConfig, TableStickyColumns, use_table_column_resize};
+    let widths = window.use_keyed_state("people-widths", cx, |_, _| {
+        std::collections::HashMap::<gpui::SharedString, f32>::new()
+    });
+    let current = widths.read(cx).clone();
+    let columns = || {
+        vec![
+            TableColumn::new("name").header("Name").width(pixel(180.)),
+            TableColumn::new("role").header("Role").width(pixel(200.)),
+            TableColumn::new("joined")
+                .header("Joined")
+                .width(pixel(260.)),
+            TableColumn::new("age").header("Age").width(pixel(120.)),
+            TableColumn::new("active")
+                .header("Status")
+                .width(pixel(110.)),
+        ]
+    };
+    let resize = use_table_column_resize(
+        "people-resize",
+        ColumnResizeConfig::new()
+            .column_widths(current)
+            .columns(columns())
+            .on_column_resize_end(move |updates, window, cx| {
+                widths.update(cx, |w, _| w.extend(updates));
+                window.refresh();
+            }),
+        window,
+        cx,
+    );
+    div()
+        .w(px(560.))
+        .child(
+            Table::new("people-sticky")
+                .label("People, pinned columns")
+                .data(people())
+                .columns(columns())
+                .id_key("id")
+                .striped(true)
+                .hover(true)
+                .plugin(
+                    "sticky",
+                    TableStickyColumns::new()
+                        .start_keys(["name"])
+                        .end_keys(["active"]),
+                )
+                .plugin("columnResize", resize),
         )
         .into_any_element()
 }

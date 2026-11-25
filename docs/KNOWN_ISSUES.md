@@ -51,6 +51,15 @@
   (tree and row expansion) leaves a press to a nested control that stops its click
   (buttons, checkboxes, links); a table cell holds no selectable text to guard.
 
+- **Sticky columns and column resize in GPUI.** A pinned cell follows the table region's
+  sideways scroll and paints over the cells that scroll under it, as `position: sticky`
+  does; each data cell is placed in its grid explicitly for that. A table's columns still
+  run left to right in a right-to-left layout (M15's RTL work), so start-pinned columns pin
+  to the left there too. A resize boundary is drawn deferred, over the body rows and inside
+  the scroll region; touch input stands in for a coarse pointer, which takes the boundary
+  out of pointer reach but leaves its keyboard resize. An unbounded column's announced
+  maximum is the window's width (upstream's window extent).
+
 - **Infinite scroll has no IntersectionObserver.** The sentinel checks, as it paints,
   whether it shows inside every clip above it, which is what the observer reports with
   its default root. `on_load_more` returns a `Task` of a `Result`, so FR4's non-Promise

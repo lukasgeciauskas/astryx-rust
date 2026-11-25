@@ -423,6 +423,77 @@ impl<T: TableRecord> RenderOnce for Table<T> {
     }
 }
 
+/// A row's fill and hover, as its pinned cells replay them.
+type RowBackdrop =
+    Rc<std::cell::Cell<Option<(Option<gpui::Hsla>, Option<(SharedString, gpui::Hsla)>)>>>;
+
+/// The row's fill under a pinned cell's content, read once the row has
+/// resolved it (the cell is built first).
+#[derive(IntoElement)]
+struct PinnedBackdrop(RowBackdrop);
+
+impl RenderOnce for PinnedBackdrop {
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        let (fill, hover) = self.0.take().unwrap_or((None, None));
+        self.0.set(Some((fill, hover.clone())));
+        let mut el = div().absolute().top_0().left_0().size_full();
+        if let Some(fill) = fill {
+            el = el.bg(fill);
+        }
+        if let Some((group, hover)) = hover {
+            el = el.group_hover(group, move |s| s.bg(hover));
+        }
+        el
+    }
+}
+
+/// Pins a cell to its edge: it follows the region's sideways scroll,
+/// covers what scrolls under it with an opaque base (the row's fill on top),
+/// and casts a shadow from its run's inner edge while content is under it
+/// (upstream's `position: sticky` cells).
+fn pin_cell(
+    el: gpui::Stateful<gpui::Div>,
+    pin: super::plugin::CellPin,
+    viewport: &ScrollHandle,
+    backdrop: Option<RowBackdrop>,
+    theme: &astryx_theme::ResolvedTheme,
+) -> gpui::Stateful<gpui::Div> {
+    use super::plugin::PinEdge;
+    let t = theme.tokens();
+    let scrolled = -viewport.offset().x;
+    let max = viewport.max_offset().x;
+    let (shift, under) = match pin.edge {
+        PinEdge::Start => (scrolled, scrolled > px(0.5)),
+        PinEdge::End => (scrolled - max, scrolled < max - px(0.5)),
+    };
+    let mut el = el.left(shift).bg(t.color.background_card);
+    // Its shadow bleeds past its edge.
+    el.style().overflow.x = Some(gpui::Overflow::Visible);
+    el.style().overflow.y = Some(gpui::Overflow::Visible);
+    if let Some(backdrop) = backdrop {
+        el = el.child(PinnedBackdrop(backdrop));
+    }
+    if pin.boundary && under {
+        let width = px(6.);
+        let shadow = t.color.shadow;
+        let clear = gpui::Hsla { a: 0., ..shadow };
+        let strip = div().absolute().top_0().bottom_0().w(width);
+        el = el.child(match pin.edge {
+            PinEdge::Start => strip.right(-width).bg(gpui::linear_gradient(
+                90.,
+                gpui::linear_color_stop(shadow, 0.),
+                gpui::linear_color_stop(clear, 1.),
+            )),
+            PinEdge::End => strip.left(-width).bg(gpui::linear_gradient(
+                270.,
+                gpui::linear_color_stop(shadow, 0.),
+                gpui::linear_color_stop(clear, 1.),
+            )),
+        });
+    }
+    el
+}
+
 /// A plugin's synthetic row: one cell across every column.
 #[allow(clippy::too_many_arguments)]
 fn synthetic_row(
@@ -535,7 +606,7 @@ fn render_data<T: TableRecord>(
 
     // ---- The header (FR2, FR11) ------------------------------------------
     let header_row = (count > 0).then(|| {
-        let cells: Vec<AnyElement> = columns
+        let mut cells: Vec<(AnyElement, bool)> = columns
             .iter()
             .enumerate()
             .map(|(i, col)| {
@@ -553,18 +624,25 @@ fn render_data<T: TableRecord>(
                     below: Vec::new(),
                     context_menu: Vec::new(),
                     aria_label: None,
+                    pinned: None,
                     column_index: i,
                     hooks: Vec::new(),
                 };
                 for p in plugins {
                     props = p.transform_header_cell(props, col, &columns, window, cx);
                 }
-                header_cell(&name, col, props, i, count, style, window, cx)
+                let pinned = props.pinned.is_some();
+                (
+                    header_cell(&name, col, props, i, count, style, scroll, window, cx),
+                    pinned,
+                )
             })
             .collect();
+        // Pinned cells paint over the cells that scroll under them.
+        cells.sort_by_key(|(_, pinned)| *pinned);
         let mut props = HeaderRowProps {
             style: StyleRefinement::default(),
-            children: cells,
+            children: cells.into_iter().map(|(cell, _)| cell).collect(),
             hooks: Vec::new(),
         };
         for p in plugins {
@@ -629,7 +707,9 @@ fn render_data<T: TableRecord>(
             render: context.clone(),
         };
         let row_key = id.key.as_ref().map_or_else(|| format!("i{i}"), key_text);
-        let cells: Vec<AnyElement> = columns
+        // The row's fill, for its pinned cells: set when the row resolves it.
+        let backdrop: RowBackdrop = Rc::default();
+        let mut cells: Vec<(AnyElement, bool)> = columns
             .iter()
             .enumerate()
             .map(|(ci, col)| {
@@ -638,6 +718,7 @@ fn render_data<T: TableRecord>(
                     context_menu: Vec::new(),
                     column_index: ci,
                     content_suppressed: false,
+                    pinned: None,
                     hooks: Vec::new(),
                 };
                 for p in plugins {
@@ -654,11 +735,15 @@ fn render_data<T: TableRecord>(
                     count,
                     display + 1 == rows_shown,
                     style,
+                    scroll,
+                    &backdrop,
                     window,
                     cx,
                 )
             })
             .collect();
+        cells.sort_by_key(|(_, pinned)| *pinned);
+        let cells: Vec<AnyElement> = cells.into_iter().map(|(cell, _)| cell).collect();
         let mut props = BodyRowProps {
             style: StyleRefinement::default(),
             children: cells,
@@ -681,6 +766,7 @@ fn render_data<T: TableRecord>(
             tracks.clone(),
             props,
             style,
+            &backdrop,
             window,
             cx,
         );
@@ -766,6 +852,7 @@ fn header_cell<T>(
     index: usize,
     count: usize,
     style: &TableStyle,
+    viewport: &ScrollHandle,
     window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
@@ -888,7 +975,16 @@ fn header_cell<T>(
             move || s.clone()
         })
         .track_focus(&cell_focus)
+        .col_start(index as i16 + 1)
+        .col_end(index as i16 + 2)
+        // One row: an explicit line keeps auto-placement from wrapping a
+        // pinned cell, which paints last, onto a row of its own.
+        .row_start(1)
+        .row_end(2)
         .role(Role::ColumnHeader);
+    if let Some(pin) = props.pinned {
+        el = pin_cell(el, pin, viewport, None, &theme);
+    }
     if let Some(label) = props.aria_label.clone().or_else(|| col.header_text()) {
         el = el.aria_label(label);
     }
@@ -941,9 +1037,11 @@ fn body_cell<T: TableRecord>(
     count: usize,
     last_row: bool,
     style: &TableStyle,
+    viewport: &ScrollHandle,
+    backdrop: &RowBackdrop,
     window: &mut Window,
     cx: &mut App,
-) -> AnyElement {
+) -> (AnyElement, bool) {
     let theme = current(window, cx);
     let rem = window.rem_size();
     let content: Option<AnyElement> = if props.content_suppressed {
@@ -985,7 +1083,17 @@ fn body_cell<T: TableRecord>(
     let mut el = cell(&theme, style, place, rem)
         .id(ElementId::Name(selector.clone().into()))
         .debug_selector(move || selector.clone())
+        .col_start(index as i16 + 1)
+        .col_end(index as i16 + 2)
+        // One row: an explicit line keeps auto-placement from wrapping a
+        // pinned cell, which paints last, onto a row of its own.
+        .row_start(1)
+        .row_end(2)
         .role(Role::Cell);
+    let pinned = props.pinned;
+    if let Some(pin) = pinned {
+        el = pin_cell(el, pin, viewport, Some(backdrop.clone()), &theme);
+    }
     theme.refine(
         el.style(),
         "table-cell",
@@ -997,7 +1105,7 @@ fn body_cell<T: TableRecord>(
         el = hook(el);
     }
     // The cell's own menu, over the whole cell (TableCell FR4).
-    menu::with_actions(
+    let el = menu::with_actions(
         el.children(content),
         ElementId::Name(format!("{table}-cell-{row_key}-{}-menu", col.key).into()),
         props.context_menu,
@@ -1005,7 +1113,8 @@ fn body_cell<T: TableRecord>(
         window,
         cx,
     )
-    .into_any_element()
+    .into_any_element();
+    (el, pinned.is_some())
 }
 
 /// A body row: the column grid, its paint (selection's wash, the hover
@@ -1018,6 +1127,7 @@ fn body_row(
     tracks: Vec<GridTrack>,
     props: BodyRowProps,
     style: &TableStyle,
+    backdrop: &RowBackdrop,
     window: &mut Window,
     cx: &mut App,
 ) -> gpui::Stateful<gpui::Div> {
@@ -1050,13 +1160,18 @@ fn body_row(
         selected_wash: paint.selected && paint.highlight,
         active: paint.active,
     };
-    if let Some(bg) = row_background(&theme, style, state) {
+    let fill = row_background(&theme, style, state);
+    if let Some(bg) = fill {
         row = row.bg(bg);
     }
-    if style.hover && !state.selected_wash && !state.active {
-        let hover = t.color.overlay_hover;
-        row = row.hover(move |s| s.bg(hover));
+    let group: SharedString = format!("{table}-row-{key}-group").into();
+    let hover =
+        (style.hover && !state.selected_wash && !state.active).then_some(t.color.overlay_hover);
+    if let Some(hover) = hover {
+        row = row.group(group.clone()).hover(move |s| s.bg(hover));
     }
+    // Its pinned cells replay the same fill over their opaque base.
+    backdrop.set(Some((fill, hover.map(|h| (group, h)))));
     if let Some(i) = aria_row_index {
         row = row.aria_row_index(i);
     }
