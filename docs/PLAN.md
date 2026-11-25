@@ -438,6 +438,19 @@ The remaining primitives:
     collation (`I18n::compare`, on `icu_collator`). A theme's `componentIcons` slots now have
     a registry (`icon::set_component_icon`; `table-sort-indicator` its first slot). Under
     truncation a cut heading shows in full while keyboard focus is in its header.
+  - Selection, activation, row status and row numbers (done): `TableSelection`
+    (`useTableSelection`) adds the 36 px checkbox column with select-all and publishes each
+    row's selected state; `use_table_selection_state` keeps the keys (its own, or the
+    caller's), with select-all keeping frozen rows; `TableSelectionToolbar` shows the count
+    and clears the whole selection. One resolver now paints a row from every plugin's state
+    (FR21): selection's wash, then the active fill, hover and the stripe.
+    `TableActivation` (`useTableActivation`, built from its accepted contract, FR1-FR12)
+    makes flat product rows with a canonical `id_key` tab stops whose primary click or
+    non-repeated Enter or Space asks for activation; the active row carries
+    `aria-current`, a fill and an inline-start marker, and a second whole-row owner, an
+    invalid key or a press on a nested control leaves it inert. `use_table_row_status` and
+    `TableRowIndex` (`useTableRowIndex`) add the status gutter and row numbers. Cells and
+    body transforms receive rows as `TableItem` handles a callback can keep.
 - **M8 Dates:** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
   DateRangeInput, DateTimeInput, TimeInput.
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

@@ -197,6 +197,8 @@ pub(crate) struct RowState {
     pub index: usize,
     pub hovered: bool,
     pub selected_wash: bool,
+    /// The current item: activation's fill, above hover and the stripe.
+    pub active: bool,
 }
 
 pub(crate) fn row_background(
@@ -207,6 +209,8 @@ pub(crate) fn row_background(
     let t = theme.tokens();
     if state.selected_wash {
         Some(t.color.accent_muted)
+    } else if state.active {
+        Some(t.color.overlay_pressed)
     } else if s.hover && state.hovered {
         Some(t.color.overlay_hover)
     } else if s.striped && state.index % 2 == 1 {

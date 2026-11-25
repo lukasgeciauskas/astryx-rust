@@ -145,6 +145,16 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
         .child(label("Sortable: press a header; Shift+press adds a key"))
         .child(sortable(window, cx))
         .child(label(
+            "Selection: checkboxes, select-all, the bulk-actions toolbar (Edsger is locked)",
+        ))
+        .child(selection(window, cx))
+        .child(label("Row status and row numbers"))
+        .child(status_and_index())
+        .child(label(
+            "Activation: press a row, or focus it and press Enter, to show it beside the table",
+        ))
+        .child(activation(window, cx))
+        .child(label(
             "Compact, grid dividers; a date reads as its ISO time",
         ))
         .child(
@@ -224,6 +234,127 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
             TableColumn::new("name").header("Name"),
             TableColumn::new("role").header("Role"),
         ]))
+        .into_any_element()
+}
+
+/// Row selection with its own state and the bulk-actions toolbar.
+fn selection(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::button::Button;
+    use crate::table::{SelectionStateConfig, TableSelectionToolbar, use_table_selection_state};
+    // The caller owns the keys here; Edsger is locked while selected.
+    let keys = window.use_keyed_state("people-selected", cx, |_, _| {
+        std::collections::HashSet::from([gpui::SharedString::from("2"), "5".into()])
+    });
+    let current = keys.read(cx).clone();
+    let selection = use_table_selection_state(
+        "people-selection",
+        SelectionStateConfig::new(people(), "id")
+            .selected_keys(current, move |next, window, cx| {
+                keys.update(cx, |k, _| *k = next);
+                window.refresh();
+            })
+            .is_item_enabled(|p: &Person| p.id != 5),
+        window,
+        cx,
+    );
+    Stack::vertical()
+        .gap(SpacingStep::S2)
+        .child(
+            TableSelectionToolbar::new("people-bulk", selection.state.clone())
+                .start_content(Button::new("people-archive", "Archive")),
+        )
+        .child(
+            Table::new("people-selectable")
+                .label("People, selectable")
+                .data(people())
+                .columns(vec![
+                    TableColumn::new("name")
+                        .header("Name")
+                        .width(proportional(2.)),
+                    TableColumn::new("role").header("Role"),
+                ])
+                .id_key("id")
+                .plugin(
+                    "selection",
+                    selection.plugin.row_label(|p: &Person| p.name.into()),
+                ),
+        )
+        .into_any_element()
+}
+
+/// A status gutter and row numbers.
+fn status_and_index() -> AnyElement {
+    use crate::table::{TableRowIndex, TableRowStatus, TableRowStatusColor, use_table_row_status};
+    Table::new("people-status")
+        .label("People, with status")
+        .data(people())
+        .columns(vec![
+            TableColumn::new("name")
+                .header("Name")
+                .width(proportional(2.)),
+            TableColumn::new("role").header("Role"),
+        ])
+        .id_key("id")
+        .plugin(
+            "rowStatus",
+            use_table_row_status(|p: &Person| match (p.active, p.age) {
+                (_, a) if a > 100 => Some(TableRowStatus::warning("Over a hundred")),
+                (true, _) => Some(TableRowStatus::success("Active")),
+                (false, a) if a > 70 => {
+                    Some(TableRowStatus::color(TableRowStatusColor::Blue, "Emeritus"))
+                }
+                (false, _) => Some(TableRowStatus::error("Inactive")),
+            }),
+        )
+        .plugin("rowIndex", TableRowIndex::new())
+        .into_any_element()
+}
+
+/// Master-detail: the active row drives the panel beside the table.
+fn activation(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::table::{RowKey, TableActivation};
+    let active = window.use_keyed_state("people-active", cx, |_, _| Some(RowKey::from("2")));
+    let key = active.read(cx).clone();
+    let current = people()
+        .into_iter()
+        .find(|p| key.as_ref() == Some(&RowKey::from(p.id.to_string())));
+    let state = active.clone();
+    let plugin = TableActivation::new(key, move |_: &Person, key, window, cx| {
+        let key = key.clone();
+        state.update(cx, |k, _| *k = Some(key));
+        window.refresh();
+    })
+    .is_item_activatable(|p: &Person| p.active || p.id != 3);
+    Stack::horizontal()
+        .gap(SpacingStep::S4)
+        .child(
+            div().flex_1().min_w_0().child(
+                Table::new("people-activation")
+                    .label("People, activatable")
+                    .data(people())
+                    .columns(vec![
+                        TableColumn::new("name")
+                            .header("Name")
+                            .width(proportional(2.)),
+                        TableColumn::new("role").header("Role"),
+                    ])
+                    .id_key("id")
+                    .hover(true)
+                    .plugin("activation", plugin),
+            ),
+        )
+        .child(
+            Card::new().w(px(220.)).child(match current {
+                Some(p) => Stack::vertical()
+                    .gap(SpacingStep::S1)
+                    .child(Text::new(p.name).text_type(TextType::Label))
+                    .child(Text::new(p.role).text_type(TextType::Supporting))
+                    .into_any_element(),
+                None => Text::new("No row is active")
+                    .text_type(TextType::Supporting)
+                    .into_any_element(),
+            }),
+        )
         .into_any_element()
 }
 

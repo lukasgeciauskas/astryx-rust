@@ -177,11 +177,22 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::table::TABLE_HEADER_CELL_DOC,
     crate::table::USE_TABLE_SORTABLE_DOC,
     crate::table::USE_TABLE_SORTABLE_STATE_DOC,
+    crate::table::USE_TABLE_SELECTION_DOC,
+    crate::table::USE_TABLE_SELECTION_STATE_DOC,
+    crate::table::TABLE_SELECTION_TOOLBAR_DOC,
+    crate::table::USE_TABLE_ROW_STATUS_DOC,
+    crate::table::USE_TABLE_ROW_INDEX_DOC,
 ];
+
+/// Modules upstream has specified (an accepted contract) but not yet built,
+/// so they have no `.doc.mjs` to check against. One moves to [`REGISTRY`]
+/// once upstream publishes its doc.
+pub const SPEC_ONLY: &[ComponentDoc] = &[crate::table::USE_TABLE_ACTIVATION_DOC];
 
 /// The registered doc for an upstream component name.
 pub fn find(name: &str) -> Option<&'static ComponentDoc> {
     REGISTRY
         .iter()
+        .chain(SPEC_ONLY)
         .find(|doc| doc.name.eq_ignore_ascii_case(name))
 }

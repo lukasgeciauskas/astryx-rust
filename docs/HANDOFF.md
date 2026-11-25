@@ -155,9 +155,8 @@ Stages, each a commit:
 
 1. ~~Table and its parts~~ (done: `table/`: model, plugin trait, data and children modes).
 2. ~~Sorting~~ (done: `table/sortable.rs`, fork patch R14 for `aria-sort`).
-3. Selection, activation and row status: `useTableSelectionState`, `useTableSelection`
-   (FR6), `TableSelectionToolbar`, `useTableActivation` (an accepted contract upstream
-   has not built; FR21's paint path), `useTableRowStatus`, `useTableRowIndex`.
+3. ~~Selection, activation, row status and row numbers~~ (done: `table/selection.rs`,
+   `activation.rs`, `row_status.rs`, `row_index.rs`; tests in `table/row_tests.rs`).
 4. Pagination, filtering (`useTableFilterState`, `useTableFiltering` over PowerSearch's
    config) and infinite scroll (the loading source, FR22).
 5. Tree (`useTableTreeData`, `useTableTreeState`), grouped rows and row expansion (FR7;
@@ -166,6 +165,10 @@ Stages, each a commit:
    pinned cells).
 7. Virtualization: rows and columns on `astryx_primitives::list_window` (FR18-FR20, FR23,
    DEC-5, DEC-6), then the `virtualization` builder (Pending in TABLE_DOC until then).
+   It brings upstream's column admission: the selection column and a row-number column
+   counting from 1 register as fixed-height columns, while the status column and a
+   row-number column counting from elsewhere give the reason a table falls back to
+   unwindowed rows (`registerFixedHeightColumn`, `registerWindowFallbackReason`).
 
 Before each, read the plugin's file under `../Astryx/packages/core/src/Table/plugins/`,
 its `.doc.mjs` and its spec under `docs/specs/components/Table/plugins/` where there is

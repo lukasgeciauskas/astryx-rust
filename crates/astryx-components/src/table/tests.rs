@@ -13,7 +13,7 @@ use super::*;
 
 type Calls = Rc<RefCell<Vec<String>>>;
 
-fn rows() -> Vec<Record> {
+pub(super) fn rows() -> Vec<Record> {
     vec![
         Record::new()
             .with("id", "a")
@@ -43,7 +43,7 @@ impl Render for Host {
     }
 }
 
-fn host(
+pub(super) fn host(
     cx: &mut TestAppContext,
     width: f32,
     build: impl Fn(&mut Window, &mut App) -> AnyElement + 'static,
@@ -64,13 +64,13 @@ fn host(
     cx
 }
 
-fn bounds(cx: &mut VisualTestContext, selector: &str) -> gpui::Bounds<gpui::Pixels> {
+pub(super) fn bounds(cx: &mut VisualTestContext, selector: &str) -> gpui::Bounds<gpui::Pixels> {
     let s: &'static str = Box::leak(selector.to_string().into_boxed_str());
     cx.debug_bounds(s)
         .unwrap_or_else(|| panic!("no {selector}"))
 }
 
-fn shown(cx: &mut VisualTestContext, selector: &str) -> bool {
+pub(super) fn shown(cx: &mut VisualTestContext, selector: &str) -> bool {
     let s: &'static str = Box::leak(selector.to_string().into_boxed_str());
     cx.debug_bounds(s).is_some()
 }
@@ -240,7 +240,7 @@ impl TablePlugin<Record> for Recorder {
         &self,
         mut props: BodyCellProps,
         column: &TableColumn<Record>,
-        _: &Record,
+        _: &TableItem<Record>,
         _: &[TableColumn<Record>],
         context: &TableRowContext,
         _: &mut Window,
@@ -264,7 +264,7 @@ impl TablePlugin<Record> for Recorder {
     fn transform_body_row(
         &self,
         mut props: BodyRowProps,
-        _: &Record,
+        _: &TableItem<Record>,
         context: &TableRowContext,
         _: &mut Window,
         _: &mut App,
@@ -487,7 +487,7 @@ fn sort_host(cx: &mut TestAppContext, multi: bool, truncate: bool) -> &mut Visua
     cx
 }
 
-fn settle(cx: &mut VisualTestContext) {
+pub(super) fn settle(cx: &mut VisualTestContext) {
     for _ in 0..3 {
         cx.update(|window, _| window.refresh());
         cx.run_until_parked();

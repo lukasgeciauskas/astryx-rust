@@ -387,6 +387,7 @@ fn render_cell(
                 index: row.place.index,
                 hovered,
                 selected_wash: false,
+                active: false,
             },
         ) {
             el = el.bg(bg);

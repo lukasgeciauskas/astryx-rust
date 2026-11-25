@@ -347,6 +347,14 @@ pub fn registry_problems() -> Vec<String> {
             }
         }
     }
+    for rust in doc::SPEC_ONLY {
+        if !manifest::find(rust.name, None).is_empty() {
+            problems.push(format!(
+                "{} has an upstream doc now: move it from SPEC_ONLY to REGISTRY",
+                rust.name
+            ));
+        }
+    }
     problems
 }
 

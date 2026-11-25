@@ -33,6 +33,16 @@
   content as HTML's automatic table layout does. A plugin transform cannot throw, so
   FR10's failure isolation has nothing to catch.
 
+- **Table plugins: what Rust's ownership changes.** Upstream passes a row's object to
+  cells and plugins, and compares rows by reference. Here a cell or plugin gets a
+  `TableItem`, a handle into the table's data that a callback can keep, and a row-number
+  column given `data` without a key function matches a row in that same data by position,
+  else the last equal row (`PartialEq`); rows the caller copied, such as
+  `use_table_sortable_state`'s sorted rows, need `data_keyed`. Activation's `data-active`
+  attribute has no GPUI form (the row's `aria-current` and marker carry the state), and a
+  table cell holds no selectable text, so FR6's text-selection gate never applies.
+  Upstream's development warnings print once to stderr in debug builds.
+
 - **The keyboard hint anchors to a focus ring.** GPUI tells no element's bounds by its
   focus, so the arrow-key hint (TabList, Toolbar, SegmentedControl) sits below the
   innermost focus ring drawn inside its composite, one frame after focus enters. A

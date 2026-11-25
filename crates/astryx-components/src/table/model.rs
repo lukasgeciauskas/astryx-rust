@@ -261,7 +261,53 @@ pub enum TableFilterRef {
     },
 }
 
-pub(crate) type CellFn<T> = Rc<dyn Fn(&T, &mut Window, &mut App) -> AnyElement>;
+pub(crate) type CellFn<T> = Rc<dyn Fn(&TableItem<T>, &mut Window, &mut App) -> AnyElement>;
+
+/// One row of a table's data, as a handle a callback can keep (upstream
+/// hands the item object itself to cells and plugins). It reads as the row
+/// (`Deref`) and keeps the table's data alive.
+pub struct TableItem<T> {
+    data: Rc<[T]>,
+    index: usize,
+}
+
+impl<T> Clone for TableItem<T> {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            index: self.index,
+        }
+    }
+}
+
+impl<T> TableItem<T> {
+    /// The row at `index` of `data`.
+    pub fn new(data: Rc<[T]>, index: usize) -> Self {
+        assert!(
+            index < data.len(),
+            "TableItem: index {index} is out of range"
+        );
+        Self { data, index }
+    }
+
+    /// Its position in the data the table renders.
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    /// The data it belongs to.
+    pub fn data(&self) -> &Rc<[T]> {
+        &self.data
+    }
+}
+
+impl<T> std::ops::Deref for TableItem<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.data[self.index]
+    }
+}
 pub(crate) type HeaderFn = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
 /// A column's header: text, or any element.
@@ -372,6 +418,18 @@ impl<T> TableColumn<T> {
     pub fn render_cell(
         mut self,
         render: impl Fn(&T, &mut Window, &mut App) -> AnyElement + 'static,
+    ) -> Self {
+        self.render_cell = Some(Rc::new(move |item: &TableItem<T>, window, cx| {
+            render(item, window, cx)
+        }));
+        self
+    }
+
+    /// Upstream `renderCell` with the row as a handle a callback can keep
+    /// (a button in the cell that acts on its row).
+    pub fn render_cell_item(
+        mut self,
+        render: impl Fn(&TableItem<T>, &mut Window, &mut App) -> AnyElement + 'static,
     ) -> Self {
         self.render_cell = Some(Rc::new(render));
         self
@@ -573,6 +631,51 @@ type KeyFn<T> = Rc<dyn Fn(&T) -> TableValue>;
 pub enum IdKey<T> {
     Field(SharedString),
     Fn(KeyFn<T>),
+}
+
+impl<T> IdKey<T> {
+    /// A key read from the field `name`.
+    pub fn field(name: impl Into<SharedString>) -> Self {
+        IdKey::Field(name.into())
+    }
+
+    /// A key a function derives from the row.
+    pub fn func(f: impl Fn(&T) -> TableValue + 'static) -> Self {
+        IdKey::Fn(Rc::new(f))
+    }
+
+    /// The row's key as selection keeps it: the value as a string.
+    pub fn string_key(&self, item: &T) -> SharedString
+    where
+        T: TableRecord,
+    {
+        let value = match self {
+            IdKey::Field(f) => item.value(f),
+            IdKey::Fn(f) => f(item),
+        };
+        match value {
+            TableValue::Text(t) => t,
+            other => other.display_text(),
+        }
+    }
+}
+
+impl<T> From<&'static str> for IdKey<T> {
+    fn from(name: &'static str) -> Self {
+        IdKey::Field(name.into())
+    }
+}
+
+impl<T> From<SharedString> for IdKey<T> {
+    fn from(name: SharedString) -> Self {
+        IdKey::Field(name)
+    }
+}
+
+impl<T> From<String> for IdKey<T> {
+    fn from(name: String) -> Self {
+        IdKey::Field(name.into())
+    }
 }
 
 impl<T> Clone for IdKey<T> {

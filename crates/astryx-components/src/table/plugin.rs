@@ -16,11 +16,34 @@ use std::rc::Rc;
 
 use gpui::{AnyElement, App, Div, ScrollHandle, SharedString, Stateful, StyleRefinement, Window};
 
-use super::model::{IdentityStatus, RowKey, TableColumn};
+use super::model::{IdentityStatus, RowKey, TableColumn, TableItem};
 use crate::icon::IconSource;
+
+/// A development diagnostic, printed once per `key` in debug builds
+/// (upstream's deduplicated `devWarning`).
+pub(crate) fn dev_warn_once(key: &str, message: impl FnOnce() -> String) {
+    if !cfg!(debug_assertions) {
+        return;
+    }
+    thread_local! {
+        static SEEN: std::cell::RefCell<std::collections::HashSet<String>> =
+            std::cell::RefCell::default();
+    }
+    if SEEN.with(|s| s.borrow_mut().insert(key.to_string())) {
+        eprintln!("astryx: {}", message());
+    }
+}
 
 /// A change to an element the table builds: handlers, attributes.
 pub type ElementHook = Box<dyn FnOnce(Stateful<Div>) -> Stateful<Div>>;
+
+/// A plugin that claims a whole row's press (upstream `wholeRowOwner`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WholeRowOwner {
+    Activation,
+    Expansion,
+    Navigation,
+}
 
 /// The branch a table renders.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,6 +85,9 @@ pub struct TableRenderContext {
     pub header_row_count: usize,
     /// The scroll container around the table.
     pub viewport: ScrollHandle,
+    /// The plugins that claim a whole row's action (activation, row
+    /// expansion): more than one neutralizes activation (FR17).
+    pub whole_row_owners: usize,
 }
 
 /// Facts about one body row (upstream `TableRowContext`).
@@ -184,6 +210,7 @@ pub struct HeaderRowProps {
 /// checkbox), the label `content` (a sort control may wrap it), `after` it
 /// (a sort indicator), an `overlay` laid over the cell (a resize handle,
 /// never part of the header's name) and content `below` it (inline filters).
+#[derive(Default)]
 pub struct HeaderCellProps {
     pub style: StyleRefinement,
     pub before: Vec<AnyElement>,
@@ -200,28 +227,49 @@ pub struct HeaderCellProps {
 }
 
 /// A body row's props: its cells, built (upstream `BodyRowRenderProps`).
+#[derive(Default)]
 pub struct BodyRowProps {
     pub style: StyleRefinement,
     pub children: Vec<AnyElement>,
     /// Rendered right after the row: a detail panel.
     pub after_row: Vec<AnyElement>,
     pub aria_row_index: Option<usize>,
-    /// Selection's published state (FR21): the row is selected, and paints
-    /// its wash when `highlight`.
-    pub selected: Option<RowPaint>,
+    /// What the row plugins publish for its paint (FR21): one resolver
+    /// paints it from every plugin's state.
+    pub paint: RowPaint,
+    /// Upstream `tabIndex`: `Some(true)` makes the row a tab stop,
+    /// `Some(false)` focusable but out of the tab order (`-1`), `None`
+    /// leaves it unfocusable.
+    pub tab_stop: Option<bool>,
+    /// Upstream `aria-keyshortcuts`, one token each.
+    pub key_shortcuts: Vec<SharedString>,
+    /// The one whole-row action (activation, FR17): a primary click on the
+    /// row or a non-repeated Enter or Space while the row itself is
+    /// focused runs it, after the row's other handlers, unless one called
+    /// `window.prevent_default()`. Presses on a nested control never do.
+    pub row_action: Option<RowAction>,
     pub hooks: Vec<ElementHook>,
 }
 
-/// What a row plugin publishes for the row's paint (upstream
-/// `rowPaint.ts`).
+/// A whole row's action ([`BodyRowProps::row_action`]).
+pub type RowAction = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// What the row plugins publish for a row's paint (upstream `rowPaint.ts`,
+/// FR21): selection's wash wins while the row is selected with
+/// `highlight`; otherwise the active row's fill; then hover and the stripe.
+/// The active row also carries its inline-start marker.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RowPaint {
+    /// Selected (`aria-selected`, the theme's `selected` state).
     pub selected: bool,
+    /// Selection paints its wash on a selected row (`hasRowHighlight`).
     pub highlight: bool,
+    /// The current item (activation: `aria-current`, fill and marker).
     pub active: bool,
 }
 
 /// A body cell's props (upstream `BodyCellRenderProps`).
+#[derive(Default)]
 pub struct BodyCellProps {
     pub style: StyleRefinement,
     pub context_menu: Vec<TableContextActions>,
@@ -254,6 +302,18 @@ pub trait TablePlugin<T> {
 
     /// Whether it transforms body rows or cells (for the row model).
     fn transforms_body(&self) -> bool {
+        false
+    }
+
+    /// The whole-row action it claims, if any (FR17): more than one owner
+    /// neutralizes activation.
+    fn whole_row_owner(&self) -> Option<WholeRowOwner> {
+        None
+    }
+
+    /// Whether it needs the rows' canonical identity: `id_key` values, with
+    /// missing, invalid and duplicate keys reported (FR16).
+    fn needs_canonical_identity(&self) -> bool {
         false
     }
 
@@ -310,7 +370,7 @@ pub trait TablePlugin<T> {
     fn transform_body_row(
         &self,
         props: BodyRowProps,
-        item: &T,
+        item: &TableItem<T>,
         context: &TableRowContext,
         window: &mut Window,
         cx: &mut App,
@@ -323,7 +383,7 @@ pub trait TablePlugin<T> {
         &self,
         props: BodyCellProps,
         column: &TableColumn<T>,
-        item: &T,
+        item: &TableItem<T>,
         columns: &[TableColumn<T>],
         context: &TableRowContext,
         window: &mut Window,

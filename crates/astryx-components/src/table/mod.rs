@@ -1,27 +1,45 @@
 //! Table (M7): a data-driven table with a plugin pipeline, or the caller's
 //! composition of sections, rows and cells. Upstream: `Table/`.
 
+mod activation;
 mod cells;
 pub mod examples;
 pub(crate) mod menu;
 pub mod model;
 mod parts;
 pub mod plugin;
+mod row_index;
+mod row_status;
+mod selection;
 mod sortable;
 #[allow(clippy::module_inception)]
 mod table;
 
+pub use activation::{TableActivation, USE_TABLE_ACTIVATION_DOC, use_table_activation};
 pub use cells::{TableDensity, TableDividers, TableTextOverflow, TableVerticalAlign};
 pub use model::{
     ColumnHeader, ColumnWidth, IdKey, IdentityStatus, Record, RowKey, SortableColumn, TableColumn,
-    TableColumnAlign, TableFilterRef, TableRecord, TableValue, capitalize, generate_columns, pixel,
-    proportional, proportional_min, resolve_column_floor_widths, resolve_table_min_width,
+    TableColumnAlign, TableFilterRef, TableItem, TableRecord, TableValue, capitalize,
+    generate_columns, pixel, proportional, proportional_min, resolve_column_floor_widths,
+    resolve_table_min_width,
 };
 pub use parts::{TableBody, TableCell, TableFooter, TableHeader, TableHeaderCell, TableRow};
 pub use plugin::{
-    BodyCellProps, BodyRowProps, ElementHook, HeaderCellProps, HeaderRowProps, RowKind, RowModel,
-    RowPaint, ScrollWrapperProps, TableContextAction, TableContextActions, TableMode, TablePlugin,
-    TableRenderContext, TableRenderProps, TableRowContext,
+    BodyCellProps, BodyRowProps, ElementHook, HeaderCellProps, HeaderRowProps, RowAction, RowKind,
+    RowModel, RowPaint, ScrollWrapperProps, TableContextAction, TableContextActions, TableMode,
+    TablePlugin, TableRenderContext, TableRenderProps, TableRowContext, WholeRowOwner,
+};
+pub use row_index::{
+    ROW_INDEX_COLUMN_KEY, TableRowIndex, USE_TABLE_ROW_INDEX_DOC, use_table_row_index,
+};
+pub use row_status::{
+    ROW_STATUS_COLUMN_KEY, StatusColor, TableRowSemanticStatus, TableRowStatus,
+    TableRowStatusColor, TableRowStatusPlugin, USE_TABLE_ROW_STATUS_DOC, use_table_row_status,
+};
+pub use selection::{
+    SELECTION_COLUMN_KEY, SelectionState, SelectionStateConfig, TABLE_SELECTION_TOOLBAR_DOC,
+    TableSelection, TableSelectionState, TableSelectionToolbar, USE_TABLE_SELECTION_DOC,
+    USE_TABLE_SELECTION_STATE_DOC, use_table_selection_state,
 };
 pub use sortable::{
     SortDirection, SortEntry, SortableState, SortableStateConfig, TableSortable,
@@ -30,6 +48,8 @@ pub use sortable::{
 };
 pub use table::Table;
 
+#[cfg(test)]
+mod row_tests;
 #[cfg(test)]
 mod tests;
 

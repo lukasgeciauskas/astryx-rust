@@ -26,8 +26,8 @@ use super::cells::{
 };
 use super::menu;
 use super::model::{
-    ColumnHeader, IdKey, RowKey, TableColumn, TableRecord, column_tracks, generate_columns,
-    resolve_identity, resolve_table_min_width,
+    ColumnHeader, IdKey, RowKey, TableColumn, TableItem, TableRecord, column_tracks,
+    generate_columns, resolve_identity, resolve_table_min_width,
 };
 use super::plugin::{
     BodyCellProps, BodyRowProps, HeaderCellProps, HeaderRowProps, RowKind, ScrollWrapperProps,
@@ -292,6 +292,7 @@ impl<T: TableRecord> RenderOnce for Table<T> {
                 logical_row_count: 0,
                 header_row_count: 0,
                 viewport: scroll.clone(),
+                whole_row_owners: 0,
             };
             let tracks = match self.text_overflow {
                 TableTextOverflow::Wrap => vec![GridTrack::Auto],
@@ -442,7 +443,10 @@ fn render_data<T: TableRecord>(
     let min_width = resolve_table_min_width(&columns);
     let count = columns.len();
     let row_model = admitted_row_model(plugins);
-    let identity = resolve_identity(data, this.id_key.as_ref(), false);
+    // Canonical identity when a plugin needs it (FR16): id_key values with
+    // missing, invalid and duplicate keys marked.
+    let canonical = plugins.iter().any(|p| p.needs_canonical_identity());
+    let identity = resolve_identity(data, this.id_key.as_ref(), canonical);
     let header_rows = usize::from(count > 0);
     let context = TableRenderContext {
         mode: TableMode::Data,
@@ -450,6 +454,10 @@ fn render_data<T: TableRecord>(
         logical_row_count: data.len(),
         header_row_count: header_rows,
         viewport: scroll.clone(),
+        whole_row_owners: plugins
+            .iter()
+            .filter(|p| p.whole_row_owner().is_some())
+            .count(),
     };
     let loading = plugins.iter().any(|p| p.is_loading(cx) == Some(true));
     let has_more = plugins.iter().any(|p| p.has_more(cx) == Some(true));
@@ -515,8 +523,8 @@ fn render_data<T: TableRecord>(
     let aria_indexes = this.row_index_start.is_some() || this.row_count.is_some();
     let first_index = this.row_index_start.unwrap_or(1);
     let mut body: Vec<AnyElement> = Vec::new();
-    for (i, item) in data.iter().enumerate() {
-        let id = &identity[i];
+    for (i, id) in identity.iter().enumerate() {
+        let item = &TableItem::new(data.clone(), i);
         let row_context = TableRowContext {
             key: id.key.clone(),
             identity_status: id.status,
@@ -571,26 +579,17 @@ fn render_data<T: TableRecord>(
             children: cells,
             after_row: Vec::new(),
             aria_row_index: aria_indexes.then_some(first_index + i),
-            selected: None,
+            paint: super::plugin::RowPaint::default(),
+            tab_stop: None,
+            key_shortcuts: Vec::new(),
+            row_action: None,
             hooks: Vec::new(),
         };
         for p in plugins {
             props = p.transform_body_row(props, item, &row_context, window, cx);
         }
-        let row = body_row(
-            &name,
-            &row_key,
-            i,
-            tracks.clone(),
-            props.style,
-            props.children,
-            props.aria_row_index,
-            props.selected,
-            props.hooks,
-            style,
-            window,
-            cx,
-        );
+        let after_row = std::mem::take(&mut props.after_row);
+        let row = body_row(&name, &row_key, i, tracks.clone(), props, style, window, cx);
         body.push(
             menu::with_actions(
                 row,
@@ -602,7 +601,7 @@ fn render_data<T: TableRecord>(
             )
             .into_any_element(),
         );
-        body.extend(props.after_row);
+        body.extend(after_row);
     }
     let empty = if data.is_empty() {
         match std::mem::replace(&mut this.empty, EmptyChoice::Off) {
@@ -844,7 +843,7 @@ fn body_cell<T: TableRecord>(
     table: &str,
     row_key: &str,
     col: &TableColumn<T>,
-    item: &T,
+    item: &TableItem<T>,
     props: BodyCellProps,
     index: usize,
     count: usize,
@@ -905,17 +904,25 @@ fn body_row(
     key: &str,
     index: usize,
     tracks: Vec<GridTrack>,
-    props_style: StyleRefinement,
-    children: Vec<AnyElement>,
-    aria_row_index: Option<usize>,
-    selected: Option<super::plugin::RowPaint>,
-    hooks: Vec<super::plugin::ElementHook>,
+    props: BodyRowProps,
     style: &TableStyle,
     window: &mut Window,
     cx: &mut App,
 ) -> gpui::Stateful<gpui::Div> {
     let theme = current(window, cx);
     let t = theme.tokens();
+    let rem = window.rem_size();
+    let BodyRowProps {
+        style: props_style,
+        children,
+        aria_row_index,
+        paint,
+        tab_stop,
+        key_shortcuts,
+        row_action,
+        hooks,
+        ..
+    } = props;
     let selector = format!("{table}-row-{key}");
     let mut row = div()
         .id(ElementId::Name(selector.clone().into()))
@@ -924,29 +931,106 @@ fn body_row(
         .grid_template_columns(tracks)
         .w_full()
         .role(Role::Row);
+    // One resolver paints the row from every plugin's state (FR21).
     let state = RowState {
         index,
         hovered: false,
-        selected_wash: selected.is_some_and(|s| s.selected && s.highlight),
+        selected_wash: paint.selected && paint.highlight,
+        active: paint.active,
     };
     if let Some(bg) = row_background(&theme, style, state) {
         row = row.bg(bg);
     }
-    if style.hover && !state.selected_wash {
+    if style.hover && !state.selected_wash && !state.active {
         let hover = t.color.overlay_hover;
         row = row.hover(move |s| s.bg(hover));
     }
     if let Some(i) = aria_row_index {
         row = row.aria_row_index(i);
     }
-    if selected.is_some_and(|s| s.selected) {
+    if paint.selected {
         row = row.aria_selected(true);
     }
-    let props = row_theme_props(style, Some(index));
-    theme.refine(row.style(), "table-row", &props, None);
+    // The active row: `aria-current` and an inline-start marker that does not
+    // rely on colour (activation DD1, AR5).
+    if paint.active {
+        let marker = format!("{table}-row-{key}-active");
+        row = row.aria_current(gpui::AriaCurrent::True).child(
+            div()
+                .debug_selector(move || marker.clone())
+                .absolute()
+                .top_0()
+                .bottom_0()
+                .when(style.dir.is_rtl(), |d| d.right_0())
+                .when(!style.dir.is_rtl(), |d| d.left_0())
+                .w(px(3.))
+                .bg(t.color.accent),
+        );
+    }
+    let mut theme_props = row_theme_props(style, Some(index));
+    if paint.selected {
+        theme_props.push(("selected", "true"));
+    }
+    theme.refine(row.style(), "table-row", &theme_props, None);
     row.style().refine(&props_style);
+    if !key_shortcuts.is_empty() {
+        row = row.aria_keyshortcuts(SharedString::from(key_shortcuts.join(" ")));
+    }
+    // A focusable row: a tab stop, or focusable out of the tab order.
+    let focus = (tab_stop.is_some() || row_action.is_some()).then(|| {
+        let handle = window
+            .use_keyed_state(
+                ElementId::Name(format!("{table}-row-{key}-focus").into()),
+                cx,
+                |_, cx| cx.focus_handle(),
+            )
+            .read(cx)
+            .clone();
+        handle.tab_stop(tab_stop != Some(false))
+    });
+    if let Some(focus) = &focus {
+        row = row.track_focus(focus);
+        if astryx_primitives::is_focus_visible(focus, window) {
+            row = row.child(crate::focus::focus_ring_inset(t, px(0.), rem));
+        }
+    }
     for hook in hooks {
         row = hook(row);
+    }
+    // The whole-row action runs after every other handler of the row.
+    if let (Some(action), Some(focus)) = (row_action, focus) {
+        let (on_click, row_focus) = (action.clone(), focus.clone());
+        row = row
+            .on_click(move |event, window, cx| {
+                // Keyboard presses activate on key down, below.
+                if event.is_keyboard() || window.default_prevented() {
+                    return;
+                }
+                // A nested control took the press: it holds the focus.
+                if row_focus.contains_focused(window, cx) && !row_focus.is_focused(window) {
+                    return;
+                }
+                on_click(window, cx);
+            })
+            .on_key_down(move |event: &KeyDownEvent, window, cx| {
+                let stroke = &event.keystroke;
+                if !focus.is_focused(window) || stroke.modifiers.modified() {
+                    return;
+                }
+                let space = stroke.key == "space";
+                if !space && stroke.key != "enter" {
+                    return;
+                }
+                let cancelled = window.default_prevented();
+                // Space never scrolls the page from an activatable row.
+                if space {
+                    window.prevent_default();
+                    cx.stop_propagation();
+                }
+                if !cancelled && !event.is_held {
+                    action(window, cx);
+                }
+            });
     }
     row.relative().children(children)
 }
