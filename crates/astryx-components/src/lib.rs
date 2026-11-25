@@ -29,6 +29,7 @@ pub mod pagination;
 pub mod people;
 pub mod power_search;
 mod press;
+pub mod reorderable;
 pub mod search;
 pub mod segmented;
 pub mod selector;

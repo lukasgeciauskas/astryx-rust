@@ -109,6 +109,8 @@ pub(crate) struct ListContext {
     pub number_column: Option<Pixels>,
     pub marker: Option<ListMarker>,
     pub task: Option<ListTask>,
+    /// A reorderable list's session (AST-103).
+    pub reorder: Option<crate::reorderable::session::ReorderCx>,
 }
 
 /// Rows inside it draw this marker or task box (upstream
@@ -146,6 +148,8 @@ pub(crate) struct ListRow {
     pub last: bool,
     pub number: i64,
     pub corners: RowCorners,
+    /// Its place among the list's children.
+    pub index: usize,
 }
 
 /// A vertical list of ListItem rows, upstream `List`.
@@ -168,6 +172,7 @@ pub struct List {
     label: Option<SharedString>,
     list_style: ListStyle,
     start: i64,
+    reorderable: Option<crate::reorderable::Reorderable>,
     style: StyleRefinement,
 }
 
@@ -184,8 +189,20 @@ impl List {
             label: None,
             list_style: ListStyle::None,
             start: 1,
+            reorderable: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Upstream `reorderable`: the object [`create_reorderable`] made. Its
+    /// rows move by their handles' drags and reorder mode; each ListItem's
+    /// `item_key` names it in the reports. Without it the list renders no
+    /// handle and listens for no reorder (AST-103 FR2).
+    ///
+    /// [`create_reorderable`]: crate::reorderable::create_reorderable
+    pub fn reorderable(mut self, reorderable: crate::reorderable::Reorderable) -> Self {
+        self.reorderable = Some(reorderable);
+        self
     }
 
     astryx_primitives::setters! {
@@ -387,13 +404,32 @@ impl RenderOnce for List {
                     last,
                     number: self.start + i as i64,
                     corners: row_corners,
+                    index: i,
                 },
                 child,
             )
             .into_any_element()
         });
 
-        let mut list = div()
+        // AST-103: a reorderable list's session, its rows' bounds once laid
+        // out, and its overlay (the line and the dragged row) last.
+        let reorder = self
+            .reorderable
+            .as_ref()
+            .map(|r| crate::reorderable::session::begin(&self.id, r, window, cx));
+        let base = match &reorder {
+            Some(rc) => {
+                let session = rc.session.clone();
+                div()
+                    .relative()
+                    .on_children_prepainted(move |bounds, window, cx| {
+                        crate::reorderable::session::finalize(&session, &bounds, count, window, cx)
+                    })
+            }
+            None => div(),
+        };
+        let overlay = reorder.as_ref().map(crate::reorderable::session::overlay);
+        let mut list = base
             .id(self.id.clone())
             .flex()
             .flex_col()
@@ -430,8 +466,9 @@ impl RenderOnce for List {
             number_column,
             marker: None,
             task: None,
+            reorder,
         };
-        let list = provide(context, list.children(rows)).into_any_element();
+        let list = provide(context, list.children(rows).children(overlay)).into_any_element();
         match self.header {
             None => list,
             Some(header) => div()

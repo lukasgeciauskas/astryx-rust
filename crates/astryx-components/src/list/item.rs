@@ -27,6 +27,8 @@ use crate::choice::CheckboxInput;
 use crate::indicator::ChoiceSize;
 use crate::item::{Item, ItemAlign, ItemDensity};
 use crate::overlay::MenuEntry;
+use crate::reorderable::ItemKey;
+use crate::reorderable::session::{self as reorder, Registration};
 
 type ClickFn = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 type ActivateFn = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -43,6 +45,8 @@ pub struct ListItem {
     label_text: Option<SharedString>,
     description: Option<AnyElement>,
     description_text: bool,
+    /// The description's text, for the dragged row's place.
+    description_string: Option<SharedString>,
     start_content: Option<AnyElement>,
     end_content: Option<AnyElement>,
     on_click: Option<ClickFn>,
@@ -52,7 +56,7 @@ pub struct ListItem {
     align: ItemAlign,
     disabled: bool,
     selected: bool,
-    item_key: Option<SharedString>,
+    item_key: Option<ItemKey>,
     menu: Option<Vec<MenuEntry>>,
     style: StyleRefinement,
 }
@@ -74,6 +78,7 @@ impl ListItem {
             label_text: None,
             description: None,
             description_text: false,
+            description_string: None,
             start_content: None,
             end_content: None,
             on_click: None,
@@ -102,13 +107,20 @@ impl ListItem {
         ?href: SharedString,
         /// Upstream `target`, with `href`.
         ?target: SharedString,
-        /// Upstream `itemKey`: the row's identity for a reorderable List.
-        ?item_key: SharedString,
+    }
+
+    /// Upstream `itemKey`: the row's identity for a reorderable List, a
+    /// string or a number from the data; `on_reorder` reports it as given.
+    pub fn item_key(mut self, key: impl Into<ItemKey>) -> Self {
+        self.item_key = Some(key.into());
+        self
     }
 
     /// Upstream `description` as text: one line, ellipsized.
     pub fn description(mut self, description: impl Into<SharedString>) -> Self {
-        self.description = Some(description.into().into_any_element());
+        let description: SharedString = description.into();
+        self.description_string = Some(description.clone());
+        self.description = Some(description.into_any_element());
         self.description_text = true;
         self
     }
@@ -177,6 +189,7 @@ impl RenderOnce for ListItem {
             last: true,
             number: 1,
             corners: Default::default(),
+            index: 0,
         });
         let in_list = ctx.is_some();
         let density = ctx.as_ref().map_or(ItemDensity::Balanced, |c| c.density);
@@ -222,20 +235,52 @@ impl RenderOnce for ListItem {
                 cx,
             )
         });
-        match (self.end_content, more) {
-            (Some(end), Some(more)) => {
-                item = item.end_content(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(t.spacing.s2)
-                        .child(end)
-                        .child(more),
-                )
+        // AST-103: a reorderable List's row joins its order, and one that can
+        // move ends with the handle (FR5: the one element reordering adds).
+        let reorder = ctx.as_ref().and_then(|c| c.reorder.clone());
+        let reorder_key = reorder.as_ref().and(self.item_key.clone());
+        let handle = match (&reorder, &reorder_key) {
+            (Some(rc), Some(key)) => {
+                let movable = rc.reorderable.can_move(key);
+                reorder::register(
+                    rc,
+                    Registration {
+                        index: row.index,
+                        key: key.clone(),
+                        name: self.label_text.clone(),
+                        movable,
+                    },
+                    cx,
+                );
+                movable.then(|| {
+                    reorder::handle(
+                        rc,
+                        key,
+                        self.label_text.clone(),
+                        row.index + 1,
+                        self.disabled,
+                        window,
+                        cx,
+                    )
+                })
             }
-            (Some(end), None) => item = item.end_content(end),
-            (None, Some(more)) => item = item.end_content(more),
-            (None, None) => {}
+            _ => None,
+        };
+        let ends: Vec<AnyElement> = [
+            self.end_content,
+            more.map(IntoElement::into_any_element),
+            handle,
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        match ends.len() {
+            0 => {}
+            1 => item = item.end_content(ends.into_iter().next().unwrap()),
+            _ => {
+                item =
+                    item.end_content(div().flex().items_center().gap(t.spacing.s2).children(ends))
+            }
         }
         if let Some(f) = self.on_click {
             item = item.on_click(move |event, window, cx| f(event, window, cx));
@@ -373,24 +418,63 @@ impl RenderOnce for ListItem {
         theme.refine(item.style(), "list-item", &[], None);
         item.style().refine(&self.style);
 
-        let Some(entries) = self.menu else {
-            return item.into_any_element();
+        // The dragged row rides the pointer in the List's overlay, dimmed;
+        // its place keeps its size and, dimmed, its text.
+        let source = match (&reorder, &reorder_key) {
+            (Some(rc), Some(key)) => reorder::drag_source(rc, key, cx).map(|h| (rc.clone(), h)),
+            _ => None,
         };
-        // FR13: the row's menu, on the row itself.
-        let area = div()
-            .id(ElementId::Name(format!("{}-row", self.id).into()))
-            .relative()
-            .flex()
-            .flex_col()
-            .child(item);
-        crate::overlay::with_row_menu(
-            area,
-            ElementId::Name(format!("{}-menu", self.id).into()),
-            entries,
-            self.label_text,
-            window,
-            cx,
-        )
-        .into_any_element()
+        let ghost = source.as_ref().map(|_| {
+            let mut ghost = Item::new(
+                ElementId::Name(format!("{}-reorder-source", self.id).into()),
+                self.label_text.clone().unwrap_or_default(),
+            )
+            .density(density)
+            .align(self.align)
+            .selected(self.selected)
+            .label_lines(1usize);
+            if let Some(d) = self.description_string.clone() {
+                ghost = ghost.description(d).description_lines(1usize);
+            }
+            // The row as it was, dimmed: its grip and its divider too.
+            ghost = ghost.end_content(reorder::grip(t.color.icon_secondary));
+            if dividers && !row.last {
+                ghost = ghost
+                    .rounded(px(0.))
+                    .border_b(t.border.width)
+                    .border_color(t.color.border);
+            }
+            ghost
+        });
+        let element = match self.menu {
+            None => item.into_any_element(),
+            // FR13: the row's menu, on the row itself.
+            Some(entries) => crate::overlay::with_row_menu(
+                div()
+                    .id(ElementId::Name(format!("{}-row", self.id).into()))
+                    .relative()
+                    .flex()
+                    .flex_col()
+                    .child(item),
+                ElementId::Name(format!("{}-menu", self.id).into()),
+                entries,
+                self.label_text,
+                window,
+                cx,
+            )
+            .into_any_element(),
+        };
+        match (source, ghost) {
+            (Some((rc, height)), Some(ghost)) => {
+                *rc.preview.borrow_mut() = Some(element);
+                div()
+                    .h(px(height))
+                    .overflow_hidden()
+                    .opacity(crate::reorderable::model::MOVING_OPACITY)
+                    .child(ghost)
+                    .into_any_element()
+            }
+            _ => element,
+        }
     }
 }

@@ -16,6 +16,14 @@
 
 ## Components
 
+- **A dragged row's place shows its text, not a copy of the row.** GPUI draws an element
+  once a frame, so while a row is dragged the row itself (dimmed) rides the pointer as
+  the preview, and its place shows its label, description, grip and divider, dimmed;
+  start content and custom end content are not there. Upstream dims the row in place and
+  draws a copy at the pointer. GPUI also reports no pointer type, so a finger's drag
+  starts like a mouse's (4px of travel), without upstream's hold; and Escape cancels a
+  drag, which upstream's mouse drag has no key for.
+
 - **A windowed list needs its scroller to hold its anchor.** `WindowedList` windows from
   the clips above it wherever it sits. To keep its first visible row (or its end, or a
   given item) in place as rows change, it must move the scroller, so it needs a

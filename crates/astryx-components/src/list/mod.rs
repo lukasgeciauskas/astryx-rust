@@ -20,7 +20,6 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
 }
 
 const MOTION: &str = "not yet: animated row changes land with the motion layer (M11)";
-const REORDER: &str = "not yet: reordering lands later in M6, with TreeList";
 const SWIPE: &str = "not yet: swipe actions land with the touch layer (M11)";
 
 pub const LIST_DOC: ComponentDoc = ComponentDoc {
@@ -31,7 +30,7 @@ pub const LIST_DOC: ComponentDoc = ComponentDoc {
         p("density", RustApi::Method("density")),
         p("hasDividers", RustApi::Method("dividers")),
         p("animatedLayout", RustApi::Waived(MOTION)),
-        p("reorderable", RustApi::Waived(REORDER)),
+        p("reorderable", RustApi::Method("reorderable")),
         p("edge", RustApi::Method("edge")),
         p(
             "edgeCompensation",

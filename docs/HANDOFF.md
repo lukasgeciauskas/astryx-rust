@@ -30,8 +30,11 @@ Tokenizer, MultiSelector and ComplexSelector done)._
 
 ### Not yet ported (28)
 
-- **M6 Collections (in progress):** List reordering (`reorderable`, AST-103). Item's
-  swipe actions wait for M11; PowerSearch's date and time values wait for M8.
+- **M6 Collections (in progress):** the rest of reordering (FR9's shift feedback,
+  `positions`, `attach` with two-dimensional moves), then `useKeyboardHint` (not
+  ported; TabList, Toolbar, SegmentedControl and AvatarGroup lack it, and reorder
+  mode's hint shares its anchored layer). Item's swipe actions wait for M11;
+  PowerSearch's date and time values wait for M8.
 - **M7:** Table. **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
   TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,

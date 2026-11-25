@@ -117,9 +117,59 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
             ),
         )
         .child(label(
+            "Reorderable: drag a handle, or press it and use the arrows",
+        ))
+        .child(reorderable(window, cx))
+        .child(label(
             "Windowed: 10,000 rows, opened at row 5,000; only rows in view render",
         ))
         .child(windowed(window, cx))
+        .into_any_element()
+}
+
+/// A reorderable list (AST-103): each row's handle drags it, or toggles
+/// reorder mode for the arrow keys; the button starts the mode from the app.
+fn reorderable(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::button::Button;
+    use crate::reorderable::{ItemKey, ReorderableOptions, create_reorderable};
+    let items = window.use_keyed_state("list-reorder-items", cx, |_, _| {
+        vec!["Eggs", "Milk", "Bread", "Butter", "Jam"]
+    });
+    let order = items.clone();
+    let object = create_reorderable(ReorderableOptions::new(move |m, window, cx| {
+        order.update(cx, |items, _| {
+            if let ItemKey::Text(key) = &m.key
+                && let Some(from) = items.iter().position(|i| *i == key.as_ref())
+            {
+                let item = items.remove(from);
+                items.insert(m.to, item);
+            }
+        });
+        window.refresh();
+    }));
+    let start = object.clone();
+    Stack::vertical()
+        .gap(SpacingStep::S3)
+        .child(
+            Stack::horizontal().child(
+                Button::new("list-reorder-start", "Move Bread")
+                    .on_click(move |_, window, cx| start.start("Bread", window, cx)),
+            ),
+        )
+        .child(
+            Card::new().w(px(320.)).child(
+                List::new("groceries")
+                    .label("Groceries")
+                    .dividers(true)
+                    .reorderable(object)
+                    .children(
+                        items
+                            .read(cx)
+                            .iter()
+                            .map(|name| ListItem::new(*name, *name).item_key(*name)),
+                    ),
+            ),
+        )
         .into_any_element()
 }
 

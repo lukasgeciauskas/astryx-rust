@@ -314,8 +314,7 @@ The remaining primitives:
     `aria-current` on a selected interactive row; swipe actions wait for M11.
   - MetadataList and MetadataListItem (done) on R7 grid tracks; OverflowList (done) with
     upstream's `computeOverflow` fit over a hidden measuring copy.
-  - Carried: List's and TreeList's `animatedLayout` (with TreeList's expand glide, FR8-FR9) to the motion layer (M11), like Collapsible's;
-    `reorderable` lands with TreeList at the end of M6.
+  - Carried: List's and TreeList's `animatedLayout` (with TreeList's expand glide, FR8-FR9) to the motion layer (M11), like Collapsible's.
   - Typeahead, BaseTypeahead and TypeaheadItem (done) on `search::SearchSource`: the
     threshold and debounce (FR2), stale answers dropped and answers kept through a
     dismissal (FR3), partial lists that keep their rows and highlight (FR10), grouped
@@ -389,6 +388,17 @@ The remaining primitives:
     right-to-left. Table's row and column virtualization (M7) are its consumers; Selector
     renders every option, as upstream's does. INV5's byte budget measures a JavaScript
     bundle and has no Rust counterpart.
+  - Reordering (`reorderable::create_reorderable`, AST-103), List its first adopter: the
+    handle (a toggle named "Reorder" and the row's label) ends each keyed row the object
+    accepts (FR1, FR2, FR5); a drag from it with the source dimmed in place, the row
+    riding the pointer, upstream's drop-position rule and accent line, edge autoscroll on
+    UIKit's measured steps, one report at the drop, and its announcements (FR3); reorder
+    mode by click, Enter or Space, the arrows moving a place with each move reported and
+    announced with its neighbours, refusals past rows that stay at the ends, the mode's
+    line and its hint of buttons, Escape or Done (FR4); `start(key)` (FR4a); and
+    `labels` (FR1, an upstream gap). Remaining in M6: `feedbackBehavior`'s shift (FR9),
+    `positions` (FR1) and `attach` (FR4b, as wrappers for an app's own elements, with
+    two-dimensional moves), all three upstream gaps.
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.
