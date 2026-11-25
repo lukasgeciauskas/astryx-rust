@@ -11,6 +11,7 @@
 //!
 //! [`List::reorderable`]: crate::list::List::reorderable
 
+pub mod examples;
 pub(crate) mod model;
 pub(crate) mod session;
 
@@ -20,7 +21,10 @@ mod tests;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gpui::{App, Pixels, Point, SharedString, WeakEntity, Window};
+use gpui::{
+    AnyElement, App, Div, ElementId, IntoElement, ParentElement, Pixels, Point, RenderOnce,
+    SharedString, Styled, WeakEntity, Window, div, prelude::*,
+};
 
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
 
@@ -182,12 +186,121 @@ impl Reorderable {
         session::start(self, key.into(), window, cx);
     }
 
+    /// FR4b: reorders an app's own elements, with no collection component.
+    /// Call it once a frame while they render; stop calling it to detach,
+    /// which ends a drag or reorder mode in progress and reports nothing.
+    ///
+    /// The container takes the items as its children, in order
+    /// ([`ReorderAttachment::container`]); each item is wrapped with
+    /// [`ReorderAttachment::item`], and its handle, an element of the app's,
+    /// with [`ReorderAttachment::handle`]. A move the app does not apply is
+    /// refused and announced ("Can't move King of hearts").
+    pub fn attach(
+        &self,
+        id: impl Into<ElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> ReorderAttachment {
+        ReorderAttachment {
+            rc: session::begin(&id.into(), self, true, window, cx),
+        }
+    }
+
     pub(crate) fn can_move(&self, key: &ItemKey) -> bool {
         self.0
             .options
             .is_reorderable
             .as_ref()
             .is_none_or(|f| f(key))
+    }
+}
+
+/// A frame of [`Reorderable::attach`]: wraps an app's container, items and
+/// handles.
+#[derive(Clone)]
+pub struct ReorderAttachment {
+    rc: session::ReorderCx,
+}
+
+impl ReorderAttachment {
+    /// The container, laid out as the app likes (a column, a row, a
+    /// wrapping grid): its children are the `count` items, in order.
+    pub fn container(&self, container: Div, count: usize) -> AnyElement {
+        let session = self.rc.session.clone();
+        container
+            .relative()
+            .on_children_prepainted(move |bounds, window, cx| {
+                session::finalize(&session, &bounds, count, window, cx)
+            })
+            .child(session::overlay(&self.rc))
+            .into_any_element()
+    }
+
+    /// The item at `index` with `key`, named `name` in announcements and
+    /// its handle's name. A rejected key moves nothing.
+    pub fn item(
+        &self,
+        index: usize,
+        key: impl Into<ItemKey>,
+        name: impl Into<SharedString>,
+        element: impl IntoElement,
+        cx: &mut App,
+    ) -> AnyElement {
+        let key = key.into();
+        let movable = self.rc.reorderable.can_move(&key);
+        session::register(
+            &self.rc,
+            session::Registration {
+                index,
+                key: key.clone(),
+                name: Some(name.into()),
+                movable,
+            },
+            cx,
+        );
+        session::place_item(
+            &self.rc,
+            &key,
+            index,
+            element.into_any_element(),
+            || None,
+            cx,
+        )
+    }
+
+    /// The item's handle: the app's `element`, given the handle's role,
+    /// name ("Reorder" and the item's name), toggle state, Tab stop, drag
+    /// and keys. A rejected item's handle stays as it was.
+    pub fn handle(&self, key: impl Into<ItemKey>, element: impl IntoElement) -> AnyElement {
+        AttachedHandle {
+            rc: self.rc.clone(),
+            key: key.into(),
+            element: element.into_any_element(),
+        }
+        .into_any_element()
+    }
+}
+
+/// An attached handle, named once its item has registered.
+#[derive(IntoElement)]
+struct AttachedHandle {
+    rc: session::ReorderCx,
+    key: ItemKey,
+    element: AnyElement,
+}
+
+impl RenderOnce for AttachedHandle {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        if !self.rc.reorderable.can_move(&self.key) {
+            return self.element;
+        }
+        let (name, position) = session::registered(&self.rc, &self.key, cx);
+        let body = div()
+            .id(ElementId::Name(
+                format!("{:?}-reorder-{}", self.rc.id, session::key_text(&self.key)).into(),
+            ))
+            .child(self.element);
+        session::handle_on(&self.rc, &self.key, name, position, false, body, window, cx)
     }
 }
 
@@ -209,5 +322,5 @@ pub const CREATE_REORDERABLE_DOC: ComponentDoc = ComponentDoc {
         ),
         p("reorderable", RustApi::Method("List::reorderable")),
     ],
-    example: include_str!("../list/examples.rs"),
+    example: include_str!("examples.rs"),
 };

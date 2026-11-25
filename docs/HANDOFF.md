@@ -30,11 +30,10 @@ Tokenizer, MultiSelector and ComplexSelector done)._
 
 ### Not yet ported (28)
 
-- **M6 Collections (in progress):** the rest of reordering (FR9's shift feedback,
-  `positions`, `attach` with two-dimensional moves), then `useKeyboardHint` (not
-  ported; TabList, Toolbar, SegmentedControl and AvatarGroup lack it, and reorder
-  mode's hint shares its anchored layer). Item's swipe actions wait for M11;
-  PowerSearch's date and time values wait for M8.
+- **M6 Collections (in progress):** `useKeyboardHint` (not ported; TabList, Toolbar,
+  SegmentedControl and AvatarGroup lack it, and reorder mode's hint shares its anchored
+  layer). Item's swipe actions wait for M11; PowerSearch's date and time values wait
+  for M8.
 - **M7:** Table. **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
   TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
@@ -49,7 +48,7 @@ Tokenizer, MultiSelector and ComplexSelector done)._
 
 | What | Waits for |
 |---|---|
-| Item swipe actions, SegmentedControl's sliding lens, Collapsible's and List's animated layout | Motion layer (M11) |
+| Item swipe actions, SegmentedControl's sliding lens, Collapsible's and List's animated layout, reordering's shift slide (AST-103 FR9) | Motion layer (M11) |
 | Lightbox springs (it eases over 280ms now) | Motion layer (M11) |
 | Lightbox video playback and `hasAutoPlay` (a video opens in the system player now) | MediaPlayer's decoder (M13) |
 | Dialog content inset done by the dialog itself | Layout (M9) |

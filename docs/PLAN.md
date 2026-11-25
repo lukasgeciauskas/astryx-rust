@@ -396,9 +396,15 @@ The remaining primitives:
     mode by click, Enter or Space, the arrows moving a place with each move reported and
     announced with its neighbours, refusals past rows that stay at the ends, the mode's
     line and its hint of buttons, Escape or Done (FR4); `start(key)` (FR4a); and
-    `labels` (FR1, an upstream gap). Remaining in M6: `feedbackBehavior`'s shift (FR9),
-    `positions` (FR1) and `attach` (FR4b, as wrappers for an app's own elements, with
-    two-dimensional moves), all three upstream gaps.
+    `labels` (FR1, an upstream gap). Also built though upstream has not: `feedbackBehavior`'s
+    shift (FR9: the midpoint rule, the passed items taking the next slots, the insertion
+    line again under Reduce Motion; the slide itself waits for the motion layer, M11),
+    `positions` (FR1: the nearest given slot, or FR9's rule over them; another length is
+    ignored) and `attach` (FR4b: `ReorderAttachment` wraps an app's own container, items
+    and handles, with the layout read from the items' boxes, so a row moves by Left and
+    Right and a wrapping grid by all four arrows with its row and column announced, and a
+    move the app does not apply is refused). A tree's `{parent, index}` moves wait for a
+    tree collection that adopts the object; none does upstream, TreeList included.
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.

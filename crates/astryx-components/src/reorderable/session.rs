@@ -1,19 +1,22 @@
 //! A reorderable collection's session (upstream `List/listReorderEngine.tsx`):
-//! its rows as the last frame laid them out, a drag, reorder mode and the
-//! announcements, with the handle, the overlay that draws the preview and
-//! the insertion line, and the reorder mode hint.
+//! its items as the last frame laid them out, a drag, reorder mode and the
+//! announcements, with the handle, the overlay that draws the dragged item
+//! and the insertion line, and reorder mode's hint.
 //!
-//! A collection renders [`begin`] once a frame, each of its rows
-//! [`register`]s as it renders and ends with the [`handle`], and the
-//! collection's last child is the [`overlay`]. The collection reports its
-//! children's bounds to [`finalize`] once they are laid out.
+//! A collection calls [`begin`] once a frame; each of its items
+//! [`register`]s as it renders and holds a handle; the collection's last
+//! child is the [`overlay`], and it reports its children's bounds to
+//! [`finalize`] once they are laid out. List does this for its rows, and
+//! [`ReorderAttachment`](super::ReorderAttachment) for an app's own
+//! elements.
 //!
-//! The drag's look follows upstream: the rows stay still until the drop; the
-//! source dims in place (here the row's text, the one copy GPUI can draw
-//! twice), and the row itself, dimmed, follows the pointer as the preview;
-//! an accent line marks the candidate; and the scroller the collection sits
-//! in autoscrolls near its edges. With a mouse the rows jump to their new
-//! places at the drop, as upstream's do.
+//! The drag's look follows upstream: the other items stay still until the
+//! drop (or, with shift feedback, slide aside to open the gap); the source
+//! dims in place, and the item itself, dimmed, follows the pointer as the
+//! preview (GPUI draws an element once a frame, so the place keeps a copy of
+//! the row's text); an accent line marks the candidate; and the scroller the
+//! collection sits in autoscrolls near its edges. With a mouse the items
+//! jump to their new places at the drop, as upstream's do.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -23,25 +26,26 @@ use std::time::Duration;
 use astryx_i18n::{Arg, current as i18n, use_direction};
 use astryx_primitives::{
     LayerAlign, LayerOptions, Placement, Politeness, ScrollHost, anchored_layer, announce,
-    is_focus_visible, use_context,
+    is_focus_visible, prefers_reduced_motion, use_context,
 };
 use astryx_theme::{ThemeStyled, current};
 use gpui::{
     AnyElement, App, Bounds, Context, CursorStyle, DispatchPhase, ElementId, Entity, FocusHandle,
-    InteractiveElement, IntoElement, KeyDownEvent, MouseButton, MouseMoveEvent, MouseUpEvent,
-    ParentElement, Pixels, Point, RenderOnce, Role, ScrollHandle, SharedString,
+    Hsla, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, MouseMoveEvent, MouseUpEvent,
+    ParentElement, Pixels, Point, RenderOnce, Role, ScrollHandle, SharedString, Stateful,
     StatefulInteractiveElement, Styled, Task, Toggled, Window, canvas, div, point, px, relative,
 };
 
 use super::model::{
-    AUTOSCROLL_TICK_MS, INSERTION_LINE_THICKNESS, MOUSE_DRAG_SLOP, MOVING_OPACITY, ReorderBounds,
-    ReorderGeometry, ReorderRow, autoscroll_step, bounds_of, clamp_top, drop_position, line_center,
-    mode_line_center,
+    AUTOSCROLL_TICK_MS, Arrow, INSERTION_LINE_THICKNESS, MOUSE_DRAG_SLOP, MOVING_OPACITY, Rect,
+    ReorderBounds, ReorderGeometry, ReorderLayout, ReorderRow, arrow_target, autoscroll_step,
+    bounds_of, clamp_top, drop_position, layout_of, line_center, mode_line_center, movable_range,
+    nearest_slot, row_and_column, shift_candidate, shift_offset, slot_centers,
 };
-use super::{ItemKey, ReorderMove, Reorderable, ReorderableLabels};
+use super::{FeedbackBehavior, ItemKey, ReorderMove, Reorderable, ReorderableLabels};
 use crate::content::Kbd;
 
-/// One row of the collection, as the last frame laid it out.
+/// One item of the collection, as the last frame laid it out.
 #[derive(Clone, Debug)]
 pub(crate) struct Row {
     pub key: Option<ItemKey>,
@@ -51,7 +55,7 @@ pub(crate) struct Row {
     pub bounds: Bounds<Pixels>,
 }
 
-/// A row telling the session about itself as it renders.
+/// An item telling the session about itself as it renders.
 #[derive(Clone, Debug)]
 pub(crate) struct Registration {
     /// Its place among the collection's children.
@@ -69,14 +73,23 @@ struct Armed {
 pub(crate) struct Drag {
     pub key: ItemKey,
     pub dragged: usize,
-    /// Measured at pickup, in the collection's coordinates.
-    pub geometry: ReorderGeometry,
-    /// The pointer's distance below the row's top at pickup.
-    grab: f32,
+    /// Every item's box at pickup, in the collection's coordinates.
+    rects: Vec<Rect>,
+    layout: ReorderLayout,
+    /// The items along the layout's axis, for upstream's drop rule.
+    geometry: ReorderGeometry,
+    /// Each slot's centre: the app's `positions`, else the measured one.
+    centers: Vec<(f32, f32)>,
+    given: bool,
+    /// Shift feedback (FR9) rather than the insertion line.
+    shift: bool,
+    /// The dragged item's size plus the gap, along the axis.
+    pitch: f32,
+    /// The pointer's offset into the item at pickup.
+    grab: (f32, f32),
     pointer: Point<Pixels>,
     pub position: usize,
-    /// The row's inline start and width, in the collection's coordinates.
-    span: (f32, f32),
+    range: (usize, usize),
 }
 
 enum Landed {
@@ -97,7 +110,7 @@ struct Pending {
 pub(crate) struct Session {
     pub rows: Vec<Row>,
     next: Vec<Registration>,
-    /// The collection's bounds, and its scroller's offset, when last laid out.
+    /// The collection's bounds, and its scroller's offset, when laid out.
     list: Option<Bounds<Pixels>>,
     host_at_probe: f32,
     armed: Option<Armed>,
@@ -107,15 +120,18 @@ pub(crate) struct Session {
     pending: Option<Pending>,
     reorderable: Option<Reorderable>,
     host: Option<ScrollHandle>,
-    /// The latest press dragged its row: its click does not toggle the mode.
+    rtl: bool,
+    /// An app's own elements (`attach`), not a collection component.
+    attached: bool,
+    /// The latest press dragged its item: its click does not toggle the mode.
     dragged_press: bool,
     scroll_into_view: Option<ItemKey>,
     handles: HashMap<ItemKey, FocusHandle>,
     autoscroll: Option<Task<()>>,
 }
 
-/// What a collection gives its rows: the session, the object and a slot for
-/// the dragged row, which the overlay draws at the pointer.
+/// What a collection gives its items: the session, the object, and a slot
+/// for the dragged item, which the overlay draws at the pointer.
 #[derive(Clone)]
 pub(crate) struct ReorderCx {
     pub session: Entity<Session>,
@@ -130,10 +146,17 @@ impl std::fmt::Debug for ReorderCx {
     }
 }
 
-fn key_text(key: &ItemKey) -> String {
+pub(crate) fn key_text(key: &ItemKey) -> String {
     match key {
         ItemKey::Number(n) => n.to_string(),
         ItemKey::Text(t) => t.to_string(),
+    }
+}
+
+fn id_text(id: &ElementId) -> String {
+    match id {
+        ElementId::Name(n) => n.to_string(),
+        other => format!("{other:?}"),
     }
 }
 
@@ -141,6 +164,7 @@ fn key_text(key: &ItemKey) -> String {
 pub(crate) fn begin(
     id: &ElementId,
     reorderable: &Reorderable,
+    attached: bool,
     window: &mut Window,
     cx: &mut App,
 ) -> ReorderCx {
@@ -164,10 +188,13 @@ pub(crate) fn begin(
         }
     }
     let host = use_context::<ScrollHost>(cx).map(|h| h.0);
+    let rtl = use_direction(cx).is_rtl();
     session.update(cx, |s, _| {
         s.next.clear();
         s.reorderable = Some(reorderable.clone());
         s.host = host;
+        s.rtl = rtl;
+        s.attached = attached;
     });
     ReorderCx {
         session,
@@ -177,12 +204,32 @@ pub(crate) fn begin(
     }
 }
 
-/// A row renders: it joins this frame's order.
+/// An item's name and one-based position, as it registered this frame.
+pub(crate) fn registered(rc: &ReorderCx, key: &ItemKey, cx: &App) -> (Option<SharedString>, usize) {
+    let s = rc.session.read(cx);
+    s.next
+        .iter()
+        .find(|r| &r.key == key)
+        .map_or((None, 1), |r| (r.name.clone(), r.index + 1))
+}
+
+/// An item renders: it joins this frame's order.
 pub(crate) fn register(rc: &ReorderCx, registration: Registration, cx: &mut App) {
     rc.session.update(cx, |s, _| s.next.push(registration));
 }
 
-/// The collection's children are laid out: the frame's rows, then whatever
+fn rects_of(rows: &[Row], list: Bounds<Pixels>) -> Vec<Rect> {
+    rows.iter()
+        .map(|r| Rect {
+            x: f32::from(r.bounds.left() - list.left()),
+            y: f32::from(r.bounds.top() - list.top()),
+            w: f32::from(r.bounds.size.width),
+            h: f32::from(r.bounds.size.height),
+        })
+        .collect()
+}
+
+/// The collection's children are laid out: the frame's items, then what
 /// waited for them (a move's announcement, a scroll into view).
 pub(crate) fn finalize(
     session: &Entity<Session>,
@@ -193,12 +240,7 @@ pub(crate) fn finalize(
 ) {
     let mut announcements: Vec<SharedString> = Vec::new();
     let mut scroll: Option<(ScrollHandle, Bounds<Pixels>)> = None;
-    let labels = session
-        .read(cx)
-        .reorderable
-        .as_ref()
-        .map(|r| r.0.options.labels.clone())
-        .unwrap_or_default();
+    let labels = labels_of(session, cx);
     let m = Messages::new(&labels, cx);
     session.update(cx, |s, _| {
         let mut rows: Vec<Row> = children
@@ -219,41 +261,39 @@ pub(crate) fn finalize(
             }
         }
         s.rows = rows;
-        let index_of =
-            |s: &Session, key: &ItemKey| s.rows.iter().position(|r| r.key.as_ref() == Some(key));
         if let Some(p) = s.pending.take() {
-            match index_of(s, &p.key) {
+            match index_of(&s.rows, &p.key) {
                 Some(at) if at == p.to => {
                     announcements.push(match p.landed {
                         Landed::Dropped => m.dropped(at + 1, s.rows.len()),
-                        Landed::Place => m.place_of(&s.rows, at),
+                        Landed::Place => m.place(&s.rows, s.list, at),
                     });
-                    if matches!(p.landed, Landed::Place) {
+                    if matches!(p.landed, Landed::Place) || s.attached {
                         s.scroll_into_view = Some(p.key.clone());
                     }
                 }
                 _ => announcements.push(p.kept),
             }
         }
-        // A row leaving ends its mode without a word, and its drag.
+        // An item leaving ends its mode without a word, and its drag.
         if let Some(key) = s.mode.clone()
-            && index_of(s, &key).is_none()
+            && index_of(&s.rows, &key).is_none()
         {
             s.mode = None;
         }
         if let Some(key) = s.drag.as_ref().map(|d| d.key.clone())
-            && index_of(s, &key).is_none()
+            && index_of(&s.rows, &key).is_none()
         {
             s.drag = None;
             s.autoscroll = None;
         }
         if let Some(key) = s.scroll_into_view.take()
-            && let (Some(at), Some(host)) = (index_of(s, &key), s.host.clone())
+            && let (Some(at), Some(host)) = (index_of(&s.rows, &key), s.host.clone())
         {
             scroll = Some((host, s.rows[at].bounds));
         }
     });
-    // The row scrolls into view, the nearest way.
+    // The item scrolls into view, the nearest way.
     if let Some((host, row)) = scroll {
         let view = host.bounds();
         let offset = host.offset();
@@ -362,11 +402,28 @@ impl<'a> Messages<'a> {
             .unwrap_or_else(|| self.unnamed(at + 1))
     }
 
-    /// "Milk, position 3 of 5, after Eggs, before Bread", at the top or the
-    /// end.
-    fn place_of(&self, rows: &[Row], at: usize) -> SharedString {
+    /// Where an item is: "Milk, position 3 of 5, after Eggs, before Bread",
+    /// at the top or the end; in a grid with its row and column.
+    fn place(&self, rows: &[Row], list: Option<Bounds<Pixels>>, at: usize) -> SharedString {
         let label = self.name_of(rows, at);
         let total = rows.len();
+        if let Some(list) = list {
+            let rects = rects_of(rows, list);
+            if layout_of(&rects) == ReorderLayout::Grid {
+                let (row, column) = row_and_column(&rects, at);
+                return self.get(
+                    &self.labels.place_in_grid,
+                    "@astryx.list.reorderPlaceInGrid",
+                    &[
+                        ("label", label.as_ref().into()),
+                        ("row", Arg::Num(row as f64)),
+                        ("column", Arg::Num(column as f64)),
+                        ("position", Arg::Num((at + 1) as f64)),
+                        ("total", Arg::Num(total as f64)),
+                    ],
+                );
+            }
+        }
         let previous = (at > 0).then(|| self.name_of(rows, at - 1));
         let next = (at + 1 < total).then(|| self.name_of(rows, at + 1));
         let mut args: Vec<(&str, Arg<'_>)> = vec![
@@ -403,6 +460,14 @@ impl<'a> Messages<'a> {
         )
     }
 
+    fn not_moved(&self, label: &str) -> SharedString {
+        self.get(
+            &self.labels.not_moved,
+            "@astryx.list.reorderNotMoved",
+            &[("label", label.into())],
+        )
+    }
+
     fn mode_done(&self, label: &str, position: usize, total: usize) -> SharedString {
         self.get(
             &self.labels.mode_done,
@@ -434,12 +499,17 @@ impl<'a> Messages<'a> {
         self.get(&self.labels.handle_hint, "@astryx.list.reorderHint", &[])
     }
 
-    fn move_up(&self) -> SharedString {
-        self.get(&self.labels.move_up, "@astryx.list.reorderMoveUp", &[])
-    }
-
-    fn move_down(&self) -> SharedString {
-        self.get(&self.labels.move_down, "@astryx.list.reorderMoveDown", &[])
+    fn arrow(&self, arrow: Arrow) -> SharedString {
+        match arrow {
+            Arrow::Up => self.get(&self.labels.move_up, "@astryx.list.reorderMoveUp", &[]),
+            Arrow::Down => self.get(&self.labels.move_down, "@astryx.list.reorderMoveDown", &[]),
+            Arrow::Left => self.get(&self.labels.move_left, "@astryx.list.reorderMoveLeft", &[]),
+            Arrow::Right => self.get(
+                &self.labels.move_right,
+                "@astryx.list.reorderMoveRight",
+                &[],
+            ),
+        }
     }
 
     fn done(&self) -> SharedString {
@@ -475,9 +545,29 @@ fn index_of(rows: &[Row], key: &ItemKey) -> Option<usize> {
     rows.iter().position(|r| r.key.as_ref() == Some(key))
 }
 
+/// What a move the app does not apply announces: a List's item stays at
+/// its place; an attached one cannot move (FR4b).
+fn kept_message(s: &Session, m: &Messages<'_>, at: usize, dropped: bool) -> SharedString {
+    if s.attached {
+        m.not_moved(&m.name_of(&s.rows, at))
+    } else if dropped {
+        m.cancelled(at + 1, s.rows.len())
+    } else {
+        m.place(&s.rows, s.list, at)
+    }
+}
+
+/// The layout the items are in now.
+fn layout_now(s: &Session) -> ReorderLayout {
+    match s.list {
+        Some(list) => layout_of(&rects_of(&s.rows, list)),
+        None => ReorderLayout::Vertical,
+    }
+}
+
 // ---- Reorder mode --------------------------------------------------------
 
-/// The handle toggles its row's mode.
+/// The handle toggles its item's mode.
 fn toggle(session: &Entity<Session>, key: &ItemKey, window: &mut Window, cx: &mut App) {
     if session.read(cx).drag.is_some() {
         return;
@@ -509,7 +599,6 @@ pub(crate) fn end_mode(session: &Entity<Session>, window: &mut Window, cx: &mut 
         let name = m.name_of(&rows, at);
         say(m.mode_done(&name, at + 1, rows.len()), window, cx);
     }
-    // Focus a pointer left in the hint goes back to the handle.
     if let Some(focus) = session.read(cx).handles.get(&key).cloned()
         && !focus.is_focused(window)
         && window.focused(cx).is_none()
@@ -519,15 +608,21 @@ pub(crate) fn end_mode(session: &Entity<Session>, window: &mut Window, cx: &mut 
     window.refresh();
 }
 
-/// Reorder mode's move: a place up (`-1`) or down (`1`), reported at once
-/// and announced once it lands. A move into a row that stays at either end
-/// is refused and announced; one past the end does nothing.
-fn step(session: &Entity<Session>, delta: i8, window: &mut Window, cx: &mut App) {
-    let (key, rows, dragging) = {
+/// Reorder mode's move along the layout (FR4): reported at once and
+/// announced once it lands. A move into an item that stays at either end is
+/// refused and announced; one past the end does nothing.
+fn step(session: &Entity<Session>, arrow: Arrow, window: &mut Window, cx: &mut App) {
+    let (key, rows, list, rtl, dragging) = {
         let s = session.read(cx);
-        (s.mode.clone(), s.rows.clone(), s.drag.is_some())
+        (
+            s.mode.clone(),
+            s.rows.clone(),
+            s.list,
+            s.rtl,
+            s.drag.is_some(),
+        )
     };
-    let Some(key) = key else {
+    let (Some(key), Some(list)) = (key, list) else {
         return;
     };
     if dragging {
@@ -536,11 +631,9 @@ fn step(session: &Entity<Session>, delta: i8, window: &mut Window, cx: &mut App)
     let Some(index) = index_of(&rows, &key) else {
         return;
     };
-    let to = index as isize + delta as isize;
-    if to < 0 || to as usize >= rows.len() {
+    let Some(to) = arrow_target(&rects_of(&rows, list), index, arrow, rtl) else {
         return;
-    }
-    let to = to as usize;
+    };
     let labels = labels_of(session, cx);
     let m = Messages::new(&labels, cx);
     let movable: Vec<bool> = rows.iter().map(|r| r.movable).collect();
@@ -548,9 +641,9 @@ fn step(session: &Entity<Session>, delta: i8, window: &mut Window, cx: &mut App)
         say(m.refused(&m.name_of(&rows, to)), window, cx);
         return;
     }
-    let kept = m.place_of(&rows, index);
+    let kept = kept_message(session.read(cx), &m, index, false);
     session.update(cx, |s, _| {
-        s.last_step = delta;
+        s.last_step = if to < index { -1 } else { 1 };
         s.pending = Some(Pending {
             key: key.clone(),
             to,
@@ -573,18 +666,14 @@ pub(crate) fn start(reorderable: &Reorderable, key: ItemKey, window: &mut Window
         }
         sessions.last().and_then(|s| s.upgrade())
     };
-    let started = session.as_ref().is_some_and(|session| {
+    let found = session.as_ref().is_some_and(|session| {
         let s = session.read(cx);
-        if s.drag.is_some() {
-            return true;
-        }
-        let movable = s
-            .rows
+        s.rows
             .iter()
-            .any(|r| r.key.as_ref() == Some(&key) && r.movable);
-        movable && reorderable.can_move(&key)
+            .any(|r| r.key.as_ref() == Some(&key) && r.movable)
+            && reorderable.can_move(&key)
     });
-    let Some(session) = session.filter(|_| started) else {
+    let Some(session) = session.filter(|_| found) else {
         if cfg!(debug_assertions) {
             eprintln!(
                 "createReorderable: `start({})` found no mounted item with that key that can be reordered, so it did nothing.",
@@ -629,32 +718,85 @@ fn scroller(host: &Option<ScrollHandle>, window: &Window) -> (f32, f32, f32, f32
     }
 }
 
-/// The collection's top now: where it was laid out, moved by any scroll
+/// The collection's origin now: where it was laid out, moved by any scroll
 /// since.
-fn list_top(s: &Session) -> f32 {
-    let laid = s.list.map_or(0., |b| f32::from(b.top()));
+fn origin(s: &Session) -> (f32, f32) {
+    let laid = s
+        .list
+        .map_or((0., 0.), |b| (f32::from(b.left()), f32::from(b.top())));
     match &s.host {
-        Some(h) => laid + (f32::from(h.offset().y) - s.host_at_probe),
+        Some(h) => (laid.0, laid.1 + (f32::from(h.offset().y) - s.host_at_probe)),
         None => laid,
     }
 }
 
-fn dragged_top(s: &Session, d: &Drag, window: &Window) -> f32 {
-    let row = d.geometry.rows[d.dragged];
-    let first = d.geometry.rows[0];
-    let last = d.geometry.rows[d.geometry.rows.len() - 1];
-    let origin = list_top(s);
+/// Where the dragged item sits now, in the collection's coordinates: under
+/// the pointer, stopped at the scroller's edges and the collection's ends.
+fn dragged_at(s: &Session, d: &Drag, window: &Window) -> (f32, f32) {
+    let (ox, oy) = origin(s);
+    let own = d.rects[d.dragged];
+    let x = f32::from(d.pointer.x) - ox - d.grab.0;
+    let y = f32::from(d.pointer.y) - oy - d.grab.1;
     let (scroll_top, scroll_bottom, _, _) = scroller(&s.host, window);
-    clamp_top(
-        f32::from(d.pointer.y) - d.grab,
-        row.height,
+    let low = |f: fn(&Rect) -> f32| d.rects.iter().map(f).fold(f32::INFINITY, f32::min);
+    let high = |f: fn(&Rect) -> f32| d.rects.iter().map(f).fold(f32::NEG_INFINITY, f32::max);
+    let clamped_y = clamp_top(
+        y + oy,
+        own.h,
         ReorderBounds {
             scroll_top,
             scroll_bottom,
-            list_top: origin + first.top,
-            list_bottom: origin + last.top + last.height,
+            list_top: oy + low(|r| r.y),
+            list_bottom: oy + high(|r| r.y + r.h),
         },
-    )
+    ) - oy;
+    match d.layout {
+        ReorderLayout::Vertical if !d.given => (own.x, clamped_y),
+        ReorderLayout::Horizontal if !d.given => (
+            x.clamp(
+                low(|r| r.x),
+                (high(|r| r.x + r.w) - own.w).max(low(|r| r.x)),
+            ),
+            own.y,
+        ),
+        _ => (
+            x.clamp(
+                low(|r| r.x),
+                (high(|r| r.x + r.w) - own.w).max(low(|r| r.x)),
+            ),
+            clamped_y,
+        ),
+    }
+}
+
+/// The candidate for the dragged item at `at` (its box's origin).
+fn candidate(d: &Drag, at: (f32, f32), rtl: bool, width: f32) -> usize {
+    let own = d.rects[d.dragged];
+    let center = (at.0 + own.w / 2., at.1 + own.h / 2.);
+    let reading = |x: f32| if rtl { width - x } else { x };
+    match (d.layout, d.given, d.shift) {
+        (_, true, false) | (ReorderLayout::Grid, false, false) => {
+            nearest_slot(&d.centers, center, d.range)
+        }
+        (_, true, true) | (ReorderLayout::Grid, false, true) => {
+            shift_candidate(&d.centers, d.position, center, d.range)
+        }
+        (ReorderLayout::Vertical, false, false) => drop_position(&d.geometry, d.dragged, center.1),
+        (ReorderLayout::Horizontal, false, false) => {
+            drop_position(&d.geometry, d.dragged, reading(center.0))
+        }
+        (ReorderLayout::Vertical, false, true) | (ReorderLayout::Horizontal, false, true) => {
+            let along = d.layout == ReorderLayout::Vertical;
+            let starts: Vec<f32> = d.geometry.rows.iter().map(|r| r.top).collect();
+            let sizes: Vec<f32> = d.geometry.rows.iter().map(|r| r.height).collect();
+            let slots: Vec<(f32, f32)> = slot_centers(&starts, &sizes, d.dragged)
+                .into_iter()
+                .map(|c| (c, 0.))
+                .collect();
+            let at = if along { center.1 } else { reading(center.0) };
+            shift_candidate(&slots, d.position, (at, 0.), d.range)
+        }
+    }
 }
 
 /// A press on a handle moved past the slop: the drag begins.
@@ -670,6 +812,18 @@ fn begin_drag(
     }
     let labels = labels_of(session, cx);
     let m = Messages::new(&labels, cx);
+    let options = session
+        .read(cx)
+        .reorderable
+        .as_ref()
+        .map(|r| r.0.options.clone());
+    let given_positions = options
+        .as_ref()
+        .and_then(|o| o.positions.as_ref().map(|f| f()));
+    let shift = options
+        .as_ref()
+        .is_some_and(|o| o.feedback == FeedbackBehavior::Shift)
+        && !prefers_reduced_motion(cx);
     let began = session.update(cx, |s, _| {
         s.armed = None;
         let list = s.list?;
@@ -677,16 +831,26 @@ fn begin_drag(
         if !s.rows[dragged].movable {
             return None;
         }
+        let rects = rects_of(&s.rows, list);
+        let layout = layout_of(&rects);
         let movable: Vec<bool> = s.rows.iter().map(|r| r.movable).collect();
         let bounds = bounds_of(&movable);
-        let top = f32::from(list.top());
-        let rows: Vec<ReorderRow> = s
-            .rows
+        let width = f32::from(list.size.width);
+        // The items along the axis, in reading order.
+        let along: Vec<(f32, f32)> = rects
+            .iter()
+            .map(|r| match layout {
+                ReorderLayout::Horizontal if s.rtl => (width - r.x - r.w, r.w),
+                ReorderLayout::Horizontal => (r.x, r.w),
+                _ => (r.y, r.h),
+            })
+            .collect();
+        let rows: Vec<ReorderRow> = along
             .iter()
             .enumerate()
-            .map(|(i, r)| ReorderRow {
-                top: f32::from(r.bounds.top()) - top,
-                height: f32::from(r.bounds.size.height),
+            .map(|(i, &(top, height))| ReorderRow {
+                top,
+                height,
                 is_fixed: bounds[i],
             })
             .collect();
@@ -695,18 +859,34 @@ fn begin_drag(
         } else {
             0.
         };
-        let row = s.rows[dragged].bounds;
+        let geometry = ReorderGeometry { rows, gap };
+        let range = movable_range(&geometry.rows, dragged);
+        let (centers, given) = match given_positions.filter(|p| p.len() == rects.len()) {
+            Some(p) => (
+                p.iter().map(|c| (f32::from(c.x), f32::from(c.y))).collect(),
+                true,
+            ),
+            None => (rects.iter().map(Rect::center).collect(), false),
+        };
+        let own = rects[dragged];
+        let pitch = along[dragged].1 + geometry.gap;
         s.drag = Some(Drag {
             key: key.clone(),
             dragged,
-            geometry: ReorderGeometry { rows, gap },
-            grab: f32::from(pointer.y - row.top()),
+            grab: (
+                f32::from(pointer.x - list.left()) - own.x,
+                f32::from(pointer.y - list.top()) - own.y,
+            ),
+            rects,
+            layout,
+            geometry,
+            centers,
+            given,
+            shift,
+            pitch,
             pointer,
             position: dragged,
-            span: (
-                f32::from(row.left() - list.left()),
-                f32::from(row.size.width),
-            ),
+            range,
         });
         s.dragged_press = true;
         Some((dragged, s.rows.len()))
@@ -728,13 +908,13 @@ fn drop_drag(session: &Entity<Session>, window: &mut Window, cx: &mut App) {
     };
     let labels = labels_of(session, cx);
     let m = Messages::new(&labels, cx);
-    let total = d.geometry.rows.len();
+    let total = d.rects.len();
     if d.position == d.dragged {
         say(m.dropped(d.position + 1, total), window, cx);
         window.refresh();
         return;
     }
-    let kept = m.cancelled(d.dragged + 1, total);
+    let kept = kept_message(session.read(cx), &m, d.dragged, true);
     session.update(cx, |s, _| {
         s.pending = Some(Pending {
             key: d.key.clone(),
@@ -764,22 +944,18 @@ fn cancel_drag(session: &Entity<Session>, window: &mut Window, cx: &mut App) {
     };
     let labels = labels_of(session, cx);
     let m = Messages::new(&labels, cx);
-    say(
-        m.cancelled(d.dragged + 1, d.geometry.rows.len()),
-        window,
-        cx,
-    );
+    say(m.cancelled(d.dragged + 1, d.rects.len()), window, cx);
     window.refresh();
 }
 
-/// Points per tick toward the edge the dragged row is past: positive down.
+/// Points per tick toward the edge the dragged item is past: positive down.
 fn autoscroll_points(s: &Session, window: &Window) -> f32 {
     let Some(d) = &s.drag else {
         return 0.;
     };
     let (scroll_top, scroll_bottom, position, max) = scroller(&s.host, window);
-    let height = d.geometry.rows[d.dragged].height;
-    let top = dragged_top(s, d, window);
+    let height = d.rects[d.dragged].h;
+    let top = dragged_at(s, d, window).1 + origin(s).1;
     let mut step = 0.;
     if position < max {
         step = autoscroll_step(top + height - scroll_bottom);
@@ -790,7 +966,8 @@ fn autoscroll_points(s: &Session, window: &Window) -> f32 {
     step
 }
 
-/// Starts the edge autoscroll's timer while the dragged row is near an edge.
+/// Starts the edge autoscroll's timer while the dragged item is near an
+/// edge.
 fn update_autoscroll(session: &Entity<Session>, window: &mut Window, cx: &mut App) {
     let s = session.read(cx);
     if s.host.is_none() || s.autoscroll.is_some() || autoscroll_points(s, window) == 0. {
@@ -867,16 +1044,91 @@ fn released(session: &Entity<Session>, window: &mut Window, cx: &mut App) {
     session.update(cx, |s, _| s.armed = None);
 }
 
+/// While the dragged item would land elsewhere under shift feedback, where
+/// the item at `index` slides (FR9).
+pub(crate) fn shift_of(rc: &ReorderCx, index: usize, cx: &App) -> Option<(f32, f32)> {
+    let s = rc.session.read(cx);
+    let d = s.drag.as_ref().filter(|d| d.shift)?;
+    let offset = shift_offset(
+        &d.centers, d.layout, d.given, d.pitch, d.dragged, d.position, index,
+    );
+    (offset != (0., 0.)).then_some(offset)
+}
+
+/// The dragged item's place: `Some((size, shift))` when `key` is being
+/// dragged; with shift feedback its place is the gap.
+pub(crate) fn drag_source(
+    rc: &ReorderCx,
+    key: &ItemKey,
+    cx: &App,
+) -> Option<(gpui::Size<Pixels>, bool)> {
+    let s = rc.session.read(cx);
+    let d = s.drag.as_ref().filter(|d| &d.key == key)?;
+    let own = d.rects[d.dragged];
+    Some((gpui::size(px(own.w), px(own.h)), d.shift))
+}
+
 // ---- The handle ----------------------------------------------------------
 
-/// The handle that ends a reorderable row: a drag target and a toggle
-/// (`aria-pressed`) for reorder mode, named "Reorder" and the row's label.
+/// The handle's box and its three lines: 28px square, taking only the
+/// lines' 14px in its row (the negative block margins), reaching 8px into
+/// the row's end padding.
+pub(crate) fn grip(color: Hsla) -> gpui::Div {
+    let bar = || div().w(px(20.)).h(px(2.)).rounded(px(1.)).bg(color);
+    div()
+        .relative()
+        .flex()
+        .flex_col()
+        .items_center()
+        .justify_center()
+        .gap(px(4.))
+        .flex_none()
+        .w(px(28.))
+        .h(px(28.))
+        .my(px(-7.))
+        .mr(px(-8.))
+        .rounded(px(4.))
+        .child(bar())
+        .child(bar())
+        .child(bar())
+}
+
+fn handle_id(rc: &ReorderCx, key: &ItemKey) -> String {
+    format!("{}-reorder-{}", id_text(&rc.id), key_text(key))
+}
+
+/// A List row's handle: the grip, ending the row.
 pub(crate) fn handle(
     rc: &ReorderCx,
     key: &ItemKey,
     label: Option<SharedString>,
     position: usize,
     disabled: bool,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let theme = current(window, cx);
+    let t = theme.tokens();
+    let color = if disabled {
+        t.color.icon_disabled
+    } else {
+        t.color.icon_secondary
+    };
+    let body = grip(color).id(ElementId::Name(handle_id(rc, key).into()));
+    handle_on(rc, key, label, position, disabled, body, window, cx)
+}
+
+/// Makes `body` an item's handle (FR4): a drag target, and a toggle
+/// (`aria-pressed`) for reorder mode named "Reorder" and the item's name,
+/// in the Tab order, with the mode's hint while its item is in the mode.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn handle_on(
+    rc: &ReorderCx,
+    key: &ItemKey,
+    label: Option<SharedString>,
+    position: usize,
+    disabled: bool,
+    body: Stateful<gpui::Div>,
     window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
@@ -892,28 +1144,23 @@ pub(crate) fn handle(
             f
         }
     };
-    let (in_mode, dragging) = {
+    let (in_mode, dragging, layout) = {
         let s = session.read(cx);
-        (s.mode.as_ref() == Some(key), s.drag.is_some())
+        (
+            s.mode.as_ref() == Some(key),
+            s.drag.is_some(),
+            layout_now(s),
+        )
     };
     let labels = rc.reorderable.0.options.labels.clone();
     let m = Messages::new(&labels, cx);
-    let name = m.handle(label.as_deref(), position);
-    let color = if disabled {
-        t.color.icon_disabled
-    } else {
-        t.color.icon_secondary
-    };
-    let id = ElementId::Name(format!("{:?}-reorder-{}", rc.id, key_text(key)).into());
-    let mut el = grip(color)
-        .id(id.clone())
-        .debug_selector({
-            let id = format!("{}-reorder-{}", rc_name(&rc.id), key_text(key));
-            move || id.clone()
-        })
+    let selector = handle_id(rc, key);
+    let mut el = body
+        .debug_selector(move || selector.clone())
         .track_focus(&focus)
+        .relative()
         .role(Role::Button)
-        .aria_label(name)
+        .aria_label(m.handle(label.as_deref(), position))
         .aria_description(m.hint())
         .aria_toggled(if in_mode {
             Toggled::True
@@ -966,6 +1213,13 @@ pub(crate) fn handle(
                     return;
                 }
                 let mode = s3.read(cx).mode.as_ref() == Some(&k3);
+                let arrow = match k.key.as_str() {
+                    "up" => Some(Arrow::Up),
+                    "down" => Some(Arrow::Down),
+                    "left" => Some(Arrow::Left),
+                    "right" => Some(Arrow::Right),
+                    _ => None,
+                };
                 match k.key.as_str() {
                     "escape" if s3.read(cx).drag.is_some() => {
                         cx.stop_propagation();
@@ -979,13 +1233,9 @@ pub(crate) fn handle(
                         cx.stop_propagation();
                         toggle(&s3, &k3, window, cx);
                     }
-                    "up" if mode => {
+                    _ if mode && arrow.is_some() => {
                         cx.stop_propagation();
-                        step(&s3, -1, window, cx);
-                    }
-                    "down" if mode => {
-                        cx.stop_propagation();
-                        step(&s3, 1, window, cx);
+                        step(&s3, arrow.unwrap_or(Arrow::Down), window, cx);
                     }
                     _ => {}
                 }
@@ -997,7 +1247,7 @@ pub(crate) fn handle(
     // The mode's hint, anchored below the handle's start (Core's keyboard
     // hint's layer and roles); its buttons do what the keys do.
     let rtl = use_direction(cx).is_rtl();
-    let hint = mode_hint(rc, &m, window, cx);
+    let hint = mode_hint(rc, &m, layout, window, cx);
     let dismiss = session.clone();
     anchored_layer(
         ElementId::Name(format!("{:?}-reorder-hint", rc.id).into()),
@@ -1017,45 +1267,21 @@ pub(crate) fn handle(
     .into_any_element()
 }
 
-/// The handle's box and its three lines: 28px square, taking only the
-/// lines' 14px in its row (the negative block margins), reaching 8px into
-/// the row's end padding.
-pub(crate) fn grip(color: gpui::Hsla) -> gpui::Div {
-    let bar = || div().w(px(20.)).h(px(2.)).rounded(px(1.)).bg(color);
-    div()
-        .relative()
-        .flex()
-        .flex_col()
-        .items_center()
-        .justify_center()
-        .gap(px(4.))
-        .flex_none()
-        .w(px(28.))
-        .h(px(28.))
-        .my(px(-7.))
-        .mr(px(-8.))
-        .rounded(px(4.))
-        .child(bar())
-        .child(bar())
-        .child(bar())
-}
-
-fn rc_name(id: &ElementId) -> String {
-    match id {
-        ElementId::Name(n) => n.to_string(),
-        other => format!("{other:?}"),
-    }
-}
-
 type PressFn = Rc<dyn Fn(&mut Window, &mut App)>;
 
-/// Reorder mode's hint: the moves and Done, as buttons that never take the
-/// focus from the handle.
-fn mode_hint(rc: &ReorderCx, m: &Messages<'_>, window: &mut Window, cx: &mut App) -> AnyElement {
+/// Reorder mode's hint: the moves along the layout's axis and Done, as
+/// buttons that never take the focus from the handle.
+fn mode_hint(
+    rc: &ReorderCx,
+    m: &Messages<'_>,
+    layout: ReorderLayout,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
     let theme = current(window, cx);
     let t = theme.tokens();
     let rem = window.rem_size();
-    let name = rc_name(&rc.id);
+    let name = id_text(&rc.id);
     let button = |id: &str, label: Option<SharedString>, child: AnyElement, on_press: PressFn| {
         let mut b = div()
             .id(ElementId::Name(format!("{name}-hint-{id}").into()))
@@ -1083,10 +1309,20 @@ fn mode_hint(rc: &ReorderCx, m: &Messages<'_>, window: &mut Window, cx: &mut App
         }
         b
     };
-    let s1 = rc.session.clone();
-    let s2 = rc.session.clone();
-    let s3 = rc.session.clone();
-    div()
+    let arrows: &[(Arrow, &str, &str)] = match layout {
+        ReorderLayout::Vertical => &[(Arrow::Up, "up", "up"), (Arrow::Down, "down", "down")],
+        ReorderLayout::Horizontal => &[
+            (Arrow::Left, "left", "left"),
+            (Arrow::Right, "right", "right"),
+        ],
+        ReorderLayout::Grid => &[
+            (Arrow::Left, "left", "left"),
+            (Arrow::Right, "right", "right"),
+            (Arrow::Up, "up", "up"),
+            (Arrow::Down, "down", "down"),
+        ],
+    };
+    let mut hint = div()
         .flex()
         .items_center()
         .gap(t.spacing.s1)
@@ -1098,31 +1334,29 @@ fn mode_hint(rc: &ReorderCx, m: &Messages<'_>, window: &mut Window, cx: &mut App
         .text_size(t.text.supporting.size.to_pixels(rem))
         .line_height(relative(t.text.supporting.leading))
         .text_color(t.color.text_secondary)
-        .whitespace_nowrap()
-        .child(button(
-            "up",
-            Some(m.move_up()),
-            Kbd::new("up").into_any_element(),
-            Rc::new(move |window, cx| step(&s1, -1, window, cx)),
-        ))
-        .child(button(
-            "down",
-            Some(m.move_down()),
-            Kbd::new("down").into_any_element(),
-            Rc::new(move |window, cx| step(&s2, 1, window, cx)),
-        ))
-        .child(button(
-            "done",
-            None,
-            div().px(t.spacing.s1).child(m.done()).into_any_element(),
-            Rc::new(move |window, cx| end_mode(&s3, window, cx)),
-        ))
-        .into_any_element()
+        .whitespace_nowrap();
+    for &(arrow, id, keys) in arrows {
+        let s = rc.session.clone();
+        hint = hint.child(button(
+            id,
+            Some(m.arrow(arrow)),
+            Kbd::new(keys).into_any_element(),
+            Rc::new(move |window, cx| step(&s, arrow, window, cx)),
+        ));
+    }
+    let s = rc.session.clone();
+    hint.child(button(
+        "done",
+        None,
+        div().px(t.spacing.s1).child(m.done()).into_any_element(),
+        Rc::new(move |window, cx| end_mode(&s, window, cx)),
+    ))
+    .into_any_element()
 }
 
 // ---- The overlay ---------------------------------------------------------
 
-/// The collection's last child: the insertion line, the dragged row at the
+/// The collection's last child: the insertion line, the dragged item at the
 /// pointer, and the probe that reads where the collection sits and takes
 /// the drag's pointer.
 pub(crate) fn overlay(rc: &ReorderCx) -> AnyElement {
@@ -1134,57 +1368,111 @@ struct Overlay {
     rc: ReorderCx,
 }
 
+/// The insertion line beside `rect` (across the inline axis), before or
+/// after it in reading order, in the middle of the gap.
+fn side_line(rect: Rect, after: bool, gap: f32, rtl: bool) -> (f32, f32, f32, f32) {
+    let right = after != rtl;
+    let x = if right {
+        rect.x + rect.w + gap / 2.
+    } else {
+        rect.x - gap / 2.
+    };
+    (
+        x - INSERTION_LINE_THICKNESS / 2.,
+        rect.y,
+        INSERTION_LINE_THICKNESS,
+        rect.h,
+    )
+}
+
+/// The inline gap after `index` in its row.
+fn inline_gap(rects: &[Rect]) -> f32 {
+    rects
+        .windows(2)
+        .find(|w| (w[0].y - w[1].y).abs() <= 1.)
+        .map_or(0., |w| {
+            (w[1].x - w[0].x - w[0].w)
+                .abs()
+                .min((w[0].x - w[1].x - w[1].w).abs())
+                .max(0.)
+        })
+}
+
 impl RenderOnce for Overlay {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
         let t = theme.tokens();
+        let accent = t.color.accent;
+        let surface = t.color.background_surface;
         let session = self.rc.session.clone();
         let mut layer = div().absolute().top_0().left_0().size_full();
-        let line = |left: f32, width: f32, center: f32| {
+        let line = |(x, y, w, h): (f32, f32, f32, f32)| {
             div()
                 .absolute()
-                .left(px(left))
-                .top(px(center - INSERTION_LINE_THICKNESS / 2.))
-                .w(px(width))
-                .h(px(INSERTION_LINE_THICKNESS))
+                .left(px(x))
+                .top(px(y))
+                .w(px(w))
+                .h(px(h))
                 .rounded(px(INSERTION_LINE_THICKNESS / 2.))
-                .bg(t.color.accent)
+                .bg(accent)
+        };
+        let across = |rect: Rect, center: f32| {
+            (
+                rect.x,
+                center - INSERTION_LINE_THICKNESS / 2.,
+                rect.w,
+                INSERTION_LINE_THICKNESS,
+            )
+        };
+        let (rtl, width) = {
+            let s = session.read(cx);
+            (s.rtl, s.list.map_or(0., |l| f32::from(l.size.width)))
         };
         let drag = {
             let s = session.read(cx);
             s.drag.as_ref().map(|d| {
-                let top = dragged_top(s, d, window);
-                let origin = list_top(s);
-                let row = d.geometry.rows[d.dragged];
-                let position =
-                    drop_position(&d.geometry, d.dragged, top + row.height / 2. - origin);
-                (
-                    top - origin,
-                    position,
-                    d.span,
-                    line_center(&d.geometry, d.dragged, position),
-                )
+                let at = dragged_at(s, d, window);
+                let position = candidate(d, at, rtl, width);
+                let own = d.rects[d.dragged];
+                let line = if d.shift {
+                    None
+                } else {
+                    match d.layout {
+                        ReorderLayout::Vertical if !d.given => {
+                            line_center(&d.geometry, d.dragged, position).map(|c| across(own, c))
+                        }
+                        _ => (position != d.dragged).then(|| {
+                            side_line(
+                                d.rects[position],
+                                position > d.dragged,
+                                inline_gap(&d.rects),
+                                rtl,
+                            )
+                        }),
+                    }
+                };
+                (at, own, position, line)
             })
         };
-        if let Some((top, position, span, center)) = drag {
+        if let Some((at, own, position, line_at)) = drag {
             session.update(cx, |s, _| {
                 if let Some(d) = &mut s.drag {
                     d.position = position;
                 }
             });
-            if let Some(center) = center {
-                layer = layer.child(line(span.0, span.1, center));
+            if let Some(l) = line_at {
+                layer = layer.child(line(l));
             }
-            if let Some(row) = self.rc.preview.borrow_mut().take() {
+            if let Some(item) = self.rc.preview.borrow_mut().take() {
                 layer = layer.child(
                     div()
                         .absolute()
-                        .left(px(span.0))
-                        .top(px(top))
-                        .w(px(span.1))
+                        .left(px(at.0))
+                        .top(px(at.1))
+                        .w(px(own.w))
                         .opacity(MOVING_OPACITY)
-                        .bg(t.color.background_surface)
-                        .child(row),
+                        .bg(surface)
+                        .child(item),
                 );
             }
         } else {
@@ -1192,24 +1480,15 @@ impl RenderOnce for Overlay {
             if let (Some(key), Some(list)) = (&s.mode, s.list)
                 && let Some(at) = index_of(&s.rows, key)
             {
-                let origin = f32::from(list.top());
-                let rows: Vec<(f32, f32)> = s
-                    .rows
-                    .iter()
-                    .map(|r| {
-                        (
-                            f32::from(r.bounds.top()) - origin,
-                            f32::from(r.bounds.size.height),
-                        )
-                    })
-                    .collect();
-                let row = s.rows[at].bounds;
-                let center = mode_line_center(&rows, at, s.last_step);
-                layer = layer.child(line(
-                    f32::from(row.left() - list.left()),
-                    f32::from(row.size.width),
-                    center,
-                ));
+                let rects = rects_of(&s.rows, list);
+                let l = match layout_of(&rects) {
+                    ReorderLayout::Vertical => {
+                        let rows: Vec<(f32, f32)> = rects.iter().map(|r| (r.y, r.h)).collect();
+                        across(rects[at], mode_line_center(&rows, at, s.last_step))
+                    }
+                    _ => side_line(rects[at], s.last_step > 0, inline_gap(&rects), s.rtl),
+                };
+                layer = layer.child(line(l));
             }
         }
         let probe_session = session.clone();
@@ -1255,9 +1534,37 @@ impl RenderOnce for Overlay {
     }
 }
 
-/// The dragged row's slot: `Some(its height)` when `key` is being dragged.
-pub(crate) fn drag_source(rc: &ReorderCx, key: &ItemKey, cx: &App) -> Option<f32> {
-    let s = rc.session.read(cx);
-    let d = s.drag.as_ref().filter(|d| &d.key == key)?;
-    Some(d.geometry.rows[d.dragged].height)
+/// An item's place while it is dragged: its dimmed copy (the List's text
+/// copy, or what an app gives), or under shift feedback the gap; the item
+/// itself goes to the overlay. Items the drag passes slide under shift
+/// feedback.
+pub(crate) fn place_item(
+    rc: &ReorderCx,
+    key: &ItemKey,
+    index: usize,
+    element: AnyElement,
+    copy: impl FnOnce() -> Option<AnyElement>,
+    cx: &App,
+) -> AnyElement {
+    if let Some((size, shift)) = drag_source(rc, key, cx) {
+        *rc.preview.borrow_mut() = Some(element);
+        let place = div().w(size.width).h(size.height).flex_none();
+        return match (shift, copy()) {
+            (false, Some(copy)) => place
+                .overflow_hidden()
+                .opacity(MOVING_OPACITY)
+                .child(copy)
+                .into_any_element(),
+            _ => place.into_any_element(),
+        };
+    }
+    match shift_of(rc, index, cx) {
+        Some((dx, dy)) => div()
+            .relative()
+            .left(px(dx))
+            .top(px(dy))
+            .child(element)
+            .into_any_element(),
+        None => element,
+    }
 }

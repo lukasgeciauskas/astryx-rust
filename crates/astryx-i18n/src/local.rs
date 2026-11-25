@@ -5,6 +5,13 @@
 //! any key, with its catalogs or overrides.
 
 const ENGLISH: &[(&str, &str)] = &[
+    ("@astryx.list.reorderMoveLeft", "Move left"),
+    ("@astryx.list.reorderMoveRight", "Move right"),
+    ("@astryx.list.reorderNotMoved", "Can't move {label}"),
+    (
+        "@astryx.list.reorderPlaceInGrid",
+        "{label}, row {row, number}, column {column, number}, position {position, number} of {total, number}",
+    ),
     ("@astryx.listItem.moreActions", "More actions for {label}"),
     (
         "@astryx.powersearch.moreMatches",

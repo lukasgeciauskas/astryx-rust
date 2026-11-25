@@ -108,6 +108,9 @@ impl Page {
                 .gap(gpui::px(48.))
                 .child(astryx::components::selector::examples::examples(window, cx))
                 .child(astryx::components::list::examples::examples(window, cx))
+                .child(astryx::components::reorderable::examples::examples(
+                    window, cx,
+                ))
                 .child(astryx::components::metadata::examples::examples(window, cx))
                 .child(astryx::components::overflow::examples::examples(window, cx))
                 .child(astryx::components::typeahead::examples::examples(

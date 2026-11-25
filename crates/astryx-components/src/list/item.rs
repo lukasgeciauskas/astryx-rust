@@ -418,34 +418,36 @@ impl RenderOnce for ListItem {
         theme.refine(item.style(), "list-item", &[], None);
         item.style().refine(&self.style);
 
-        // The dragged row rides the pointer in the List's overlay, dimmed;
-        // its place keeps its size and, dimmed, its text.
-        let source = match (&reorder, &reorder_key) {
-            (Some(rc), Some(key)) => reorder::drag_source(rc, key, cx).map(|h| (rc.clone(), h)),
-            _ => None,
+        // While the row is dragged it rides the pointer in the List's
+        // overlay; its place keeps a dimmed copy of its text, grip and
+        // divider (GPUI draws an element once), or opens as the gap under
+        // shift feedback. Rows a shifting drag passes slide aside.
+        let copy = {
+            let (label, description) = (self.label_text.clone(), self.description_string.clone());
+            let (id, align, selected) = (self.id.clone(), self.align, self.selected);
+            let (grip, divider) = (
+                t.color.icon_secondary,
+                (dividers && !row.last).then_some((t.border.width, t.color.border)),
+            );
+            move || {
+                let mut copy = Item::new(
+                    ElementId::Name(format!("{id}-reorder-source").into()),
+                    label.unwrap_or_default(),
+                )
+                .density(density)
+                .align(align)
+                .selected(selected)
+                .label_lines(1usize)
+                .end_content(reorder::grip(grip));
+                if let Some(d) = description {
+                    copy = copy.description(d).description_lines(1usize);
+                }
+                if let Some((width, color)) = divider {
+                    copy = copy.rounded(px(0.)).border_b(width).border_color(color);
+                }
+                Some(copy.into_any_element())
+            }
         };
-        let ghost = source.as_ref().map(|_| {
-            let mut ghost = Item::new(
-                ElementId::Name(format!("{}-reorder-source", self.id).into()),
-                self.label_text.clone().unwrap_or_default(),
-            )
-            .density(density)
-            .align(self.align)
-            .selected(self.selected)
-            .label_lines(1usize);
-            if let Some(d) = self.description_string.clone() {
-                ghost = ghost.description(d).description_lines(1usize);
-            }
-            // The row as it was, dimmed: its grip and its divider too.
-            ghost = ghost.end_content(reorder::grip(t.color.icon_secondary));
-            if dividers && !row.last {
-                ghost = ghost
-                    .rounded(px(0.))
-                    .border_b(t.border.width)
-                    .border_color(t.color.border);
-            }
-            ghost
-        });
         let element = match self.menu {
             None => item.into_any_element(),
             // FR13: the row's menu, on the row itself.
@@ -464,16 +466,8 @@ impl RenderOnce for ListItem {
             )
             .into_any_element(),
         };
-        match (source, ghost) {
-            (Some((rc, height)), Some(ghost)) => {
-                *rc.preview.borrow_mut() = Some(element);
-                div()
-                    .h(px(height))
-                    .overflow_hidden()
-                    .opacity(crate::reorderable::model::MOVING_OPACITY)
-                    .child(ghost)
-                    .into_any_element()
-            }
+        match (&reorder, &reorder_key) {
+            (Some(rc), Some(key)) => reorder::place_item(rc, key, row.index, element, copy, cx),
             _ => element,
         }
     }

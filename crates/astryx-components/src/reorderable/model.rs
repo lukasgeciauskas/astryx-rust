@@ -173,6 +173,290 @@ pub(crate) fn mode_line_center(rows: &[(f32, f32)], index: usize, step: i8) -> f
     }
 }
 
+/// An item's box, in the collection's coordinates.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Rect {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+impl Rect {
+    pub fn center(&self) -> (f32, f32) {
+        (self.x + self.w / 2., self.y + self.h / 2.)
+    }
+}
+
+/// How a collection lays its items out, read from their boxes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReorderLayout {
+    /// One column: Up and Down move.
+    Vertical,
+    /// One row: Left and Right move.
+    Horizontal,
+    /// Rows of several items (a grid, a wrapping board): all four move.
+    Grid,
+}
+
+pub(crate) fn layout_of(rects: &[Rect]) -> ReorderLayout {
+    let same = |f: fn(&Rect) -> f32| rects.windows(2).all(|w| (f(&w[0]) - f(&w[1])).abs() <= 1.);
+    if rects.len() < 2 || same(|r| r.x) {
+        ReorderLayout::Vertical
+    } else if same(|r| r.y) {
+        ReorderLayout::Horizontal
+    } else {
+        ReorderLayout::Grid
+    }
+}
+
+/// The items' rows, in reading order: a row ends where the next item sits
+/// lower.
+pub(crate) fn rows_of(rects: &[Rect]) -> Vec<Vec<usize>> {
+    let mut rows: Vec<Vec<usize>> = Vec::new();
+    for (i, r) in rects.iter().enumerate() {
+        match rows.last_mut() {
+            Some(row) if (rects[row[0]].y - r.y).abs() <= 1. => row.push(i),
+            _ => rows.push(vec![i]),
+        }
+    }
+    rows
+}
+
+/// An arrow key in reorder mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Arrow {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+/// Where an arrow moves the item at `index` (FR4): Up and Down along a
+/// column, Left and Right along a row (mirrored right to left); in a grid,
+/// Left and Right go to the previous and next place in reading order, and
+/// Up and Down to the same column of the row above or below, or that row's
+/// last place when it is shorter. `None` when the key does not move on
+/// this layout or the place is past an end.
+pub(crate) fn arrow_target(rects: &[Rect], index: usize, arrow: Arrow, rtl: bool) -> Option<usize> {
+    let back = |i: usize| i.checked_sub(1);
+    let forward = |i: usize| (i + 1 < rects.len()).then_some(i + 1);
+    let (left, right) = if rtl {
+        (forward(index), back(index))
+    } else {
+        (back(index), forward(index))
+    };
+    match (layout_of(rects), arrow) {
+        (ReorderLayout::Vertical, Arrow::Up) => back(index),
+        (ReorderLayout::Vertical, Arrow::Down) => forward(index),
+        (ReorderLayout::Vertical, _) => None,
+        (_, Arrow::Left) => left,
+        (_, Arrow::Right) => right,
+        (ReorderLayout::Horizontal, _) => None,
+        (ReorderLayout::Grid, vertical) => {
+            let rows = rows_of(rects);
+            let r = rows.iter().position(|row| row.contains(&index))?;
+            let c = rows[r].iter().position(|&i| i == index)?;
+            let target = if vertical == Arrow::Up {
+                r.checked_sub(1)?
+            } else {
+                r + 1
+            };
+            let row = rows.get(target)?;
+            Some(row[c.min(row.len() - 1)])
+        }
+    }
+}
+
+/// An item's row and column, one-based, for a grid's announcement.
+pub(crate) fn row_and_column(rects: &[Rect], index: usize) -> (usize, usize) {
+    let rows = rows_of(rects);
+    for (r, row) in rows.iter().enumerate() {
+        if let Some(c) = row.iter().position(|&i| i == index) {
+            return (r + 1, c + 1);
+        }
+    }
+    (1, index + 1)
+}
+
+/// Where the dragged item's centre sits when it lands in each slot, along a
+/// one-axis list of varying sizes (`starts`, `sizes`): a slot before it
+/// starts where that item starts, one after it ends where that item ends.
+pub(crate) fn slot_centers(starts: &[f32], sizes: &[f32], dragged: usize) -> Vec<f32> {
+    let own = sizes[dragged];
+    (0..starts.len())
+        .map(|i| match i.cmp(&dragged) {
+            std::cmp::Ordering::Less => starts[i] + own / 2.,
+            std::cmp::Ordering::Equal => starts[i] + own / 2.,
+            std::cmp::Ordering::Greater => starts[i] + sizes[i] - own / 2.,
+        })
+        .collect()
+}
+
+/// FR1's insertion-line candidate for slots it cannot order by rows: the
+/// slot whose centre is nearest the dragged item's centre, within the drop
+/// range.
+pub(crate) fn nearest_slot(centers: &[(f32, f32)], at: (f32, f32), range: (usize, usize)) -> usize {
+    let d = |c: &(f32, f32)| (c.0 - at.0).powi(2) + (c.1 - at.1).powi(2);
+    (range.0..=range.1)
+        .min_by(|a, b| d(&centers[*a]).total_cmp(&d(&centers[*b])))
+        .unwrap_or(range.0)
+}
+
+/// FR9's midpoint rule: the candidate moves from `current` to another slot
+/// only once the dragged item's centre passes that slot's centre, measured
+/// along the line between the two; when several qualify the nearest wins.
+/// So a pointer resting near a boundary does not flicker.
+pub(crate) fn shift_candidate(
+    centers: &[(f32, f32)],
+    current: usize,
+    at: (f32, f32),
+    range: (usize, usize),
+) -> usize {
+    let c = centers[current];
+    let d = |p: &(f32, f32)| (p.0 - at.0).powi(2) + (p.1 - at.1).powi(2);
+    (range.0..=range.1)
+        .filter(|&s| s != current)
+        .filter(|&s| {
+            let line = (centers[s].0 - c.0, centers[s].1 - c.1);
+            let length = line.0 * line.0 + line.1 * line.1;
+            length > 0. && ((at.0 - c.0) * line.0 + (at.1 - c.1) * line.1) / length >= 1.
+        })
+        .min_by(|a, b| d(&centers[*a]).total_cmp(&d(&centers[*b])))
+        .unwrap_or(current)
+}
+
+/// Where each item shifts while the dragged one would land at `candidate`
+/// (FR9): the items it passes take the next slot toward its old place. In a
+/// one-axis list, by the dragged item's pitch; otherwise from slot to slot.
+pub(crate) fn shift_offset(
+    centers: &[(f32, f32)],
+    layout: ReorderLayout,
+    given: bool,
+    pitch: f32,
+    dragged: usize,
+    candidate: usize,
+    index: usize,
+) -> (f32, f32) {
+    let to = if index > dragged && index <= candidate {
+        index - 1
+    } else if index < dragged && index >= candidate {
+        index + 1
+    } else {
+        return (0., 0.);
+    };
+    let sign = if to < index { -1. } else { 1. };
+    match layout {
+        ReorderLayout::Vertical if !given => (0., sign * pitch),
+        ReorderLayout::Horizontal if !given => (sign * pitch, 0.),
+        _ => (
+            centers[to].0 - centers[index].0,
+            centers[to].1 - centers[index].1,
+        ),
+    }
+}
+
+#[cfg(test)]
+mod layout_tests {
+    use super::*;
+
+    fn grid(columns: usize, count: usize) -> Vec<Rect> {
+        (0..count)
+            .map(|i| Rect {
+                x: (i % columns) as f32 * 110.,
+                y: (i / columns) as f32 * 70.,
+                w: 100.,
+                h: 60.,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn reads_the_layout_from_the_boxes() {
+        assert_eq!(layout_of(&grid(1, 4)), ReorderLayout::Vertical);
+        assert_eq!(layout_of(&grid(4, 4)), ReorderLayout::Horizontal);
+        assert_eq!(layout_of(&grid(3, 7)), ReorderLayout::Grid);
+        assert_eq!(
+            rows_of(&grid(3, 7)),
+            [vec![0, 1, 2], vec![3, 4, 5], vec![6]]
+        );
+    }
+
+    #[test]
+    fn fr4_arrows_in_a_grid() {
+        let g = grid(3, 7);
+        // Left and Right go along reading order, across a row's end.
+        assert_eq!(arrow_target(&g, 2, Arrow::Right, false), Some(3));
+        assert_eq!(arrow_target(&g, 3, Arrow::Left, false), Some(2));
+        // Right to left mirrors them.
+        assert_eq!(arrow_target(&g, 2, Arrow::Left, true), Some(3));
+        // Up and Down keep the column; a shorter row takes its last place.
+        assert_eq!(arrow_target(&g, 1, Arrow::Down, false), Some(4));
+        assert_eq!(arrow_target(&g, 5, Arrow::Down, false), Some(6));
+        assert_eq!(arrow_target(&g, 4, Arrow::Up, false), Some(1));
+        assert_eq!(arrow_target(&g, 1, Arrow::Up, false), None);
+        assert_eq!(arrow_target(&g, 6, Arrow::Right, false), None);
+        assert_eq!(row_and_column(&g, 4), (2, 2));
+        // A column ignores Left and Right; a row ignores Up and Down.
+        assert_eq!(arrow_target(&grid(1, 3), 1, Arrow::Left, false), None);
+        assert_eq!(arrow_target(&grid(3, 3), 1, Arrow::Down, false), None);
+        assert_eq!(arrow_target(&grid(3, 3), 1, Arrow::Left, false), Some(0));
+    }
+
+    #[test]
+    fn slot_centres_along_one_axis() {
+        // Rows of 40, 80, 40: dragging the first, its slot after the tall
+        // row ends where that row ends.
+        let c = slot_centers(&[0., 40., 120.], &[40., 80., 40.], 0);
+        assert_eq!(c, [20., 100., 140.]);
+    }
+
+    #[test]
+    fn fr1_the_nearest_slot_wins() {
+        let centers = [(50., 30.), (160., 30.), (270., 30.), (50., 100.)];
+        assert_eq!(nearest_slot(&centers, (150., 40.), (0, 3)), 1);
+        assert_eq!(nearest_slot(&centers, (60., 90.), (0, 3)), 3);
+        assert_eq!(nearest_slot(&centers, (60., 90.), (0, 2)), 0);
+    }
+
+    #[test]
+    fn fr9_the_candidate_moves_once_the_centre_passes_the_slot_centre() {
+        let centers = [(0., 20.), (0., 60.), (0., 100.)];
+        // Resting near the boundary between 0 and 1 keeps 0.
+        assert_eq!(shift_candidate(&centers, 0, (0., 41.), (0, 2)), 0);
+        assert_eq!(shift_candidate(&centers, 0, (0., 59.), (0, 2)), 0);
+        assert_eq!(shift_candidate(&centers, 0, (0., 60.), (0, 2)), 1);
+        // Back from 1: only once past slot 0's centre.
+        assert_eq!(shift_candidate(&centers, 1, (0., 30.), (0, 2)), 1);
+        assert_eq!(shift_candidate(&centers, 1, (0., 20.), (0, 2)), 0);
+        // Past several, the nearest qualifying wins.
+        assert_eq!(shift_candidate(&centers, 0, (0., 110.), (0, 2)), 2);
+    }
+
+    #[test]
+    fn fr9_the_passed_items_take_the_next_slot() {
+        let rows = grid(1, 4);
+        let centers: Vec<_> = rows.iter().map(Rect::center).collect();
+        // Dragging row 0 to 2: rows 1 and 2 move up a pitch.
+        for (i, expected) in [(0, 0.), (1, -70.), (2, -70.), (3, 0.)] {
+            assert_eq!(
+                shift_offset(&centers, ReorderLayout::Vertical, false, 70., 0, 2, i),
+                (0., expected)
+            );
+        }
+        // In a grid, from slot to slot.
+        let gc: Vec<_> = grid(3, 6).iter().map(Rect::center).collect();
+        assert_eq!(
+            shift_offset(&gc, ReorderLayout::Grid, false, 0., 1, 3, 3),
+            (220., -70.)
+        );
+        assert_eq!(
+            shift_offset(&gc, ReorderLayout::Grid, false, 0., 1, 3, 2),
+            (-110., 0.)
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -22,7 +22,8 @@
   start content and custom end content are not there. Upstream dims the row in place and
   draws a copy at the pointer. GPUI also reports no pointer type, so a finger's drag
   starts like a mouse's (4px of travel), without upstream's hold; and Escape cancels a
-  drag, which upstream's mouse drag has no key for.
+  drag, which upstream's mouse drag has no key for. Under shift feedback the passed items
+  jump to their slots; their slide waits for the motion layer (M11).
 
 - **A windowed list needs its scroller to hold its anchor.** `WindowedList` windows from
   the clips above it wherever it sits. To keep its first visible row (or its end, or a

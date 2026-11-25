@@ -416,7 +416,7 @@ impl RenderOnce for List {
         let reorder = self
             .reorderable
             .as_ref()
-            .map(|r| crate::reorderable::session::begin(&self.id, r, window, cx));
+            .map(|r| crate::reorderable::session::begin(&self.id, r, false, window, cx));
         let base = match &reorder {
             Some(rc) => {
                 let session = rc.session.clone();

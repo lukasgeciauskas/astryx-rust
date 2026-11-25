@@ -12,7 +12,9 @@ use gpui::{
     div, point, px,
 };
 
-use super::{ReorderMove, ReorderableLabels, ReorderableOptions, create_reorderable};
+use super::{
+    FeedbackBehavior, ReorderMove, ReorderableLabels, ReorderableOptions, create_reorderable,
+};
 use crate::list::{List, ListItem};
 
 type Items = Rc<RefCell<Vec<&'static str>>>;
@@ -26,6 +28,7 @@ struct Host {
     reorderable: bool,
     pinned: Option<&'static str>,
     labels: ReorderableLabels,
+    feedback: FeedbackBehavior,
     scroll: ScrollHandle,
     height: f32,
 }
@@ -48,7 +51,8 @@ impl Render for Host {
             }
             window.refresh();
         })
-        .labels(self.labels.clone());
+        .labels(self.labels.clone())
+        .feedback_behavior(self.feedback);
         if let Some(pinned) = pinned {
             options = options.is_reorderable(move |k| *k != super::ItemKey::from(pinned));
         }
@@ -108,6 +112,7 @@ fn host<'a>(
             reorderable: true,
             pinned: None,
             labels: ReorderableLabels::default(),
+            feedback: FeedbackBehavior::InsertionLine,
             scroll,
             height: 600.,
         };
@@ -279,13 +284,26 @@ fn fr1_labels_replace_the_catalog(cx: &mut TestAppContext) {
     assert_said(cx, "Finished: Jam is 4 of 4");
 }
 
+/// Presses at `from`, passes the slop with a 5px step (where the drag
+/// begins, so the item follows from there), then moves so the item has
+/// travelled `to - from`.
 fn drag(cx: &mut VisualTestContext, from: Point<gpui::Pixels>, to: Point<gpui::Pixels>) {
     cx.simulate_mouse_down(from, MouseButton::Left, Modifiers::none());
     settle(cx);
-    let steps = 8;
+    let (dx, dy) = (f32::from(to.x - from.x), f32::from(to.y - from.y));
+    let length = dx.hypot(dy);
+    let (ux, uy) = if length > 0. {
+        (dx / length, dy / length)
+    } else {
+        (0., 1.)
+    };
+    let slop = point(px(ux * 5.), px(uy * 5.));
+    cx.simulate_mouse_move(from + slop, Some(MouseButton::Left), Modifiers::none());
+    settle(cx);
+    let steps = 6;
     for i in 1..=steps {
         let t = i as f32 / steps as f32;
-        let at = point(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
+        let at = point(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t) + slop;
         cx.simulate_mouse_move(at, Some(MouseButton::Left), Modifiers::none());
         settle(cx);
     }
@@ -446,4 +464,246 @@ fn fr3_a_release_outside_the_window_drops(cx: &mut TestAppContext) {
     cx.simulate_mouse_move(to, None, Modifiers::none());
     settle(cx);
     assert_eq!(moves(&s.log), [("Text(\"Eggs\")".to_string(), 2)]);
+}
+
+#[gpui::test]
+fn fr9_shift_feedback_slides_the_passed_rows_aside(cx: &mut TestAppContext) {
+    let (cx, s) = host(cx, &FOUR, |h| h.feedback = FeedbackBehavior::Shift);
+    let from = handle(cx, "Eggs").center();
+    let milk = handle(cx, "Milk");
+    let bread = handle(cx, "Bread");
+    let pitch = milk.top() - handle(cx, "Eggs").top();
+    let jam = handle(cx, "Jam");
+    // Past Bread's slot centre: Milk and Bread slide up a pitch; Jam stays.
+    drag(cx, from, point(from.x, bread.center().y + px(1.)));
+    assert_eq!(handle(cx, "Milk").top(), milk.top() - pitch);
+    assert_eq!(handle(cx, "Bread").top(), bread.top() - pitch);
+    assert_eq!(handle(cx, "Jam").top(), jam.top());
+    cx.simulate_mouse_up(
+        point(from.x, bread.center().y),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    settle(cx);
+    assert_eq!(moves(&s.log), [("Text(\"Eggs\")".to_string(), 2)]);
+    assert_eq!(
+        handle(cx, "Milk").top(),
+        milk.top() - pitch,
+        "the new order, at rest"
+    );
+}
+
+#[gpui::test]
+fn fr9_under_reduced_motion_shift_shows_the_line(cx: &mut TestAppContext) {
+    let (cx, s) = host(cx, &FOUR, |h| h.feedback = FeedbackBehavior::Shift);
+    cx.update(|_, cx| astryx_primitives::set_reduced_motion(true, cx));
+    let from = handle(cx, "Eggs").center();
+    let milk = handle(cx, "Milk");
+    let bread = handle(cx, "Bread");
+    drag(cx, from, point(from.x, bread.center().y + px(1.)));
+    assert_eq!(handle(cx, "Milk").top(), milk.top(), "no row travels");
+    cx.simulate_mouse_up(
+        point(from.x, bread.center().y),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    settle(cx);
+    assert_eq!(s.log.borrow().len(), 1);
+}
+
+/// An app's own cards in a wrapping grid, three to a row, each with its
+/// own grip as the handle (FR4b).
+struct Cards {
+    items: Items,
+    log: Log,
+    applies: bool,
+    feedback: FeedbackBehavior,
+    positions: Option<Vec<Point<gpui::Pixels>>>,
+}
+
+impl Render for Cards {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let (items, log, applies) = (self.items.clone(), self.log.clone(), self.applies);
+        let mut options = ReorderableOptions::new(move |m, window, _| {
+            log.borrow_mut().push(m.clone());
+            if applies {
+                let mut items = items.borrow_mut();
+                let key = format!("{:?}", m.key);
+                let from = items
+                    .iter()
+                    .position(|i| key == format!("Text({i:?})"))
+                    .unwrap();
+                let item = items.remove(from);
+                items.insert(m.to, item);
+            }
+            window.refresh();
+        })
+        .feedback_behavior(self.feedback);
+        if let Some(p) = self.positions.clone() {
+            options = options.positions(move || p.clone());
+        }
+        let attached = create_reorderable(options).attach("cards", window, cx);
+        let names = self.items.borrow().clone();
+        let cards: Vec<_> = names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                let grip = div().size(px(24.)).bg(gpui::black());
+                let card = div()
+                    .w(px(100.))
+                    .h(px(60.))
+                    .flex()
+                    .items_start()
+                    .justify_end()
+                    .child(attached.handle(*name, grip));
+                attached.item(i, *name, *name, card, cx)
+            })
+            .collect();
+        div().p(px(20.)).child(
+            attached.container(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .w(px(330.))
+                    .gap(px(10.))
+                    .children(cards),
+                names.len(),
+            ),
+        )
+    }
+}
+
+fn cards(
+    cx: &mut TestAppContext,
+    configure: impl FnOnce(&mut Cards),
+) -> (&mut VisualTestContext, Items, Log) {
+    cx.update(|cx| {
+        astryx_theme::init(cx);
+        astryx_primitives::focus::init(cx);
+    });
+    let names: Vec<&'static str> = (1..=7)
+        .map(|i| &*Box::leak(format!("Card {i}").into_boxed_str()))
+        .collect();
+    let items: Items = Rc::new(RefCell::new(names));
+    let log: Log = Rc::default();
+    let (i2, l2) = (items.clone(), log.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| {
+        let mut c = Cards {
+            items: i2,
+            log: l2,
+            applies: true,
+            feedback: FeedbackBehavior::InsertionLine,
+            positions: None,
+        };
+        configure(&mut c);
+        c
+    });
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    (cx, items, log)
+}
+
+fn card(cx: &mut VisualTestContext, n: usize) -> gpui::Bounds<gpui::Pixels> {
+    let selector: &'static str = Box::leak(format!("cards-reorder-Card {n}").into_boxed_str());
+    cx.debug_bounds(selector)
+        .unwrap_or_else(|| panic!("no handle for Card {n}"))
+}
+
+#[gpui::test]
+fn fr4b_fr4_an_attached_grid_moves_by_all_four_arrows(cx: &mut TestAppContext) {
+    let (cx, items, _) = cards(cx, |_| {});
+    let at = card(cx, 2).center();
+    click(cx, at);
+    assert!(
+        shown(cx, "cards-hint-left") && shown(cx, "cards-hint-up"),
+        "the grid's hint has all four moves"
+    );
+    press(cx, "right");
+    assert_eq!(items.borrow()[2], "Card 2");
+    assert_said(cx, "Card 2, row 1, column 3, position 3 of 7");
+    // Right across the row's end.
+    press(cx, "right");
+    assert_said(cx, "Card 2, row 2, column 1, position 4 of 7");
+    // Down into the short last row: its last place.
+    press(cx, "down");
+    assert_eq!(items.borrow()[6], "Card 2");
+    assert_said(cx, "Card 2, row 3, column 1, position 7 of 7");
+    // The live region clears before the same place is said again.
+    cx.executor().advance_clock(Duration::from_secs(10));
+    settle(cx);
+    press(cx, "up");
+    assert_said(cx, "Card 2, row 2, column 1, position 4 of 7");
+}
+
+#[gpui::test]
+fn fr4b_a_move_the_app_does_not_apply_is_refused(cx: &mut TestAppContext) {
+    let (cx, items, log) = cards(cx, |c| c.applies = false);
+    let at = card(cx, 1).center();
+    click(cx, at);
+    press(cx, "right");
+    assert_eq!(log.borrow().len(), 1);
+    assert_eq!(items.borrow()[0], "Card 1");
+    assert_said(cx, "Can't move Card 1");
+}
+
+#[gpui::test]
+fn fr3_fr4b_a_drag_in_a_grid_lands_in_the_nearest_slot(cx: &mut TestAppContext) {
+    let (cx, items, log) = cards(cx, |_| {});
+    let from = card(cx, 1).center();
+    let target = card(cx, 5).center();
+    drag(cx, from, target);
+    cx.simulate_mouse_up(target, MouseButton::Left, Modifiers::none());
+    settle(cx);
+    assert_eq!(moves(&log), [("Text(\"Card 1\")".to_string(), 4)]);
+    assert_eq!(items.borrow()[4], "Card 1");
+}
+
+#[gpui::test]
+fn fr9_shift_in_a_grid_moves_items_slot_to_slot(cx: &mut TestAppContext) {
+    let (cx, _, _) = cards(cx, |c| c.feedback = FeedbackBehavior::Shift);
+    let (c2, c3, c4) = (card(cx, 2), card(cx, 3), card(cx, 4));
+    let from = card(cx, 1).center();
+    drag(cx, from, c4.center() + point(px(0.), px(1.)));
+    // Cards 2-4 take the slots before them.
+    assert_eq!(card(cx, 2).origin, card_slot(c2, -110., 0.));
+    assert_eq!(card(cx, 3).origin, card_slot(c3, -110., 0.));
+    assert_eq!(card(cx, 4).origin, card_slot(c4, 220., -70.));
+}
+
+fn card_slot(b: gpui::Bounds<gpui::Pixels>, dx: f32, dy: f32) -> Point<gpui::Pixels> {
+    point(b.origin.x + px(dx), b.origin.y + px(dy))
+}
+
+#[gpui::test]
+fn fr1_positions_place_the_slots(cx: &mut TestAppContext) {
+    // A hand whose slots run right to left over the cards' boxes: slot 0
+    // where the third card sits.
+    let given: Vec<Point<gpui::Pixels>> = (0..7)
+        .map(|i| {
+            let i = 6 - i;
+            point(
+                px((i % 3) as f32 * 110. + 50.),
+                px((i / 3) as f32 * 70. + 30.),
+            )
+        })
+        .collect();
+    let (cx, _, log) = cards(cx, move |c| c.positions = Some(given));
+    let from = card(cx, 2).center();
+    // Onto the box of card 7, where slot 0 is.
+    let target = card(cx, 7).center();
+    drag(cx, from, target);
+    cx.simulate_mouse_up(target, MouseButton::Left, Modifiers::none());
+    settle(cx);
+    assert_eq!(moves(&log), [("Text(\"Card 2\")".to_string(), 0)]);
+}
+
+#[gpui::test]
+fn fr1_positions_of_the_wrong_length_are_ignored(cx: &mut TestAppContext) {
+    let (cx, _, log) = cards(cx, |c| c.positions = Some(vec![point(px(0.), px(0.))]));
+    let from = card(cx, 1).center();
+    let target = card(cx, 5).center();
+    drag(cx, from, target);
+    cx.simulate_mouse_up(target, MouseButton::Left, Modifiers::none());
+    settle(cx);
+    assert_eq!(moves(&log), [("Text(\"Card 1\")".to_string(), 4)]);
 }
