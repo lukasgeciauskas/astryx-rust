@@ -160,6 +160,40 @@ pub fn set_time_now(now: Option<PlainTime>) {
     NOW.with(|cell| cell.set(now));
 }
 
+/// A date and a time of day, upstream `ISODateTimeString`
+/// (`2026-03-21T14:30` or with seconds).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct PlainDateTime {
+    pub date: super::PlainDate,
+    pub time: PlainTime,
+}
+
+impl PlainDateTime {
+    pub fn new(date: super::PlainDate, time: PlainTime) -> Self {
+        Self { date, time }
+    }
+
+    /// Reads `YYYY-MM-DDTHH:MM` or `YYYY-MM-DDTHH:MM:SS`.
+    pub fn from_iso(text: &str) -> Option<Self> {
+        let (date, time) = text.trim().split_once('T')?;
+        Some(Self {
+            date: super::PlainDate::from_iso(date)?,
+            time: PlainTime::from_iso(time)?,
+        })
+    }
+
+    /// `YYYY-MM-DDTHH:MM`, or with seconds.
+    pub fn to_iso(self, include_seconds: bool) -> String {
+        format!("{}T{}", self.date, self.time.to_iso(include_seconds))
+    }
+}
+
+impl fmt::Display for PlainDateTime {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}T{}", self.date, self.time)
+    }
+}
+
 /// "2:30 PM" for 14:30 (`formatDisplayTime12h`).
 pub fn format_display_time_12h(time: PlainTime, include_seconds: bool) -> String {
     let hour = match time.hour {

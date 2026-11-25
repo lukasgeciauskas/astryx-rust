@@ -41,7 +41,7 @@ pub use plain::{
 };
 pub use text::normalize_date_text;
 pub use time::{
-    HourFormat, PlainTime, adjust_time, clamp_time, compare_time, format_display_time_12h,
-    format_display_time_24h, format_locale_time, is_locale_time_complete, is_time_in_range,
-    parse_locale_time, parse_time_input, resolve_hour_format, set_time_now,
+    HourFormat, PlainDateTime, PlainTime, adjust_time, clamp_time, compare_time,
+    format_display_time_12h, format_display_time_24h, format_locale_time, is_locale_time_complete,
+    is_time_in_range, parse_locale_time, parse_time_input, resolve_hour_format, set_time_now,
 };

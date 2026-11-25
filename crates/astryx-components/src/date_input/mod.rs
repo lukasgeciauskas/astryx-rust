@@ -6,6 +6,7 @@
 mod date_input;
 pub mod examples;
 pub(crate) mod presentation;
+pub(crate) mod segment;
 pub(crate) mod typed;
 
 #[cfg(test)]

@@ -5,16 +5,16 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-25, during M8 (Dates): stages 1 to 3 done._
+_Last updated: 2026-11-25, during M8 (Dates): stages 1 to 4 done._
 
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6 and M7; M8 (Dates) is under way
-  (stages 1 to 3: calendar systems and Calendar, DateInput's pointer field, TimeInput's typed
-  field). Details and dates are in
+  (stages 1 to 4: calendar systems and Calendar, then the pointer surfaces of DateInput,
+  TimeInput and DateTimeInput). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 86 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 87 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** M7's seven stages, from `cceff1a` (Table and its parts)
   through sorting, selection and activation, pagination and filtering, tree and grouped
@@ -30,7 +30,7 @@ _Last updated: 2026-11-25, during M8 (Dates): stages 1 to 3 done._
 
 ### Not yet ported (27)
 
-- **M8:** DateRangeInput, DateTimeInput (DateInput and TimeInput are ported; their sheet
+- **M8:** DateRangeInput (DateInput, TimeInput and DateTimeInput are ported; their sheet
   and native surfaces come later in M8). **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
@@ -183,8 +183,8 @@ date and time foundations in `astryx_i18n::date` (calendar arithmetic, formattin
 the typed date and time parsers) and Calendar with its three public hooks
 (`crates/astryx-components/src/calendar/`). The owner approved the calendar crates; ICU4X
 and jiff were already dependencies. Stage 2 added DateInput's pointer field (`crates/astryx-components/src/date_input/`) and the
-shared entry-error report (`field/entry_report.rs`). Stage 3 added TimeInput's typed field (`time_input/`). The remaining stages, in order:
-DateTimeInput, DateRangeInput, the touch sheets (MonthScroller,
+shared entry-error report (`field/entry_report.rs`). Stage 3 added TimeInput's typed field (`time_input/`). Stage 4 added DateTimeInput's pointer field (`date_time_input/`). The remaining stages, in
+order: DateRangeInput, the touch sheets (MonthScroller,
 the month/year and time wheels), the native pickers (a fork patch: a hidden
 `<input type="date">` and `showPicker()` on the web, the Common Controls month calendar and
 date-time picker on Windows), then the carried items. Carried into M8:

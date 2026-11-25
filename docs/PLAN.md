@@ -532,6 +532,13 @@ The remaining primitives:
     hint (FR5), Enter and blur commits that keep a rejected draft (`time_input/typed.rs`,
     upstream `useTypedTime`, FR13-FR15), clear, `changeAction`, disabled with its reason,
     and InputGroup membership with its status announced through the shared channel (FR10).
+  - Stage 4 (done): DateTimeInput's pointer field (`date_time_input/`): a date segment on
+    DateInput's typing session (now `date_input/segment.rs`, shared) and a time segment on
+    TimeInput's, one combined value (a time before any date emits nothing, a new date keeps
+    the time clamped into a bound on that day, FR2, FR6), the calendar popover, the optional
+    preset-time listbox limited to the day's bounds with its keyboard (FR7), the time arrows,
+    the date segment's message first with the time rejection through its own alert (FR16),
+    clear, `changeAction`, disabled and the wrapping two-segment row (FR5).
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
     `entryErrorBehavior: complete` (`table/filtering.rs` shows none until then).
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

@@ -9,12 +9,12 @@
 
 use std::rc::Rc;
 
-use astryx_i18n::date::{DateParse, PlainDate, Weekday};
+use astryx_i18n::date::{PlainDate, Weekday};
 use astryx_i18n::{CalendarSystem, current as i18n, use_direction};
 use astryx_primitives::editing::{EditorStyle, FieldSettings, FocusFn, TextEditState, text_editor};
 use astryx_primitives::{
-    ElementSize, Placement, Politeness, announce, control_focus, is_focus_visible,
-    prefers_reduced_motion, provide, resolve_size,
+    ElementSize, Placement, control_focus, is_focus_visible, prefers_reduced_motion, provide,
+    resolve_size,
 };
 use astryx_theme::{ThemeStyled, current, scope};
 use gpui::{
@@ -26,14 +26,12 @@ use super::presentation::{
     LegacyNativePicker, PickerPresentation, Surface, calendar_picker, coarse_pointer,
     effective_picker, resolve_picker,
 };
-use super::typed::{
-    DateInputEntryError, DateInputFormat, IsDisabled, TypedDate, TypedState, is_accepted,
-    shown_rejection,
-};
+use super::segment::{DateSegment, SegmentProps};
+use super::typed::{DateInputEntryError, DateInputFormat, IsDisabled, TypedDate};
 use crate::button::{ButtonVariant, IconButton};
 use crate::calendar::{Calendar, CalendarHandle, DateConstraint};
 use crate::choice::action::{ActionFn, Optimistic};
-use crate::field::entry_report::{CallerErrorPrecedence, EntryReport, ReportFn, ResolveInput};
+use crate::field::entry_report::ReportFn;
 use crate::field::{EntryErrorBehavior, Field, InputStatus, StatusPlacement, entry_error_behavior};
 use crate::icon::{Icon, IconColor, IconSize};
 use crate::input::control::{Chrome, control_box, described_by, status_indicator};
@@ -257,153 +255,44 @@ impl Styled for DateInput {
 /// The field's per-frame state for its handlers.
 #[derive(Clone)]
 struct Ctx {
-    state: gpui::Entity<FieldState>,
-    typed: TypedDate,
-    value: Option<PlainDate>,
+    segment: DateSegment,
     locked: bool,
     disabled: bool,
-    behavior: EntryErrorBehavior,
     on_change: Option<ValueFn>,
     action: Option<ActionFn<Option<PlainDate>>>,
     optimistic: Rc<Optimistic<Option<PlainDate>>>,
-    report: EntryReport<DateInputEntryError>,
-    calendar_handle: CalendarHandle,
     popover: PopoverController,
 }
 
-/// DateInput's state between frames.
-#[derive(Default)]
-struct FieldState {
-    typed: TypedState,
-    last_alert: Option<SharedString>,
+/// Upstream `fireChange`: `on_change`, then the action (ORD3).
+fn fire(
+    locked: bool,
+    optimistic: &Optimistic<Option<PlainDate>>,
+    on_change: Option<ValueFn>,
+    action: Option<ActionFn<Option<PlainDate>>>,
+    value: Option<PlainDate>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    if locked {
+        return;
+    }
+    let change = optimistic.change(on_change, action);
+    change(value, window, cx);
+    window.refresh();
 }
 
 impl Ctx {
-    /// Upstream `fireChange`: `on_change`, then the action (ORD3).
     fn fire(&self, value: Option<PlainDate>, window: &mut Window, cx: &mut App) {
-        if self.locked {
-            return;
-        }
-        let change = self
-            .optimistic
-            .change(self.on_change.clone(), self.action.clone());
-        change(value, window, cx);
-        window.refresh();
-    }
-
-    /// The rejection a frame shows, as reported.
-    fn current_error(&self, cx: &App) -> Option<DateInputEntryError> {
-        let state = &self.state.read(cx).typed;
-        shown_rejection(state, &self.typed, self.locked, self.behavior).and_then(|s| {
-            self.typed
-                .entry_error(&s.result, true, &s.text, self.behavior)
-        })
-    }
-
-    fn reset(&self, window: &mut Window, cx: &mut App) {
-        self.state.update(cx, |s, _| s.typed.reset());
-        self.report.report(None, window, cx);
-    }
-
-    /// Reports a typed date once per typing session (upstream `report`).
-    fn report_date(&self, date: PlainDate, window: &mut Window, cx: &mut App) -> bool {
-        let state = &self.state.read(cx).typed;
-        if Some(date) == self.value || Some(date) == state.last_fired_date() {
-            return false;
-        }
-        self.state.update(cx, |s, _| {
-            s.typed.last_fired = (Some(date), s.typed.fired_epoch)
-        });
-        self.fire(Some(date), window, cx);
-        true
-    }
-
-    /// Upstream `handleChange`: a date only once more typing cannot change
-    /// it (AST-111 FR12).
-    fn typed(&self, text: String, window: &mut Window, cx: &mut App) {
-        if self.locked {
-            return;
-        }
-        let result = self.typed.parse(&text);
-        let empty = text.trim().is_empty();
-        let error = (!empty)
-            .then(|| self.typed.entry_error(&result, false, &text, self.behavior))
-            .flatten();
-        let shown_text = {
-            let state = &self.state.read(cx).typed;
-            shown_rejection(state, &self.typed, self.locked, self.behavior).map(|s| s.text)
-        };
-        let current = self.current_error(cx);
-        let kept = if error.is_some() || empty || is_accepted(&result) {
-            None
-        } else {
-            shown_text
-        };
-        let keeps = kept.is_some();
-        self.state.update(cx, |s, _| {
-            s.typed.pending = Some(text);
-            s.typed.rejection_committed = false;
-            s.typed.kept_text = kept;
-        });
-        self.report
-            .report(error.or(if keeps { current } else { None }), window, cx);
-        if let DateParse::Value {
-            date,
-            is_complete: true,
-        } = result
-            && self.report_date(date, window, cx)
-        {
-            // The open calendar shows the typed date's month.
-            self.calendar_handle.navigate_to(date, window, cx);
-        }
-        window.refresh();
-    }
-
-    /// Upstream `commit`: Enter or blur.
-    fn commit(&self, window: &mut Window, cx: &mut App) {
-        let Some(pending) = self.state.read(cx).typed.pending.clone() else {
-            return;
-        };
-        if self.locked {
-            return;
-        }
-        if pending.trim().is_empty() {
-            if self.value.is_some() {
-                self.fire(None, window, cx);
-            }
-            self.reset(window, cx);
-            window.refresh();
-            return;
-        }
-        let result = self.typed.parse(&pending);
-        if matches!(
-            result,
-            DateParse::Unreadable
-                | DateParse::Incomplete
-                | DateParse::Nonexistent { .. }
-                | DateParse::OutOfRange { .. }
-        ) {
-            // Keep the text and say why it cannot commit; never finish or
-            // adjust the date (AST-118 FR4).
-            self.state.update(cx, |s, _| {
-                s.typed.rejection_committed = true;
-                s.typed.kept_commits += 1;
-                s.typed.kept_text = None;
-            });
-            let error = self
-                .typed
-                .entry_error(&result, true, &pending, self.behavior);
-            self.report.report(error, window, cx);
-            window.refresh();
-            return;
-        }
-        if let DateParse::Value { date, .. } = result {
-            self.report_date(date, window, cx);
-        }
-        self.state
-            .update(cx, |s, _| s.typed.last_fired = (None, s.typed.fired_epoch));
-        self.reset(window, cx);
-        window.refresh();
+        fire(
+            self.locked,
+            &self.optimistic,
+            self.on_change.clone(),
+            self.action.clone(),
+            value,
+            window,
+            cx,
+        );
     }
 
     /// A calendar pick commits and closes the popover (FR9).
@@ -412,7 +301,7 @@ impl Ctx {
             return;
         }
         self.fire(Some(date), window, cx);
-        self.reset(window, cx);
+        self.segment.reset(window, cx);
         self.popover.hide(window, cx);
     }
 }
@@ -459,11 +348,6 @@ impl RenderOnce for DateInput {
             &i18n,
         );
         let behavior = entry_error_behavior(self.entry_error_behavior, cx);
-        let state = window.use_keyed_state(
-            ElementId::Name(format!("{:?}-date-input", self.id).into()),
-            cx,
-            |_, _| FieldState::default(),
-        );
         let calendar_handle = window
             .use_keyed_state(
                 ElementId::Name(format!("{:?}-calendar-handle", self.id).into()),
@@ -475,102 +359,87 @@ impl RenderOnce for DateInput {
         let popover_id = ElementId::Name(format!("{}-popover", self.id).into());
         let popover = PopoverController::new(popover_id.clone(), window, cx);
 
-        // A new value drops typed text and retires the reported date; a
-        // re-enabled field shows its value for text typing already reported
-        // (FR12, AST-118 FR6).
-        let value = self.value;
-        let disabled = locked;
-        let typed_for_state = typed.clone();
-        state.update(cx, |s, _| {
-            let t = &mut s.typed;
-            let replaced = t.replaces.check(&value, t.kept_commits);
-            if t.prev_value != Some(value) {
-                let first = t.prev_value.is_none();
-                t.prev_value = Some(value);
-                if !first {
-                    let retires = value != t.last_fired_date();
-                    if retires {
-                        t.fired_epoch += 1;
-                    }
-                    if t.pending.is_some() && replaced && (retires || value.is_none()) {
-                        t.reset();
-                    }
-                }
-            }
-            if disabled != t.was_disabled {
-                t.was_disabled = disabled;
-                let reported = t.pending.as_deref().map(|p| typed_for_state.parse(p));
-                if !disabled
-                    && !t.focused
-                    && matches!(reported, Some(DateParse::Value { date, .. }) if Some(date) == t.last_fired_date())
-                {
-                    t.fired_epoch += 1;
-                    t.reset();
-                }
-            }
-        });
-
-        let report = EntryReport::<DateInputEntryError>::new(&self.id, window, cx);
-        let shown = shown_rejection(&state.read(cx).typed, &typed, locked, behavior);
-        let rejection_message = shown.as_ref().map(|s| typed.error_message(&s.result));
-        let entry_error = shown
-            .as_ref()
-            .and_then(|s| typed.entry_error(&s.result, true, &s.text, behavior));
-        let resolved = report.resolve(
-            ResolveInput {
-                entry_error,
-                rejection_message,
-                status: self.status.as_ref(),
-                status_announced: place.is_none(),
-                precedence: CallerErrorPrecedence::WithCallback,
-                callback: self.on_entry_error_change.clone(),
-            },
+        let segment = {
+            let (opt, on_change, action) = (
+                optimistic.clone(),
+                self.on_change.clone(),
+                self.change_action.clone(),
+            );
+            let (opt2, on_change2, action2) = (
+                optimistic.clone(),
+                self.on_change.clone(),
+                self.change_action.clone(),
+            );
+            let value = self.value;
+            let handle = calendar_handle.clone();
+            DateSegment::new(
+                &self.id,
+                SegmentProps {
+                    typed: typed.clone(),
+                    value: self.value,
+                    locked,
+                    behavior,
+                    on_date: Rc::new(move |date, window, cx| {
+                        fire(
+                            locked,
+                            &opt,
+                            on_change.clone(),
+                            action.clone(),
+                            Some(date),
+                            window,
+                            cx,
+                        )
+                    }),
+                    on_clear: Rc::new(move |window, cx| {
+                        if value.is_some() {
+                            fire(
+                                locked,
+                                &opt2,
+                                on_change2.clone(),
+                                action2.clone(),
+                                None,
+                                window,
+                                cx,
+                            );
+                        }
+                    }),
+                    // The open calendar shows the typed date's month.
+                    on_typed: Some(Rc::new(move |date, window, cx| {
+                        handle.navigate_to(date, window, cx)
+                    })),
+                },
+                window,
+                cx,
+            )
+        };
+        let shown = segment.shown(cx);
+        let resolved = segment.resolve(
+            self.status.as_ref(),
+            place.is_none(),
+            self.on_entry_error_change.clone(),
             window,
             cx,
         );
         let field_status = resolved.status;
-        // The field's alert: the message no shown status announces.
-        let alert_changed = state.update(cx, |s, _| {
-            let changed = s.last_alert != resolved.alert;
-            s.last_alert = resolved.alert.clone();
-            changed
-        });
-        if alert_changed && let Some(alert) = resolved.alert.clone() {
-            window.defer(cx, move |window, cx| {
-                announce(alert, Politeness::Assertive, window, cx)
-            });
-        }
 
         let ctx = Ctx {
-            state: state.clone(),
-            typed: typed.clone(),
-            value: self.value,
+            segment: segment.clone(),
             locked,
             disabled: self.disabled,
-            behavior,
             on_change: self.on_change.clone(),
             action: self.change_action.clone(),
             optimistic: optimistic.clone(),
-            report: report.clone(),
-            calendar_handle: calendar_handle.clone(),
             popover: popover.clone(),
         };
 
         // ORD2: typed text while editing, else the committed date.
-        let (pending, focused_state) = {
-            let s = &state.read(cx).typed;
-            (s.pending.clone(), s.focused)
-        };
-        let committed = shown_value
-            .map(|v| typed.format_committed(v))
-            .unwrap_or_default();
-        let display = pending.clone().unwrap_or(committed);
-        let format_hint = (self.placeholder.is_none() && focused_state && display.is_empty())
-            .then(|| typed.format_hint())
-            .flatten();
-        let placeholder = format_hint
-            .or(self.placeholder.clone())
-            .unwrap_or_else(|| i18n.t("@astryx.dateInput.placeholder"));
+        let display = segment.display(shown_value, cx);
+        let placeholder = segment.placeholder(
+            self.placeholder.clone(),
+            i18n.t("@astryx.dateInput.placeholder"),
+            &display,
+            cx,
+        );
 
         let editor_state = window.use_keyed_state(
             ElementId::Name(format!("{:?}-editor", self.id).into()),
@@ -593,26 +462,26 @@ impl RenderOnce for DateInput {
             s.on_change = (!locked).then(|| {
                 let ctx = ctx.clone();
                 Rc::new(move |text: String, window: &mut Window, cx: &mut App| {
-                    ctx.typed(text, window, cx)
+                    ctx.segment.typed(text, window, cx)
                 }) as astryx_primitives::editing::ChangeFn
             });
             // FR16: Enter commits typed text.
             s.on_enter = Some({
                 let ctx = ctx.clone();
-                Rc::new(move |window: &mut Window, cx: &mut App| ctx.commit(window, cx)) as FocusFn
+                Rc::new(move |window: &mut Window, cx: &mut App| ctx.segment.commit(window, cx))
+                    as FocusFn
             });
             s.on_blur = Some({
                 let ctx = ctx.clone();
                 Rc::new(move |window: &mut Window, cx: &mut App| {
-                    ctx.state.update(cx, |s, _| s.typed.focused = false);
-                    ctx.commit(window, cx);
+                    ctx.segment.set_focused(false, cx);
+                    ctx.segment.commit(window, cx);
                 })
             });
             s.on_focus = Some({
                 let ctx = ctx.clone();
                 Rc::new(move |window: &mut Window, cx: &mut App| {
-                    ctx.state.update(cx, |s, _| s.typed.focused = true);
-                    ctx.typed.prepare();
+                    ctx.segment.set_focused(true, cx);
                     window.refresh();
                 })
             });
@@ -836,7 +705,7 @@ impl RenderOnce for DateInput {
                     // ORD4: the clear goes through the change pipeline, then
                     // focus returns to the input.
                     ctx.fire(None, window, cx);
-                    ctx.reset(window, cx);
+                    ctx.segment.reset(window, cx);
                     window.focus(&focus, cx);
                 }),
             ));
