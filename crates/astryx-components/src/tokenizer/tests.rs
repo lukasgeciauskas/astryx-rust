@@ -212,3 +212,73 @@ fn fr3_blurred_tokens_fold_into_one_row(cx: &mut TestAppContext) {
     focus_field(cx, 0);
     assert!(!shown(cx, "k-folded"), "every token while focused");
 }
+
+fn sheet_field(t: Tokenizer<SearchItem>) -> Tokenizer<SearchItem> {
+    t.presentation(crate::overlay::PopoverPresentation::BottomSheet)
+}
+
+fn click(cx: &mut VisualTestContext, selector: &str) {
+    // Sheets and dialogs finish their entrance first.
+    cx.executor().advance_clock(Duration::from_millis(600));
+    settle(cx);
+    let at = cx
+        .debug_bounds(Box::leak(selector.to_string().into_boxed_str()))
+        .unwrap_or_else(|| panic!("{selector} is not drawn"))
+        .center();
+    cx.simulate_click(at, gpui::Modifiers::none());
+    settle(cx);
+}
+
+#[gpui::test]
+fn fr17_fr19_fr26_the_sheet_edits_a_draft_that_save_reports(cx: &mut TestAppContext) {
+    let (cx, value, log) = host(cx, &["Design"], sheet_field);
+    assert!(!shown(cx, "k-sheet-list"));
+    click(cx, "k-trigger");
+    assert!(shown(cx, "k-sheet-list"), "the trigger opens the sheet");
+    assert!(shown(cx, "k-sheet-row-design"), "the chosen item leads");
+    click(cx, "k-sheet-row-research");
+    assert!(log.borrow().is_empty(), "the draft is not reported yet");
+    assert_eq!(announced(cx), "Added Research");
+    click(cx, "k-sheet-save");
+    assert_eq!(*log.borrow(), ["Add Research"]);
+    assert_eq!(labels(&value), ["Design", "Research"]);
+    assert!(!shown(cx, "k-sheet-list"), "Save closes the sheet");
+}
+
+#[gpui::test]
+fn fr27_dismissing_a_changed_draft_asks_first(cx: &mut TestAppContext) {
+    let (cx, _, log) = host(cx, &[], sheet_field);
+    click(cx, "k-trigger");
+    click(cx, "k-sheet-row-sales");
+    cx.executor().advance_clock(Duration::from_millis(600));
+    press(cx, "escape");
+    cx.executor().advance_clock(Duration::from_millis(600));
+    assert!(shown(cx, "k-sheet-destroy"), "the discard confirmation");
+    click(cx, "k-sheet-destroy");
+    assert!(!shown(cx, "k-sheet-list"), "discarded and closed");
+    assert!(log.borrow().is_empty(), "nothing reported");
+}
+
+#[gpui::test]
+fn fr24_clear_all_asks_then_empties_the_draft(cx: &mut TestAppContext) {
+    let (cx, _, log) = host(cx, &["Design", "Sales"], sheet_field);
+    click(cx, "k-trigger");
+    click(cx, "k-sheet-clear");
+    assert!(shown(cx, "k-sheet-destroy"));
+    click(cx, "k-sheet-destroy");
+    assert_eq!(announced(cx), "All items removed");
+    click(cx, "k-sheet-save");
+    assert_eq!(*log.borrow(), ["Remove Sales"]);
+}
+
+#[gpui::test]
+fn fr23_the_limit_holds_in_the_draft(cx: &mut TestAppContext) {
+    let (cx, _, log) = host(cx, &["Design"], |t| sheet_field(t).max_entries(1));
+    click(cx, "k-trigger");
+    click(cx, "k-sheet-row-sales");
+    click(cx, "k-sheet-save");
+    assert!(
+        log.borrow().is_empty(),
+        "an unchecked row at the limit does nothing"
+    );
+}

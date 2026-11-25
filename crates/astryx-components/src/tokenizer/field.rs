@@ -184,8 +184,8 @@ impl<T: Searchable> Tokenizer<T> {
         }
     }
 
-    /// Upstream `presentation`: adaptive by default. The bottom-sheet
-    /// presentation is not drawn yet; every presentation is the inline field.
+    /// Upstream `presentation`: adaptive by default (the sheet on a compact
+    /// touch screen, else the inline field).
     pub fn presentation(mut self, presentation: crate::overlay::PopoverPresentation) -> Self {
         self.presentation = presentation;
         self
@@ -422,6 +422,9 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
         let engine = crate::typeahead::engine::engine_of::<T>(&id, window, cx);
         let value = self.value.clone();
         let at_limit = self.max_entries.is_some_and(|m| value.len() >= m);
+        if crate::overlay::presents_as_sheet(self.presentation, window) {
+            return self.render_sheet_field(disabled, size, window, cx);
+        }
 
         // onFocus and onBlur, as focus enters and leaves the field.
         let focused = group_focus.contains_focused(window, cx) || input_focus.is_focused(window);
@@ -883,5 +886,165 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
         }
         field.style().refine(&self.style);
         field.child(control).into_any_element()
+    }
+}
+
+impl<T: Searchable> Tokenizer<T> {
+    /// FR16-FR17: the sheet presentation's field: a trigger showing the
+    /// tokens (display-only) or the placeholder, and the sheet.
+    fn render_sheet_field(
+        mut self,
+        disabled: bool,
+        size: ElementSize,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> AnyElement {
+        let id = self.base.id.clone();
+        let dir = use_direction(cx);
+        let theme = current(window, cx);
+        let t = theme.tokens();
+        let rem = window.rem_size();
+        let draft = super::sheet::draft_state::<T>(&id, window, cx);
+        let open = draft.read(cx).open;
+        let status = self.status.as_ref().map(|s| s.status);
+        let on_open: ActFn = {
+            let (draft, value) = (draft.clone(), self.value.clone());
+            Rc::new(move |window: &mut Window, cx: &mut App| {
+                if !disabled {
+                    super::sheet::open_sheet(&draft, &value, window, cx);
+                }
+            })
+        };
+        let content: AnyElement = if self.value.is_empty() {
+            div()
+                .text_color(t.color.text_secondary)
+                .child(
+                    self.base
+                        .placeholder
+                        .clone()
+                        .unwrap_or_else(|| i18n(cx).t("@astryx.tokenizer.searchPlaceholder")),
+                )
+                .into_any_element()
+        } else {
+            div()
+                .flex()
+                .flex_wrap()
+                .gap(t.spacing.s1)
+                .children(self.value.iter().map(|item| {
+                    match &self.render_token {
+                        Some(f) => {
+                            let act: ActFn = Rc::new(|_, _| {});
+                            f(item, act, window, cx)
+                        }
+                        None => Token::new(
+                            ElementId::Name(format!("{id}-sheet-token-{}", item.id()).into()),
+                            item.label(),
+                        )
+                        .into_any_element(),
+                    }
+                }))
+                .into_any_element()
+        };
+        let chrome = Chrome {
+            id: ElementId::Name(format!("{id}-control").into()),
+            target: "tokenizer",
+            variant: None,
+            size,
+            status,
+            disabled,
+            read_only: false,
+            focused: false,
+            focus_visible: false,
+            row: false,
+            place: None,
+            dir,
+        };
+        let mut surface = control_box(&chrome, &theme, window, cx)
+            .items_center()
+            .gap(t.spacing.s1)
+            .px(t.spacing.s1)
+            .py(t.spacing.s1.to_pixels(rem) - px(1.))
+            .min_h(crate::button::element_height(size, t));
+        {
+            let open = on_open.clone();
+            surface = surface.on_click(move |_, window, cx| open(window, cx));
+        }
+        surface = surface.child(super::sheet::SheetTrigger {
+            id: ElementId::Name(format!("{id}-trigger").into()),
+            label: self.label.clone(),
+            content,
+            disabled,
+            open,
+            on_open: on_open.clone(),
+        });
+        if let Some(content) = self.end_content.take() {
+            surface = surface.child(
+                div()
+                    .flex_none()
+                    .ml_auto()
+                    .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child(content),
+            );
+        }
+        if let Some(status) = status.filter(|_| self.status_placement != StatusPlacement::Detached)
+        {
+            let message = self.status.as_ref().and_then(|s| s.message.clone());
+            surface = surface.child(status_indicator(
+                &id,
+                status,
+                self.status_placement,
+                message.as_ref(),
+                &theme,
+                window,
+                cx,
+            ));
+        }
+        let sheet = super::sheet::sheet(
+            super::sheet::SheetProps {
+                id: id.clone(),
+                label: self.label.clone(),
+                source: self.base.source.clone(),
+                max_entries: self.max_entries,
+                create: self.create.clone(),
+                max_menu_items: self.base.max_menu_items,
+                min_query_length: self.base.min_query_length,
+                debounce: self.base.debounce,
+                empty_search_text: self.base.empty_search_text.clone(),
+                on_change: self.on_change.clone(),
+                on_change_query: self.base.on_change_query.clone(),
+                disabled,
+            },
+            window,
+            cx,
+        );
+        let control = crate::overlay::disabled_reason(
+            &id,
+            disabled,
+            self.disabled_message.as_ref(),
+            false,
+            surface,
+        );
+        let mut field = Field::new(id, self.label)
+            .description_opt(self.description)
+            .label_hidden(self.label_hidden)
+            .disabled(disabled)
+            .optional(self.optional)
+            .required(self.required)
+            .status_placement(self.status_placement);
+        if let Some(status) = self.status {
+            field = field.status(status);
+        }
+        if let Some(tooltip) = self.label_tooltip {
+            field = field.label_tooltip(tooltip);
+        }
+        if let Some(width) = self.width {
+            field = field.width(width);
+        }
+        field.style().refine(&self.style);
+        div()
+            .display_contents()
+            .child(field.child(control))
+            .child(sheet)
+            .into_any_element()
     }
 }

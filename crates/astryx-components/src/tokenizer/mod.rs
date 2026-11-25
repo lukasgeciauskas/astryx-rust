@@ -14,6 +14,7 @@
 
 pub mod examples;
 mod field;
+mod sheet;
 
 #[cfg(test)]
 mod tests;
@@ -88,13 +89,7 @@ pub const TOKENIZER_DOC: ComponentDoc = ComponentDoc {
         p("controlXstyle", RustApi::Method("control_style")),
         p("controlClassName", RustApi::Method("control_style")),
         p("controlStyle", RustApi::Method("control_style")),
-        p(
-            "presentation",
-            RustApi::Pending(
-                "presentation",
-                "the bottom-sheet presentation lands in the next M6 commit",
-            ),
-        ),
+        p("presentation", RustApi::Method("presentation")),
     ],
     example: include_str!("examples.rs"),
 };

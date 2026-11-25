@@ -326,8 +326,11 @@ The remaining primitives:
     never offered (FR13), the focus list kept open across picks (FR14), the create row,
     `max_entries` with the field kept mounted (FR1, FR15), Clear all, the folded
     `UnfocusedInline` and `UnfocusedLayer` overflow (FR3), announcements, and
-    `TokenizerController` (focus, blur, open, close). Its bottom-sheet presentation
-    (FR16-FR27) is next.
+    `TokenizerController` (focus, blur, open, close).
+  - Tokenizer, bottom-sheet presentation (done): the trigger field with display-only
+    tokens (FR17), one tall sheet with its bordered search, checkbox rows over a draft
+    in stable order, the Create row, 50-row batches, the pinned footer, Clear all and
+    discard confirmations, and Save reporting the last edit that holds (FR18-FR27).
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.
