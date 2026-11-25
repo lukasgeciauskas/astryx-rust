@@ -150,7 +150,17 @@ Suggested order, each a commit:
      the editor popover with its 400-720 px width and edge rules (FR1-FR9), the
      filter and value editors for every non-date value type, Clear all (FR22,
      FR23), the result count (FR19), `components` overrides.
-   - C: the sheet flow (FR10-FR21, FR30, DEC-7).
+   - C: the sheet flow (FR10-FR21, FR30, DEC-7, AR5, AR6), in parts:
+     C1 adaptive resolution (FR10) and the trigger field with display-only tokens and
+     the end lane (FR11); C2 the Filters sheet over a draft (FR12, FR15b, FR15c: rows,
+     remove actions, empty state, Clear all and discard confirmations, Done replaying
+     the draft's edits onto the latest filters); C3 the Add filter sheet (FR13, FR18,
+     FR30: grouped fields, field search from eight fields, the content search's inline
+     suggestions and value-only rows); C4 the value step (FR14, FR17, FR20, FR21:
+     Operator radio group, RadioList/CheckboxList choices, staged numbers, list values
+     through the Tokenizer's sheet, the nested editor, the unavailable state); C5 the
+     stack and focus rules (FR15a, FR16), announcements (AR6), FR19's no-mount rule.
+     Upstream: `PowerSearchBottomSheet.tsx` and `powerSearchSheetUtils.ts`.
    - The date and time value types (`time`, `date_absolute`, `date_relative`,
      `date_range`, `timezoneID`, FR25, FR26) need M8's Calendar, date inputs and
      calendar systems: record them as M8 work in PLAN.md and the doc's Pending notes.

@@ -36,6 +36,32 @@ use crate::layout::SpacingStep;
 
 type OpenFn = Rc<dyn Fn(bool, &mut Window, &mut App)>;
 
+/// The open modal sheets in open order (BottomSheet FR5): the last is on
+/// top; the others are covered.
+#[derive(Default)]
+struct SheetStack(Vec<String>);
+
+impl gpui::Global for SheetStack {}
+
+/// How many open modal sheets cover the sheet `key` (0 on top), after
+/// noting whether it is open.
+fn stack_depth(key: &str, open: bool, cx: &mut App) -> usize {
+    let stack = cx.default_global::<SheetStack>();
+    let at = stack.0.iter().position(|k| k == key);
+    match (open, at) {
+        (true, None) => {
+            stack.0.push(key.to_string());
+            0
+        }
+        (true, Some(i)) => stack.0.len() - 1 - i,
+        (false, Some(i)) => {
+            stack.0.remove(i);
+            0
+        }
+        (false, None) => 0,
+    }
+}
+
 /// Upstream `height`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum SheetHeight {
@@ -192,6 +218,14 @@ impl RenderOnce for BottomSheet {
             Phase::Closing { progress } => 1. - t.ease.exit.ease(progress),
         };
 
+        // BottomSheet FR5, FR6: a covered sheet recedes a step behind the top
+        // one and leaves the stack's one backdrop to it.
+        let key = format!("{:?}", self.id);
+        let depth = if self.scrim {
+            stack_depth(&key, state.read(cx).open, cx)
+        } else {
+            0
+        };
         let viewport = window.viewport_size();
         let budget = |height: SheetHeight| match height {
             SheetHeight::Hug | SheetHeight::Tall => viewport.height * 0.92,
@@ -318,6 +352,12 @@ impl RenderOnce for BottomSheet {
         } else {
             sheet.translate(px(0.), relative(1. - shown)).mt(dragged)
         };
+        if depth > 0 && !reduced {
+            let steps = depth.min(2) as f32;
+            sheet = sheet
+                .scale(1. - 0.04 * steps)
+                .mt(-(t.spacing.s2.to_pixels(rem) * steps));
+        }
         theme.refine(sheet.style(), "bottom-sheet", &[], None);
         sheet.style().refine(&self.style);
         let mut sheet = sheet.children(probes(&state, cx)).child(body).child(handle);
@@ -374,7 +414,8 @@ impl RenderOnce for BottomSheet {
         let holder = if self.scrim {
             backdrop(
                 &self.id,
-                Some(faded(t.color.overlay, shown)),
+                // One dim for the stack: a covered sheet's backdrop is clear.
+                Some(faded(t.color.overlay, if depth > 0 { 0. } else { shown })),
                 info.then_some(press),
                 window,
             )

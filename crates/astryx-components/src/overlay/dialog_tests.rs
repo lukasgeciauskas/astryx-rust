@@ -517,3 +517,61 @@ fn a_unique_id_deduplicates(cx: &mut TestAppContext) {
     );
     assert!(cx.debug_bounds("toast-c").is_none());
 }
+
+#[gpui::test]
+fn bottom_sheet_fr5_fr7_fr9_a_stack_dismisses_from_the_top(cx: &mut TestAppContext) {
+    let inner = Rc::new(Cell::new(false));
+    let log: Log = Log::default();
+    let (cx, open) = page(cx, {
+        let (inner, log) = (inner.clone(), log.clone());
+        move |open| {
+            let (close, inner_open, inner_close, opened_log) =
+                (open.clone(), inner.clone(), inner.clone(), log.clone());
+            div()
+                .child(
+                    BottomSheet::new("outer", open.get(), "Filters")
+                        .on_open_change(move |is_open, window, _| {
+                            close.set(is_open);
+                            window.refresh();
+                        })
+                        .child(div().debug_selector(|| "d-content".into()).child(
+                            Button::new("add", "Add filter").on_click(move |_, window, _| {
+                                inner_open.set(true);
+                                window.refresh();
+                            }),
+                        )),
+                )
+                .child(
+                    BottomSheet::new("inner", inner.get(), "Add filter")
+                        .on_open_change(move |is_open, window, _| {
+                            inner_close.set(is_open);
+                            window.refresh();
+                        })
+                        .child(
+                            div()
+                                .debug_selector(|| "inner-content".into())
+                                .child(Button::new("inner-button", "Inner").on_click(
+                                    move |_, _, _| opened_log.borrow_mut().push("inner"),
+                                )),
+                        ),
+                )
+                .into_any_element()
+        }
+    });
+    open.set(true);
+    assert!(shown(cx));
+    // Open the second sheet from a control inside the first.
+    press(cx, "tab");
+    press(cx, "enter");
+    settle(cx);
+    assert!(inner.get());
+    assert!(cx.debug_bounds("inner-content").is_some());
+    // Escape reaches only the top sheet.
+    press(cx, "escape");
+    assert!(!inner.get(), "the top sheet closed");
+    assert!(open.get(), "the sheet beneath stays");
+    // Focus came back to its opener inside the revealed sheet: Enter
+    // opens the second sheet again.
+    press(cx, "enter");
+    assert!(inner.get());
+}

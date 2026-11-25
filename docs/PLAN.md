@@ -355,7 +355,10 @@ The remaining primitives:
     text with their editor (FR24), the editor popover 400-720 px wide at the nearer edge of
     its opening control when capped (FR1-FR9), read-only fields and filters (FR22), Clear
     all keeping read-only filters (FR23), the result count (FR19), FR28's held source rows,
-    `components` overrides and `PowerSearchController`. Next: the sheet flow (stage C).
+    `components` overrides and `PowerSearchController`. Next: the sheet flow (stage C), which
+    starts with BottomSheet's stack (done: covered sheets recede a step and leave the
+    stack's one dim to the top sheet, BottomSheet FR5-FR6; Escape reaches the top sheet
+    and focus returns into the revealed one, FR7, FR9).
   - TreeList (done): data-driven rows with chevrons, guides, start and end content,
     density and variants; row actions (FR7); the WAI-ARIA tree keys as the
     `astryx_primitives::tree_focus` primitive (upstream `useTreeFocus`) with one tab stop
