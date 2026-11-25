@@ -41,6 +41,9 @@
   Layout whose header, content and footer take the dialog's inset; here the dialog pads
   its children by that inset (`spacing-4`) and DialogHeader reaches to the edges for its
   divider. Long content scrolls the whole surface rather than a LayoutContent region.
+- **Toasts need a ToastViewport in the window.** Upstream mounts a fallback viewport on
+  the first toast when no LayerProvider exists; GPUI cannot add to a window's tree from
+  outside it, so an app renders `ToastViewport::new()` once in its root view.
 - **A popup trigger has no `aria-controls`.** AccessKit links nodes by id, and GPUI does
   not expose the node id of another element, so a trigger reports `aria-expanded` and
   `aria-haspopup` but not which surface it controls.

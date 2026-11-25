@@ -13,7 +13,7 @@ use crate::layout::{SpacingStep, Stack};
 use crate::overlay::{
     AlertDialog, BottomSheet, Dialog, DialogHeader, DialogPurpose, Drawer, DrawerHeader, HoverCard,
     InfoTip, Overlay, OverlayPosition, OverlayShowOn, Popover, PopoverPresentation, PopoverRole,
-    SheetHeight, SnapPoint, Tooltip,
+    SheetHeight, SnapPoint, ToastOptions, ToastType, Tooltip, show_toast,
 };
 use crate::text::{Text, TextType};
 
@@ -251,6 +251,49 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                         .child(Text::new("Share").text_type(TextType::Label))
                         .child(Button::new("share-copy", "Copy link").variant(ButtonVariant::Ghost))
                         .child(Button::new("share-mail", "Email").variant(ButtonVariant::Ghost)),
+                ),
+        )
+        .child(label("Toast"))
+        .child(
+            Stack::horizontal()
+                .gap(SpacingStep::S3)
+                .child(
+                    Button::new("toast-info", "Save")
+                        .variant(ButtonVariant::Secondary)
+                        .on_click(|_, window, cx| {
+                            show_toast(
+                                ToastOptions::new("Changes saved").unique_id("saved"),
+                                window,
+                                cx,
+                            );
+                        }),
+                )
+                .child(
+                    Button::new("toast-undo", "Archive")
+                        .variant(ButtonVariant::Secondary)
+                        .on_click(|_, window, cx| {
+                            show_toast(
+                                ToastOptions::new("Conversation archived").end_content(|_, _| {
+                                    Button::new("toast-undo-action", "Undo")
+                                        .variant(ButtonVariant::Ghost)
+                                        .into_any_element()
+                                }),
+                                window,
+                                cx,
+                            );
+                        }),
+                )
+                .child(
+                    Button::new("toast-error", "Send")
+                        .variant(ButtonVariant::Secondary)
+                        .on_click(|_, window, cx| {
+                            show_toast(
+                                ToastOptions::new("Message not sent. Check your connection.")
+                                    .kind(ToastType::Error),
+                                window,
+                                cx,
+                            );
+                        }),
                 ),
         )
         .child(label("Overlay"))

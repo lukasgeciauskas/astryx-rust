@@ -186,6 +186,8 @@ impl Render for Gallery {
                             .child(self.page.render(&resolved, window, cx)),
                     ),
             )
+            // Toasts shown from any page.
+            .child(astryx::components::overlay::ToastViewport::new())
     }
 }
 

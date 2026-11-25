@@ -407,3 +407,113 @@ fn a_popover_can_present_as_a_sheet(cx: &mut TestAppContext) {
         .advance_clock(std::time::Duration::from_secs(1));
     assert!(!shown(cx));
 }
+
+// ----------------------------------------------------------------------------
+// Toast
+
+fn toast_page(cx: &mut TestAppContext) -> &mut VisualTestContext {
+    let (cx, _) = page(cx, |_| ToastViewport::new().into_any_element());
+    cx
+}
+
+fn saved(id: &'static str) -> ToastOptions {
+    ToastOptions::element("Saved", move |_, _| {
+        div()
+            .debug_selector(move || id.into())
+            .child("Saved")
+            .into_any_element()
+    })
+}
+
+fn wait(cx: &mut VisualTestContext, ms: u64) {
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(ms));
+    settle(cx);
+}
+
+#[gpui::test]
+fn an_info_toast_shows_then_hides_after_five_seconds(cx: &mut TestAppContext) {
+    let cx = toast_page(cx);
+    cx.update(|window, cx| {
+        show_toast(saved("toast-a"), window, cx);
+    });
+    settle(cx);
+    assert!(cx.debug_bounds("toast-a").is_some());
+    wait(cx, 4900);
+    assert_eq!(cx.update(|_, cx| super::toast::queued(cx)), 1);
+    wait(cx, 200);
+    assert_eq!(
+        cx.update(|_, cx| super::toast::queued(cx)),
+        0,
+        "it timed out"
+    );
+}
+
+#[gpui::test]
+fn hovering_a_toast_holds_it(cx: &mut TestAppContext) {
+    let cx = toast_page(cx);
+    cx.update(|window, cx| {
+        show_toast(saved("toast-a"), window, cx);
+    });
+    settle(cx);
+    let bounds = cx.debug_bounds("toast-a").expect("shown");
+    cx.simulate_mouse_move(bounds.center(), None, Modifiers::none());
+    settle(cx);
+    wait(cx, 8000);
+    assert_eq!(
+        cx.update(|_, cx| super::toast::queued(cx)),
+        1,
+        "held while hovered"
+    );
+    cx.simulate_mouse_move(point(px(5.), px(5.)), None, Modifiers::none());
+    settle(cx);
+    wait(cx, 5100);
+    assert_eq!(cx.update(|_, cx| super::toast::queued(cx)), 0);
+}
+
+#[gpui::test]
+fn an_error_toast_stays_and_a_handle_dismisses_it(cx: &mut TestAppContext) {
+    let cx = toast_page(cx);
+    let handle =
+        cx.update(|window, cx| show_toast(saved("toast-a").kind(ToastType::Error), window, cx));
+    settle(cx);
+    wait(cx, 20_000);
+    assert_eq!(
+        cx.update(|_, cx| super::toast::queued(cx)),
+        1,
+        "errors stay"
+    );
+    cx.update(|window, cx| handle.dismiss(window, cx));
+    settle(cx);
+    assert_eq!(cx.update(|_, cx| super::toast::queued(cx)), 0);
+}
+
+#[gpui::test]
+fn a_unique_id_deduplicates(cx: &mut TestAppContext) {
+    let cx = toast_page(cx);
+    cx.update(|window, cx| {
+        show_toast(saved("toast-a").unique_id("save"), window, cx);
+        show_toast(saved("toast-b").unique_id("save"), window, cx);
+    });
+    settle(cx);
+    assert_eq!(cx.update(|_, cx| super::toast::queued(cx)), 1);
+    assert!(
+        cx.debug_bounds("toast-b").is_some(),
+        "the new one replaced it"
+    );
+    cx.update(|window, cx| {
+        show_toast(
+            saved("toast-c")
+                .unique_id("save")
+                .collision(ToastCollision::Ignore),
+            window,
+            cx,
+        );
+    });
+    settle(cx);
+    assert!(
+        cx.debug_bounds("toast-b").is_some(),
+        "an ignored one is dropped"
+    );
+    assert!(cx.debug_bounds("toast-c").is_none());
+}

@@ -265,7 +265,7 @@ The remaining primitives:
   (+Header, imperative; done: modal layers drawn above earlier ones, purpose-based
   dismissal, focus entry and return), AlertDialog (done), BottomSheet (+Switcher; done:
   snap points, drag and swipe-to-dismiss from the grab handle), Drawer (+Header; done),
-  Popover's sheet presentations (done), Toast(+viewport/queue), DropdownMenu
+  Popover's sheet presentations (done), Toast (+viewport/queue; done), DropdownMenu
   (submenus, menu press), ContextMenu (with spelling suggestions in text fields),
   MoreMenu, Lightbox, CommandPalette.
 - **M6 Collections:** combobox, virtualization, tree/grid focus, reorderable.

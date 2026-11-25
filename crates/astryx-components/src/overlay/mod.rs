@@ -13,6 +13,7 @@ mod motion;
 mod popover;
 mod scrim;
 mod sheet;
+mod toast;
 mod tooltip;
 
 #[cfg(test)]
@@ -34,6 +35,10 @@ pub use info_tip::InfoTip;
 pub use popover::{Popover, PopoverController, PopoverPresentation, PopoverRole};
 pub use scrim::{Overlay, OverlayAlign, OverlayPosition, OverlayScrim, OverlayShowOn};
 pub use sheet::{BottomSheet, BottomSheetSwitcher, SheetHeight, SnapPoint};
+pub use toast::{
+    Toast, ToastCollision, ToastDismissReason, ToastHandle, ToastOptions, ToastPosition, ToastType,
+    ToastViewport, show_toast,
+};
 pub(crate) use tooltip::tooltip_description;
 pub use tooltip::{FocusTrigger, Tooltip, TooltipContent, TooltipController, TouchTrigger};
 
@@ -358,5 +363,34 @@ pub const BOTTOM_SHEET_SWITCHER_DOC: ComponentDoc = ComponentDoc {
         p("hasScrim", RustApi::Method("scrim")),
         p("children", RustApi::Method("sheet")),
     ],
+    example: include_str!("examples.rs"),
+};
+
+pub const TOAST_DOC: ComponentDoc = ComponentDoc {
+    name: "Toast",
+    rust_type: "astryx::components::overlay::Toast",
+    props: &[
+        p("body", RustApi::Argument("body")),
+        p("type", RustApi::Method("kind")),
+        p("isAutoHide", RustApi::Method("auto_hide")),
+        p("autoHideDuration", RustApi::Method("auto_hide_duration")),
+        p("isExiting", RustApi::Method("exiting")),
+        p("endContent", RustApi::Method("end_content")),
+        p("onDismiss", RustApi::Method("on_dismiss")),
+        p(
+            "renderContent",
+            RustApi::Waived("compose the body freely; the dismiss button stays at the end"),
+        ),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const USE_TOAST_DOC: ComponentDoc = ComponentDoc {
+    name: "useToast",
+    rust_type: "astryx::components::overlay::show_toast",
+    props: &[p(
+        "show",
+        RustApi::Method("show_toast(ToastOptions, window, cx)"),
+    )],
     example: include_str!("examples.rs"),
 };

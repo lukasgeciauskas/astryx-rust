@@ -127,6 +127,8 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::overlay::DRAWER_HEADER_DOC,
     crate::overlay::BOTTOM_SHEET_DOC,
     crate::overlay::BOTTOM_SHEET_SWITCHER_DOC,
+    crate::overlay::TOAST_DOC,
+    crate::overlay::USE_TOAST_DOC,
 ];
 
 /// The registered doc for an upstream component name.
