@@ -709,6 +709,7 @@ impl RenderOnce for PowerSearch {
                     max_menu_items: self.max_operator_menu_items,
                     max_search_results: self.max_search_results,
                     save_label: self.save_label.clone(),
+                    placeholder: placeholder.clone(),
                 },
                 window,
                 cx,

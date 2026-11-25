@@ -552,6 +552,66 @@ pub fn typed_rows(
     results
 }
 
+/// The suggestions Add filter's content search lists (FR13, FR30): the
+/// rows of [`typed_rows`] whose field the config has, then each
+/// search-source field's rows that need no source and its "More" row in
+/// place of its source rows. Nothing here waits for a source.
+pub fn sheet_rows(
+    config: &PowerSearchConfig,
+    query: &str,
+    max_results: usize,
+    max_items: usize,
+    cx: &gpui::App,
+) -> Vec<PowerSearchItem> {
+    let t18 = astryx_i18n::current(cx);
+    let mut rows: Vec<PowerSearchItem> = typed_rows(config, query, max_results, cx)
+        .into_iter()
+        .filter(|r| config.find_field(&r.data.field_key).is_some())
+        .collect();
+    if query.trim().is_empty() || !is_value_only(config, query) {
+        return rows;
+    }
+    let content = content_default(config, query, cx);
+    let content = content.as_ref().map(|(f, o)| (f.as_ref(), o.as_ref()));
+    for field in config.fields.iter().filter(|f| is_source_field(f, query)) {
+        let own = value_only_rows_with(field, query, content, &[], max_items, cx);
+        let mut shown: Vec<PowerSearchItem> = own.into_iter().take(VALUE_ROWS_PER_FIELD).collect();
+        let source_op = field
+            .operators
+            .iter()
+            .find(|o| {
+                o.value_only_match
+                    && o.value.search_source().is_some()
+                    && !takes_free_text(&o.value)
+            })
+            .map(|o| o.key.clone());
+        shown.push(PowerSearchItem {
+            id: format!("__more__:{}", field.key).into(),
+            label: t18.format(
+                "@astryx.powersearch.moreMatches",
+                &[
+                    ("field", field.label.as_ref().into()),
+                    ("query", query.into()),
+                ],
+            ),
+            data: RowData {
+                field_key: field.key.clone(),
+                operator_key: source_op,
+                filter_value: None,
+                group: None,
+                more_query: Some(query.to_string().into()),
+                filter_index: None,
+            },
+        });
+        for row in shown {
+            if !rows.iter().any(|r| r.id == row.id) {
+                rows.push(row);
+            }
+        }
+    }
+    rows
+}
+
 /// The content-search field's default operator while the content-search row
 /// shows for `query` (FR27: it adds no value-only row then).
 pub fn content_default(

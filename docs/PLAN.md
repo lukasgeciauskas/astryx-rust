@@ -363,9 +363,12 @@ The remaining primitives:
     Filters sheet over a draft with rows, remove actions, the empty state, Clear all and
     discard confirmations and Done's replay (FR12, FR15b, FR15c), Add filter's grouped
     and searchable fields (FR13) and the value step with its Operator group and choice
-    lists (FR14, FR17). Remaining: the content search's inline suggestions and FR30's
-    value-only rows, nested groups and staged numbers in the value step, the FR16
-    focus rules and the sheets' announcements (AR6, FR19).
+    lists (FR14, FR17), Add filter's content search with its inline suggestions and
+    FR30's value-only rows and "More" rows (FR13, FR30), nested groups in the value step
+    (FR14), and numbers staged as they are typed (FR17). Remaining: the FR16 focus rules,
+    a people field's "More" row opening its Tokenizer sheet directly and "More" rows
+    carrying the typed text into a search editor's opening query (FR30, BaseTypeahead
+    FR18), and the sheets' announcements (AR6, FR19).
   - TreeList (done): data-driven rows with chevrons, guides, start and end content,
     density and variants; row actions (FR7); the WAI-ARIA tree keys as the
     `astryx_primitives::tree_focus` primitive (upstream `useTreeFocus`) with one tab stop

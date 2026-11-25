@@ -36,6 +36,8 @@ pub(crate) struct ValueEditorProps {
     pub sheet: bool,
     /// The sheet names a list editor by its field.
     pub field_label: Option<SharedString>,
+    /// The sheet unstages a number that stops parsing (FR17).
+    pub on_unstage: Option<EnterFn>,
 }
 
 /// A source that matches nothing (a list editor without one: free text).
@@ -460,7 +462,18 @@ fn number_editor(
         input = input.on_enter(move |window, cx| enter(window, cx));
     }
     if p.sheet {
-        input = input.w_full();
+        // FR17: every parseable keystroke stages; an empty field unstages.
+        let (stage, unstage) = (p.on_change.clone(), p.on_unstage.clone());
+        input = input
+            .w_full()
+            .on_input(move |value, window, cx| match value {
+                Some(n) => stage(to_value(n), false, window, cx),
+                None => {
+                    if let Some(f) = &unstage {
+                        f(window, cx)
+                    }
+                }
+            });
     }
     input.into_any_element()
 }

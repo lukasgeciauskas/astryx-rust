@@ -46,6 +46,7 @@ pub(crate) type TokenOverrideFn =
 type ActFn = Rc<dyn Fn(&mut Window, &mut App)>;
 type KeyActFn = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
 type IndexFn = Rc<dyn Fn(usize, &mut Window, &mut App)>;
+type SuggestionFn = Rc<dyn Fn(super::source::PowerSearchItem, &mut Window, &mut App)>;
 
 /// Upstream `SEARCHABLE_FIELD_COUNT`: the field list searches from here on.
 const SEARCHABLE_FIELD_COUNT: usize = 8;
@@ -84,6 +85,7 @@ pub(crate) struct FlowState {
     staged: Option<Staged>,
     confirm: Option<Confirm>,
     field_query: String,
+    content_query: String,
 }
 
 pub(crate) fn flow_state(id: &ElementId, window: &mut Window, cx: &mut App) -> Entity<FlowState> {
@@ -96,6 +98,7 @@ pub(crate) fn flow_state(id: &ElementId, window: &mut Window, cx: &mut App) -> E
             staged: None,
             confirm: None,
             field_query: String::new(),
+            content_query: String::new(),
         }
     })
 }
@@ -122,6 +125,7 @@ pub(crate) fn open_flow(
         s.staged = None;
         s.confirm = None;
         s.field_query.clear();
+        s.content_query.clear();
     });
     window.refresh();
 }
@@ -138,6 +142,7 @@ pub(crate) struct SheetProps {
     pub max_menu_items: Option<usize>,
     pub max_search_results: usize,
     pub save_label: Option<SharedString>,
+    pub placeholder: SharedString,
 }
 
 /// A row's two parts (FR12): "{field} {operator}" and the value, unbudgeted.
@@ -298,6 +303,65 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                         })
                     });
                 }
+                window.refresh();
+            },
+        )
+    };
+    // A content-search suggestion (FR13, FR30): one with a value adds it;
+    // any other opens the value step on its field and operator, a "More"
+    // row carrying the typed text into a text field.
+    let choose_suggestion: SuggestionFn = {
+        let (state, config) = (state.clone(), config.clone());
+        Rc::new(
+            move |item: super::source::PowerSearchItem, window: &mut Window, cx: &mut App| {
+                let data = item.data.clone();
+                let Some(field) = config.find_field(&data.field_key) else {
+                    return;
+                };
+                let op = match &data.operator_key {
+                    Some(k) => field.find_operator(k),
+                    None => field.default_op(),
+                };
+                if let (Some(value), Some(op)) = (data.filter_value.clone(), op) {
+                    let filter = PowerSearchFilter::new(field.key.clone(), op.key.clone(), value);
+                    let label = row_label_text(&config, &filter, cx);
+                    state.update(cx, |s, _| {
+                        s.draft.add(filter);
+                        s.adding = false;
+                        s.entry = Entry::Filters;
+                        s.content_query.clear();
+                    });
+                    announce(
+                        i18n(cx).format(
+                            "@astryx.tokenizer.tokenAdded",
+                            &[("label", label.as_str().into())],
+                        ),
+                        Politeness::Polite,
+                        window,
+                        cx,
+                    );
+                    window.refresh();
+                    return;
+                }
+                let value = match (op.map(|o| &o.value), &data.more_query) {
+                    (Some(OperatorValue::Empty), _) => Some(FilterValue::Empty),
+                    (
+                        Some(OperatorValue::String {
+                            search_source: None,
+                            ..
+                        }),
+                        Some(text),
+                    ) => Some(FilterValue::String(text.clone())),
+                    _ => None,
+                };
+                state.update(cx, |s, _| {
+                    s.staged = Some(Staged {
+                        index: None,
+                        field: field.key.clone(),
+                        operator: op.map(|o| o.key.clone()),
+                        value,
+                    })
+                });
                 window.refresh();
             },
         )
@@ -655,7 +719,100 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
             }
             lists.push(list.into_any_element());
         }
-        let search = searchable.then(|| {
+        let content_search = config
+            .content_search_field_key
+            .as_ref()
+            .and_then(|k| config.find_field(k))
+            .and_then(|f| f.default_op())
+            .is_some_and(|o| matches!(o.value, OperatorValue::String { .. }));
+        let content_query = state.read(cx).content_query.clone();
+        let suggestions: Vec<super::source::PowerSearchItem> = if content_search && interactive {
+            let max_items = p.max_menu_items.unwrap_or(10);
+            if content_query.trim().is_empty() {
+                super::source::field_rows(&config)
+            } else {
+                super::source::sheet_rows(
+                    &config,
+                    &content_query,
+                    p.max_search_results,
+                    max_items,
+                    cx,
+                )
+            }
+        } else {
+            Vec::new()
+        };
+        let content_box = content_search.then(|| {
+            let (state, first, choose) = (
+                state.clone(),
+                suggestions.first().cloned(),
+                choose_suggestion.clone(),
+            );
+            div()
+                .debug_selector({
+                    let s = format!("{}-sheet-content-search", p.id);
+                    move || s
+                })
+                .child(
+                    crate::input::TextInput::new(
+                        ElementId::Name(format!("{}-sheet-content-search", p.id).into()),
+                        t18.t("@astryx.powersearch.sheet.search"),
+                        content_query.clone(),
+                    )
+                    .label_hidden(true)
+                    .placeholder(p.placeholder.clone())
+                    .clear(true)
+                    .size(ElementSize::Lg)
+                    .disabled(!interactive)
+                    .on_change(move |text, window, cx| {
+                        state.update(cx, |s, _| s.content_query = text.to_string());
+                        window.refresh();
+                    })
+                    .on_enter(move |window, cx| {
+                        if let Some(first) = first.clone() {
+                            choose(first, window, cx);
+                        }
+                    }),
+                )
+        });
+        let content_list = content_search.then(|| -> AnyElement {
+            if suggestions.is_empty() {
+                if content_query.trim().is_empty() {
+                    return div().into_any_element();
+                }
+                return EmptyState::new(t18.t("@astryx.powersearch.sheet.noResults"))
+                    .description(t18.t("@astryx.powersearch.sheet.tryDifferentSearch"))
+                    .compact(true)
+                    .heading_level(HeadingLevel::H4)
+                    .icon(
+                        Icon::new("search")
+                            .size(IconSize::Lg)
+                            .color(IconColor::Secondary),
+                    )
+                    .into_any_element();
+            }
+            let mut list = List::new(ElementId::Name(format!("{}-sheet-results", p.id).into()))
+                .dividers(true)
+                .density(ItemDensity::Spacious)
+                .edge(ListEdge::Bleed)
+                .label(t18.t("@astryx.powersearch.sheet.searchResults"));
+            for item in suggestions.iter() {
+                let choose = choose_suggestion.clone();
+                let it = item.clone();
+                let selector = format!("{}-sheet-result-{}", p.id, item.id);
+                list = list.child(
+                    ListItem::new_element(
+                        ElementId::Name(format!("{}-sheet-result-{}", p.id, item.id).into()),
+                        div()
+                            .debug_selector(move || selector)
+                            .child(item.label.clone()),
+                    )
+                    .on_click(move |_, window, cx| choose(it.clone(), window, cx)),
+                );
+            }
+            list.into_any_element()
+        });
+        let search = (searchable && !content_search).then(|| {
             let state = state.clone();
             crate::input::TextInput::new(
                 ElementId::Name(format!("{}-sheet-field-search", p.id).into()),
@@ -724,9 +881,10 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                     HeadingLevel::H2,
                     t18.t("@astryx.powersearch.sheet.addFilter"),
                 ))
+                .children(content_box)
                 .children(search)
-                .children(empty)
-                .children(lists)
+                .children(content_list)
+                .when(!content_search, |el| el.children(empty).children(lists))
                 .children(footer),
         )
     };
@@ -829,94 +987,137 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                     },
                 )
             };
-            let editor: Option<AnyElement> =
-                match &op.value {
-                    // FR17: enums and relative dates as the system's lists.
-                    OperatorValue::Enum { values } => {
-                        let set = set_value.clone();
-                        Some(
-                            RadioList::new(
-                                ElementId::Name(format!("{}-sheet-value-{}", p.id, op.key).into()),
-                                field_label.clone(),
-                                match &staged.value {
-                                    Some(FilterValue::Enum(v)) => v.clone(),
-                                    _ => SharedString::default(),
-                                },
-                            )
-                            .items(
-                                values
-                                    .iter()
-                                    .map(|v| RadioListItem::new(v.value.clone(), v.label.clone())),
-                            )
-                            .on_change(move |v, window, cx| {
-                                set(FilterValue::Enum(v), false, window, cx)
-                            })
-                            .into_any_element(),
+            let editor: Option<AnyElement> = match &op.value {
+                // FR17: enums and relative dates as the system's lists.
+                OperatorValue::Enum { values } => {
+                    let set = set_value.clone();
+                    Some(
+                        RadioList::new(
+                            ElementId::Name(format!("{}-sheet-value-{}", p.id, op.key).into()),
+                            field_label.clone(),
+                            match &staged.value {
+                                Some(FilterValue::Enum(v)) => v.clone(),
+                                _ => SharedString::default(),
+                            },
                         )
-                    }
-                    OperatorValue::DateRelative {
-                        past_allowed,
-                        future_allowed,
-                    } => {
-                        let set = set_value.clone();
-                        Some(
-                            RadioList::new(
-                                ElementId::Name(format!("{}-sheet-value-{}", p.id, op.key).into()),
-                                field_label.clone(),
-                                match &staged.value {
-                                    Some(FilterValue::DateRelative(v)) => v.clone(),
-                                    _ => SharedString::default(),
-                                },
-                            )
-                            .items(
-                                relative_date_options(*past_allowed, *future_allowed, &t18)
-                                    .into_iter()
-                                    .map(|(v, l)| RadioListItem::new(v, l)),
-                            )
-                            .on_change(move |v, window, cx| {
-                                set(FilterValue::DateRelative(v), false, window, cx)
-                            })
-                            .into_any_element(),
+                        .items(
+                            values
+                                .iter()
+                                .map(|v| RadioListItem::new(v.value.clone(), v.label.clone())),
                         )
-                    }
-                    OperatorValue::EnumList { values } => {
-                        let set = set_value.clone();
-                        Some(
-                            CheckboxList::new(
-                                ElementId::Name(format!("{}-sheet-value-{}", p.id, op.key).into()),
-                                field_label.clone(),
-                            )
-                            .value(match &staged.value {
-                                Some(FilterValue::EnumList(v)) => v.clone(),
-                                _ => Vec::new(),
-                            })
-                            .items(values.iter().map(|v| {
+                        .on_change(move |v, window, cx| {
+                            set(FilterValue::Enum(v), false, window, cx)
+                        })
+                        .into_any_element(),
+                    )
+                }
+                OperatorValue::DateRelative {
+                    past_allowed,
+                    future_allowed,
+                } => {
+                    let set = set_value.clone();
+                    Some(
+                        RadioList::new(
+                            ElementId::Name(format!("{}-sheet-value-{}", p.id, op.key).into()),
+                            field_label.clone(),
+                            match &staged.value {
+                                Some(FilterValue::DateRelative(v)) => v.clone(),
+                                _ => SharedString::default(),
+                            },
+                        )
+                        .items(
+                            relative_date_options(*past_allowed, *future_allowed, &t18)
+                                .into_iter()
+                                .map(|(v, l)| RadioListItem::new(v, l)),
+                        )
+                        .on_change(move |v, window, cx| {
+                            set(FilterValue::DateRelative(v), false, window, cx)
+                        })
+                        .into_any_element(),
+                    )
+                }
+                OperatorValue::EnumList { values } => {
+                    let set = set_value.clone();
+                    Some(
+                        CheckboxList::new(
+                            ElementId::Name(format!("{}-sheet-value-{}", p.id, op.key).into()),
+                            field_label.clone(),
+                        )
+                        .value(match &staged.value {
+                            Some(FilterValue::EnumList(v)) => v.clone(),
+                            _ => Vec::new(),
+                        })
+                        .items(
+                            values.iter().map(|v| {
                                 CheckboxListItem::new(v.label.clone()).value(v.value.clone())
-                            }))
-                            .on_change(move |v, window, cx| {
-                                set(FilterValue::EnumList(v), false, window, cx)
-                            })
-                            .into_any_element(),
+                            }),
                         )
-                    }
-                    _ => value_editor(
-                        ValueEditorProps {
-                            id: ElementId::Name(
-                                format!("{}-sheet-value-{}-{}", p.id, staged.field, op.key).into(),
-                            ),
-                            op: op.value.clone(),
-                            value: staged.value.clone(),
-                            on_change: set_value,
-                            on_enter: None,
-                            max_menu_items: p.max_menu_items,
-                            disabled: !interactive,
-                            sheet: true,
-                            field_label: Some(field_label.clone()),
-                        },
+                        .on_change(move |v, window, cx| {
+                            set(FilterValue::EnumList(v), false, window, cx)
+                        })
+                        .into_any_element(),
+                    )
+                }
+                OperatorValue::Nested => {
+                    let state = state.clone();
+                    let on_value: super::editor::NestedValueFn =
+                        Rc::new(move |value, window, cx| {
+                            let changed = state
+                                .read(cx)
+                                .staged
+                                .as_ref()
+                                .is_some_and(|s| s.value != value);
+                            if changed {
+                                state.update(cx, |s, _| {
+                                    if let Some(st) = s.staged.as_mut() {
+                                        st.value = value;
+                                    }
+                                });
+                                window.refresh();
+                            }
+                        });
+                    Some(super::editor::nested_step(
+                        &ElementId::Name(format!("{}-sheet-nested-{}", p.id, staged.field).into()),
+                        &config,
+                        &staged.field,
+                        &op.key,
+                        staged.value.clone(),
+                        !interactive,
+                        p.max_menu_items,
+                        on_value,
                         window,
                         cx,
-                    ),
-                };
+                    ))
+                }
+                _ => value_editor(
+                    ValueEditorProps {
+                        id: ElementId::Name(
+                            format!("{}-sheet-value-{}-{}", p.id, staged.field, op.key).into(),
+                        ),
+                        op: op.value.clone(),
+                        value: staged.value.clone(),
+                        on_change: set_value,
+                        on_enter: None,
+                        max_menu_items: p.max_menu_items,
+                        disabled: !interactive,
+                        sheet: true,
+                        field_label: Some(field_label.clone()),
+                        on_unstage: Some({
+                            let state = state.clone();
+                            Rc::new(move |window: &mut Window, cx: &mut App| {
+                                state.update(cx, |s, _| {
+                                    if let Some(st) = s.staged.as_mut() {
+                                        st.value = None;
+                                    }
+                                });
+                                window.refresh();
+                            })
+                        }),
+                    },
+                    window,
+                    cx,
+                ),
+            };
             sections.extend(editor);
         }
         // Several sections sit in muted containers (FR14).

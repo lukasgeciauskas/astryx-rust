@@ -269,6 +269,8 @@ pub struct NumberInput {
     label: SharedString,
     value: Option<f64>,
     on_change: Option<ValueFn>,
+    /// Each edit's committable number, or none (PowerSearch's sheet stages it).
+    on_input: Option<ValueFn>,
     size: Option<ElementSize>,
     label_hidden: bool,
     description: Option<SharedString>,
@@ -316,6 +318,7 @@ impl NumberInput {
             label: label.into(),
             value: value.into(),
             on_change: None,
+            on_input: None,
             size: None,
             label_hidden: false,
             description: None,
@@ -406,6 +409,16 @@ impl NumberInput {
     /// Upstream `onChange`: the committed number, or `None` when cleared.
     pub fn on_change(mut self, f: impl Fn(Option<f64>, &mut Window, &mut App) + 'static) -> Self {
         self.on_change = Some(Rc::new(f));
+        self
+    }
+
+    /// Every edit, with the number it would commit (none while empty or
+    /// not a number): upstream's `onInput` with `resolveNumberInputCommit`.
+    pub(crate) fn on_input(
+        mut self,
+        f: impl Fn(Option<f64>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_input = Some(Rc::new(f));
         self
     }
 
@@ -855,7 +868,15 @@ impl RenderOnce for NumberInput {
             // FR2: typing only edits the draft.
             s.on_change = editable.then(|| {
                 let ctx = ctx.clone();
+                let on_input = self.on_input.clone();
                 Rc::new(move |text: String, window: &mut Window, cx: &mut App| {
+                    if let Some(f) = &on_input {
+                        let value = match resolve_commit(&text, ctx.rules, false, &ctx.i18n) {
+                            Decision::Commit { value, .. } => Some(value),
+                            _ => None,
+                        };
+                        f(value, window, cx);
+                    }
                     let clears = ctx.state.update(cx, |s, _| {
                         s.kept_at_blur = false;
                         let clears =

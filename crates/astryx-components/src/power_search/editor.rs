@@ -23,6 +23,8 @@ use astryx_primitives::ElementSize;
 
 pub(crate) type SaveFn = Rc<dyn Fn(Option<PowerSearchFilter>, &mut Window, &mut App)>;
 pub(crate) type CancelFn = Rc<dyn Fn(&mut Window, &mut App)>;
+/// Reports a nested group's value while it is complete, else none.
+pub(crate) type NestedValueFn = Rc<dyn Fn(Option<FilterValue>, &mut Window, &mut App)>;
 
 /// Whether the editor adds a filter or edits one (upstream `mode`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -445,6 +447,7 @@ impl RenderOnce for PowerSearchFilterEditor {
                 read_only,
                 self.max_menu_items,
                 on_operator.clone(),
+                true,
                 window,
                 cx,
             );
@@ -518,6 +521,7 @@ impl RenderOnce for PowerSearchFilterEditor {
                         disabled: read_only,
                         sheet: false,
                         field_label: None,
+                        on_unstage: None,
                     },
                     window,
                     cx,
@@ -578,6 +582,7 @@ fn nested_tree(
     read_only: bool,
     max_menu_items: Option<usize>,
     on_operator: impl Fn(Option<SharedString>, &mut Window, &mut App) + Clone + 'static,
+    root_picker: bool,
     _window: &mut Window,
     cx: &mut App,
 ) -> AnyElement {
@@ -707,7 +712,7 @@ fn nested_tree(
     let mut root = TreeListItemData::new("nested-root", group_label.clone())
         .expanded(true)
         .children(children);
-    if operators.len() > 1 {
+    if root_picker && operators.len() > 1 {
         let (id, on_operator) = (id.clone(), on_operator.clone());
         root = root.label_content(move |_, cx| {
             Selector::new(
@@ -906,6 +911,7 @@ fn sub_row(
                 disabled: read_only,
                 sheet: false,
                 field_label: None,
+                on_unstage: None,
             },
             window,
             cx,
@@ -913,4 +919,69 @@ fn sub_row(
         row = row.children(editor.map(|e| div().flex_grow(2.).flex_shrink(1.).min_w_0().child(e)));
     }
     row.into_any_element()
+}
+
+/// The value step's nested editor (FR14): the sub-filter tree, its root
+/// reading the operator's label (the step's Operator group picks it). It
+/// reports a complete group as the value, else none.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn nested_step(
+    id: &ElementId,
+    config: &Rc<PowerSearchConfig>,
+    field: &SharedString,
+    operator: &SharedString,
+    initial: Option<FilterValue>,
+    read_only: bool,
+    max_menu_items: Option<usize>,
+    on_value: NestedValueFn,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let state: Entity<EditorState> = {
+        let (config, field, operator) = (config.clone(), field.clone(), operator.clone());
+        window.use_keyed_state(
+            ElementId::Name(format!("{id}-nested-step").into()),
+            cx,
+            move |_, cx| EditorState {
+                draft: Draft::from_partial(
+                    &config,
+                    &PartialFilter {
+                        field,
+                        operator: Some(operator),
+                        value: initial,
+                        read_only: false,
+                    },
+                ),
+                root: cx.focus_handle(),
+                focused: true,
+            },
+        )
+    };
+    if state.read(cx).draft.operator.as_ref() != Some(operator) {
+        state.update(cx, |s, _| {
+            s.draft.operator = Some(operator.clone());
+            s.draft.subs.get_or_insert_with(Vec::new);
+        });
+    }
+    let draft = state.read(cx).draft.clone();
+    // The step stages the group while it is complete.
+    let value = draft
+        .complete(config)
+        .then(|| draft.to_filter(config))
+        .flatten()
+        .map(|f| f.value);
+    let report = on_value.clone();
+    window.defer(cx, move |window, cx| report(value, window, cx));
+    nested_tree(
+        id,
+        config,
+        &state,
+        &draft,
+        read_only,
+        max_menu_items,
+        |_, _, _| {},
+        false,
+        window,
+        cx,
+    )
 }
