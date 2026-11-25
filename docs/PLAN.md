@@ -258,7 +258,7 @@ The remaining primitives:
     the number pad.
   - Carried into later milestones, recorded in each doc: FormLayout's
     `defaultEntryErrorBehavior` readers (M8).
-- **M5 Layer runtime & overlays:** Popover (done: focus region through fork patch R12,
+- **M5 Layer runtime & overlays (done, 2026-11-25):** Popover (done: focus region through fork patch R12,
   focus entry and return, light and Escape dismissal, the disclosure contract with its
   trigger; its sheet presentations wait for BottomSheet), HoverCard (done: Tooltip's
   engine with a card surface; Timestamp's copyable hover card), Overlay (done), Dialog
