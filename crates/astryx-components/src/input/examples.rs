@@ -1,5 +1,5 @@
 //! Text entry examples: the gallery's Inputs page and the doc example of
-//! TextInput, TextArea, NumberInput, InputGroup and FormLayout.
+//! TextInput, TextArea, NumberInput, InputGroup, FormLayout and FileInput.
 
 use std::time::Duration;
 
@@ -11,7 +11,10 @@ use gpui::{
 use crate::button::{Button, ButtonVariant};
 use crate::field::{FormDirection, FormLayout, InputStatus, Optionality, StatusPlacement};
 use crate::icon::Icon;
-use crate::input::{InputGroup, InputGroupText, InputType, NumberInput, TextArea, TextInput};
+use crate::input::{
+    FileInput, FileInputMode, InputGroup, InputGroupText, InputType, NumberInput, PickedFile,
+    TextArea, TextInput,
+};
 use crate::layout::{SpacingStep, Stack};
 use crate::text::{Text, TextType};
 
@@ -90,6 +93,17 @@ Leave the parcel with the neighbor at number 12.",
     let display = text("display", "Ada L.", window, cx);
     let email2 = text("email2", "", window, cx);
     let notes2 = text("notes2", "", window, cx);
+    let files = |key: &'static str, window: &mut Window, cx: &mut App| {
+        window.use_keyed_state(key, cx, |_, _| Vec::<PickedFile>::new())
+    };
+    let set_files = |entity: Entity<Vec<PickedFile>>| {
+        move |next: Vec<PickedFile>, window: &mut Window, cx: &mut App| {
+            entity.update(cx, |v, _| *v = next);
+            window.refresh();
+        }
+    };
+    let resume = files("resume", window, cx);
+    let photos = files("photos", window, cx);
 
     Stack::vertical()
         .gap(SpacingStep::S4)
@@ -319,6 +333,29 @@ Leave the parcel with the neighbor at number 12.",
                         .min(5.),
                 )
                 .child(TextInput::new("org", "Organization", "Astryx").read_only(true)),
+        )
+        .child(label("FileInput"))
+        .child(
+            Stack::vertical()
+                .gap(SpacingStep::S4)
+                .width(px(360.))
+                .child(
+                    FileInput::new("resume", "Resume", resume.read(cx).clone())
+                        .accept(".pdf,.doc,.docx")
+                        .description("PDF or Word, up to 5 MB.")
+                        .max_size(5 * 1024 * 1024)
+                        .on_change(set_files(resume.clone())),
+                )
+                .child(
+                    FileInput::new("photos", "Photos", photos.read(cx).clone())
+                        .mode(FileInputMode::Dropzone)
+                        .multiple(true)
+                        .max_files(3)
+                        .accept("image/*")
+                        .description("Up to three images. Drop them here or click to choose.")
+                        .on_change(set_files(photos.clone())),
+                )
+                .child(FileInput::new("locked", "Attachment", Vec::new()).disabled(true)),
         )
         .child(label("Sizes"))
         .child(

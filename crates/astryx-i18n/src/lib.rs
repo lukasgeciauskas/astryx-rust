@@ -257,6 +257,11 @@ impl I18n {
         self.0.info.number(value, Default::default())
     }
 
+    /// Items joined as a narrow "and" list in the locale: "a, b, and c".
+    pub fn conjunction<'a>(&self, items: impl IntoIterator<Item = &'a str>) -> String {
+        self.0.info.conjunction(items)
+    }
+
     /// The locale's number symbols, read from its number format.
     pub fn number_symbols(&self) -> &number::NumberSymbols {
         self.0.info.number_symbols()

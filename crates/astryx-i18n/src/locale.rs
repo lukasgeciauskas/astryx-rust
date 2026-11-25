@@ -81,6 +81,7 @@ pub struct LocaleInfo {
     locale: Locale,
     units: [OnceCell<Option<UnitFormatter>>; 3],
     unit_list: OnceCell<Option<ListFormatter>>,
+    and_list: OnceCell<Option<ListFormatter>>,
     decimal: DecimalFormatter,
     decimal_ungrouped: DecimalFormatter,
     cardinal: PluralRules,
@@ -107,6 +108,7 @@ impl LocaleInfo {
         Self {
             units: Default::default(),
             unit_list: OnceCell::new(),
+            and_list: OnceCell::new(),
             decimal_ungrouped: decimal(GroupingStrategy::Never),
             cardinal: PluralRules::try_new_cardinal((&locale).into())
                 .or_else(|_| PluralRules::try_new_cardinal(Default::default()))
@@ -118,6 +120,27 @@ impl LocaleInfo {
             decimal: decimal(GroupingStrategy::Auto),
             locale,
             symbols: OnceCell::new(),
+        }
+    }
+
+    /// A narrow "and" list, upstream `createListFormatter`
+    /// (`Intl.ListFormat` conjunction, narrow): "a, b, and c" in English.
+    pub fn conjunction<'a>(&self, items: impl IntoIterator<Item = &'a str>) -> String {
+        use writeable::Writeable as _;
+        let items: Vec<&str> = items.into_iter().collect();
+        let list = self.and_list.get_or_init(|| {
+            ListFormatter::try_new_and(
+                (&self.locale).into(),
+                ListFormatterOptions::default().with_length(ListLength::Narrow),
+            )
+            .ok()
+        });
+        match list {
+            Some(list) => list
+                .format(items.iter().copied())
+                .write_to_string()
+                .into_owned(),
+            None => items.join(", "),
         }
     }
 

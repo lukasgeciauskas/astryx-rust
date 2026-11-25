@@ -278,3 +278,6 @@ mod group;
 
 #[path = "form_tests.rs"]
 mod form;
+
+#[path = "file_tests.rs"]
+mod file;

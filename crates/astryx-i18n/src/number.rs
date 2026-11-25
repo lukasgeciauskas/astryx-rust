@@ -465,6 +465,15 @@ mod tests {
     }
 
     #[test]
+    fn lists_join_in_the_locale() {
+        let en = crate::I18n::new("en");
+        assert_eq!(en.conjunction(["a", "b", "c"]), "a, b, c");
+        assert_eq!(en.conjunction(["a"]), "a");
+        let de = crate::I18n::new("de");
+        assert_eq!(de.conjunction(["a", "b"]), "a und b");
+    }
+
+    #[test]
     fn editable_numbers_use_the_decimal_separator() {
         assert_eq!(editable_number(1234.5, &de()), "1234,5");
         assert_eq!(editable_number(7., &en()), "7");
