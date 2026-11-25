@@ -53,6 +53,12 @@
   layout-transparent, measures the surface, places it with `position_layer` (flip to the
   other side, then slide into the viewport, mirrored in RTL), paints it deferred and joins
   the layer stack, so Escape and outside presses reach the topmost layer first.
+- **Popup triggers:** a popup provides an `overlay::Disclosure` around its trigger
+  (expanded, popup kind, toggle); Button reads it for `aria-expanded` and
+  `aria-haspopup` (fork patch R12) and toggles after its own click handler. A layer
+  that takes focus makes its surface a `tab_trap()` with a non-tab-stop focus handle,
+  moves focus in right after the frame that first draws it (a deferred call from a
+  probe painted in the surface), and returns focus that would be lost on close.
 - **Tooltip props:** a component's `tooltip` goes through `overlay::with_tooltip(id,
   text, acts, el)`; `labelTooltip` is an InfoTip in the label row (`FieldLabel`);
   `disabledMessage` is `overlay::disabled_reason`, which shows on any focus; a tooltip

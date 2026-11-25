@@ -13,8 +13,7 @@ use std::time::Duration;
 
 use astryx_i18n::use_direction;
 use astryx_primitives::{
-    LayerAlign, LayerOptions, Placement, anchored_layer, prefers_reduced_motion, provide,
-    use_context,
+    LayerAlign, LayerOptions, Placement, anchored_layer, provide, use_context,
 };
 use astryx_theme::{ThemeStyled, current};
 use gpui::{
@@ -582,29 +581,10 @@ impl RenderOnce for Tooltip {
             wrapper,
         );
         if visible {
-            // The entrance: a short fade and grow from the anchor's side
-            // (upstream `layerAnimations`); a fade alone under reduced motion.
+            // The entrance from the anchor's side (upstream `layerAnimations`).
             let now = cx.background_executor().now();
             let since = state.update(cx, |s, _| *s.shown_at.get_or_insert(now));
-            let duration = t.duration.fast_max;
-            let progress = if duration.is_zero() {
-                1.
-            } else {
-                (now.saturating_duration_since(since).as_secs_f32() / duration.as_secs_f32())
-                    .min(1.)
-            };
-            if progress < 1. {
-                window.request_animation_frame();
-            }
-            let eased = t.ease.standard.ease(progress);
             let side = state.read(cx).side;
-            let step = t.spacing.s2.to_pixels(window.rem_size()) * (1. - eased);
-            let (dx, dy) = match (side, rtl) {
-                (Placement::Above, _) => (px(0.), step),
-                (Placement::Below, _) => (px(0.), -step),
-                (Placement::End, false) | (Placement::Start, true) => (-step, px(0.)),
-                (Placement::Start, false) | (Placement::End, true) => (step, px(0.)),
-            };
             let content = match &self.content {
                 TooltipContent::Text(text) => text.clone().into_any_element(),
                 TooltipContent::Element(build) => build(window, cx),
@@ -621,7 +601,6 @@ impl RenderOnce for Tooltip {
                 .rounded(t.radius.container)
                 .font_stack(&t.font.family.body)
                 .text_style(&t.text.body)
-                .opacity(eased)
                 .role(Role::Tooltip)
                 .on_hover({
                     let state = state.clone();
@@ -641,16 +620,14 @@ impl RenderOnce for Tooltip {
             if let Some(d) = &describes {
                 surface = surface.aria_label(d.clone());
             }
-            if !prefers_reduced_motion(cx) {
-                surface = surface.translate(dx, dy).scale(0.95 + 0.05 * eased);
-            }
             theme.refine(surface.style(), "tooltip", &[], None);
             surface.style().refine(&self.style);
+            let surface = super::motion::entrance(surface, since, side, rtl, t, window, cx);
             let options = LayerOptions {
                 placement: self.placement,
                 align: self.alignment,
-                offset: t.spacing.s1.to_pixels(window.rem_size()),
-                margin: t.spacing.s2.to_pixels(window.rem_size()),
+                offset: super::motion::clearance(t, window),
+                margin: super::motion::gutter(t, window),
                 rtl,
                 priority: 1,
             };

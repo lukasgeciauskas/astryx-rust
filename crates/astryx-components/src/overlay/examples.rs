@@ -5,14 +5,17 @@ use astryx_primitives::{LayerAlign, Placement};
 use gpui::{AnyElement, App, IntoElement, ParentElement, Window};
 
 use crate::button::{Button, ButtonVariant, IconButton};
+use crate::choice::Switch;
 use crate::field::InputStatus;
 use crate::icon::Icon;
 use crate::input::TextInput;
 use crate::layout::{SpacingStep, Stack};
-use crate::overlay::{InfoTip, Tooltip};
+use crate::overlay::{InfoTip, Popover, PopoverRole, Tooltip};
 use crate::text::{Text, TextType};
 
-pub fn examples(_: &mut Window, _: &mut App) -> AnyElement {
+pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
+    let archived = window.use_keyed_state("popover-archived", cx, |_, _| false);
+    let shown_archived = *archived.read(cx);
     let label = |text: &'static str| Text::new(text).text_type(TextType::Supporting);
     let placed = |id: &'static str, placement: Placement, text: &'static str| {
         Tooltip::new(id, text)
@@ -53,6 +56,55 @@ pub fn examples(_: &mut Window, _: &mut App) -> AnyElement {
                     Text::new("Times are shown in ")
                         .text_type(TextType::Body)
                         .child(Tooltip::new("utc", "Coordinated Universal Time").text("UTC")),
+                ),
+        )
+        .child(label("Popover"))
+        .child(
+            Stack::horizontal()
+                .gap(SpacingStep::S3)
+                .child(
+                    Popover::new("filters", "Filters")
+                        .content(
+                            Stack::vertical()
+                                .gap(SpacingStep::S3)
+                                .width(gpui::px(240.))
+                                .child(Text::new("Filters").text_type(TextType::Label))
+                                .child(
+                                    Switch::new("archived", "Show archived", shown_archived)
+                                        .on_change({
+                                            let archived = archived.clone();
+                                            move |on, window, cx| {
+                                                archived.update(cx, |v, _| *v = on);
+                                                window.refresh();
+                                            }
+                                        }),
+                                )
+                                .child(TextInput::new("owner", "Owner", "")),
+                        )
+                        .child(Button::new("filters-button", "Filters").variant(ButtonVariant::Secondary)),
+                )
+                .child(
+                    Popover::new("about", "About this report")
+                        .placement(Placement::End)
+                        .content(
+                            Text::new(
+                                "Totals refresh every hour. Numbers for today are estimates until midnight.",
+                            )
+                            .text_type(TextType::Body),
+                        )
+                        .width(gpui::px(260.))
+                        .child(Button::new("about-button", "About").variant(ButtonVariant::Ghost)),
+                )
+                .child(
+                    Popover::new("actions", "")
+                        .role(PopoverRole::None)
+                        .padding(SpacingStep::S1)
+                        .content(
+                            Stack::vertical()
+                                .child(Button::new("rename", "Rename").variant(ButtonVariant::Ghost))
+                                .child(Button::new("duplicate", "Duplicate").variant(ButtonVariant::Ghost)),
+                        )
+                        .child(Button::new("actions-button", "Actions").variant(ButtonVariant::Secondary)),
                 ),
         )
         .child(label("InfoTip"))

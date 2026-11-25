@@ -49,6 +49,7 @@ Each patch lands before the components that need it.
 | R9 | `aria-current` (**landed**, `69dc0ba`) | `aria_current(AriaCurrent)` on any stateful element, setting AccessKit's aria-current; `AriaCurrent` is re-exported next to `Role` | The current page of Breadcrumbs and Pagination and the current step of a Stepper (M4); nav items (M9) |
 | R10 | The view inside a `ViewElement` (**landed**, `2e391af`) | `ViewElement::view_mut` and `take_view`: a parent reaches the component inside an `AnyElement` | The inline text flow (M4): a Text or Link inside a paragraph joins its lines |
 | R11 | Input modes and spellcheck (**landed**, `d8be0c9`) | `TextInputConfiguration::input_mode` (the HTML `inputmode` set) and `spellcheck`; the web's IME mirror applies both | `inputMode`, `enterKeyHint`, `autoCapitalize`, `hasAutoCorrect` and `hasSpellCheck` on text fields (M4) |
+| R12 | Focus traps and `aria-haspopup` (**landed**, `93e506e`) | `tab_trap()`: Tab and Shift-Tab from inside an element cycle among its tab stops; `Window::with_tab_scope`; `aria_has_popup(HasPopup)` | Every M5 layer: Popover's focus region, dialogs, drawers and menus; popup triggers |
 
 ### How each patch works
 
@@ -130,6 +131,14 @@ Each patch lands before the components that need it.
   remembers the mode, so the keyboard it brings up after an editable tap is the field's;
   native platforms ignore both (they have no touch keyboard, and Astryx checks spelling
   itself).
+- **R12 (focus traps and `aria-haspopup`), as built:**
+  - GPUI's tab groups only reorder stops, and a group is known only by its tab index, so
+    a trap is recorded as a range of the tab-stop map's insertion history (the stops
+    painted inside the element). `next` and `prev` from a stop inside the innermost
+    trap holding it search only that range, wrapping; from outside, they ignore traps.
+  - The trap markers are tab-stop operations, so a cached view replays them.
+  - Focusing a trap's container (a focusable element that is not a tab stop) and then
+    calling `focus_next` lands on its first stop: how a layer moves focus in.
 
 - **R2 (backdrop blur):**
   - A new scene primitive.

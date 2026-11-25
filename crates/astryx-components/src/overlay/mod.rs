@@ -1,15 +1,21 @@
-//! Overlays: Tooltip and InfoTip (pulled forward from M5 to finish the
-//! fields' tooltips), with Popover, HoverCard, Dialog and the rest of M5 to
-//! follow.
+//! Overlays (M5): Tooltip and InfoTip, Popover, and the rest of the layer
+//! family as it lands.
 
+mod disclosure;
 pub mod examples;
 mod info_tip;
+mod motion;
+mod popover;
 mod tooltip;
 
 #[cfg(test)]
+mod popover_tests;
+#[cfg(test)]
 mod tests;
 
+pub(crate) use disclosure::disclosure;
 pub use info_tip::InfoTip;
+pub use popover::{Popover, PopoverController, PopoverRole};
 pub(crate) use tooltip::tooltip_description;
 pub use tooltip::{FocusTrigger, Tooltip, TooltipContent, TooltipController, TouchTrigger};
 
@@ -98,6 +104,45 @@ pub const INFO_TIP_DOC: ComponentDoc = ComponentDoc {
         p("content", RustApi::Argument("content")),
         p("label", RustApi::Method("label")),
         p("size", RustApi::Method("size")),
+        p("xstyle", RustApi::Trait("Styled")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const POPOVER_DOC: ComponentDoc = ComponentDoc {
+    name: "Popover",
+    rust_type: "astryx::components::overlay::Popover",
+    props: &[
+        p("children", RustApi::Method("child")),
+        p(
+            "anchorRef",
+            RustApi::Waived(
+                "GPUI has no refs: wrap the anchor with `child` where it renders; elements are rebuilt every frame, so wrapping never remounts it",
+            ),
+        ),
+        p("content", RustApi::Method("content / content_fn")),
+        p("placement", RustApi::Method("placement")),
+        p("alignment", RustApi::Method("alignment")),
+        p("isOpen", RustApi::Method("open")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p("isEnabled", RustApi::Method("enabled")),
+        p("width", RustApi::Method("width")),
+        p("padding", RustApi::Method("padding")),
+        p("label", RustApi::Argument("label")),
+        p("role", RustApi::Method("role")),
+        p("isModal", RustApi::Method("modal")),
+        p("hasCloseButton", RustApi::Method("close_button")),
+        p("closeButtonLabel", RustApi::Method("close_button_label")),
+        p("hasAutoFocus", RustApi::Method("auto_focus")),
+        p("hasLightDismiss", RustApi::Method("light_dismiss")),
+        p("hasEscapeDismiss", RustApi::Method("escape_dismiss")),
+        p(
+            "presentation",
+            RustApi::Pending(
+                "presentation",
+                "the sheet presentations land with BottomSheet in M5",
+            ),
+        ),
         p("xstyle", RustApi::Trait("Styled")),
     ],
     example: include_str!("examples.rs"),

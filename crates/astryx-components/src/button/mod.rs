@@ -524,12 +524,19 @@ impl RenderOnce for Button {
             .map(|href| (href, self.target.clone(), use_link_handler(cx)));
         let loading_text = i18n(cx).t("@astryx.button.loading");
         let activation_state = state.clone();
+        // The trigger of a popup reports it and toggles it after its own
+        // handler (upstream's cloned trigger props).
+        let disclosure = crate::overlay::disclosure(cx);
+        let toggle = disclosure.as_ref().and_then(|d| d.toggle.clone());
         let activate: ClickFn = Rc::new(move |event, window, cx| {
             if let Some(f) = &on_click {
                 f(event, window, cx);
                 if window.default_prevented() {
                     return;
                 }
+            }
+            if let Some(toggle) = &toggle {
+                toggle(window, cx);
             }
             if let Some((href, target, handler)) = &link {
                 handler.open(href, target.clone(), window, cx);
@@ -605,8 +612,11 @@ impl RenderOnce for Button {
         if let Some(current) = self.current {
             el = el.aria_current(current);
         }
-        if let Some(expanded) = self.expanded {
+        if let Some(expanded) = self.expanded.or(disclosure.as_ref().map(|d| d.expanded)) {
             el = el.aria_expanded(expanded);
+        }
+        if let Some(d) = &disclosure {
+            el = el.aria_has_popup(d.popup);
         }
         // A tooltip around the button describes it.
         if let Some(description) = crate::overlay::tooltip_description(cx) {

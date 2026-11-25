@@ -258,7 +258,9 @@ The remaining primitives:
     the number pad.
   - Carried into later milestones, recorded in each doc: FormLayout's
     `defaultEntryErrorBehavior` readers (M8).
-- **M5 Layer runtime & overlays:** Popover, HoverCard, Overlay,
+- **M5 Layer runtime & overlays:** Popover (done: focus region through fork patch R12,
+  focus entry and return, light and Escape dismissal, the disclosure contract with its
+  trigger; its sheet presentations wait for BottomSheet), BottomSheet, HoverCard, Overlay,
   Dialog(+Header, imperative), AlertDialog, Drawer, Toast(+viewport/queue), DropdownMenu
   (submenus, menu press), ContextMenu (with spelling suggestions in text fields),
   MoreMenu, Lightbox, CommandPalette.

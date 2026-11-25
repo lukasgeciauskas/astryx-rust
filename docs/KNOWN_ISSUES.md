@@ -37,6 +37,10 @@
   `astryx_primitives::spell::set_spell_checker(DictionaryChecker::new(aff, dic))`.
   `spellbook`, which reads the dictionaries, is MPL-2.0.
 
+- **A popup trigger has no `aria-controls`.** AccessKit links nodes by id, and GPUI does
+  not expose the node id of another element, so a trigger reports `aria-expanded` and
+  `aria-haspopup` but not which surface it controls.
+
 ## Tooling
 
 - **True hot-patching needs our patched dx.** `cargo xtask dev --hot-patch` patches

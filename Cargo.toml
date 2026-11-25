@@ -27,11 +27,11 @@ publish = false
 # docs/gpui-fork.md), pinned to one revision. Every app that uses Astryx must
 # resolve GPUI to this same revision, or Cargo builds two incompatible copies.
 # Bump it only with `cargo xtask bump-gpui <rev>` followed by a full test run.
-gpui = { git = "https://github.com/lukasgeciauskas/zed", rev = "d8be0c9f3ae1f2dc316585c0389699118c133684" }
+gpui = { git = "https://github.com/lukasgeciauskas/zed", rev = "93e506ee3260224cb25b47ab20aa2238f764a16d" }
 # `multithreaded` (the default) needs nightly Rust for wasm; we stay on stable.
-gpui_platform = { git = "https://github.com/lukasgeciauskas/zed", rev = "d8be0c9f3ae1f2dc316585c0389699118c133684", default-features = false }
+gpui_platform = { git = "https://github.com/lukasgeciauskas/zed", rev = "93e506ee3260224cb25b47ab20aa2238f764a16d", default-features = false }
 # Browser files (fork patch R8), for wasm builds only.
-gpui_web = { git = "https://github.com/lukasgeciauskas/zed", rev = "d8be0c9f3ae1f2dc316585c0389699118c133684", default-features = false }
+gpui_web = { git = "https://github.com/lukasgeciauskas/zed", rev = "93e506ee3260224cb25b47ab20aa2238f764a16d", default-features = false }
 
 astryx = { path = "crates/astryx" }
 astryx-theme = { path = "crates/astryx-theme" }

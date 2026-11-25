@@ -23,7 +23,7 @@ use std::rc::{Rc, Weak};
 use gpui::{
     Anchor, AnyElement, App, Bounds, DispatchPhase, Element, ElementId, Global, GlobalElementId,
     InspectorElementId, IntoElement, LayoutId, MouseDownEvent, ParentElement as _, Pixels, Point,
-    Subscription, Window, WindowId, anchored, deferred,
+    Styled as _, Subscription, Window, WindowId, anchored, deferred,
 };
 
 use crate::anchored::{LayerOptions, LayerPosition, position_layer};
@@ -367,6 +367,8 @@ pub struct AnchoredLayer {
     escape: EscapeBehavior,
     on_placed: Option<PlacedFn>,
     depth: usize,
+    light_dismiss: bool,
+    match_anchor_width: bool,
 }
 
 /// Wraps `trigger` without changing its layout: it is laid out as if
@@ -381,6 +383,8 @@ pub fn anchored_layer(id: impl Into<ElementId>, trigger: impl IntoElement) -> An
         escape: EscapeBehavior::Close,
         on_placed: None,
         depth: 0,
+        light_dismiss: true,
+        match_anchor_width: false,
     }
 }
 
@@ -400,6 +404,19 @@ impl AnchoredLayer {
     /// What Escape does while this layer is topmost.
     pub fn escape(mut self, behavior: EscapeBehavior) -> Self {
         self.escape = behavior;
+        self
+    }
+
+    /// Whether a press outside the layer and its trigger dismisses it
+    /// (upstream `hasLightDismiss`); on by default.
+    pub fn light_dismiss(mut self, light_dismiss: bool) -> Self {
+        self.light_dismiss = light_dismiss;
+        self
+    }
+
+    /// Makes the layer at least as wide as its trigger.
+    pub fn match_anchor_width(mut self, match_width: bool) -> Self {
+        self.match_anchor_width = match_width;
         self
     }
 
@@ -493,6 +510,12 @@ impl Element for AnchoredLayer {
         let (mut surface, entry, options) = state.surface.take()?;
         // The trigger is never outside its own layer.
         *entry.inside.borrow_mut() = vec![window.element_transform().apply_bounds(bounds)];
+        if self.match_anchor_width {
+            surface = gpui::div()
+                .min_w(bounds.size.width)
+                .child(surface)
+                .into_any_element();
+        }
         let measured = surface.layout_as_root(
             gpui::size(
                 gpui::AvailableSpace::MaxContent,
@@ -525,7 +548,9 @@ impl Element for AnchoredLayer {
         window: &mut Window,
         cx: &mut App,
     ) {
-        if let Some(entry) = entry.as_ref() {
+        if let Some(entry) = entry.as_ref()
+            && self.light_dismiss
+        {
             dismiss_on_outside_press(&entry.0, window, cx);
         }
         self.trigger.paint(window, cx);
