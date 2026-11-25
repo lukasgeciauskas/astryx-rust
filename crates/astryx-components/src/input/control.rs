@@ -24,6 +24,8 @@ pub(crate) struct Chrome {
     pub id: ElementId,
     /// The theming target: `text-input`, `text-area`, `number-input`.
     pub target: &'static str,
+    /// A `variant` theming prop, for a target that has one (`selector`).
+    pub variant: Option<&'static str>,
     pub size: ElementSize,
     pub status: Option<StatusType>,
     pub disabled: bool,
@@ -43,7 +45,9 @@ impl Chrome {
     /// The `(prop, value)` pairs themes match on (FR14: `data-size`,
     /// `data-status`, `data-disabled`, `data-readonly`).
     pub fn props(&self) -> Vec<(&'static str, &'static str)> {
-        let mut props = vec![("size", self.size.as_str())];
+        let mut props: Vec<(&'static str, &'static str)> =
+            self.variant.map(|v| ("variant", v)).into_iter().collect();
+        props.push(("size", self.size.as_str()));
         if let Some(status) = self.status {
             props.push(("status", status.as_str()));
         }

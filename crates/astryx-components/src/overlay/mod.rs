@@ -61,6 +61,8 @@ pub use menu::{
     MenuAction, MenuCheckboxItem, MenuEntry, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSize,
     SubmenuPresentation,
 };
+pub(crate) use motion::{clearance, entrance, gutter, viewport_cap};
+pub(crate) use popover::presents_as_sheet;
 pub use popover::{Popover, PopoverController, PopoverPresentation, PopoverRole};
 pub use scrim::{Overlay, OverlayAlign, OverlayPosition, OverlayScrim, OverlayShowOn};
 pub use sheet::{BottomSheet, BottomSheetSwitcher, SheetHeight, SnapPoint};

@@ -381,6 +381,10 @@ impl Element for Layer {
 // Anchored layers
 
 type PlacedFn = Rc<dyn Fn(LayerPosition, &mut Window, &mut App)>;
+/// Places a layer: the anchor's bounds, the layer's size and the viewport,
+/// with the layer's options.
+pub type PositionFn =
+    Rc<dyn Fn(Bounds<Pixels>, gpui::Size<Pixels>, Bounds<Pixels>, &LayerOptions) -> LayerPosition>;
 
 /// A trigger and, while open, a layer on one side of it. See
 /// [`anchored_layer`].
@@ -390,6 +394,7 @@ pub struct AnchoredLayer {
     surface: Option<(AnyElement, Dismiss, LayerOptions)>,
     escape: EscapeBehavior,
     on_placed: Option<PlacedFn>,
+    position: Option<PositionFn>,
     depth: usize,
     light_dismiss: bool,
     match_anchor_width: bool,
@@ -406,6 +411,7 @@ pub fn anchored_layer(id: impl Into<ElementId>, trigger: impl IntoElement) -> An
         surface: None,
         escape: EscapeBehavior::Close,
         on_placed: None,
+        position: None,
         depth: 0,
         light_dismiss: true,
         match_anchor_width: false,
@@ -441,6 +447,17 @@ impl AnchoredLayer {
     /// Makes the layer at least as wide as its trigger.
     pub fn match_anchor_width(mut self, match_width: bool) -> Self {
         self.match_anchor_width = match_width;
+        self
+    }
+
+    /// Places the layer with `f` instead of [`position_layer`]: a Selector
+    /// puts its selected option over the trigger.
+    pub fn position_with(
+        mut self,
+        f: impl Fn(Bounds<Pixels>, gpui::Size<Pixels>, Bounds<Pixels>, &LayerOptions) -> LayerPosition
+        + 'static,
+    ) -> Self {
+        self.position = Some(Rc::new(f));
         self
     }
 
@@ -549,7 +566,10 @@ impl Element for AnchoredLayer {
             cx,
         );
         let viewport = Bounds::new(Point::default(), window.viewport_size());
-        let position = position_layer(bounds, measured, viewport, &options);
+        let position = match &self.position {
+            Some(place) => place(bounds, measured, viewport, &options),
+            None => position_layer(bounds, measured, viewport, &options),
+        };
         if let Some(f) = &self.on_placed {
             f(position, window, cx);
         }

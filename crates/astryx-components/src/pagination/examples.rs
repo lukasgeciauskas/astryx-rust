@@ -27,6 +27,7 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let count = window.use_keyed_state("count", cx, |_, _| 1usize);
     let dots = window.use_keyed_state("dots", cx, |_, _| 2usize);
     let step = window.use_keyed_state("step", cx, |_, _| 1usize);
+    let page_size = window.use_keyed_state("page-size", cx, |_, _| 10usize);
 
     Stack::vertical()
         .gap(SpacingStep::S4)
@@ -69,6 +70,9 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
             Pagination::new("count", *count.read(cx))
                 .variant(PaginationVariant::Count)
                 .total_items(42)
+                .page_size(*page_size.read(cx))
+                .page_size_options([10, 20, 50])
+                .on_page_size_change(store(page_size.clone()))
                 .on_change(store(count.clone())),
         )
         .child(

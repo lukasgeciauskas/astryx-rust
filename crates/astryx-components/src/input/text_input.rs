@@ -349,6 +349,7 @@ impl RenderOnce for TextInput {
         let chrome = Chrome {
             id: ElementId::Name(format!("{}-control", self.id).into()),
             target: "text-input",
+            variant: None,
             size,
             status,
             disabled: self.disabled,

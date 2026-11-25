@@ -2,7 +2,7 @@
 //! FormLayout and FileInput to follow (M4). The editing itself is
 //! `astryx_primitives::editing`; this module is the Astryx chrome around it.
 
-mod control;
+pub(crate) mod control;
 pub mod examples;
 mod field_menu;
 pub(crate) mod file_input;
@@ -18,6 +18,7 @@ pub use file_input::{FileInput, FileInputMode, PickedFile, mime_for_extension};
 pub use group::{InputGroup, InputGroupText};
 pub use number_input::{EntryErrorKind, NumberInput, NumberInputEntryError};
 pub use text_area::TextArea;
+pub(crate) use text_input::selection_color;
 pub use text_input::{InputType, TextInput};
 
 use crate::doc::{ComponentDoc, PropMapping, RustApi};

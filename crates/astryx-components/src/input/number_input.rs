@@ -935,6 +935,7 @@ impl RenderOnce for NumberInput {
         let chrome = Chrome {
             id: ElementId::Name(format!("{}-control", self.id).into()),
             target: "number-input",
+            variant: None,
             size,
             status,
             disabled: self.disabled,

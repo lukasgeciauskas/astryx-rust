@@ -29,6 +29,7 @@ pub enum Page {
     Overlays,
     Navigation,
     Wayfinding,
+    Collections,
 }
 
 impl Page {
@@ -52,6 +53,7 @@ impl Page {
         Page::Overlays,
         Page::Navigation,
         Page::Wayfinding,
+        Page::Collections,
     ];
 
     pub fn title(self) -> &'static str {
@@ -75,6 +77,7 @@ impl Page {
             Page::Overlays => "Overlays",
             Page::Navigation => "Navigation",
             Page::Wayfinding => "Wayfinding",
+            Page::Collections => "Collections",
         }
     }
 
@@ -99,6 +102,7 @@ impl Page {
             Page::Overlays => astryx::components::overlay::examples::examples(window, cx),
             Page::Navigation => astryx::components::segmented::examples::examples(window, cx),
             Page::Wayfinding => astryx::components::pagination::examples::examples(window, cx),
+            Page::Collections => astryx::components::selector::examples::examples(window, cx),
         }
     }
 }

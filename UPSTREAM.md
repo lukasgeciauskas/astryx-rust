@@ -7,7 +7,7 @@ next to this repository at `../Astryx`.
 |---|---|
 | Upstream commit | `40ccf520df30933a70df9ee3068cddb7f8d2d0a7` (2026-11-24) |
 | `@astryxdesign/core` | 0.7.18 |
-| GPUI | the fork `lukasgeciauskas/zed` at `93e506ee3260224cb25b47ab20aa2238f764a16d`, based on Zed `2b248e607288f229695be89ca2e73face27e5c54` (2026-11-24); see `docs/gpui-fork.md` |
+| GPUI | the fork `lukasgeciauskas/zed` at `01da1adfa69364e9df02b39d897e24d001cf6fde`, based on Zed `2b248e607288f229695be89ca2e73face27e5c54` (2026-11-24); see `docs/gpui-fork.md` |
 | Rust toolchain | 1.100.0 (matches the Zed revision) |
 
 ## Re-sync from upstream

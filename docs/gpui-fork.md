@@ -50,6 +50,7 @@ Each patch lands before the components that need it.
 | R10 | The view inside a `ViewElement` (**landed**, `2e391af`) | `ViewElement::view_mut` and `take_view`: a parent reaches the component inside an `AnyElement` | The inline text flow (M4): a Text or Link inside a paragraph joins its lines |
 | R11 | Input modes and spellcheck (**landed**, `d8be0c9`) | `TextInputConfiguration::input_mode` (the HTML `inputmode` set) and `spellcheck`; the web's IME mirror applies both | `inputMode`, `enterKeyHint`, `autoCapitalize`, `hasAutoCorrect` and `hasSpellCheck` on text fields (M4) |
 | R12 | Focus traps and `aria-haspopup` (**landed**, `93e506e`) | `tab_trap()`: Tab and Shift-Tab from inside an element cycle among its tab stops; `Window::with_tab_scope`; `aria_has_popup(HasPopup)` | Every M5 layer: Popover's focus region, dialogs, drawers and menus; popup triggers |
+| R13 | Active descendants across layers (**landed**, `01da1ad`) | `aria_active_descendant_of(&FocusHandle)`: an element is the active descendant of the element tracking that handle while it is focused, wherever it sits in the tree | Selector's listbox options (M6), and every combobox popup after it |
 
 ### How each patch works
 
@@ -139,6 +140,16 @@ Each patch lands before the components that need it.
   - The trap markers are tab-stop operations, so a cached view replays them.
   - Focusing a trap's container (a focusable element that is not a tab stop) and then
     calling `focus_next` lands on its first stop: how a layer moves focus in.
+
+- **R13 (active descendants across layers), as built:**
+  - GPUI's `aria_active_descendant()` is honored only under the focused node, and a
+    deferred layer (a popup) paints at the accessibility root, so a combobox's
+    options could never be its active descendant.
+  - `aria_active_descendant_of(&FocusHandle)` keeps the handle on the element; in
+    prepaint, while that handle is focused, the element's node becomes the reported
+    focus (`A11y::set_active_descendant_of_focused`), provided a focused node exists.
+    Deferred layers prepaint after the main tree, so the focused trigger's node is
+    already known.
 
 - **R2 (backdrop blur):**
   - A new scene primitive.

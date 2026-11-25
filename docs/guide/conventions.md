@@ -78,9 +78,19 @@
     { .. }, window, cx)`; text fields do it through `input::field_menu`.
 - **Search sources** (`crate::search`): `Searchable` items, a `SearchSource` that
   answers `Ready` or `Pending(Task)` and may show partial lists through its
-  `SearchContext`, and `static_source(items)`. CommandPalette uses them; Typeahead,
-  Tokenizer and Selector (M6) should too. A source built in `render` has no identity:
-  keep it in an `Rc` or name it with a key when a change must re-run a query.
+  `SearchContext`, and `static_source(items)`. CommandPalette uses them; Typeahead
+  and Tokenizer should too. Selector filters its own options, as upstream does. A
+  source built in `render` has no identity: keep it in an `Rc` or name it with a key
+  when a change must re-run a query.
+- **Comboboxes** (Selector, and MultiSelector after it): focus stays on the trigger or
+  the search field, and the highlighted option claims it with
+  `aria_active_descendant_of(&focus)` (fork patch R13), since the list sits in
+  another layer. The keys are `selector::combobox::Combobox::key` (pure; apply its
+  `KeyOutcome`). Options take the pointer by press: rows highlight on mouse move
+  and pick on the release of a press that began in the list (a window
+  `MouseUpEvent` listener registered while the list is drawn), never on click.
+  `AnchoredLayer::position_with` places a layer by any rule (Selector's selected
+  option over its trigger).
 - **Tooltip props:** a component's `tooltip` goes through `overlay::with_tooltip(id,
   text, acts, el)`; `labelTooltip` is an InfoTip in the label row (`FieldLabel`);
   `disabledMessage` is `overlay::disabled_reason`, which shows on any focus; a tooltip

@@ -24,7 +24,9 @@ pub use announce::{Politeness, announce, announcer};
 pub use context::{Provider, provide, use_context, with_context};
 pub use focus::{FocusNext, FocusPrevious, RovingScope, control_focus};
 pub use hotkeys::{Hotkey, hotkeys};
-pub use layer::{AnchoredLayer, EscapeBehavior, Layer, anchored_layer, has_open_layer, layer};
+pub use layer::{
+    AnchoredLayer, EscapeBehavior, Layer, PositionFn, anchored_layer, has_open_layer, layer,
+};
 pub use link::{LinkHandler, Navigation, link_provider, set_link_handler, use_link_handler};
 pub use list_focus::{ListFocus, ListKeys, ListOrientation};
 pub use modality::{

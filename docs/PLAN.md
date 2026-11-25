@@ -221,8 +221,8 @@ The remaining primitives:
   - Pulled forward because M3 components need them: Field and FieldStatus (from M4), and
     Item's core (from M6; swipe actions wait for M11).
   - Carried into later milestones, recorded in each doc: TabMenu and BreadcrumbItem
-    menus (finished in M5 with DropdownMenu), Pagination's page-size selector (M6, with
-    Selector); the SegmentedControl lens and Item swipe actions (M11). Tooltips, InfoTips, disabled messages and Stepper's on-track and compact
+    menus (finished in M5 with DropdownMenu), Pagination's page-size selector (finished
+    in M6 with Selector); the SegmentedControl lens and Item swipe actions (M11). Tooltips, InfoTips, disabled messages and Stepper's on-track and compact
     modes were finished with M4.
   - A gallery test renders every page, so an example that panics fails `cargo test`.
 - **M4 Editing engine & fields (done):**
@@ -289,9 +289,21 @@ The remaining primitives:
     - Header and footer regions make the menu, or a submenu's flyout, a modal dialog.
   - Text fields gain the browser's context menu, which GPUI lacks: spelling suggestions
     for the word under the pointer, "Add to dictionary", Cut, Copy, Paste and Select all.
-- **M6 Collections:** combobox, virtualization, tree/grid focus, reorderable.
+- **M6 Collections (in progress):** combobox, virtualization, tree/grid focus, reorderable.
   - Components: List, Item, Selector, MultiSelector, Typeahead, Tokenizer, ComplexSelector,
     TreeList, OverflowList, MetadataList, PowerSearch.
+  - Selector and SelectorOption (done): the input, secondary and ghost triggers; options,
+    sections and dividers; the combobox keys (`selector::combobox`, FR8 opening
+    highlight); closed-trigger typeahead that picks and announces; search with counted
+    announcements (FR9); the highlight that follows its option (FR10); the selected
+    option over the trigger, clamped to the window (FR2, through
+    `AnchoredLayer::position_with`); the press model (FR7); read-only (FR6), loading
+    (FR5), clear, changeAction, the bottom-sheet presentations (FR4), focus return
+    (AR2) and the keyboard ring (AR5).
+  - GPUI fork patch R13 (active descendants across layers): a popup's option is its
+    combobox's active descendant.
+  - Pagination's page-size selector (done), which closes the M3 item; `page_href` now
+    receives the page size, as upstream's `getPageHref(page, pageSize)`.
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.

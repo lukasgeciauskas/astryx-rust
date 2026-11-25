@@ -1,4 +1,4 @@
-# GPUI cheat sheet (fork rev 93e506e, Zed base 2b248e6)
+# GPUI cheat sheet (fork rev 01da1ad, Zed base 2b248e6)
 
 Every API here is used by code in this repository and compiles at the pinned
 revision of our fork (`docs/gpui-fork.md`). For anything else, read the real source, not memory:
@@ -95,6 +95,14 @@ from another version may not exist here.
 - Overlays: `deferred(anchored().position(point).child(..))` draws above later siblings.
   Astryx wraps this in `astryx_primitives::layer` and `anchored_layer` (see
   conventions).
+- Active descendants: GPUI's `aria_active_descendant()` works only under the focused
+  element, and a deferred layer paints at the accessibility root. Our fork's
+  `aria_active_descendant_of(&focus_handle)` (patch R13) names the focused element by
+  its handle instead, so a popup's option can be a combobox's active descendant.
+- Focus listeners in a `RenderOnce`: `window.on_focus_in(&handle, cx, ..)` returns a
+  `Subscription` to keep in keyed state (`cx.on_focus` needs a view's `Context`). It
+  also fires for focus entering a descendant, and not when focus moves between the
+  handle and its descendants.
 - Images: `img(source)` with `.object_fit(ObjectFit::Contain)`. The natural size of a
   loaded image: `window.use_asset::<ImgResourceLoader>(&resource, cx)` (or the
   `RenderImage` of `ImageSource::Render`), then `image.size(0)`. A `RenderImage` built

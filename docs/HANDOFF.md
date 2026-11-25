@@ -5,29 +5,30 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-25, at the end of M5._
+_Last updated: 2026-11-25, during M6 (Selector done)._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4 and M5. Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4 and M5; M6 is in progress (Selector,
+  SelectorOption and Pagination's page-size selector are done). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 72 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 73 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** the commit that added this file; `af61065` docs: M5 is done; `f8b5551` Lightbox,
   use_lightbox, CommandPalette and search sources; `9af8f12` menus. CI is green
   on all three (ubuntu, windows, wasm).
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
-  `93e506ee3260224cb25b47ab20aa2238f764a16d` (patches R1 and R5 to R12; see
+  `01da1adfa69364e9df02b39d897e24d001cf6fde` (patches R1 and R5 to R13; see
   [`gpui-fork.md`](gpui-fork.md)). The `[patch.crates-io]` block in
   `Cargo.toml` (async-task, calloop) is legitimate and stays.
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (38)
+### Not yet ported (37)
 
-- **M6 Collections (next):** List, Selector, MultiSelector, Typeahead, Tokenizer,
+- **M6 Collections (in progress):** List, MultiSelector, Typeahead, Tokenizer,
   ComplexSelector, TreeList, OverflowList, MetadataList, PowerSearch. Item's core
   exists (`crates/astryx-components/src/item/`); its swipe actions wait for M11.
 - **M7:** Table. **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
@@ -44,7 +45,6 @@ _Last updated: 2026-11-25, at the end of M5._
 
 | What | Waits for |
 |---|---|
-| Pagination's page-size selector | Selector (M6) |
 | Item swipe actions, SegmentedControl's sliding lens, Collapsible's animated layout | Motion layer (M11) |
 | Lightbox springs (it eases over 280ms now) | Motion layer (M11) |
 | Lightbox video playback and `hasAutoPlay` (a video opens in the system player now) | MediaPlayer's decoder (M13) |
@@ -130,9 +130,8 @@ time:
 
 Suggested order, each a commit:
 
-1. **Selector** (on `search::SearchSource` and the combobox keys already in
-   CommandPalette), then Pagination's page-size selector, which closes an M3
-   item.
+1. ~~**Selector**, then Pagination's page-size selector~~ (done: `selector/`,
+   fork patch R13; Selector filters its own options, as upstream does).
 2. **List** (and Item's remaining props), then **MetadataList**,
    **OverflowList**.
 3. **Typeahead** and **Tokenizer** (share `search::`), **MultiSelector**,

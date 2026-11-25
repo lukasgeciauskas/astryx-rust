@@ -1,6 +1,7 @@
 //! Pagination. Upstream: `Pagination/`.
 //!
-//! The page-size selector lands with Selector (M6).
+//! With `page_size_options`, a Selector before the controls picks the page
+//! size; a choice reports it and goes back to page 1.
 
 pub mod examples;
 
@@ -95,7 +96,11 @@ pub fn page_range(current: usize, total: usize, siblings: usize) -> Vec<PageSlot
 }
 
 type PageFn = Rc<dyn Fn(usize, &mut Window, &mut App)>;
-type HrefFn = Rc<dyn Fn(usize) -> SharedString>;
+
+/// The page-size Selector's width, upstream `PAGE_SIZE_SELECTOR_WIDTH`.
+const PAGE_SIZE_SELECTOR_WIDTH: f32 = 80.;
+type HrefFn = Rc<dyn Fn(usize, Option<usize>) -> SharedString>;
+type SizeFn = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 
 /// Controls for moving between pages, upstream `Pagination`.
 ///
@@ -113,6 +118,10 @@ pub struct Pagination {
     total_pages: Option<usize>,
     has_more: Option<bool>,
     page_size: usize,
+    /// `page_size` was given, so links carry it.
+    page_size_set: bool,
+    page_size_options: Vec<usize>,
+    on_page_size_change: Option<SizeFn>,
     variant: PaginationVariant,
     page_label: Option<SharedString>,
     first_last: Option<bool>,
@@ -137,6 +146,9 @@ impl Pagination {
             total_pages: None,
             has_more: None,
             page_size: 10,
+            page_size_set: false,
+            page_size_options: Vec::new(),
+            on_page_size_change: None,
             variant: PaginationVariant::Pages,
             page_label: None,
             first_last: None,
@@ -187,6 +199,23 @@ impl Pagination {
     /// Upstream `pageSize`: items per page (at least 1).
     pub fn page_size(mut self, size: usize) -> Self {
         self.page_size = size.max(1);
+        self.page_size_set = true;
+        self
+    }
+
+    /// Upstream `pageSizeOptions`: a page-size Selector shows when given.
+    pub fn page_size_options(mut self, options: impl IntoIterator<Item = usize>) -> Self {
+        self.page_size_options = options.into_iter().collect();
+        self
+    }
+
+    /// Upstream `onPageSizeChange`: the size picked. `on_change(1)` follows,
+    /// since the page goes back to the first; navigate here, not there.
+    pub fn on_page_size_change(
+        mut self,
+        f: impl Fn(usize, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_page_size_change = Some(Rc::new(f));
         self
     }
 
@@ -213,8 +242,10 @@ impl Pagination {
     }
 
     /// Upstream `getPageHref`: the pages become links through the link
-    /// handler; `on_change` still runs.
-    pub fn page_href(mut self, f: impl Fn(usize) -> SharedString + 'static) -> Self {
+    /// handler; `on_change` still runs. The page size is passed when
+    /// `page_size` or `page_size_options` is set. The dots, the page box
+    /// and the page-size selector are not links.
+    pub fn page_href(mut self, f: impl Fn(usize, Option<usize>) -> SharedString + 'static) -> Self {
         self.page_href = Some(Rc::new(f));
         self
     }
@@ -265,7 +296,10 @@ impl RenderOnce for Pagination {
         let href = self.page_href.clone();
         let handler = use_link_handler(cx);
         let announce_total = total;
-        let go: PageFn = Rc::new(move |target, window, cx| {
+        let href_size =
+            (self.page_size_set || !self.page_size_options.is_empty()).then_some(self.page_size);
+        // A page change: on_change, the announcement, the action.
+        let change_page: PageFn = Rc::new(move |target, window, cx| {
             if disabled {
                 return;
             }
@@ -282,10 +316,20 @@ impl RenderOnce for Pagination {
                 ),
             };
             announce(text, Politeness::Polite, window, cx);
-            if let Some(href) = &href {
-                handler.open(&href(target), None, window, cx);
-            }
         });
+        // A control's activation: the change, then its link.
+        let go: PageFn = {
+            let change_page = change_page.clone();
+            Rc::new(move |target, window, cx| {
+                if disabled {
+                    return;
+                }
+                change_page(target, window, cx);
+                if let Some(href) = &href {
+                    handler.open(&href(target, href_size), None, window, cx);
+                }
+            })
+        };
 
         let sm = self.size == ElementSize::Sm;
         let icon_size = if sm { IconSize::Sm } else { IconSize::Md };
@@ -632,9 +676,38 @@ impl RenderOnce for Pagination {
         let name = self
             .label
             .unwrap_or_else(|| i18n.t("@astryx.pagination.label"));
+        // The page-size selector.
+        let sizes = (!self.page_size_options.is_empty()).then(|| {
+            let (report, change_page) = (self.on_page_size_change.clone(), change_page.clone());
+            div().flex().items_center().gap(t.spacing.s2).child(
+                crate::selector::Selector::new(
+                    ElementId::Name(format!("{}-page-size", self.id).into()),
+                    i18n.t("@astryx.pagination.itemsPerPage"),
+                    self.page_size_options
+                        .iter()
+                        .map(|size| SharedString::from(size.to_string())),
+                )
+                .label_hidden(true)
+                .value(SharedString::from(self.page_size.to_string()))
+                .size(self.size)
+                .disabled(self.disabled)
+                .width(gpui::px(PAGE_SIZE_SELECTOR_WIDTH))
+                .on_change(move |value, window, cx| {
+                    let Some(size) = value.and_then(|v| v.parse::<usize>().ok()) else {
+                        return;
+                    };
+                    if let Some(f) = &report {
+                        f(size, window, cx);
+                    }
+                    // Back to the first page.
+                    change_page(1, window, cx);
+                }),
+            )
+        });
         el.id(self.id)
             .role(Role::Navigation)
             .aria_label(name)
+            .children(sizes)
             .child(controls)
             .into_any_element()
     }
@@ -646,8 +719,6 @@ impl RenderOnce for Pagination {
 const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
-
-const SELECTOR: &str = "not yet: the page-size selector lands with Selector (M6)";
 
 pub const PAGINATION_DOC: ComponentDoc = ComponentDoc {
     name: "Pagination",
@@ -665,8 +736,8 @@ pub const PAGINATION_DOC: ComponentDoc = ComponentDoc {
         p("totalPages", RustApi::Method("total_pages")),
         p("hasMore", RustApi::Method("has_more")),
         p("pageSize", RustApi::Method("page_size")),
-        p("pageSizeOptions", RustApi::Waived(SELECTOR)),
-        p("onPageSizeChange", RustApi::Waived(SELECTOR)),
+        p("pageSizeOptions", RustApi::Method("page_size_options")),
+        p("onPageSizeChange", RustApi::Method("on_page_size_change")),
         p("variant", RustApi::Method("variant")),
         p("pageLabel", RustApi::Method("page_label")),
         p("hasFirstLast", RustApi::Method("first_last")),

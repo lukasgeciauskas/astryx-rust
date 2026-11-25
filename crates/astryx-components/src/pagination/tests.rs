@@ -140,3 +140,49 @@ fn the_input_variant_goes_to_a_typed_page(cx: &mut TestAppContext) {
         "a page past the last clamps to it"
     );
 }
+
+#[gpui::test]
+fn the_page_size_selector_reports_the_size_then_page_one(cx: &mut TestAppContext) {
+    cx.update(astryx_primitives::editing::init);
+    let log = Rc::new(RefCell::new(Vec::new()));
+    let cx = host(cx, {
+        let log = log.clone();
+        move || {
+            let (sizes, pages, links) = (log.clone(), log.clone(), log.clone());
+            let handler = astryx_primitives::LinkHandler::new(move |navigation, _, _| {
+                links.borrow_mut().push(format!("link {}", navigation.href))
+            });
+            astryx_primitives::link_provider(
+                handler,
+                Pagination::new("p", 3)
+                    .variant(PaginationVariant::Count)
+                    .total_items(200)
+                    .page_size_options([10, 20, 50])
+                    .page_href(|page, size| format!("/?page={page}&size={size:?}").into())
+                    .on_page_size_change(move |size, _, _| {
+                        sizes.borrow_mut().push(format!("size {size}"))
+                    })
+                    .on_change(move |page, _, _| pages.borrow_mut().push(format!("page {page}"))),
+            )
+            .into_any_element()
+        }
+    });
+    // The selector comes first: open it and pick the second size.
+    press(cx, "tab");
+    press(cx, "down");
+    press(cx, "down");
+    press(cx, "enter");
+    assert_eq!(
+        *log.borrow(),
+        ["size 20", "page 1"],
+        "the size, then page one, and no link"
+    );
+    // A page link carries the page size.
+    press(cx, "tab");
+    press(cx, "enter");
+    let log = log.borrow();
+    assert!(
+        log.iter().any(|l| l == "link /?page=2&size=Some(10)"),
+        "{log:?}"
+    );
+}

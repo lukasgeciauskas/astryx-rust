@@ -176,6 +176,7 @@ pub struct Icon {
     variant: Option<SharedString>,
     label: Option<SharedString>,
     id: Option<ElementId>,
+    rotation: Option<f32>,
     style: StyleRefinement,
 }
 
@@ -189,8 +190,16 @@ impl Icon {
             variant: None,
             label: None,
             id: None,
+            rotation: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Turns the glyph by `radians` around its center, as upstream rotates a
+    /// disclosure chevron.
+    pub fn rotation(mut self, radians: f32) -> Self {
+        self.rotation = Some(radians);
+        self
     }
 
     astryx_primitives::setters! {
@@ -243,6 +252,9 @@ impl RenderOnce for Icon {
             .flex_none()
             .size(size.rems())
             .text_color(color);
+        if let Some(turn) = self.rotation.filter(|r| *r != 0.) {
+            el = el.with_transformation(gpui::Transformation::rotate(gpui::radians(turn)));
+        }
         theme.refine(
             el.style(),
             "icon",

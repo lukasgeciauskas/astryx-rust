@@ -25,6 +25,7 @@ pub mod people;
 mod press;
 pub mod search;
 pub mod segmented;
+pub mod selector;
 pub mod slider;
 pub mod status;
 pub mod stepper;

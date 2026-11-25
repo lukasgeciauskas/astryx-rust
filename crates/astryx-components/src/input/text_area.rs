@@ -443,6 +443,7 @@ impl RenderOnce for TextArea {
         let chrome = Chrome {
             id: ElementId::Name(format!("{}-control", self.id).into()),
             target: "text-area",
+            variant: None,
             size,
             status,
             disabled: self.disabled,
