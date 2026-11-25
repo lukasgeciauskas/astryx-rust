@@ -85,6 +85,8 @@ struct Inner {
     messages: HashMap<SharedString, HashMap<SharedString, SharedString>>,
     overrides: HashMap<SharedString, HashMap<SharedString, SharedString>>,
     info: Rc<LocaleInfo>,
+    /// The locale's numeric collator, made on first use.
+    collator: Rc<OnceCell<Option<icu_collator::CollatorBorrowed<'static>>>>,
 }
 
 /// A locale with its direction, calendar and messages: upstream's
@@ -104,6 +106,7 @@ impl I18n {
             messages: HashMap::new(),
             overrides: HashMap::new(),
             info: Rc::new(LocaleInfo::new(&locale)),
+            collator: Rc::default(),
             locale,
         }))
     }
@@ -264,6 +267,23 @@ impl I18n {
     pub fn number(&self, value: f64) -> String {
         use message::LocaleFormat as _;
         self.0.info.number(value, Default::default())
+    }
+
+    /// Two strings in the order the locale sorts them, runs of digits by their
+    /// value ("a2" before "a10"): upstream `useCollator({numeric: true})`,
+    /// which a table's sort uses.
+    pub fn compare(&self, a: &str, b: &str) -> std::cmp::Ordering {
+        let collator = self.0.collator.get_or_init(|| {
+            let locale = locale::parse_locale(&self.0.locale);
+            let mut prefs = icu_collator::CollatorPreferences::from(&locale);
+            prefs.numeric_ordering =
+                Some(icu_collator::preferences::CollationNumericOrdering::True);
+            icu_collator::Collator::try_new(prefs, Default::default()).ok()
+        });
+        match collator {
+            Some(c) => c.compare(a, b),
+            None => a.cmp(b),
+        }
     }
 
     /// Items joined as a narrow "and" list in the locale: "a, b, and c".

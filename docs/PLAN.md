@@ -429,6 +429,15 @@ The remaining primitives:
     TableFooter, TableRow, TableHeaderCell and TableCell) as one shared grid whose columns
     fit their content (FR24). Themes' even-row stripe (`:nth-child(even)`) now maps to the
     row's `parity`, in codegen and at run time.
+  - Sorting (done): `TableSortable` (upstream `useTableSortable`, FR5) wraps each sortable
+    column's label in a sort control with its indicator, the multi-sort priority (its
+    description too) and the header's sort actions; a press cycles ascending, descending,
+    unsorted, and Shift adds a key. The header's `aria-sort` needed fork patch R14.
+    `use_table_sortable_state` owns the state (or follows the caller's) and sorts rows
+    stably, missing values last, numbers by value, the rest by the locale's numeric
+    collation (`I18n::compare`, on `icu_collator`). A theme's `componentIcons` slots now have
+    a registry (`icon::set_component_icon`; `table-sort-indicator` its first slot). Under
+    truncation a cut heading shows in full while keyboard focus is in its header.
 - **M8 Dates:** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
   DateRangeInput, DateTimeInput, TimeInput.
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

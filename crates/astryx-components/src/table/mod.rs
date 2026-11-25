@@ -7,6 +7,7 @@ pub(crate) mod menu;
 pub mod model;
 mod parts;
 pub mod plugin;
+mod sortable;
 #[allow(clippy::module_inception)]
 mod table;
 
@@ -21,6 +22,11 @@ pub use plugin::{
     BodyCellProps, BodyRowProps, ElementHook, HeaderCellProps, HeaderRowProps, RowKind, RowModel,
     RowPaint, ScrollWrapperProps, TableContextAction, TableContextActions, TableMode, TablePlugin,
     TableRenderContext, TableRenderProps, TableRowContext,
+};
+pub use sortable::{
+    SortDirection, SortEntry, SortableState, SortableStateConfig, TableSortable,
+    USE_TABLE_SORTABLE_DOC, USE_TABLE_SORTABLE_STATE_DOC, next_direction, next_sort,
+    use_table_sortable_state,
 };
 pub use table::Table;
 

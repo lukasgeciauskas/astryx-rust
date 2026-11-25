@@ -20,7 +20,7 @@ _Last updated: 2026-11-25, at the end of M6 (Collections)._
   ubuntu, windows and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
-  `01da1adfa69364e9df02b39d897e24d001cf6fde` (patches R1 and R5 to R13; see
+  `d436e06b539a99c5f27605a2d17954f3102af92e` (patches R1 and R5 to R14; see
   [`gpui-fork.md`](gpui-fork.md)). The `[patch.crates-io]` block in
   `Cargo.toml` (async-task, calloop) is legitimate and stays.
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
@@ -154,9 +154,7 @@ time:
 Stages, each a commit:
 
 1. ~~Table and its parts~~ (done: `table/`: model, plugin trait, data and children modes).
-2. Sorting: `useTableSortableState` and `useTableSortable` (FR5: the sort control around
-   the label, the indicator, multi-sort priority, the header's context actions, the cut
-   heading's keyboard-focus tooltip).
+2. ~~Sorting~~ (done: `table/sortable.rs`, fork patch R14 for `aria-sort`).
 3. Selection, activation and row status: `useTableSelectionState`, `useTableSelection`
    (FR6), `TableSelectionToolbar`, `useTableActivation` (an accepted contract upstream
    has not built; FR21's paint path), `useTableRowStatus`, `useTableRowIndex`.

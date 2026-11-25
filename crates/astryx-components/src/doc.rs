@@ -175,6 +175,8 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::table::TABLE_ROW_DOC,
     crate::table::TABLE_CELL_DOC,
     crate::table::TABLE_HEADER_CELL_DOC,
+    crate::table::USE_TABLE_SORTABLE_DOC,
+    crate::table::USE_TABLE_SORTABLE_STATE_DOC,
 ];
 
 /// The registered doc for an upstream component name.

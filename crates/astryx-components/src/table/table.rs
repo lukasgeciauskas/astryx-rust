@@ -692,7 +692,9 @@ fn header_cell<T>(
     let content = props
         .content
         .unwrap_or_else(|| col.key.clone().into_any_element());
+    // The label fills the cell, so a control around it (sorting) does too.
     let label = div()
+        .w_full()
         .min_w_0()
         .when(truncate, |d| d.truncate())
         .child(content);
@@ -712,6 +714,67 @@ fn header_cell<T>(
         false,
         label,
     );
+    // A truncating heading is disclosed only while keyboard focus is in its
+    // header (its sort control) and its text is cut.
+    let cell_focus = window
+        .use_keyed_state(
+            ElementId::Name(format!("{table}-header-{}-focus", col.key).into()),
+            cx,
+            |_, cx| cx.focus_handle(),
+        )
+        .read(cx)
+        .clone();
+    let label = match (truncate, col.header_text().filter(|t| !t.is_empty())) {
+        (true, Some(text)) => {
+            let cut = window.use_keyed_state(
+                ElementId::Name(format!("{table}-header-{}-cut", col.key).into()),
+                cx,
+                |_, _| false,
+            );
+            let probe_cut = cut.clone();
+            let measured = text.clone();
+            let probe = gpui::canvas(
+                move |bounds, window, cx| {
+                    let style = window.text_style();
+                    let rem = window.rem_size();
+                    let size = style.font_size.to_pixels(rem);
+                    let runs = [style.to_run(measured.len())];
+                    let width = window
+                        .text_system()
+                        .shape_line(measured.clone(), size, &runs, None)
+                        .width;
+                    let over = width > bounds.size.width + px(0.5);
+                    if *probe_cut.read(cx) != over {
+                        probe_cut.update(cx, |c, _| *c = over);
+                        window.defer(cx, |window, _| window.refresh());
+                    }
+                },
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full();
+            let open = *cut.read(cx)
+                && cell_focus.contains_focused(window, cx)
+                && astryx_primitives::is_focus_within_visible(&cell_focus, window, cx);
+            crate::overlay::Tooltip::new(
+                ElementId::Name(format!("{table}-header-{}-cut-tip", col.key).into()),
+                text,
+            )
+            .open(Some(open))
+            .child(
+                div()
+                    .relative()
+                    .w_full()
+                    .min_w_0()
+                    .child(label)
+                    .child(probe),
+            )
+            .into_any_element()
+        }
+        _ => label,
+    };
     let label_row = if props.after.is_empty() {
         label
     } else {
@@ -719,8 +782,9 @@ fn header_cell<T>(
             .flex()
             .items_center()
             .gap(t.spacing.s1.to_pixels(rem))
+            .w_full()
             .min_w_0()
-            .child(div().min_w_0().flex_shrink_1().child(label))
+            .child(div().flex_1().min_w_0().child(label))
             .children(props.after)
             .into_any_element()
     };
@@ -732,6 +796,7 @@ fn header_cell<T>(
             let s = format!("{table}-header-{}", col.key);
             move || s.clone()
         })
+        .track_focus(&cell_focus)
         .role(Role::ColumnHeader);
     if let Some(label) = props.aria_label.clone().or_else(|| col.header_text()) {
         el = el.aria_label(label);

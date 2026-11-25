@@ -438,3 +438,134 @@ fn fr3_fr24_composed_rows_share_columns_that_fit_their_content(cx: &mut TestAppC
     assert_eq!(total.left(), h0.left());
     assert_eq!(total.right(), h1.right());
 }
+
+struct SortHost {
+    multi: bool,
+    truncate: bool,
+}
+
+impl Render for SortHost {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let state = use_table_sortable_state(
+            "people",
+            SortableStateConfig::new(rows()).multi_sort(self.multi),
+            window,
+            cx,
+        );
+        let mut columns = vec![
+            TableColumn::new("name").header("Name").sortable(true),
+            TableColumn::new("age").header("Age").sortable(true),
+        ];
+        if self.truncate {
+            columns.push(
+                TableColumn::new("long")
+                    .header("A very long heading for a narrow column")
+                    .width(pixel(90.))
+                    .sortable(true),
+            );
+        }
+        let mut table = Table::new("t")
+            .data(state.sorted_data.clone())
+            .columns(columns)
+            .id_key("id")
+            .plugin("sort", state.plugin.clone());
+        if self.truncate {
+            table = table.text_overflow(TableTextOverflow::Truncate);
+        }
+        div().w(px(600.)).child(table)
+    }
+}
+
+fn sort_host(cx: &mut TestAppContext, multi: bool, truncate: bool) -> &mut VisualTestContext {
+    cx.update(|cx| {
+        astryx_theme::init(cx);
+        astryx_primitives::focus::init(cx);
+    });
+    let (_, cx) = cx.add_window_view(move |_, _| SortHost { multi, truncate });
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    cx
+}
+
+fn settle(cx: &mut VisualTestContext) {
+    for _ in 0..3 {
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+}
+
+fn order(cx: &mut VisualTestContext) -> String {
+    let mut rows: Vec<(gpui::Pixels, char)> = ['a', 'b', 'c']
+        .into_iter()
+        .map(|k| (bounds(cx, &format!("t-row-s{k}")).top(), k))
+        .collect();
+    rows.sort_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
+    rows.into_iter().map(|(_, k)| k).collect()
+}
+
+fn press_header(cx: &mut VisualTestContext, key: &str, shift: bool) {
+    let at = bounds(cx, &format!("t-header-{key}")).center();
+    let modifiers = if shift {
+        Modifiers::shift()
+    } else {
+        Modifiers::none()
+    };
+    cx.simulate_click(at, modifiers);
+    settle(cx);
+}
+
+#[gpui::test]
+fn fr5_a_header_press_cycles_its_sort(cx: &mut TestAppContext) {
+    let cx = sort_host(cx, false, false);
+    assert_eq!(order(cx), "abc");
+    press_header(cx, "name", false);
+    assert_eq!(order(cx), "acb", "Ada, Alan, Grace");
+    press_header(cx, "name", false);
+    assert_eq!(order(cx), "bca");
+    press_header(cx, "name", false);
+    assert_eq!(order(cx), "abc", "unsorted again");
+    // Missing values sort last ascending.
+    press_header(cx, "age", false);
+    assert_eq!(order(cx), "abc");
+}
+
+#[gpui::test]
+fn fr5_shift_adds_a_key_and_shows_the_priorities(cx: &mut TestAppContext) {
+    let cx = sort_host(cx, true, false);
+    press_header(cx, "age", false);
+    assert!(
+        !shown(cx, "table-sort-age-rank"),
+        "one key shows no priority"
+    );
+    press_header(cx, "name", true);
+    assert!(shown(cx, "table-sort-age-rank") && shown(cx, "table-sort-name-rank"));
+}
+
+#[gpui::test]
+fn the_headers_menu_sorts_it(cx: &mut TestAppContext) {
+    let cx = sort_host(cx, false, false);
+    let at = bounds(cx, "t-header-age").center();
+    cx.simulate_mouse_down(at, MouseButton::Right, Modifiers::none());
+    cx.simulate_mouse_up(at, MouseButton::Right, Modifiers::none());
+    settle(cx);
+    assert!(shown(cx, "t-header-age-menu-list-sort-asc"));
+    let desc = bounds(cx, "t-header-age-menu-list-sort-desc").center();
+    cx.simulate_click(desc, Modifiers::none());
+    settle(cx);
+    // Descending flips the order, the missing age first (as upstream).
+    assert_eq!(order(cx), "cba");
+}
+
+#[gpui::test]
+fn a_cut_heading_shows_in_full_on_keyboard_focus(cx: &mut TestAppContext) {
+    let cx = sort_host(cx, false, true);
+    assert!(!shown(cx, "t-header-long-cut-tip-surface"));
+    for _ in 0..3 {
+        cx.simulate_keystrokes("tab");
+        settle(cx);
+    }
+    assert!(
+        shown(cx, "t-header-long-cut-tip-surface"),
+        "the long column's sort control has focus"
+    );
+}

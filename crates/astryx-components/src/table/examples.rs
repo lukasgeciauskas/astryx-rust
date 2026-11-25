@@ -84,7 +84,7 @@ pub fn people() -> Vec<Person> {
     ]
 }
 
-pub fn examples(_window: &mut Window, _cx: &mut App) -> AnyElement {
+pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let label = |text: &'static str| Text::new(text).text_type(TextType::Supporting);
     let columns = vec![
         TableColumn::new("name")
@@ -142,6 +142,8 @@ pub fn examples(_window: &mut Window, _cx: &mut App) -> AnyElement {
                 .striped(true)
                 .hover(true),
         )
+        .child(label("Sortable: press a header; Shift+press adds a key"))
+        .child(sortable(window, cx))
         .child(label(
             "Compact, grid dividers; a date reads as its ISO time",
         ))
@@ -222,5 +224,36 @@ pub fn examples(_window: &mut Window, _cx: &mut App) -> AnyElement {
             TableColumn::new("name").header("Name"),
             TableColumn::new("role").header("Role"),
         ]))
+        .into_any_element()
+}
+
+/// A table sorted locally by its own sort state (useTableSortableState).
+fn sortable(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::table::{SortEntry, SortableStateConfig, use_table_sortable_state};
+    let state = use_table_sortable_state(
+        "people-sort",
+        SortableStateConfig::new(people())
+            .default_sort(vec![SortEntry::ascending("name")])
+            .multi_sort(true),
+        window,
+        cx,
+    );
+    Table::new("people-sorted")
+        .label("People, sortable")
+        .data(state.sorted_data.clone())
+        .columns(vec![
+            TableColumn::new("name")
+                .header("Name")
+                .width(proportional(2.))
+                .sortable(true),
+            TableColumn::new("role").header("Role").sortable(true),
+            TableColumn::new("age")
+                .header("Age")
+                .width(pixel(96.))
+                .align(TableColumnAlign::End)
+                .sortable(true),
+        ])
+        .id_key("id")
+        .plugin("sort", state.plugin.clone())
         .into_any_element()
 }

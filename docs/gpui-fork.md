@@ -51,6 +51,7 @@ Each patch lands before the components that need it.
 | R11 | Input modes and spellcheck (**landed**, `d8be0c9`) | `TextInputConfiguration::input_mode` (the HTML `inputmode` set) and `spellcheck`; the web's IME mirror applies both | `inputMode`, `enterKeyHint`, `autoCapitalize`, `hasAutoCorrect` and `hasSpellCheck` on text fields (M4) |
 | R12 | Focus traps and `aria-haspopup` (**landed**, `93e506e`) | `tab_trap()`: Tab and Shift-Tab from inside an element cycle among its tab stops; `Window::with_tab_scope`; `aria_has_popup(HasPopup)` | Every M5 layer: Popover's focus region, dialogs, drawers and menus; popup triggers |
 | R13 | Active descendants across layers (**landed**, `01da1ad`) | `aria_active_descendant_of(&FocusHandle)`: an element is the active descendant of the element tracking that handle while it is focused, wherever it sits in the tree | Selector's listbox options (M6), and every combobox popup after it |
+| R14 | `aria-sort` (**landed**, `d436e06`) | `aria_sort(SortDirection)` on any stateful element, setting AccessKit's sort direction; `SortDirection` is re-exported | A sortable Table column's header (M7) |
 
 ### How each patch works
 
