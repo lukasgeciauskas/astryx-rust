@@ -203,6 +203,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::date_input::DATE_INPUT_DOC,
     crate::time_input::TIME_INPUT_DOC,
     crate::date_time_input::DATE_TIME_INPUT_DOC,
+    crate::date_range_input::DATE_RANGE_INPUT_DOC,
 ];
 
 /// Modules upstream has specified (an accepted contract) but not yet built,

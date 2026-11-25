@@ -539,6 +539,13 @@ The remaining primitives:
     preset-time listbox limited to the day's bounds with its keyboard (FR7), the time arrows,
     the date segment's message first with the time rejection through its own alert (FR16),
     clear, `changeAction`, disabled and the wrapping two-segment row (FR5).
+  - Stage 5 (done): DateRangeInput (`date_range_input/`): the trigger button named by its
+    label and range, with each end written in the calendar and the year only when needed
+    (FR6), the range Calendar popover, presets as a labeled group of buttons whose applied
+    preset is current and whose out-of-bounds or out-of-span preset is disabled but focusable
+    (FR2, FR3, AR1-AR3, ORD1, ORD2), the presets beside the calendar or stacked above it in a
+    wrapping row whose divider shows only between the parts (FR5), clear, `changeAction`
+    and disabled. Escape drops a range in progress and leaves the popover open.
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
     `entryErrorBehavior: complete` (`table/filtering.rs` shows none until then).
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

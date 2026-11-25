@@ -774,7 +774,10 @@ impl RenderOnce for Calendar {
             None,
         );
         root.style().refine(&self.style);
-        // Escape clears a range in progress (FR4).
+        // Escape clears a range in progress (FR4), and only that: stopping it
+        // here keeps it from the layers' keystroke observer (GPUI runs no
+        // observer for a key a key-down handler stopped), so a popover around
+        // the calendar stays open.
         let escape_state = state.clone();
         let root = root.on_key_down(move |event: &KeyDownEvent, window, cx| {
             if event.keystroke.key == "escape" && escape_state.read(cx).range_start.is_some() {

@@ -10,6 +10,7 @@ pub mod complex_selector;
 pub mod containers;
 pub mod content;
 pub mod date_input;
+pub mod date_range_input;
 pub mod date_time_input;
 pub mod doc;
 pub mod feedback;

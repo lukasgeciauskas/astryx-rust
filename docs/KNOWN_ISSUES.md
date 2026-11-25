@@ -198,7 +198,11 @@
 - **TimeInput commits a typed prefix (M8).** As upstream (its FR3 implementation gap),
   typing "2.30pm" in English commits 02:00 as soon as "2" parses, and keeps it at blur.
 - **No server render, so today is always known (M8).** Calendar FR12's hydration rules
-  (an empty month until today is known) have nothing to apply to.
+  (an empty month until today is known) and DateRangeInput's year-while-today-is-unknown
+  trigger text have nothing to apply to.
+- **DateRangeInput's applied preset in dark mode is 3.88:1 (M8).** As upstream (its spec's
+  implementation gap): the label in `text-accent` on the `accent-muted` fill, on the
+  popover surface, is under 4.5:1. The tokens are upstream's.
 
 ## Tooling
 
