@@ -37,5 +37,6 @@ pub mod text;
 pub mod time;
 pub mod token;
 pub mod toolbar;
+pub mod typeahead;
 
 pub use doc::{ComponentDoc, PropMapping, RustApi};

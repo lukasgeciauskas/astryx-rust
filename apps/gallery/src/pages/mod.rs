@@ -110,6 +110,9 @@ impl Page {
                 .child(astryx::components::list::examples::examples(window, cx))
                 .child(astryx::components::metadata::examples::examples(window, cx))
                 .child(astryx::components::overflow::examples::examples(window, cx))
+                .child(astryx::components::typeahead::examples::examples(
+                    window, cx,
+                ))
                 .into_any_element(),
         }
     }

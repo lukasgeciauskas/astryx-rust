@@ -84,6 +84,9 @@
 - **OverflowList cannot see a flex-row parent.** Upstream gives a single row its unfolded
   width in a flex row and lets it shrink first; GPUI cannot read the parent's display,
   so in a flex row give the list `flex_1()` or a width.
+- **A Typeahead's source needs a name to count as replaced.** As with CommandPalette,
+  a source built in `render` is new every frame; `from_rc` or `source_key` gives it the
+  identity FR3's replaced-source rule needs.
 - **The Menu key's name depends on the platform.** ContextMenu opens on Shift+F10 and on
   a key GPUI names `menu`, `contextmenu` or `apps`; a platform that names the Menu key
   otherwise opens it only with Shift+F10.

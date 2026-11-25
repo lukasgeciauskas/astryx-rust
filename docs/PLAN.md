@@ -316,6 +316,12 @@ The remaining primitives:
     upstream's `computeOverflow` fit over a hidden measuring copy.
   - Carried: List's `animatedLayout` to the motion layer (M11), like Collapsible's;
     `reorderable` lands with TreeList at the end of M6.
+  - Typeahead, BaseTypeahead and TypeaheadItem (done) on `search::SearchSource`: the
+    threshold and debounce (FR2), stale answers dropped and answers kept through a
+    dismissal (FR3), partial lists that keep their rows and highlight (FR10), grouped
+    results and the announced empty message (FR4), wrapping keys (FR5), the listbox and
+    dialog menus with `TypeaheadController` (FR13-FR16), the selected Token with edit
+    mode and Backspace (Typeahead FR8, FR12), focusable-disabled fields (FR9).
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.

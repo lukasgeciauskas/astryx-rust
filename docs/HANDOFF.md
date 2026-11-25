@@ -10,10 +10,11 @@ _Last updated: 2026-11-25, during M6 (Selector, List and its relatives done)._
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4 and M5; M6 is in progress (Selector,
-  Pagination's page-size selector, List, MetadataList and OverflowList are done). Details and dates are in
+  Pagination's page-size selector, List, MetadataList, OverflowList and Typeahead are
+  done). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 76 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 77 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** the commit that added this file; `af61065` docs: M5 is done; `f8b5551` Lightbox,
   use_lightbox, CommandPalette and search sources; `9af8f12` menus. CI is green
@@ -26,10 +27,10 @@ _Last updated: 2026-11-25, during M6 (Selector, List and its relatives done)._
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (34)
+### Not yet ported (33)
 
-- **M6 Collections (in progress):** MultiSelector, Typeahead, Tokenizer,
-  ComplexSelector, TreeList, PowerSearch. Item's swipe actions wait for M11.
+- **M6 Collections (in progress):** MultiSelector, Tokenizer, ComplexSelector,
+  TreeList, PowerSearch. Item's swipe actions wait for M11.
 - **M7:** Table. **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
   TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
