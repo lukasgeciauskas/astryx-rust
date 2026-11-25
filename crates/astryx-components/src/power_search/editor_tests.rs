@@ -145,10 +145,7 @@ fn a_complete_draft_applies_and_enter_saves(cx: &mut TestAppContext) {
         partial("title", Some("contains"), None),
         EditorMode::Create,
     );
-    // Focus the value field and type.
-    press(cx, "tab");
-    press(cx, "tab");
-    press(cx, "tab");
+    // Focus starts in the value field.
     cx.simulate_input("dune");
     settle(cx);
     press(cx, "enter");

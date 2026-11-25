@@ -94,6 +94,8 @@ pub struct Token {
     end_content: Option<AnyElement>,
     label_hidden: bool,
     style: StyleRefinement,
+    naming: Option<(SharedString, SharedString)>,
+    popup: Option<bool>,
 }
 
 impl Token {
@@ -113,7 +115,28 @@ impl Token {
             end_content: None,
             label_hidden: false,
             style: StyleRefinement::default(),
+            naming: None,
+            popup: None,
         }
+    }
+
+    /// The token's and its remove control's names, when its label alone
+    /// does not name it (upstream `TokenNamingContext`: PowerSearch's filter
+    /// tokens are named by their whole text).
+    pub(crate) fn naming(
+        mut self,
+        action: impl Into<SharedString>,
+        remove: impl Into<SharedString>,
+    ) -> Self {
+        self.naming = Some((action.into(), remove.into()));
+        self
+    }
+
+    /// The dialog a press opens, and whether it is open (`aria-haspopup`,
+    /// `aria-expanded`).
+    pub(crate) fn popup(mut self, expanded: bool) -> Self {
+        self.popup = Some(expanded);
+        self
     }
 
     astryx_primitives::setters! {
@@ -197,10 +220,16 @@ impl RenderOnce for Token {
             .clone()
             .filter(|_| !self.disabled)
             .map(|on_remove| {
-                let name = i18n(cx).format(
-                    "@astryx.token.remove",
-                    &[("label", self.label.to_string().into())],
-                );
+                let name = match &self.naming {
+                    Some((_, remove)) => i18n(cx).format(
+                        "@astryx.token.remove",
+                        &[("label", remove.to_string().into())],
+                    ),
+                    None => i18n(cx).format(
+                        "@astryx.token.remove",
+                        &[("label", self.label.to_string().into())],
+                    ),
+                };
                 let remove_id = ElementId::Name(format!("{:?}-remove", self.id).into());
                 let focus = control_focus(&remove_id, window, cx);
                 let mut button = div()
@@ -293,7 +322,16 @@ impl RenderOnce for Token {
             (true, false) => el.role(Role::Button),
             _ => el,
         };
-        let el = el.aria_label(self.label);
+        let el = match &self.naming {
+            Some((action, _)) => el.aria_label(action.clone()),
+            None => el.aria_label(self.label),
+        };
+        let el = match self.popup {
+            Some(expanded) if interactive => el
+                .aria_has_popup(gpui::HasPopup::Dialog)
+                .aria_expanded(expanded),
+            _ => el,
+        };
         match self.description {
             Some(description) => el.aria_description(description),
             None => el,

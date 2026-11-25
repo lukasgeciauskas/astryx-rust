@@ -138,6 +138,9 @@ impl Draft {
 /// The editor's state, kept while one open lasts.
 pub(crate) struct EditorState {
     pub draft: Draft,
+    /// The root, from which focus steps to the value editor once.
+    root: gpui::FocusHandle,
+    focused: bool,
 }
 
 /// Edits one filter, upstream `PowerSearchFilterEditor` (and the popover's
@@ -235,8 +238,10 @@ impl RenderOnce for PowerSearchFilterEditor {
             window.use_keyed_state(
                 ElementId::Name(format!("{}-editor", self.id).into()),
                 cx,
-                move |_, _| EditorState {
+                move |_, cx| EditorState {
                     draft: Draft::from_partial(&config, &filter),
+                    root: cx.focus_handle(),
+                    focused: false,
                 },
             )
         };
@@ -364,19 +369,25 @@ impl RenderOnce for PowerSearchFilterEditor {
         .on_change(on_field);
         let operators = operator_options(&config, &draft.field, cx);
         let empty = matches!(op.as_ref().map(|o| &o.value), Some(OperatorValue::Empty));
+        let operator_count = operators.len();
         let nested = matches!(op.as_ref().map(|o| &o.value), Some(OperatorValue::Nested));
 
         let footer = {
             let left: AnyElement = if !read_only && self.mode == EditorMode::Edit {
                 let on_save = on_save.clone();
-                Button::new(
-                    ElementId::Name(format!("{}-delete", self.id).into()),
-                    t18.t("@astryx.powersearch.editor.delete"),
-                )
-                .variant(ButtonVariant::Ghost)
-                .size(ElementSize::Sm)
-                .on_click(move |_, window, cx| on_save(None, window, cx))
-                .into_any_element()
+                let delete_selector = format!("{}-delete", self.id);
+                div()
+                    .debug_selector(move || delete_selector)
+                    .child(
+                        Button::new(
+                            ElementId::Name(format!("{}-delete", self.id).into()),
+                            t18.t("@astryx.powersearch.editor.delete"),
+                        )
+                        .variant(ButtonVariant::Ghost)
+                        .size(ElementSize::Sm)
+                        .on_click(move |_, window, cx| on_save(None, window, cx)),
+                    )
+                    .into_any_element()
             } else {
                 div().into_any_element()
             };
@@ -515,9 +526,39 @@ impl RenderOnce for PowerSearchFilterEditor {
             }
             row.into_any_element()
         };
+        // Upstream's ValueEditorCell: once drawn, focus goes to the value
+        // editor (else the field selector): from the root, one stop per
+        // control before it.
+        let operator_shown = !nested && (operator_count > 1 || !empty) && operator_count > 0;
+        let value_shown = !nested && !empty && op.is_some();
+        let steps = 1 + usize::from(operator_shown && value_shown) + usize::from(value_shown);
+        let root = state.read(cx).root.clone();
+        let focus_probe = (!state.read(cx).focused).then(|| {
+            let (state, root) = (state.clone(), root.clone());
+            gpui::canvas(
+                |_, _, _| {},
+                move |_, _, window, cx| {
+                    let (state, root) = (state.clone(), root.clone());
+                    window.defer(cx, move |window, cx| {
+                        if state.read(cx).focused {
+                            return;
+                        }
+                        state.update(cx, |s, _| s.focused = true);
+                        root.focus(window, cx);
+                        for _ in 0..steps {
+                            window.focus_next(cx);
+                        }
+                    });
+                },
+            )
+            .absolute()
+            .size_0()
+        });
         let selector = format!("{}-editor", self.id);
         div()
             .id(ElementId::Name(format!("{}-editor-root", self.id).into()))
+            .track_focus(&root)
+            .children(focus_probe)
             .debug_selector(move || selector)
             .overflow_hidden()
             .on_key_down(on_key)

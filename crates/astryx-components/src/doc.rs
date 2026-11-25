@@ -164,6 +164,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::multi_selector::MULTI_SELECTOR_DOC,
     crate::complex_selector::COMPLEX_SELECTOR_DOC,
     crate::tree_list::TREE_LIST_DOC,
+    crate::power_search::POWER_SEARCH_DOC,
 ];
 
 /// The registered doc for an upstream component name.

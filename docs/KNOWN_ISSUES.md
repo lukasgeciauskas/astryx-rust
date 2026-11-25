@@ -66,6 +66,9 @@
   strings, which the live region speaks. A trigger whose search makes it a button is always described as
   required when it is, since its name is the bare label (upstream's name can carry the
   label's marker).
+- **PowerSearch's date and time values wait for M8.** Their editors show the value
+  (an ISO date in UTC) and cannot change it until M8 brings the date inputs, the
+  calendar systems and `timezoneID`; tokens read dates as ISO dates meanwhile.
 - **A ComplexSelector's trigger has no separate value.** `trigger_label` and
   `placeholder` are elements, as upstream's nodes are, so the combobox carries the shown
   value as the text inside it rather than as an accessible value.

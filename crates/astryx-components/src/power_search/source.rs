@@ -21,6 +21,8 @@ pub struct RowData {
     pub group: Option<SharedString>,
     /// A "More" row: opens the editor with the typed text (FR29).
     pub more_query: Option<SharedString>,
+    /// A token's filter.
+    pub filter_index: Option<usize>,
 }
 
 /// One row of the main field's list (upstream `PowerSearchItem`).
@@ -67,6 +69,7 @@ fn data(
         filter_value: value,
         group: None,
         more_query: None,
+        filter_index: None,
     }
 }
 
@@ -244,6 +247,28 @@ pub fn value_only_rows(
     content_default: Option<(&str, &str)>,
     cx: &gpui::App,
 ) -> Vec<PowerSearchItem> {
+    value_only_rows_with(field, query, content_default, &[], 10, cx)
+}
+
+/// The items one source answered, keyed by the source's identity.
+pub type SourceAnswers = [(usize, Vec<crate::search::SearchItem>)];
+
+/// A source's identity: one object several operators share is one source.
+pub fn source_key(source: &super::model::ValueSource) -> usize {
+    std::rc::Rc::as_ptr(source) as *const () as usize
+}
+
+/// [`value_only_rows`] with the answers of the field's sources (FR28): each
+/// opted-in operator with a source adds a row per item its source answered,
+/// at most `max_items`, committing the value its editor stores.
+pub fn value_only_rows_with(
+    field: &PowerSearchField,
+    query: &str,
+    content_default: Option<(&str, &str)>,
+    answers: &SourceAnswers,
+    max_items: usize,
+    cx: &gpui::App,
+) -> Vec<PowerSearchItem> {
     let t18 = astryx_i18n::current(cx);
     let mut rows = Vec::new();
     if !field_takes_value_rows(field, query) {
@@ -264,6 +289,39 @@ pub fn value_only_rows(
                 value_row_label(&field.label, &op_label, query, true, &t18),
                 data(field, Some(op), Some(value)),
             ));
+            continue;
+        }
+        if let Some(source) = op.value.search_source() {
+            let key = source_key(source);
+            let items = answers
+                .iter()
+                .find(|(k, _)| *k == key)
+                .map(|(_, items)| items.as_slice())
+                .unwrap_or(&[]);
+            for found in items.iter().take(max_items) {
+                let (id, label) = (
+                    crate::search::Searchable::id(found),
+                    crate::search::Searchable::label(found),
+                );
+                let value = match &op.value {
+                    OperatorValue::String { .. } => FilterValue::String(label.clone()),
+                    OperatorValue::StringList { .. } => {
+                        FilterValue::StringList(vec![label.clone()])
+                    }
+                    _ => FilterValue::EntityList(vec![super::model::PowerSearchEntity {
+                        id: id.clone(),
+                        label: label.clone(),
+                        photo: found
+                            .data_as::<super::value_editor::EntityPhoto>()
+                            .map(|p| p.0.clone()),
+                    }]),
+                };
+                rows.push(item(
+                    format!("{}:{}:src:{}", field.key, op.key, id),
+                    value_row_label(&field.label, &op_label, &label, false, &t18),
+                    data(field, Some(op), Some(value)),
+                ));
+            }
             continue;
         }
         let Some(values) = op.value.enum_values() else {
@@ -320,6 +378,7 @@ pub fn cap_value_rows(
             filter_value: None,
             group: None,
             more_query: Some(query.to_string().into()),
+            filter_index: None,
         },
     });
     shown
@@ -491,6 +550,26 @@ pub fn typed_rows(
         }
     }
     results
+}
+
+/// The content-search field's default operator while the content-search row
+/// shows for `query` (FR27: it adds no value-only row then).
+pub fn content_default(
+    config: &PowerSearchConfig,
+    query: &str,
+    cx: &gpui::App,
+) -> Option<(SharedString, SharedString)> {
+    let lower = query.trim().to_lowercase();
+    let exact = config.fields.iter().any(|f| {
+        f.label.to_lowercase() == lower
+            || f.operators
+                .iter()
+                .any(|o| format!("{} {}", f.label, o.label_text(cx)).to_lowercase() == lower)
+    });
+    let key = config.content_search_field_key.as_ref()?;
+    let field = config.find_field(key)?;
+    let op = field.default_op()?;
+    (!exact && !lower.is_empty()).then(|| (field.key.clone(), op.key.clone()))
 }
 
 #[cfg(test)]

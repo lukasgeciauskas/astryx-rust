@@ -15,7 +15,7 @@ Tokenizer, MultiSelector and ComplexSelector done)._
   Tokenizer, MultiSelector and ComplexSelector are done; PowerSearch is next). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 81 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 82 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** the commit that added this file; `af61065` docs: M5 is done; `f8b5551` Lightbox,
   use_lightbox, CommandPalette and search sources; `9af8f12` menus. CI is green
@@ -28,7 +28,7 @@ Tokenizer, MultiSelector and ComplexSelector done)._
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (29)
+### Not yet ported (28)
 
 - **M6 Collections (in progress):** PowerSearch (its field, editors and sheet), then
   virtualization for long lists and List reordering. Item's swipe actions wait for M11.
@@ -146,7 +146,7 @@ Suggested order, each a commit:
      (marked "implementation gap" in its spec); build them from the spec.
    - Stage A is done, and so is TreeList (`tree_list/`), which stage B's nested
      filter editor renders.
-   - B: the popover presentation: the Tokenizer-based field, filter tokens (FR24),
+   - B (done): the popover presentation: the Tokenizer-based field, filter tokens (FR24),
      the editor popover with its 400-720 px width and edge rules (FR1-FR9), the
      filter and value editors for every non-date value type, Clear all (FR22,
      FR23), the result count (FR19), `components` overrides.

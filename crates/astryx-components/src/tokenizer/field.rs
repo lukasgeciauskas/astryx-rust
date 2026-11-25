@@ -31,6 +31,8 @@ type RenderTokenFn<T> = Rc<dyn Fn(&T, ActFn, &mut Window, &mut App) -> AnyElemen
 type CreateFn<T> = Rc<dyn Fn(&str) -> T>;
 type ActFn = Rc<dyn Fn(&mut Window, &mut App)>;
 type RemoveFn<T> = Rc<dyn Fn(&T, &mut Window, &mut App)>;
+type BoundsFn = Rc<dyn Fn(gpui::Bounds<Pixels>, &mut App)>;
+type RemovableFn<T> = Rc<dyn Fn(&T) -> bool>;
 type FocusFn = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// Upstream `TokenizerChange`'s `type`.
@@ -108,6 +110,13 @@ pub struct Tokenizer<T: Searchable> {
     on_change: Option<ChangeFn<T>>,
     max_entries: Option<usize>,
     clear: bool,
+    /// Which tokens a remove may take (upstream `TokenizerItemRemovableContext`).
+    removable: Option<RemovableFn<T>>,
+    /// Clear all's announcement (upstream `TokenizerClearAllMessageContext`).
+    clear_all_message: Option<SharedString>,
+    /// Reports the input's bounds (upstream's opening-control descriptor,
+    /// Tokenizer DEC-1).
+    input_bounds: Option<BoundsFn>,
     render_token: Option<RenderTokenFn<T>>,
     disabled: bool,
     disabled_message: Option<SharedString>,
@@ -160,6 +169,9 @@ impl<T: Searchable> Tokenizer<T> {
             on_change: None,
             max_entries: None,
             clear: false,
+            removable: None,
+            clear_all_message: None,
+            input_bounds: None,
             render_token: None,
             disabled: false,
             disabled_message: None,
@@ -238,6 +250,28 @@ impl<T: Searchable> Tokenizer<T> {
     /// Upstream `maxEntries`: at the limit the field collapses.
     pub fn max_entries(mut self, max: usize) -> Self {
         self.max_entries = Some(max);
+        self
+    }
+
+    /// Locks tokens: no remove path removes one `f` refuses (PowerSearch's
+    /// read-only filters).
+    pub(crate) fn item_removable(mut self, f: impl Fn(&T) -> bool + 'static) -> Self {
+        self.removable = Some(Rc::new(f));
+        self
+    }
+
+    /// Reports where the input sits each frame (PowerSearch's editor edge).
+    pub(crate) fn on_input_bounds(
+        mut self,
+        f: impl Fn(gpui::Bounds<Pixels>, &mut App) + 'static,
+    ) -> Self {
+        self.input_bounds = Some(Rc::new(f));
+        self
+    }
+
+    /// Clear all's announcement in the composing component's words.
+    pub(crate) fn clear_all_message(mut self, message: impl Into<SharedString>) -> Self {
+        self.clear_all_message = Some(message.into());
         self
     }
 
@@ -449,8 +483,9 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
         let remove: RemoveFn<T> = {
             let (value, report, focus) =
                 (value.clone(), self.on_change.clone(), input_focus.clone());
+            let removable = self.removable.clone();
             Rc::new(move |item: &T, window: &mut Window, cx: &mut App| {
-                if disabled {
+                if disabled || removable.as_ref().is_some_and(|f| !f(item)) {
                     return;
                 }
                 let next: Vec<T> = value
@@ -617,7 +652,7 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
                                 ElementId::Name(format!("{id}-token-{}", item.id()).into()),
                                 item.label(),
                             );
-                            if !disabled {
+                            if !disabled && self.removable.as_ref().is_none_or(|f| f(item)) {
                                 token = token.on_remove(move |_, window, cx| act(window, cx));
                             }
                             token.into_any_element()
@@ -719,16 +754,27 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
                 .child(parts.input)
                 .into_any_element()
         } else {
+            let report = self.input_bounds.clone();
             div()
+                .relative()
                 .flex_1()
                 .min_w(px(60.))
                 .flex()
                 .child(parts.input)
+                .children(report.map(|report| {
+                    // Where the input sits, for a composing popup's edge rule.
+                    gpui::canvas(move |bounds, _, cx| report(bounds, cx), |_, _, _, _| {})
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full()
+                }))
                 .into_any_element()
         };
         surface = surface.child(input);
         // The end lane.
-        let show_clear = self.clear && !value.is_empty() && !disabled;
+        let can_remove = |item: &T| self.removable.as_ref().is_none_or(|f| f(item));
+        let show_clear = self.clear && !disabled && value.iter().any(can_remove);
         if parts.busy || show_clear || self.end_content.is_some() || status.is_some() {
             let mut end = div()
                 .flex()
@@ -752,6 +798,7 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
             if show_clear {
                 let (value, report, focus) =
                     (value.clone(), self.on_change.clone(), input_focus.clone());
+                let (removable, message) = (self.removable.clone(), self.clear_all_message.clone());
                 end = end.child(
                     div()
                         .debug_selector({
@@ -772,12 +819,19 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
                             .h(px(20.))
                             .on_click(move |_, window, cx| {
                                 cx.stop_propagation();
-                                let Some(last) = value.last().cloned() else {
+                                let locked =
+                                    |item: &T| removable.as_ref().is_some_and(|f| !f(item));
+                                // Clear all names the last token it removes and
+                                // keeps the locked ones.
+                                let Some(last) = value.iter().rev().find(|i| !locked(i)).cloned()
+                                else {
                                     return;
                                 };
+                                let kept: Vec<T> =
+                                    value.iter().filter(|i| locked(i)).cloned().collect();
                                 if let Some(f) = &report {
                                     f(
-                                        Vec::new(),
+                                        kept,
                                         TokenizerChange {
                                             item: last,
                                             kind: TokenizerChangeKind::Remove,
@@ -787,7 +841,9 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
                                     );
                                 }
                                 announce(
-                                    i18n(cx).t("@astryx.tokenizer.allRemoved"),
+                                    message.clone().unwrap_or_else(|| {
+                                        i18n(cx).t("@astryx.tokenizer.allRemoved")
+                                    }),
                                     Politeness::Polite,
                                     window,
                                     cx,

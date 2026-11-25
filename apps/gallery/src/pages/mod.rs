@@ -125,6 +125,9 @@ impl Page {
                 .child(astryx::components::tree_list::examples::examples(
                     window, cx,
                 ))
+                .child(astryx::components::power_search::examples::examples(
+                    window, cx,
+                ))
                 .into_any_element(),
         }
     }

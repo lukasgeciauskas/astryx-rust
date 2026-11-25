@@ -348,12 +348,14 @@ The remaining primitives:
     with `apply_filters` (upstream `usePowerSearchConfig`), value and token text, and the
     main field's rows: fields, field-and-operator and field-prefixed value rows, the
     content search, and FR27's value-only rows with FR29's order, per-field cap and
-    "More" rows. Stage B, in progress: the value editors (every type but the M8 date
-    and time ones, which read their value until then) and `PowerSearchFilterEditor`
-    (upstream `PowerSearchEditPopover`/`PowerSearchFilterEditor`: field, operator and
-    value, Delete, Cancel, Apply, Enter and Escape, an `empty` operator saving at once, and
-    the nested editor on TreeList) are done; the field with its tokens, popover and FR28
-    source rows is next, then the sheet flow (stage C).
+    "More" rows. Stage B (done): the value editors (every type but the M8
+    date and time ones, which show their value until then), `PowerSearchFilterEditor`
+    (field, operator and value; Delete, Cancel, Apply; Enter and Escape; focus starting in
+    the value; nested filters on a TreeList), and the field: filter tokens named by their
+    text with their editor (FR24), the editor popover 400-720 px wide at the nearer edge of
+    its opening control when capped (FR1-FR9), read-only fields and filters (FR22), Clear
+    all keeping read-only filters (FR23), the result count (FR19), FR28's held source rows,
+    `components` overrides and `PowerSearchController`. Next: the sheet flow (stage C).
   - TreeList (done): data-driven rows with chevrons, guides, start and end content,
     density and variants; row actions (FR7); the WAI-ARIA tree keys as the
     `astryx_primitives::tree_focus` primitive (upstream `useTreeFocus`) with one tab stop
