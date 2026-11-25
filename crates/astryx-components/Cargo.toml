@@ -15,6 +15,10 @@ gpui.workspace = true
 smallvec = "1"
 web-time.workspace = true
 unicode-segmentation.workspace = true
+anyhow.workspace = true
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+gpui_web.workspace = true
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

@@ -1,17 +1,15 @@
 //! FormLayout. Upstream: `FormLayout/`.
 //!
-//! `horizontal-labels` is a two-column grid in CSS (`auto 1fr`) whose cells
-//! are each Field's label and control (the Field box is `display:
-//! contents`). Taffy has no `display: contents`, so here each Field draws
-//! its own row: a label cell as wide as the layout's widest label, then the
-//! control. The labels report their natural widths each frame; when the
-//! widest changes, the layout takes it and draws again.
+//! `horizontal-labels` is upstream's two-column grid (`auto 1fr`) whose
+//! cells are each Field's label and control: the Field box is `display:
+//! contents` (fork patch R7), so its label cell and control column are the
+//! grid's items.
 
 use astryx_primitives::{provide, use_context};
 use astryx_theme::current;
 use gpui::{
-    AnyElement, App, ElementId, Entity, IntoElement, ParentElement, Pixels, RenderOnce,
-    StyleRefinement, Styled, Window, div, prelude::*, px,
+    AnyElement, App, ElementId, GridAutoFlow, GridTrack, IntoElement, ParentElement, Pixels,
+    RenderOnce, StyleRefinement, Styled, Window, div, prelude::*, px,
 };
 use smallvec::SmallVec;
 
@@ -60,15 +58,6 @@ pub enum EntryErrorBehavior {
     BlurOrEnter,
 }
 
-/// The widest label of a `horizontal-labels` layout.
-#[derive(Default)]
-pub(crate) struct LabelColumn {
-    /// The width the label cells take this frame.
-    pub width: Option<Pixels>,
-    /// The widest natural label width seen this frame.
-    pub measured: Pixels,
-}
-
 /// What a FormLayout tells the fields inside it (upstream
 /// `FormLayoutContext`). A nested layout replaces all of it.
 #[derive(Clone, Default)]
@@ -79,11 +68,6 @@ pub(crate) struct FormContext {
     /// both values (its FR14).
     #[allow(dead_code)]
     pub entry_error_behavior: Option<EntryErrorBehavior>,
-    /// The shared label column, in a `horizontal-labels` layout that has
-    /// not collapsed.
-    pub labels: Option<Entity<LabelColumn>>,
-    /// A `horizontal-labels` layout collapsed to one column.
-    pub collapsed: bool,
 }
 
 pub(crate) fn form_context(cx: &App) -> FormContext {
@@ -167,38 +151,26 @@ impl RenderOnce for FormLayout {
         let t = theme.tokens();
         let collapsed = self.direction == FormDirection::HorizontalLabels
             && window.viewport_size().width <= COLLAPSE_WIDTH;
-        let labels = (self.direction == FormDirection::HorizontalLabels && !collapsed).then(|| {
-            let labels = window.use_keyed_state(
-                ElementId::Name(format!("{:?}-labels", self.id).into()),
-                cx,
-                |_, _| LabelColumn::default(),
-            );
-            labels.update(cx, |l, _| l.measured = px(0.));
-            labels
-        });
-
-        let count = self.children.len().max(1) as u16;
         let mut el = div();
         el = match self.direction {
             FormDirection::Vertical => el.flex().flex_col().gap(t.spacing.s4),
-            FormDirection::Horizontal => el.grid().grid_cols(count).gap(t.spacing.s4),
-            FormDirection::HorizontalLabels if collapsed => el.flex().flex_col().gap(t.spacing.s4),
-            FormDirection::HorizontalLabels => el.flex().flex_col().gap(t.spacing.s3),
+            // Upstream `grid-auto-flow: column; grid-auto-columns: 1fr`.
+            FormDirection::Horizontal => el
+                .grid()
+                .grid_auto_flow(GridAutoFlow::Column)
+                .grid_auto_columns([GridTrack::Fr(1.)])
+                .gap(t.spacing.s4),
+            // Collapsed, the grid's cells stack in one column.
+            FormDirection::HorizontalLabels if collapsed => {
+                el.flex().flex_col().items_stretch().gap(t.spacing.s4)
+            }
+            FormDirection::HorizontalLabels => el
+                .grid()
+                .grid_template_columns([GridTrack::Auto, GridTrack::Fr(1.)])
+                .gap_y(t.spacing.s3)
+                .gap_x(t.spacing.s4)
+                .items_start(),
         };
-        if let Some(labels) = &labels {
-            // Once every label has reported, the widest sets the column.
-            let labels = labels.clone();
-            el = el.on_children_prepainted(move |_, window, cx| {
-                let changed = labels.update(cx, |l, _| {
-                    let changed = l.width != Some(l.measured);
-                    l.width = Some(l.measured);
-                    changed
-                });
-                if changed {
-                    window.defer(cx, |window, _| window.refresh());
-                }
-            });
-        }
         theme.refine(
             el.style(),
             "form-layout",
@@ -210,8 +182,6 @@ impl RenderOnce for FormLayout {
             direction: self.direction,
             optionality: self.optionality,
             entry_error_behavior: self.entry_error_behavior,
-            labels,
-            collapsed,
         };
         provide(context, el.id(self.id).children(self.children))
     }

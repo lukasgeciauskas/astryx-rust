@@ -16,15 +16,6 @@
 
 ## Components
 
-- **FileInput cannot pick files on the web.** GPUI's web platform has no file dialog
-  (`prompt_for_paths` returns an error) and no external file drops, so the browser build
-  shows the field but picking does nothing. Native builds use the platform dialog and
-  drag and drop.
-- **`horizontal-labels` FormLayout settles a frame late.** CSS lays it out as an
-  `auto 1fr` grid over `display: contents` Fields; Taffy has no `display: contents`, so
-  each Field draws its own row with a label cell as wide as the widest label, which the
-  labels report in prepaint. The first frame (and the frame after a label changes width)
-  draws with the previous width, then the layout redraws once.
 - **Butter's status fields show no status border, as upstream's do.** Butter's
   `text-input` base rule sets `borderColor` in the theme layer, which outranks the status
   border in upstream's CSS too; only the status icon and message show the status. The port

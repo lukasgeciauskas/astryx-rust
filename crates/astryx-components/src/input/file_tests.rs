@@ -228,3 +228,16 @@ fn clear_removes_the_files(cx: &mut TestAppContext) {
         "the clear button does not open the dialog"
     );
 }
+
+#[gpui::test]
+fn picked_files_read_their_bytes(cx: &mut TestAppContext) {
+    let path = std::env::temp_dir().join(format!("astryx-read-{}.txt", std::process::id()));
+    std::fs::write(&path, b"hello astryx").unwrap();
+    let file = PickedFile::from_path(&path);
+    assert_eq!(file.size, 12);
+    assert_eq!(file.mime, "text/plain");
+    let task = cx.update(|cx| file.read(cx));
+    let bytes = cx.foreground_executor.block_test(task).unwrap();
+    assert_eq!(bytes, b"hello astryx");
+    std::fs::remove_file(&path).ok();
+}

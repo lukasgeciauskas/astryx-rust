@@ -91,3 +91,20 @@ fn fr3_labels_share_one_column_beside_their_controls(cx: &mut TestAppContext) {
     assert!(a.origin.x > px(120.), "past the longer label");
     assert!(b.origin.y > a.origin.y + a.size.height);
 }
+
+#[gpui::test]
+fn fr3_a_narrow_window_stacks_labels_above_controls(cx: &mut TestAppContext) {
+    let cx = host(cx, || {
+        FormLayout::new("f")
+            .direction(FormDirection::HorizontalLabels)
+            .child(TextInput::new("a", "Name", ""))
+            .child(TextInput::new("b", "A much longer label", ""))
+    });
+    cx.simulate_resize(gpui::size(px(400.), px(600.)));
+    cx.run_until_parked();
+    let (a, b) = (control(cx, "a-control"), control(cx, "b-control"));
+    // Each control starts at the layout's edge, below its own label.
+    assert_eq!(a.origin.x, px(20.));
+    assert_eq!(b.origin.x, px(20.));
+    assert!(a.origin.y > px(40.), "below the label and the gap");
+}

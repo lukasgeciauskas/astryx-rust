@@ -7,7 +7,7 @@ mod form_layout;
 #[cfg(test)]
 pub(crate) use form_layout::resolved;
 pub use form_layout::{EntryErrorBehavior, FormDirection, FormLayout, Optionality};
-pub(crate) use form_layout::{FormContext, form_context, resolve};
+pub(crate) use form_layout::{form_context, resolve};
 
 use astryx_i18n::current as i18n;
 use astryx_primitives::{Politeness, announce};
@@ -550,10 +550,8 @@ impl RenderOnce for Field {
                 description,
                 self.label_hidden,
                 control,
-                &form,
                 &theme,
                 &self.style,
-                form.labels.as_ref().and_then(|l| l.read(cx).width),
                 window,
             )
             .into_any_element();
@@ -574,8 +572,9 @@ impl RenderOnce for Field {
     }
 }
 
-/// A Field in a `horizontal-labels` FormLayout: its label in the layout's
-/// shared label column, then the description, control and status.
+/// A Field in a `horizontal-labels` FormLayout, upstream's `display:
+/// contents` box: its label cell and its column of description, control and
+/// status are the layout grid's items (or, collapsed, its column's).
 #[allow(clippy::too_many_arguments)]
 fn horizontal_labels(
     id: ElementId,
@@ -583,30 +582,17 @@ fn horizontal_labels(
     description: Option<SharedString>,
     label_hidden: bool,
     control: AnyElement,
-    form: &FormContext,
     theme: &astryx_theme::ResolvedTheme,
     style: &StyleRefinement,
-    label_width: Option<gpui::Pixels>,
     window: &mut Window,
 ) -> impl IntoElement {
     let t = theme.tokens();
     let rem = window.rem_size();
     // The label's first line meets the control's text line.
-    let mut cell = div()
-        .flex_none()
+    let cell = div()
         .pt(t.border.width.to_pixels(rem) + t.spacing.s1.to_pixels(rem))
-        .child(div().w_max().child(label));
-    if let Some(labels) = &form.labels {
-        if let Some(width) = label_width {
-            cell = cell.w(width);
-        }
-        let labels = labels.clone();
-        cell = cell.on_children_prepainted(move |bounds, _, cx| {
-            if let Some(natural) = bounds.first().map(|b| b.size.width) {
-                labels.update(cx, |l, _| l.measured = l.measured.max(natural));
-            }
-        });
-    }
+        .min_w_0()
+        .child(label);
     let description = description.map(|description| {
         if label_hidden {
             VisuallyHidden::new().child(description).into_any_element()
@@ -621,18 +607,10 @@ fn horizontal_labels(
     let column = div()
         .flex()
         .flex_col()
-        .flex_1()
         .min_w_0()
         .children(description)
         .child(control);
-    let mut el = div().id(id).flex().min_w_0();
-    // Collapsed, the label stacks above its control (upstream's grid cells
-    // in one flex column).
-    el = if form.collapsed {
-        el.flex_col().gap(t.spacing.s4)
-    } else {
-        el.flex_row().items_start().gap(t.spacing.s4)
-    };
+    let mut el = div().id(id).display_contents();
     theme.refine(
         el.style(),
         "field",

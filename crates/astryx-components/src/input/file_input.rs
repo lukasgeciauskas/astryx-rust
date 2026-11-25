@@ -2,8 +2,10 @@
 //!
 //! The platform's file dialog stands in for `<input type="file">`, and in
 //! dropzone mode files dragged from the system drop onto the field. A file
-//! is a [`PickedFile`]: its path, name, size and MIME type. GPUI's web
-//! platform has no file dialog yet, so picking does nothing there.
+//! is a [`PickedFile`]: its path, name, size and MIME type, and
+//! [`PickedFile::read`] reads it. In the browser the fork's web platform
+//! (patch R8) opens the browser's file dialog, takes dropped files, and
+//! gives each a virtual path.
 
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -38,9 +40,27 @@ pub struct PickedFile {
 }
 
 impl PickedFile {
-    /// A file on disk: its name, size and type.
+    /// A file on disk, or a browser file's virtual path: its name, size and
+    /// type.
     pub fn from_path(path: impl Into<PathBuf>) -> Self {
         let path = path.into();
+        #[cfg(target_family = "wasm")]
+        if let Some(file) = gpui_web::web_files::info(&path) {
+            let mime = if file.mime.is_empty() {
+                path.extension()
+                    .and_then(|e| mime_for_extension(&e.to_string_lossy()))
+                    .unwrap_or_default()
+                    .to_string()
+            } else {
+                file.mime
+            };
+            return PickedFile {
+                path,
+                name: file.name.into(),
+                size: file.size,
+                mime: mime.into(),
+            };
+        }
         let name = path
             .file_name()
             .map(|n| n.to_string_lossy().into_owned())
@@ -55,6 +75,24 @@ impl PickedFile {
             name: name.into(),
             size,
             mime: mime.into(),
+        }
+    }
+}
+
+impl PickedFile {
+    /// Reads the file's bytes: from disk on the background executor, or in
+    /// the browser from the file it handed over.
+    pub fn read(&self, cx: &App) -> Task<anyhow::Result<Vec<u8>>> {
+        let path = self.path.clone();
+        #[cfg(target_family = "wasm")]
+        {
+            cx.foreground_executor()
+                .spawn(async move { gpui_web::web_files::read(&path).await })
+        }
+        #[cfg(not(target_family = "wasm"))]
+        {
+            cx.background_executor()
+                .spawn(async move { Ok(std::fs::read(&path)?) })
         }
     }
 }

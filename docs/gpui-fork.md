@@ -44,6 +44,8 @@ Each patch lands before the components that need it.
 | R4 | Blend modes | Multiply and screen in fixed-function blending; the rest through R3 layers | Not used by upstream today; lowest priority |
 | R5 | Inline layout (**landed**, `7ce1c61`) | Inline-level boxes (`inline-flex`, `inline-block`, `inline-grid`) that flow in line boxes inside block containers; `min-content`, `max-content` and `fit-content` sizes; text baselines | Every `inline-flex` component (M2, M3); inline text flow (Link in Text, Markdown, Chat) |
 | R6 | ARIA states (**landed**, `de7e405`) | `aria_disabled`, `aria_read_only`, `aria_required`, `aria_invalid`, `aria_busy`, `aria_modal` and `aria_multiselectable` on any stateful element, setting the matching AccessKit flags | Every form control (M4 onward): disabled, read-only, required and invalid fields; busy controls; modal dialogs and multi-select lists (M5) |
+| R7 | Display contents and grid tracks (**landed**, `7633ed6`) | `display: contents` (an element whose children lay out as its parent's), explicit grid track lists (`auto`, `min-content`, `max-content`, lengths, `fr`, `minmax`, `fit-content`), `grid-auto-flow`, `grid-auto-columns` and `grid-auto-rows` | FormLayout's `horizontal-labels` grid (M4); any upstream layout built on `display: contents` or track lists |
+| R8 | Browser files (**landed**, `cc84f94`) | On the web: `prompt_for_paths` opens the browser's file dialog, files dragged from the system drop as `ExternalPaths`, and `gpui_web::web_files` gives each browser file a virtual path with its name, size, type and bytes | FileInput on the web (M4); any app that opens or receives files in the browser |
 
 ### How each patch works
 
@@ -97,6 +99,23 @@ Each patch lands before the components that need it.
     modal and multiselectable. Unset states stay absent.
   - `aria_disabled` is only the flag: a focus-tracking element keeps its tab stop, matching
     upstream's `aria-disabled` controls.
+- **R7 (display contents and grid tracks), as built:**
+  - Taffy 0.15 has no `display: contents`. A contents node is acquired like any other
+    but never attached: when its parent requests layout, each contents child is
+    replaced by its children (already expanded, since children are requested first),
+    and the contents node's bounds are the union of its children's.
+  - GPUI's grids only took `repeat(n, minmax(_, 1fr))`. `grid_template_columns` and
+    `grid_template_rows` now take a `GridTrack` list, and `grid_auto_flow`,
+    `grid_auto_columns` and `grid_auto_rows` reach Taffy.
+- **R8 (browser files), as built:**
+  - Browsers expose files only as `File` objects. `gpui_web::web_files` keeps each one
+    under a virtual path (`/web-files/<n>/<name>`) with `info` (name, size, MIME type)
+    and an async `read`, so path-based APIs work unchanged.
+  - `prompt_for_paths` opens the dialog through a hidden `<input type="file">`; browsers
+    allow it only during a user gesture.
+  - Dragging files over the canvas starts an `ExternalPaths` drag with no paths (the
+    browser holds the files back), so `drag_over` styles apply; at the drop the files
+    get virtual paths and replace the empty list before the drop lands.
 
 - **R2 (backdrop blur):**
   - A new scene primitive.
