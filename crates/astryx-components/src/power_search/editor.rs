@@ -158,6 +158,7 @@ pub struct PowerSearchFilterEditor {
     save_label: Option<SharedString>,
     max_menu_items: Option<usize>,
     read_only: bool,
+    opening_query: Option<SharedString>,
 }
 
 impl PowerSearchFilterEditor {
@@ -181,7 +182,15 @@ impl PowerSearchFilterEditor {
             save_label: None,
             max_menu_items: None,
             read_only: false,
+            opening_query: None,
         }
+    }
+
+    /// A "More" row's typed text (FR29): a text field's value, else the
+    /// search editor's opening query.
+    pub(crate) fn opening_query(mut self, query: impl Into<SharedString>) -> Self {
+        self.opening_query = Some(query.into());
+        self
     }
 
     /// Upstream `saveButtonLabel`: "Apply" by default.
@@ -236,14 +245,40 @@ impl RenderOnce for PowerSearchFilterEditor {
         let t18 = i18n(cx);
         let config = self.config.clone();
         let state: Entity<EditorState> = {
-            let (config, filter) = (config.clone(), self.filter.clone());
+            let (config, filter, opening) = (
+                config.clone(),
+                self.filter.clone(),
+                self.opening_query.clone(),
+            );
             window.use_keyed_state(
                 ElementId::Name(format!("{}-editor", self.id).into()),
                 cx,
-                move |_, cx| EditorState {
-                    draft: Draft::from_partial(&config, &filter),
-                    root: cx.focus_handle(),
-                    focused: false,
+                move |_, cx| {
+                    let mut draft = Draft::from_partial(&config, &filter);
+                    let text_field = draft
+                        .operator
+                        .as_ref()
+                        .and_then(|o| config.find_operator(&draft.field, o))
+                        .is_some_and(|o| {
+                            matches!(
+                                o.value,
+                                OperatorValue::String {
+                                    search_source: None,
+                                    ..
+                                }
+                            )
+                        });
+                    if draft.value.is_none()
+                        && text_field
+                        && let Some(q) = &opening
+                    {
+                        draft.value = Some(FilterValue::String(q.clone()));
+                    }
+                    EditorState {
+                        draft,
+                        root: cx.focus_handle(),
+                        focused: false,
+                    }
                 },
             )
         };
@@ -522,6 +557,7 @@ impl RenderOnce for PowerSearchFilterEditor {
                         sheet: false,
                         field_label: None,
                         on_unstage: None,
+                        opening_query: self.opening_query.clone(),
                     },
                     window,
                     cx,
@@ -912,6 +948,7 @@ fn sub_row(
                 sheet: false,
                 field_label: None,
                 on_unstage: None,
+                opening_query: None,
             },
             window,
             cx,

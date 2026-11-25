@@ -68,6 +68,9 @@ struct Staged {
     /// Where Cancel from a creation returns focus: the field row, or the
     /// content search (FR16).
     opener: Option<String>,
+    /// A "More" row's typed text, as the step's search editor's opening
+    /// query (FR30).
+    opening_query: Option<SharedString>,
     field: SharedString,
     operator: Option<SharedString>,
     value: Option<FilterValue>,
@@ -89,6 +92,9 @@ pub(crate) struct FlowState {
     confirm: Option<Confirm>,
     field_query: String,
     content_query: String,
+    /// A people field's "More" row: its Tokenizer sheet, opened directly
+    /// with the typed text (field, operator, query) (FR30).
+    people: Option<(SharedString, SharedString, SharedString)>,
 }
 
 pub(crate) fn flow_state(id: &ElementId, window: &mut Window, cx: &mut App) -> Entity<FlowState> {
@@ -102,6 +108,7 @@ pub(crate) fn flow_state(id: &ElementId, window: &mut Window, cx: &mut App) -> E
             confirm: None,
             field_query: String::new(),
             content_query: String::new(),
+            people: None,
         }
     })
 }
@@ -129,6 +136,7 @@ pub(crate) fn open_flow(
         s.confirm = None;
         s.field_query.clear();
         s.content_query.clear();
+        s.people = None;
     });
     window.refresh();
 }
@@ -306,6 +314,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                         s.staged = Some(Staged {
                             index: None,
                             opener: Some(format!("{flow_id}-sheet-field-{}", field.key)),
+                            opening_query: None,
                             field: field.key.clone(),
                             operator: op,
                             value,
@@ -355,6 +364,22 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                     window.refresh();
                     return;
                 }
+                // FR30: a people field's "More" row skips the value step.
+                let first_opted = field.operators.iter().find(|o| o.value_only_match);
+                if let (Some(query), Some(first)) = (&data.more_query, first_opted)
+                    && matches!(
+                        first.value,
+                        OperatorValue::EntityList {
+                            search_source: Some(_),
+                            ..
+                        }
+                    )
+                {
+                    let people = (field.key.clone(), first.key.clone(), query.clone());
+                    state.update(cx, |s, _| s.people = Some(people));
+                    window.refresh();
+                    return;
+                }
                 let value = match (op.map(|o| &o.value), &data.more_query) {
                     (Some(OperatorValue::Empty), _) => Some(FilterValue::Empty),
                     (
@@ -370,6 +395,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                     s.staged = Some(Staged {
                         index: None,
                         opener: Some(format!("{flow_id}-sheet-content-search")),
+                        opening_query: data.more_query.clone(),
                         field: field.key.clone(),
                         operator: op.map(|o| o.key.clone()),
                         value,
@@ -389,6 +415,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                 s.staged = Some(Staged {
                     index: Some(index),
                     opener: None,
+                    opening_query: None,
                     field: filter.field.clone(),
                     operator: Some(filter.operator.clone()),
                     value: Some(filter.value.clone()),
@@ -1136,6 +1163,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                         disabled: !interactive,
                         sheet: true,
                         field_label: Some(field_label.clone()),
+                        opening_query: staged.opening_query.clone(),
                         on_unstage: Some({
                             let state = state.clone();
                             Rc::new(move |window: &mut Window, cx: &mut App| {
@@ -1416,11 +1444,104 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
         )
         .into_any_element()
     });
+    // ---- A people field's Tokenizer sheet (FR30) ------------------------
+    let people_sheet = state
+        .read(cx)
+        .people
+        .clone()
+        .and_then(|(field_key, op_key, query)| {
+            let field = config.find_field(&field_key)?.clone();
+            let op = field.find_operator(&op_key)?.clone();
+            let OperatorValue::EntityList {
+                search_source: Some(source),
+                render_item,
+                ..
+            } = op.value.clone()
+            else {
+                return None;
+            };
+            let on_save = {
+                let (state, config, flow_id) = (state.clone(), config.clone(), p.id.clone());
+                let (field_key, op_key) = (field_key.clone(), op_key.clone());
+                move |items: Vec<crate::search::SearchItem>,
+                      _: crate::tokenizer::TokenizerChange<crate::search::SearchItem>,
+                      window: &mut Window,
+                      cx: &mut App| {
+                    if items.is_empty() {
+                        return;
+                    }
+                    let entities = items
+                        .iter()
+                        .map(|i| super::model::PowerSearchEntity {
+                            id: crate::search::Searchable::id(i),
+                            label: crate::search::Searchable::label(i),
+                            photo: i
+                                .data_as::<super::value_editor::EntityPhoto>()
+                                .map(|p| p.0.clone()),
+                        })
+                        .collect();
+                    let filter = PowerSearchFilter::new(
+                        field_key.clone(),
+                        op_key.clone(),
+                        FilterValue::EntityList(entities),
+                    );
+                    let label = row_label_text(&config, &filter, cx);
+                    state.update(cx, |s, _| {
+                        s.draft.add(filter);
+                        s.people = None;
+                        s.adding = false;
+                        s.entry = Entry::Filters;
+                        s.content_query.clear();
+                    });
+                    let row = state.read(cx).draft.filters.len().saturating_sub(1);
+                    focus_next_render(format!("{flow_id}-sheet-row-{row}"), cx);
+                    announce(
+                        i18n(cx).format(
+                            "@astryx.tokenizer.tokenAdded",
+                            &[("label", label.as_str().into())],
+                        ),
+                        Politeness::Polite,
+                        window,
+                        cx,
+                    );
+                    window.refresh();
+                }
+            };
+            let on_close = {
+                let (state, flow_id) = (state.clone(), p.id.clone());
+                move |window: &mut Window, cx: &mut App| {
+                    if state.read(cx).people.is_some() {
+                        // Closed without adding: Add filter again, its text kept.
+                        state.update(cx, |s, _| s.people = None);
+                        focus_next_render(format!("{flow_id}-sheet-content-search"), cx);
+                        window.refresh();
+                    }
+                }
+            };
+            let mut tokenizer = crate::tokenizer::Tokenizer::from_rc(
+                ElementId::Name(format!("{}-sheet-people-{}", p.id, field.key).into()),
+                field.label.clone(),
+                source,
+                Vec::new(),
+            )
+            .debounce(super::value_editor::SOURCE_DEBOUNCE)
+            .opening_query(query)
+            .open_sheet_on_mount(on_close)
+            .on_change(on_save);
+            if let Some(render) = render_item {
+                tokenizer = tokenizer.render_item(move |item, window, cx| render(item, window, cx));
+            }
+            if let Some(n) = p.max_menu_items {
+                tokenizer = tokenizer.max_menu_items(n);
+            }
+            Some(tokenizer.into_any_element())
+        });
     div()
         .display_contents()
         .child(filters_sheet)
         .child(fields_sheet)
         .children(value_sheet)
+        .children(people_sheet)
         .children(confirmation)
         .into_any_element()
 }

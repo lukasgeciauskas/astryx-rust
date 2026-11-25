@@ -367,9 +367,11 @@ The remaining primitives:
     FR30's value-only rows and "More" rows (FR13, FR30), nested groups in the value step
     (FR14), numbers staged as they are typed (FR17), FR16's focus rules (through the new
     `astryx_primitives::request_focus`), and the result count's announcement in both
-    presentations (FR19). Remaining: a people field's "More" row opening its Tokenizer
-    sheet directly, and "More" rows carrying the typed text into a search editor's
-    opening query (FR30, BaseTypeahead FR18).
+    presentations (FR19), and "More" rows carrying the typed text into the editor they
+    open (a text field's value, or a search editor's opening query: BaseTypeahead FR18,
+    Tokenizer FR31, built here though upstream lists FR31 as an implementation gap),
+    with a people field's "More" row opening its Tokenizer sheet directly (FR29, FR30).
+    PowerSearch is done but for its date and time values, which M8 brings.
   - TreeList (done): data-driven rows with chevrons, guides, start and end content,
     density and variants; row actions (FR7); the WAI-ARIA tree keys as the
     `astryx_primitives::tree_focus` primitive (upstream `useTreeFocus`) with one tab stop

@@ -442,3 +442,69 @@ fn fr28_a_value_only_query_asks_the_operator_source_once_held(cx: &mut TestAppCo
         other => panic!("{other:?}"),
     }
 }
+
+struct MoreHost {
+    filters: Filters,
+    log: Log,
+}
+
+impl Render for MoreHost {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let op = |key: &'static str| {
+            PowerSearchOperator::new(key, key, OperatorValue::string()).value_only_match(true)
+        };
+        let config = Rc::new(PowerSearchConfig::new("books").field(
+            PowerSearchField::new("title", "Title").operators([
+                op("contains"),
+                op("starts"),
+                op("ends"),
+                op("is"),
+            ]),
+        ));
+        let (store, log) = (self.filters.clone(), self.log.clone());
+        div().p(px(40.)).w(px(600.)).child(
+            PowerSearch::new(
+                "ps",
+                config,
+                self.filters.borrow().clone(),
+                move |next, kind, index, window, _| {
+                    log.borrow_mut()
+                        .push(format!("{kind:?} {index} {}", next.len()));
+                    *store.borrow_mut() = next;
+                    window.refresh();
+                },
+            )
+            .presentation(crate::overlay::PopoverPresentation::Popover),
+        )
+    }
+}
+
+#[gpui::test]
+fn fr29_a_more_row_opens_the_editor_with_the_typed_text(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        astryx_theme::init(cx);
+        astryx_primitives::focus::init(cx);
+        astryx_primitives::editing::init(cx);
+    });
+    let (filters, log): (Filters, Log) = Default::default();
+    let (f, l) = (filters.clone(), log.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| MoreHost { filters: f, log: l });
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    press(cx, "tab");
+    type_text(cx, "dune");
+    assert!(
+        shown(cx, "ps-field-option-__more__:title"),
+        "three rows, then More"
+    );
+    click(cx, "ps-field-option-__more__:title");
+    assert!(shown(cx, "ps-editor-1-editor"));
+    // The fourth operator's text field holds the typed text: Enter saves it.
+    press(cx, "enter");
+    assert_eq!(*log.borrow(), ["Add 0 1"]);
+    let f = filters.borrow()[0].clone();
+    assert_eq!(
+        (f.operator.as_ref(), f.value.clone()),
+        ("is", FilterValue::String("dune".into()))
+    );
+}

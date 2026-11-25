@@ -145,6 +145,8 @@ pub(crate) struct SheetProps<T: Searchable> {
     pub on_change: Option<CommitFn<T>>,
     pub on_change_query: Option<QueryFn>,
     pub disabled: bool,
+    /// FR31: the first open after mounting searches this.
+    pub opening_query: Option<SharedString>,
 }
 
 pub(crate) fn draft_state<T: Searchable>(
@@ -226,12 +228,31 @@ pub(crate) fn sheet<T: Searchable>(
         cx,
         |_, _| false,
     );
+    let opening_used = window.use_keyed_state(
+        ElementId::Name(format!("{id}-sheet-opening-used").into()),
+        cx,
+        |_, _| false,
+    );
     if open && !*opening.read(cx) {
         opening.update(cx, |o, _| *o = true);
         let search = search.clone();
-        window.defer(cx, move |window, cx| {
-            search.engine.update(cx, |e, _| e.query.clear());
-            search.bootstrap(window, cx);
+        // FR31: the first open after mounting starts with the opening query,
+        // searched as a typed query is; later opens list the bootstrap set.
+        let query = props
+            .opening_query
+            .clone()
+            .filter(|_| !*opening_used.read(cx));
+        opening_used.update(cx, |u, _| *u = true);
+        let editor_q = editor.clone();
+        window.defer(cx, move |window, cx| match query {
+            Some(query) => {
+                editor_q.update(cx, |e, cx| e.set_text(query.as_ref(), cx));
+                search.query_changed(query.to_string(), true, window, cx);
+            }
+            None => {
+                search.engine.update(cx, |e, _| e.query.clear());
+                search.bootstrap(window, cx);
+            }
         });
     } else if !open && *opening.read(cx) {
         opening.update(cx, |o, _| *o = false);

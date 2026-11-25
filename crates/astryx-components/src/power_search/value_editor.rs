@@ -38,6 +38,9 @@ pub(crate) struct ValueEditorProps {
     pub field_label: Option<SharedString>,
     /// The sheet unstages a number that stops parsing (FR17).
     pub on_unstage: Option<EnterFn>,
+    /// A "More" row's typed text, as a search editor's opening query
+    /// (FR29, FR30, BaseTypeahead FR18, Tokenizer FR31).
+    pub opening_query: Option<SharedString>,
 }
 
 /// A source that matches nothing (a list editor without one: free text).
@@ -114,6 +117,9 @@ pub(crate) fn value_editor(
                     if let Some(n) = p.max_menu_items {
                         ta = ta.max_menu_items(n);
                     }
+                    if let Some(q) = p.opening_query.clone() {
+                        ta = ta.opening_query(q);
+                    }
                     if full {
                         ta = ta.w_full();
                     }
@@ -183,6 +189,9 @@ pub(crate) fn value_editor(
             }
             if let Some(n) = p.max_menu_items {
                 tk = tk.max_menu_items(n);
+            }
+            if let Some(q) = p.opening_query.clone() {
+                tk = tk.opening_query(q);
             }
             if full {
                 tk = tk.w_full();
@@ -380,6 +389,9 @@ pub(crate) fn value_editor(
             }
             if let Some(n) = p.max_menu_items {
                 tk = tk.max_menu_items(n);
+            }
+            if let Some(q) = p.opening_query.clone() {
+                tk = tk.opening_query(q);
             }
             if full {
                 tk = tk.w_full();

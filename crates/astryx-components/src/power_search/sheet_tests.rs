@@ -461,3 +461,122 @@ fn fr16_focus_follows_the_step(cx: &mut TestAppContext) {
         "Enter on the trigger reopens the flow"
     );
 }
+
+/// A people source: answers at once.
+struct People;
+
+impl crate::search::SearchSource<crate::search::SearchItem> for People {
+    fn search(
+        &self,
+        query: &str,
+        _: &crate::search::SearchContext<crate::search::SearchItem>,
+        _: &mut gpui::App,
+    ) -> crate::search::SearchAnswer<crate::search::SearchItem> {
+        ["Jane Doe", "Janet Lee", "Grace Hopper"]
+            .into_iter()
+            .filter(|n| n.to_lowercase().contains(&query.to_lowercase()))
+            .map(|n| crate::search::SearchItem::new(n.to_lowercase().replace(' ', "-"), n))
+            .collect::<Vec<_>>()
+            .into()
+    }
+
+    fn bootstrap(
+        &self,
+        _: &mut gpui::App,
+    ) -> crate::search::SearchAnswer<crate::search::SearchItem> {
+        Vec::new().into()
+    }
+}
+
+struct PeopleSheetHost {
+    filters: Filters,
+    log: Log,
+}
+
+impl Render for PeopleSheetHost {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let source: crate::power_search::model::ValueSource = Rc::new(People);
+        let config =
+            Rc::new(
+                PowerSearchConfig::new("people")
+                    .content_search_field("text")
+                    .field(PowerSearchField::new("text", "Text").operator(
+                        PowerSearchOperator::new("contains", "contains", OperatorValue::string()),
+                    ))
+                    .field(
+                        PowerSearchField::new("owner", "Owner").operator(
+                            PowerSearchOperator::new(
+                                "is",
+                                "is",
+                                OperatorValue::EntityList {
+                                    search_source: Some(source),
+                                    arbitrary_allowed: false,
+                                    tokenization: None,
+                                    render_item: None,
+                                },
+                            )
+                            .value_only_match(true),
+                        ),
+                    ),
+            );
+        let (store, log) = (self.filters.clone(), self.log.clone());
+        div().p(px(20.)).w(px(380.)).child(
+            PowerSearch::new(
+                "ps",
+                config,
+                self.filters.borrow().clone(),
+                move |next, kind, index, window, _| {
+                    log.borrow_mut()
+                        .push(format!("{kind:?} {index} {}", next.len()));
+                    *store.borrow_mut() = next;
+                    window.refresh();
+                },
+            )
+            .presentation(crate::overlay::PopoverPresentation::BottomSheet),
+        )
+    }
+}
+
+#[gpui::test]
+fn fr30_a_people_more_row_opens_its_tokenizer_sheet_searching(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        astryx_theme::init(cx);
+        astryx_primitives::focus::init(cx);
+        astryx_primitives::editing::init(cx);
+    });
+    let (filters, log): (Filters, Log) = Default::default();
+    let (f, l) = (filters.clone(), log.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| PeopleSheetHost { filters: f, log: l });
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    click(cx, "ps-trigger");
+    click(cx, "ps-sheet-content-search");
+    cx.simulate_input("jan");
+    settle(cx);
+    assert!(
+        shown(cx, "ps-sheet-result-__more__:owner"),
+        "the people field's More row"
+    );
+    click(cx, "ps-sheet-result-__more__:owner");
+    assert!(
+        shown(cx, "ps-sheet-people-owner-sheet-list"),
+        "its Tokenizer sheet, no value step"
+    );
+    assert!(!shown(cx, "ps-sheet-value"));
+    assert!(
+        shown(cx, "ps-sheet-people-owner-sheet-row-jane-doe"),
+        "already searching the text"
+    );
+    click(cx, "ps-sheet-people-owner-sheet-row-jane-doe");
+    click(cx, "ps-sheet-people-owner-sheet-save");
+    assert!(
+        shown(cx, "ps-sheet-row-0"),
+        "one filter added; Filters shows it"
+    );
+    click(cx, "ps-sheet-done");
+    assert_eq!(logged(&log), ["Add 0 1"]);
+    match &filters.borrow()[0].value {
+        FilterValue::EntityList(list) => assert_eq!(list[0].label, "Jane Doe"),
+        other => panic!("{other:?}"),
+    }
+}

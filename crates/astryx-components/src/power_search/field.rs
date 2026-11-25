@@ -179,6 +179,8 @@ struct FieldState {
     tokens: HashMap<usize, Bounds<Pixels>>,
     /// The edge a capped editor keeps for one open (FR6).
     latched: Option<LayerAlign>,
+    /// A "More" row's typed text, for the editor it opens (FR29).
+    opening: Option<SharedString>,
     announced: Option<Option<SharedString>>,
 }
 
@@ -535,6 +537,7 @@ impl RenderOnce for PowerSearch {
                 input: None,
                 tokens: HashMap::new(),
                 latched: None,
+                opening: None,
                 announced: None,
             },
         );
@@ -578,7 +581,9 @@ impl RenderOnce for PowerSearch {
                 let idle = editing == Editing::Idle;
                 state.update(cx, |s, _| {
                     s.editing = editing;
-                    if !idle {
+                    if idle {
+                        s.opening = None;
+                    } else {
                         s.opens += 1;
                         s.latched = None;
                     }
@@ -779,6 +784,7 @@ impl RenderOnce for PowerSearch {
                 on_change.clone(),
                 set_editing.clone(),
             );
+            let opening_state = state.clone();
             move |kept: Vec<PowerSearchItem>,
                   change: crate::tokenizer::TokenizerChange<PowerSearchItem>,
                   window: &mut Window,
@@ -813,6 +819,9 @@ impl RenderOnce for PowerSearch {
                             on_change(next, PowerSearchChangeType::Add, filters.len(), window, cx);
                             return;
                         }
+                        // FR29: a "More" row carries its typed text in.
+                        let opening = data.more_query.clone();
+                        opening_state.update(cx, |s, _| s.opening = opening);
                         set_editing(
                             Editing::Adding(PartialFilter {
                                 field: field.key.clone(),
@@ -1180,6 +1189,7 @@ impl RenderOnce for PowerSearch {
             let s = state.read(cx);
             (s.outer, s.input, s.latched, s.opens)
         };
+        let opening = state.read(cx).opening.clone();
         let viewport = window.viewport_size().width;
         let (width, align) = match outer {
             Some(outer) => {
@@ -1287,6 +1297,9 @@ impl RenderOnce for PowerSearch {
                 )
                 .save_label(save_label.clone())
                 .read_only(read_only);
+                if let Some(q) = opening.clone() {
+                    editor = editor.opening_query(q);
+                }
                 if let Some(n) = max_items {
                     editor = editor.max_menu_items(n);
                 }

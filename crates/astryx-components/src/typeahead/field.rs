@@ -175,6 +175,12 @@ impl<T: Searchable> Typeahead<T> {
     }
 
     /// Upstream `debounceMs`.
+    /// BaseTypeahead FR18's package-internal opening query.
+    pub(crate) fn opening_query(mut self, query: impl Into<SharedString>) -> Self {
+        self.base = self.base.opening_query(query);
+        self
+    }
+
     pub fn debounce(mut self, debounce: Duration) -> Self {
         self.base.debounce = debounce;
         self

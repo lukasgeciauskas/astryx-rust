@@ -117,6 +117,11 @@ pub struct Tokenizer<T: Searchable> {
     /// Reports the input's bounds (upstream's opening-control descriptor,
     /// Tokenizer DEC-1).
     input_bounds: Option<BoundsFn>,
+    /// FR31: the opening query.
+    opening_query: Option<SharedString>,
+    /// FR31: open the sheet as it mounts, with no trigger; called when the
+    /// sheet closes.
+    sheet_on_mount: Option<ActFn>,
     render_token: Option<RenderTokenFn<T>>,
     disabled: bool,
     disabled_message: Option<SharedString>,
@@ -172,6 +177,8 @@ impl<T: Searchable> Tokenizer<T> {
             removable: None,
             clear_all_message: None,
             input_bounds: None,
+            opening_query: None,
+            sheet_on_mount: None,
             render_token: None,
             disabled: false,
             disabled_message: None,
@@ -257,6 +264,25 @@ impl<T: Searchable> Tokenizer<T> {
     /// read-only filters).
     pub(crate) fn item_removable(mut self, f: impl Fn(&T) -> bool + 'static) -> Self {
         self.removable = Some(Rc::new(f));
+        self
+    }
+
+    /// FR31: the package-internal opening query (PowerSearch's "More" rows).
+    pub(crate) fn opening_query(mut self, query: impl Into<SharedString>) -> Self {
+        let query: SharedString = query.into();
+        self.base = self.base.opening_query(query.clone());
+        self.opening_query = Some(query);
+        self
+    }
+
+    /// FR31: opens the sheet as the Tokenizer mounts, renders no trigger,
+    /// and calls `on_close` when the sheet closes (its owner unmounts it).
+    pub(crate) fn open_sheet_on_mount(
+        mut self,
+        on_close: impl Fn(&mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.sheet_on_mount = Some(Rc::new(on_close));
+        self.presentation = crate::overlay::PopoverPresentation::BottomSheet;
         self
     }
 
@@ -1069,10 +1095,29 @@ impl<T: Searchable> Tokenizer<T> {
                 on_change: self.on_change.clone(),
                 on_change_query: self.base.on_change_query.clone(),
                 disabled,
+                opening_query: self.opening_query.clone(),
             },
             window,
             cx,
         );
+        // FR31: opened as it mounts, no trigger; the owner hears the close.
+        if let Some(on_close) = self.sheet_on_mount.clone() {
+            let mounted = window.use_keyed_state(
+                ElementId::Name(format!("{id}-sheet-mounted").into()),
+                cx,
+                |_, _| false,
+            );
+            if !*mounted.read(cx) {
+                mounted.update(cx, |m, _| *m = true);
+                let (draft, value) = (draft.clone(), self.value.clone());
+                window.defer(cx, move |window, cx| {
+                    super::sheet::open_sheet(&draft, &value, window, cx)
+                });
+            } else if !open {
+                window.defer(cx, move |window, cx| on_close(window, cx));
+            }
+            return sheet;
+        }
         let control = crate::overlay::disabled_reason(
             &id,
             disabled,

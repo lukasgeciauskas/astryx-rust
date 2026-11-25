@@ -30,8 +30,9 @@ Tokenizer, MultiSelector and ComplexSelector done)._
 
 ### Not yet ported (28)
 
-- **M6 Collections (in progress):** PowerSearch (its field, editors and sheet), then
-  virtualization for long lists and List reordering. Item's swipe actions wait for M11.
+- **M6 Collections (in progress):** virtualization for long lists and List
+  reordering. Item's swipe actions wait for M11; PowerSearch's date and time values
+  wait for M8.
 - **M7:** Table. **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
   TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
@@ -150,7 +151,7 @@ Suggested order, each a commit:
      the editor popover with its 400-720 px width and edge rules (FR1-FR9), the
      filter and value editors for every non-date value type, Clear all (FR22,
      FR23), the result count (FR19), `components` overrides.
-   - C: the sheet flow (FR10-FR21, FR30, DEC-7, AR5, AR6), in parts:
+   - C (done): the sheet flow (FR10-FR21, FR30, DEC-7, AR5, AR6), in parts:
      C1 adaptive resolution (FR10) and the trigger field with display-only tokens and
      the end lane (FR11); C2 the Filters sheet over a draft (FR12, FR15b, FR15c: rows,
      remove actions, empty state, Clear all and discard confirmations, Done replaying
