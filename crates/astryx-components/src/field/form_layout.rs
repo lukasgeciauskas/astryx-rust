@@ -66,12 +66,21 @@ pub(crate) struct FormContext {
     pub optionality: Option<Optionality>,
     /// Read by the date and time inputs; NumberInput behaves the same under
     /// both values (its FR14).
-    #[allow(dead_code)]
     pub entry_error_behavior: Option<EntryErrorBehavior>,
 }
 
 pub(crate) fn form_context(cx: &App) -> FormContext {
     use_context::<FormContext>(cx).unwrap_or_default()
+}
+
+/// A field's entry error behavior (upstream `useEntryErrorBehavior`): its own,
+/// else the nearest FormLayout's default, else `Complete`.
+pub(crate) fn entry_error_behavior(
+    own: Option<EntryErrorBehavior>,
+    cx: &App,
+) -> EntryErrorBehavior {
+    own.or(form_context(cx).entry_error_behavior)
+        .unwrap_or_default()
 }
 
 /// A field's required state and markers under its form's default,

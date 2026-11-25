@@ -109,7 +109,15 @@ impl Page {
             Page::Navigation => astryx::components::segmented::examples::examples(window, cx),
             Page::Wayfinding => astryx::components::pagination::examples::examples(window, cx),
             Page::Tables => astryx::components::table::examples::examples(window, cx),
-            Page::Dates => astryx::components::calendar::examples::examples(window, cx),
+            Page::Dates => gpui::div()
+                .flex()
+                .flex_col()
+                .gap(gpui::px(48.))
+                .child(astryx::components::date_input::examples::examples(
+                    window, cx,
+                ))
+                .child(astryx::components::calendar::examples::examples(window, cx))
+                .into_any_element(),
             Page::Collections => gpui::div()
                 .flex()
                 .flex_col()

@@ -2,12 +2,13 @@
 //! Field container, and FormLayout. Upstream: `Field/`, `FieldStatus/`,
 //! `FormLayout/`.
 
+pub(crate) mod entry_report;
 mod form_layout;
 
 #[cfg(test)]
 pub(crate) use form_layout::resolved;
 pub use form_layout::{EntryErrorBehavior, FormDirection, FormLayout, Optionality};
-pub(crate) use form_layout::{form_context, resolve};
+pub(crate) use form_layout::{entry_error_behavior, form_context, resolve};
 
 use astryx_i18n::current as i18n;
 use astryx_primitives::{Politeness, announce};

@@ -87,6 +87,8 @@ pub(crate) struct PopoverState {
     auto_focus: bool,
     /// Focus still has to enter: once the surface has been drawn.
     pending_focus: bool,
+    /// The next opening leaves focus where it is.
+    skip_focus_once: bool,
     on_open_change: Option<OpenFn>,
 }
 
@@ -102,6 +104,7 @@ impl PopoverState {
             controlled: false,
             auto_focus: true,
             pending_focus: false,
+            skip_focus_once: false,
             on_open_change: None,
         }
     }
@@ -133,7 +136,7 @@ fn transition(state: &Entity<PopoverState>, open: bool, window: &mut Window, cx:
             s.open = true;
             s.shown_at = None;
             s.return_to = s.return_override.clone().or(focused);
-            s.pending_focus = s.auto_focus;
+            s.pending_focus = s.auto_focus && !std::mem::take(&mut s.skip_focus_once);
         });
     } else {
         let (surface, return_to) = state.update(cx, |s, _| {
@@ -227,6 +230,21 @@ impl PopoverController {
 
     pub fn is_open(&self, cx: &App) -> bool {
         self.state.read(cx).open
+    }
+
+    /// Opens without moving focus into the surface (upstream
+    /// `show({skipAutoFocus: true})`): a typed field keeps its caret.
+    pub(crate) fn show_without_focus(&self, window: &mut Window, cx: &mut App) {
+        if self.state.read(cx).open {
+            return;
+        }
+        self.state.update(cx, |s, _| s.skip_focus_once = true);
+        request(&self.state, true, window, cx);
+    }
+
+    /// Whether focus is inside the open surface.
+    pub(crate) fn contains_focus(&self, window: &Window, cx: &App) -> bool {
+        self.state.read(cx).surface.contains_focused(window, cx)
     }
 }
 

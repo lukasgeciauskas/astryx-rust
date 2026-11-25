@@ -776,7 +776,7 @@ impl RenderOnce for Calendar {
         root.style().refine(&self.style);
         // Escape clears a range in progress (FR4).
         let escape_state = state.clone();
-        root.on_key_down(move |event: &KeyDownEvent, window, cx| {
+        let root = root.on_key_down(move |event: &KeyDownEvent, window, cx| {
             if event.keystroke.key == "escape" && escape_state.read(cx).range_start.is_some() {
                 escape_state.update(cx, |s, _| {
                     s.range_start = None;
@@ -785,7 +785,10 @@ impl RenderOnce for Calendar {
                 cx.stop_propagation();
                 window.refresh();
             }
-        })
+        });
+        // Upstream's `inline-block`: in any parent, the calendar keeps its
+        // content's width.
+        div().flex().flex_row().items_start().child(root)
     }
 }
 

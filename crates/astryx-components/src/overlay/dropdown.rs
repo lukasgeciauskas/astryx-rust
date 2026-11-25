@@ -133,6 +133,7 @@ pub(crate) fn menu_disclosure(
         on_hover: Some(on_hover),
         on_key: Some(on_key),
         open_tint: true,
+        detached: false,
     }
 }
 

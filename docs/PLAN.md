@@ -511,6 +511,20 @@ The remaining primitives:
     targets (`calendar`, `calendar-nav`, `calendar-day`, `calendar-range`,
     `calendar-range-preview`), and the public `use_calendar_days`,
     `use_calendar_navigation` and `use_calendar_constraints`.
+  - Stage 2 (done): DateInput's pointer field. Typed entry in the field's calendar
+    (`date_input/typed.rs`, upstream `useTypedDate`): a complete date reports once per
+    typing session, two-digit and omitted years wait for Enter or blur, Gregorian text only
+    `parseDateInput` reads commits at Enter or blur, rejected text stays with its own message
+    (unreadable, nonexistent, out of range, unavailable) and `on_entry_error_change`
+    (AST-111 FR9-FR14, AST-117, AST-118). `field/entry_report.rs` is upstream's
+    `useEntryErrorReport` and `useValueReplacesEntry`, shared with TimeInput and
+    DateTimeInput, and FormLayout's `defaultEntryErrorBehavior` now has its reader. The
+    calendar popover opens from the toggle, a press in the input, ArrowDown or Alt+ArrowDown
+    (keeping the caret), closes on a pick, Escape, an outside press, or focus leaving the
+    field and calendar (FR8, FR9). Clear, `changeAction` with the busy state, disabled with
+    its reason, the format hint and calendar description (AR9), InputGroup membership, and
+    AST-043's presentation vocabulary (`date_input/presentation.rs`); the sheet and native
+    surfaces come in later stages.
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
     `entryErrorBehavior: complete` (`table/filtering.rs` shows none until then).
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

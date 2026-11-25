@@ -33,6 +33,9 @@ pub(crate) struct Disclosure {
     /// The trigger shows the pressed tint while the popup is open
     /// (upstream DropdownMenu's `triggerOpen`).
     pub open_tint: bool,
+    /// Hides an enclosing trigger's disclosure from the controls inside: a
+    /// field's clear button is no popup trigger.
+    pub detached: bool,
 }
 
 impl Disclosure {
@@ -46,11 +49,20 @@ impl Disclosure {
             on_hover: None,
             on_key: None,
             open_tint: false,
+            detached: false,
+        }
+    }
+
+    /// No disclosure: the controls inside are not the popup's trigger.
+    pub fn detached() -> Self {
+        Disclosure {
+            detached: true,
+            ..Self::new(false, HasPopup::Dialog, None)
         }
     }
 }
 
 /// The popup a button opens, if it is one's trigger.
 pub(crate) fn disclosure(cx: &App) -> Option<Disclosure> {
-    use_context::<Disclosure>(cx)
+    use_context::<Disclosure>(cx).filter(|d| !d.detached)
 }

@@ -200,6 +200,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::calendar::USE_CALENDAR_DAYS_DOC,
     crate::calendar::USE_CALENDAR_NAVIGATION_DOC,
     crate::calendar::USE_CALENDAR_CONSTRAINTS_DOC,
+    crate::date_input::DATE_INPUT_DOC,
 ];
 
 /// Modules upstream has specified (an accepted contract) but not yet built,
