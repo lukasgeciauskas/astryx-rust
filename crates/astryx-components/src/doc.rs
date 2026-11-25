@@ -163,6 +163,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::tokenizer::TOKENIZER_DOC,
     crate::multi_selector::MULTI_SELECTOR_DOC,
     crate::complex_selector::COMPLEX_SELECTOR_DOC,
+    crate::tree_list::TREE_LIST_DOC,
 ];
 
 /// The registered doc for an upstream component name.

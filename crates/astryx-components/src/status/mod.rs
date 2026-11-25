@@ -195,12 +195,33 @@ impl RenderOnce for Spinner {
         let angle = turns.fract() * TAU;
         window.request_animation_frame();
 
-        let ring = canvas(
-            |_, _, _| {},
-            move |bounds, _, window, _| paint_ring(bounds, diameter, stroke, angle, colors, window),
-        )
-        .flex_none()
-        .size(px(frame));
+        // A theme's `spinner` indicator replaces the ring (Indicator FR7).
+        let ring = match crate::indicator::theme_indicator(crate::indicator::SPINNER, cx) {
+            Some(draw) => div()
+                .flex()
+                .flex_none()
+                .items_center()
+                .justify_center()
+                .size(px(frame))
+                .child(draw(
+                    crate::indicator::IndicatorRequest {
+                        state: "busy",
+                        size: px(frame),
+                    },
+                    window,
+                    cx,
+                ))
+                .into_any_element(),
+            None => canvas(
+                |_, _, _| {},
+                move |bounds, _, window, _| {
+                    paint_ring(bounds, diameter, stroke, angle, colors, window)
+                },
+            )
+            .flex_none()
+            .size(px(frame))
+            .into_any_element(),
+        };
         let name = self
             .aria_label
             .clone()

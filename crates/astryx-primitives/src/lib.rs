@@ -17,6 +17,7 @@ pub mod modality;
 pub mod props;
 pub mod size;
 pub mod spell;
+pub mod tree_focus;
 pub mod typeahead;
 
 pub use anchored::{LayerAlign, LayerOptions, LayerPosition, Placement, position_layer};

@@ -15,7 +15,7 @@ Tokenizer, MultiSelector and ComplexSelector done)._
   Tokenizer, MultiSelector and ComplexSelector are done; PowerSearch is next). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 80 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 81 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** the commit that added this file; `af61065` docs: M5 is done; `f8b5551` Lightbox,
   use_lightbox, CommandPalette and search sources; `9af8f12` menus. CI is green
@@ -28,10 +28,10 @@ Tokenizer, MultiSelector and ComplexSelector done)._
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (30)
+### Not yet ported (29)
 
-- **M6 Collections (in progress):** TreeList,
-  PowerSearch. Item's swipe actions wait for M11.
+- **M6 Collections (in progress):** PowerSearch (its field, editors and sheet), then
+  virtualization for long lists and List reordering. Item's swipe actions wait for M11.
 - **M7:** Table. **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
   TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
@@ -144,6 +144,8 @@ Suggested order, each a commit:
      field-prefixed value rows; the content-search row; FR27-FR29's value-only rows,
      source calls held 150 ms, "More" rows). Upstream's source lacks FR27-FR30
      (marked "implementation gap" in its spec); build them from the spec.
+   - Stage A is done, and so is TreeList (`tree_list/`), which stage B's nested
+     filter editor renders.
    - B: the popover presentation: the Tokenizer-based field, filter tokens (FR24),
      the editor popover with its 400-720 px width and edge rules (FR1-FR9), the
      filter and value editors for every non-date value type, Clear all (FR22,
@@ -152,7 +154,7 @@ Suggested order, each a commit:
    - The date and time value types (`time`, `date_absolute`, `date_relative`,
      `date_range`, `timezoneID`, FR25, FR26) need M8's Calendar, date inputs and
      calendar systems: record them as M8 work in PLAN.md and the doc's Pending notes.
-4. **TreeList** (tree focus), virtualization for long lists, reordering.
+4. ~~**TreeList** (tree focus)~~ (done), virtualization for long lists, reordering.
 
 Before starting, read PLAN.md's M6 entry and the upstream `Selector/`,
 `Typeahead/` and `List/` folders; `Selector/hooks.ts` holds the combobox

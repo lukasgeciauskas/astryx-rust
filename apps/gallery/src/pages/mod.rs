@@ -122,6 +122,9 @@ impl Page {
                 .child(astryx::components::complex_selector::examples::examples(
                     window, cx,
                 ))
+                .child(astryx::components::tree_list::examples::examples(
+                    window, cx,
+                ))
                 .into_any_element(),
         }
     }

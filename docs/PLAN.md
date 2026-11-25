@@ -314,7 +314,7 @@ The remaining primitives:
     `aria-current` on a selected interactive row; swipe actions wait for M11.
   - MetadataList and MetadataListItem (done) on R7 grid tracks; OverflowList (done) with
     upstream's `computeOverflow` fit over a hidden measuring copy.
-  - Carried: List's `animatedLayout` to the motion layer (M11), like Collapsible's;
+  - Carried: List's and TreeList's `animatedLayout` (with TreeList's expand glide, FR8-FR9) to the motion layer (M11), like Collapsible's;
     `reorderable` lands with TreeList at the end of M6.
   - Typeahead, BaseTypeahead and TypeaheadItem (done) on `search::SearchSource`: the
     threshold and debounce (FR2), stale answers dropped and answers kept through a
@@ -350,6 +350,12 @@ The remaining primitives:
     content search, and FR27's value-only rows with FR29's order, per-field cap and
     "More" rows. Next: the popover presentation with FR28's source rows (stage B), then
     the sheet flow (stage C).
+  - TreeList (done): data-driven rows with chevrons, guides, start and end content,
+    density and variants; row actions (FR7); the WAI-ARIA tree keys as the
+    `astryx_primitives::tree_focus` primitive (upstream `useTreeFocus`) with one tab stop
+    and typeahead (AR1); focus kept when a branch collapses around it (AR2); and the
+    theme's `tree-disclosure` mark (FR10). Theme indicators (`indicator::set_theme_indicator`,
+    Indicator FR7) also give Spinner a theme's `spinner` picture.
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.

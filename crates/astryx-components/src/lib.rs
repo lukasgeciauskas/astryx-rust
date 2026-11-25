@@ -41,6 +41,7 @@ pub mod time;
 pub mod token;
 pub mod tokenizer;
 pub mod toolbar;
+pub mod tree_list;
 pub mod typeahead;
 
 pub use doc::{ComponentDoc, PropMapping, RustApi};

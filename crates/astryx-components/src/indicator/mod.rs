@@ -17,6 +17,14 @@ use smallvec::SmallVec;
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
 use crate::icon::{Icon, IconColor, IconSize};
 
+mod theme;
+
+pub(crate) use theme::theme_indicator;
+pub use theme::{
+    IndicatorRequest, SPINNER, TREE_DISCLOSURE, ThemeIndicatorFn, clear_theme_indicator,
+    set_theme_indicator,
+};
+
 /// Upstream indicator `state`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum IndicatorState {
