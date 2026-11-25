@@ -60,6 +60,13 @@
   out of pointer reach but leaves its keyboard resize. An unbounded column's announced
   maximum is the window's width (upstream's window extent).
 
+- **Table virtualization in GPUI.** Windowed rows scroll in the table's own region, which
+  takes its height from the table's parent (give the table a sized parent); a plugin that
+  wraps the region (pagination's controls) leaves it unsized, so the rows then scroll with
+  the page. Column windowing keeps a focused cell's column mounted by noting the column a
+  key or a press last reached, as GPUI reports no focus moving into a cell; it forgets it
+  when focus leaves the table.
+
 - **Infinite scroll has no IntersectionObserver.** The sentinel checks, as it paints,
   whether it shows inside every clip above it, which is what the observer reports with
   its default root. `on_load_more` returns a `Task` of a `Result`, so FR4's non-Promise

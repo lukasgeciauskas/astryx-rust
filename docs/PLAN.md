@@ -413,7 +413,7 @@ The remaining primitives:
     AvatarGroup's one tab stop across its interactive members with wrapping arrows, Home
     and End (FR4) and its spoken hint (FR5), interactive Avatars taking focus, and
     AvatarGroupOverflow's `onClick` and `children`.
-- **M7 Table (in progress):** BaseTable/Table parts plus 14 plugins as a trait-based pipeline:
+- **M7 Table (done, 2026-11-25):** BaseTable/Table parts plus 14 plugins as a trait-based pipeline:
   columnResize, columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion,
   rowIndex, rowStatus, selection, sortable, stickyColumns, tree, virtualization.
   - Table and its parts (done): `table::Table<T>` over any `TableRecord` (a typed row, or the
@@ -421,7 +421,7 @@ The remaining primitives:
     identity (FR16), the default cell text with missing values empty (FR25) and generated
     columns; the `TablePlugin<T>` trait with every transform, the header cell's slots and
     FR9's ordering, row and render contexts (FR17), a loading source (FR22) and context-menu
-    actions gathered into one menu per header cell and per row; density, dividers, stripes,
+    actions gathered into one menu per header cell and per body cell; density, dividers, stripes,
     hover, vertical alignment, wrapping or truncating text with the default cell's tooltip,
     the named scroll region that becomes a tab stop and scrolls by keys (FR1), container
     bleed, row indexes and the empty state (FR8). A data-driven table lays out as one fixed
@@ -483,6 +483,16 @@ The remaining primitives:
     in the header row, accent under the pointer, on focus or in a drag, quiet while the
     region scrolls (FR10); a drag or the arrow keys resize, a proportional column trading
     width with its neighbor; it announces a splitter with the rendered width (AR7, AR8).
+  - Virtualization (done): `use_table_rows_virtualization` windows flat rows with valid
+    keys and default or fixed-height cells (selection, row numbers from 1) on
+    `list_window`'s `WindowedList`, inside the table's own block viewport sized by its
+    parent: overscan, a focused row kept as an island, the first visible row anchored,
+    truthful row indices and count (FR2-FR8, FR10); taller equal rows become the pitch
+    (FR17), and anything else (wrapping, custom cells, invalid keys, non-flat rows)
+    renders every row (FR14, FR6). `use_table_columns_virtualization` mounts only the
+    columns near the inline viewport, plus pinned columns and a focused cell's; an
+    unmounted column keeps its grid track. Product rows are built by one `RowBuilder` that
+    the full and windowed bodies share.
 - **M8 Dates:** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
   DateRangeInput, DateTimeInput, TimeInput.
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with

@@ -181,6 +181,12 @@ impl<T: 'static> TablePlugin<T> for TableRowIndex<T> {
                     None => div().into_any_element(),
                 }
             });
+        // Only a count from 1 keeps the rows windowed (upstream).
+        let column = if self.start_from == 1 {
+            column.fixed_height()
+        } else {
+            column
+        };
         let column = match &self.label {
             IndexLabel::Text(text) => column.header(text.clone()),
             IndexLabel::Element(f) => {

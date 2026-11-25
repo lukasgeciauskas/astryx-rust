@@ -194,6 +194,8 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::table::USE_TABLE_COLUMN_SETTINGS_STATE_DOC,
     crate::table::USE_TABLE_STICKY_COLUMNS_DOC,
     crate::table::USE_TABLE_COLUMN_RESIZE_DOC,
+    crate::table::USE_TABLE_ROWS_VIRTUALIZATION_DOC,
+    crate::table::USE_TABLE_COLUMNS_VIRTUALIZATION_DOC,
 ];
 
 /// Modules upstream has specified (an accepted contract) but not yet built,

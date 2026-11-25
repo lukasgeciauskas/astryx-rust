@@ -5,18 +5,18 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-25, at the end of M6 (Collections)._
+_Last updated: 2026-11-25, at the end of M7 (Table)._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5 and M6; M7 (Table) is in progress. Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6 and M7; M8 (Dates) is next. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 82 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 83 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
-- **Last commits on `main`:** M6's stages, ending with the keyboard hint and this
-  file's update; before it `7713d53` reordering's shift feedback, positions and
-  attach, `844a27e` List reordering, `276323d` long-list windowing. CI runs on
+- **Last commits on `main`:** M7's seven stages, from `cceff1a` (Table and its parts)
+  through sorting, selection and activation, pagination and filtering, tree and grouped
+  rows, column settings and resize, to virtualization. CI runs on
   ubuntu, windows and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
@@ -26,9 +26,9 @@ _Last updated: 2026-11-25, at the end of M6 (Collections)._
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (28)
+### Not yet ported (27)
 
-- **M7 (in progress):** Table's plugins and windowing (see "Next" below). **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
+- **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
   TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
@@ -49,6 +49,8 @@ _Last updated: 2026-11-25, at the end of M6 (Collections)._
 | FormLayout's `defaultEntryErrorBehavior` readers | Date inputs (M8) |
 | Backdrop blur (Lightbox, scrims) | Fork patch R2 |
 | PowerSearch's date and time values (`time`, `date_absolute`, `date_relative`, `date_range`, `timezoneID`, FR25, FR26) | Calendar, date inputs and calendar systems (M8) |
+| Table filtering's `date_absolute` and `time` controls | DateInput and TimeInput (M8) |
+| Table row expansion's `animatedLayout` glide (FR15) | Motion layer (M11) |
 | TreeList's `animatedLayout` and expand glide (FR8, FR9) | Motion layer (M11) |
 
 ## The owner's standing instructions
@@ -149,29 +151,36 @@ time:
   app's window receives the OS's pointer events, so hold the injected state against
   them.
 
-## Next: M7 Table
+## Lessons from M7
 
-Stages, each a commit:
+- **A `RenderOnce` renders at layout, after its parent's render returned.** A cell's
+  control can read what the table learned from rows built after it (the tree's
+  `aria-controls`, a pinned cell's row fill): share an `Rc<Cell<..>>` and read it in
+  `render`.
+- **Grid auto-placement wraps out-of-order cells.** Cells moved later in a row (pinned
+  cells, which must paint last) need explicit row and column lines, or they land on a
+  new row.
+- **Paint above later siblings with `deferred`.** It keeps the scroll region's clip and
+  hit-tests last: the resize boundary runs through the body rows that way.
+- **Time on wasm is `web_time::Instant`.** The executor's `now()` returns it; mixing in
+  `std::time::Instant` builds natively and fails the wasm build.
+- **Upstream gives each table cell its own context menu** (TableCell FR4), not one menu
+  per row, whatever an older code comment says; read the spec when the two disagree.
 
-1. ~~Table and its parts~~ (done: `table/`: model, plugin trait, data and children modes).
-2. ~~Sorting~~ (done: `table/sortable.rs`, fork patch R14 for `aria-sort`).
-3. ~~Selection, activation, row status and row numbers~~ (done: `table/selection.rs`,
-   `activation.rs`, `row_status.rs`, `row_index.rs`; tests in `table/row_tests.rs`).
-4. ~~Pagination, filtering and infinite scroll~~ (done: `table/pagination.rs`,
-   `filtering.rs`, `infinite_scroll.rs`; tests in `table/data_tests.rs`; the date and time
-   filter controls wait for M8).
-5. ~~Tree, grouped rows and row expansion~~ (done: `table/tree.rs`, `grouped.rs`,
-   `row_expansion.rs`; tests in `table/structure_tests.rs`; fork patch R15; the glide,
-   FR15, waits for M11).
-6. ~~Column resize, column settings and sticky columns~~ (done: `table/column_resize.rs`,
-   `column_settings.rs`, `sticky.rs`; tests in `table/column_tests.rs`).
-7. Virtualization: rows and columns on `astryx_primitives::list_window` (FR18-FR20, FR23,
-   DEC-5, DEC-6), then the `virtualization` builder (Pending in TABLE_DOC until then).
-   It brings upstream's column admission: the selection column and a row-number column
-   counting from 1 register as fixed-height columns, while the status column and a
-   row-number column counting from elsewhere give the reason a table falls back to
-   unwindowed rows (`registerFixedHeightColumn`, `registerWindowFallbackReason`).
+## Next: M8 Dates
 
-Before each, read the plugin's file under `../Astryx/packages/core/src/Table/plugins/`,
-its `.doc.mjs` and its spec under `docs/specs/components/Table/plugins/` where there is
-one, plus Table.spec.md's FR rows for it.
+M7 (Table) is done: `crates/astryx-components/src/table/` (Table, its parts, all 14 plugin
+families, selection's toolbar and activation), fork patches R14 and R15, tests in
+`table/tests.rs`, `row_tests.rs`, `data_tests.rs`, `structure_tests.rs`,
+`column_tests.rs` and `window_tests.rs`. What it carried: Table filtering's date and
+time controls (M8 below) and row expansion's glide (M11).
+
+M8 builds the date and time inputs on calendar systems (jiff + icu4x, AST-111): Calendar,
+DateInput (segmented), DateRangeInput, DateTimeInput and TimeInput. Carried into it:
+- PowerSearch's date and time values (`time`, `date_absolute`, `date_relative`,
+  `date_range`, `timezoneID`, FR25, FR26).
+- FormLayout's `defaultEntryErrorBehavior` readers.
+- Table filtering's `date_absolute` and `time` controls (`table/filtering.rs`'s
+  `filter_control`).
+
+Ask the owner before adding the jiff or icu4x calendar crates (installing software).

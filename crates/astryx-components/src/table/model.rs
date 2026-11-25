@@ -334,6 +334,9 @@ pub struct TableColumn<T> {
     pub filter: Option<TableFilterRef>,
     pub(crate) render_cell: Option<CellFn<T>>,
     pub(crate) wrappers: Vec<CellWrapFn<T>>,
+    /// Its renderer keeps a row at the table's fixed pitch (upstream
+    /// `registerFixedHeightColumn`): rows still window with it.
+    pub(crate) fixed_height: bool,
 }
 
 impl<T> Clone for TableColumn<T> {
@@ -348,6 +351,7 @@ impl<T> Clone for TableColumn<T> {
             filter: self.filter.clone(),
             render_cell: self.render_cell.clone(),
             wrappers: self.wrappers.clone(),
+            fixed_height: self.fixed_height,
         }
     }
 }
@@ -365,6 +369,7 @@ impl<T> TableColumn<T> {
             filter: None,
             render_cell: None,
             wrappers: Vec::new(),
+            fixed_height: false,
         }
     }
 
@@ -439,6 +444,12 @@ impl<T> TableColumn<T> {
         render: impl Fn(&TableItem<T>, &mut Window, &mut App) -> AnyElement + 'static,
     ) -> Self {
         self.render_cell = Some(Rc::new(render));
+        self
+    }
+
+    /// Marks its renderer as keeping the row's fixed pitch.
+    pub(crate) fn fixed_height(mut self) -> Self {
+        self.fixed_height = true;
         self
     }
 

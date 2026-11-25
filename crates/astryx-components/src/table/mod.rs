@@ -23,6 +23,7 @@ mod sticky;
 #[allow(clippy::module_inception)]
 mod table;
 mod tree;
+mod virtualization;
 
 pub use activation::{TableActivation, USE_TABLE_ACTIVATION_DOC, use_table_activation};
 pub use cells::{TableDensity, TableDividers, TableTextOverflow, TableVerticalAlign};
@@ -91,6 +92,11 @@ pub use tree::{
     AllExpanded, TableTreeData, TableTreeRowMeta, TreeIndent, TreeState, TreeStateConfig,
     USE_TABLE_TREE_DATA_DOC, USE_TABLE_TREE_STATE_DOC, use_table_tree_data, use_table_tree_state,
 };
+pub use virtualization::{
+    ColumnsVirtualization, RowsVirtualization, TableVirtualization,
+    USE_TABLE_COLUMNS_VIRTUALIZATION_DOC, USE_TABLE_ROWS_VIRTUALIZATION_DOC,
+    use_table_columns_virtualization, use_table_rows_virtualization,
+};
 
 #[cfg(test)]
 mod column_tests;
@@ -102,6 +108,8 @@ mod row_tests;
 mod structure_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod window_tests;
 
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
 
@@ -122,13 +130,7 @@ pub const TABLE_DOC: ComponentDoc = ComponentDoc {
         p("hasHover", RustApi::Method("hover")),
         p("verticalAlign", RustApi::Method("vertical_align")),
         p("textOverflow", RustApi::Method("text_overflow")),
-        p(
-            "virtualization",
-            RustApi::Pending(
-                "virtualization",
-                "row and column windowing come later in M7",
-            ),
-        ),
+        p("virtualization", RustApi::Method("virtualization")),
         p("plugins", RustApi::Method("plugin (named; TablePlugin)")),
         p("rowIndexStart", RustApi::Method("row_index_start")),
         p("rowCount", RustApi::Method("row_count")),

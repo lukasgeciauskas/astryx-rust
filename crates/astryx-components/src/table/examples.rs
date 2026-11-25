@@ -268,6 +268,10 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
         ))
         .child(sticky_resizable(window, cx))
         .child(label(
+            "Virtualization: 10,000 rows and 40 columns; only the cells near the viewport mount",
+        ))
+        .child(virtualized(window, cx))
+        .child(label(
             "Compact, grid dividers; a date reads as its ISO time",
         ))
         .child(
@@ -577,6 +581,53 @@ fn sticky_resizable(window: &mut Window, cx: &mut App) -> AnyElement {
                         .end_keys(["active"]),
                 )
                 .plugin("columnResize", resize),
+        )
+        .into_any_element()
+}
+
+/// Rows and columns windowed in the table's own viewport.
+fn virtualized(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::table::{
+        TableRowIndex, TableStickyColumns, use_table_columns_virtualization,
+        use_table_rows_virtualization,
+    };
+    // Built once, kept between frames.
+    let rows = window.use_keyed_state("virtual-rows", cx, |_, _| {
+        let rows: std::rc::Rc<[Record]> = (0..10_000)
+            .map(|i| {
+                (0..40).fold(Record::new().with("id", i as i64), |r, c| {
+                    r.with(format!("c{c}"), format!("R{i} C{c}"))
+                })
+            })
+            .collect();
+        rows
+    });
+    let rows = rows.read(cx).clone();
+    let columns: Vec<TableColumn<Record>> = (0..40)
+        .map(|c| {
+            TableColumn::new(format!("c{c}"))
+                .header(format!("Column {c}"))
+                .width(pixel(120.))
+        })
+        .collect();
+    div()
+        .h(px(320.))
+        .child(
+            Table::new("virtual")
+                .label("Ten thousand rows")
+                .data(rows)
+                .columns(columns)
+                .id_key("id")
+                .density(TableDensity::Compact)
+                .plugin("rowIndex", TableRowIndex::new())
+                .plugin(
+                    "sticky",
+                    TableStickyColumns::new().start_keys(["__rowIndex"]),
+                )
+                .virtualization(
+                    use_table_rows_virtualization(29., 320.)
+                        .with(use_table_columns_virtualization(900.)),
+                ),
         )
         .into_any_element()
 }

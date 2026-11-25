@@ -11,12 +11,13 @@
 use std::rc::Rc;
 
 use astryx_i18n::{current as i18n, use_direction};
-use astryx_primitives::{provide, use_context};
+use astryx_primitives::{ListPitch, WindowedList, provide, use_context};
 use astryx_theme::current;
 use gpui::{
-    AnyElement, App, ElementId, FocusHandle, GridTrack, InteractiveElement, IntoElement,
+    AnyElement, App, ElementId, Entity, FocusHandle, GridTrack, InteractiveElement, IntoElement,
     KeyDownEvent, ParentElement, Pixels, RenderOnce, Role, ScrollHandle, SharedString,
-    StatefulInteractiveElement, StyleRefinement, Styled, Window, div, point, prelude::*, px,
+    StatefulInteractiveElement, StyleRefinement, Styled, Window, canvas, div, point, prelude::*,
+    px,
 };
 use smallvec::SmallVec;
 
@@ -58,6 +59,9 @@ pub struct Table<T: TableRecord> {
     hover: bool,
     vertical_align: TableVerticalAlign,
     text_overflow: TableTextOverflow,
+    /// `text_overflow` was given (windowed rows default to truncation).
+    text_overflow_set: bool,
+    virtualization: Option<super::virtualization::TableVirtualization>,
     plugins: Vec<(SharedString, Rc<dyn TablePlugin<T>>)>,
     row_index_start: Option<usize>,
     row_count: Option<usize>,
@@ -88,6 +92,8 @@ impl<T: TableRecord> Table<T> {
             hover: false,
             vertical_align: TableVerticalAlign::Middle,
             text_overflow: TableTextOverflow::Wrap,
+            text_overflow_set: false,
+            virtualization: None,
             plugins: Vec::new(),
             row_index_start: None,
             row_count: None,
@@ -163,6 +169,20 @@ impl<T: TableRecord> Table<T> {
     /// Upstream `textOverflow`.
     pub fn text_overflow(mut self, overflow: TableTextOverflow) -> Self {
         self.text_overflow = overflow;
+        self.text_overflow_set = true;
+        self
+    }
+
+    /// Upstream `virtualization`: rows, columns or both
+    /// (`use_table_rows_virtualization`, `use_table_columns_virtualization`,
+    /// combined with `with`). Rows window only for flat data with a valid
+    /// `id_key`, default or fixed-height cells and no wrapping (text then
+    /// truncates by default); otherwise the table renders every row.
+    pub fn virtualization(
+        mut self,
+        virtualization: super::virtualization::TableVirtualization,
+    ) -> Self {
+        self.virtualization = Some(virtualization);
         self
     }
 
@@ -305,6 +325,7 @@ impl<T: TableRecord> RenderOnce for Table<T> {
             )
         } else {
             let context = TableRenderContext {
+                block_viewport: false,
                 table: name.clone().into(),
                 mode: TableMode::Children,
                 row_model: admitted_row_model(&plugins),
@@ -353,8 +374,12 @@ impl<T: TableRecord> RenderOnce for Table<T> {
         for p in &plugins {
             wrapper = p.transform_scroll_wrapper(wrapper, &render_context, window, cx);
         }
-        // A tab stop once it scrolls, with the arrows scrolling it.
-        let scrollable = scroll.max_offset().x > px(0.);
+        // A tab stop once it scrolls, with the arrows scrolling it. Windowed
+        // rows scroll in the region itself (a block viewport), sized by the
+        // table's parent.
+        let block = render_context.block_viewport;
+        let scrollable =
+            scroll.max_offset().x > px(0.) || (block && scroll.max_offset().y > px(0.));
         let region_name = label
             .clone()
             .unwrap_or_else(|| i18n.t("@astryx.table.label"));
@@ -364,21 +389,29 @@ impl<T: TableRecord> RenderOnce for Table<T> {
             .id(ElementId::Name(format!("{name}-scroll").into()))
             .track_focus(&focus.clone().tab_stop(scrollable))
             .track_scroll(&scroll)
-            .overflow_x_scroll()
+            .when(!block, |d| d.overflow_x_scroll())
+            .when(block, |d| d.overflow_scroll().flex_1().min_h_0())
             .relative()
             .role(Role::Group)
             .aria_label(region_name)
             .on_key_down(move |event: &KeyDownEvent, window, cx| {
-                let max = keys_scroll.max_offset().x;
+                let max = keys_scroll.max_offset();
                 let offset = keys_scroll.offset();
-                let x = match event.keystroke.key.as_str() {
-                    "left" => offset.x + step,
-                    "right" => offset.x - step,
-                    "home" => px(0.),
-                    "end" => -max,
+                let page = keys_scroll.bounds().size.height;
+                let (x, y) = match (event.keystroke.key.as_str(), block) {
+                    ("left", _) => (offset.x + step, offset.y),
+                    ("right", _) => (offset.x - step, offset.y),
+                    ("home", false) => (px(0.), offset.y),
+                    ("end", false) => (-max.x, offset.y),
+                    ("up", true) => (offset.x, offset.y + step),
+                    ("down", true) => (offset.x, offset.y - step),
+                    ("pageup", true) => (offset.x, offset.y + page),
+                    ("pagedown", true) => (offset.x, offset.y - page),
+                    ("home", true) => (offset.x, px(0.)),
+                    ("end", true) => (offset.x, -max.y),
                     _ => return,
                 };
-                keys_scroll.set_offset(point(x.min(px(0.)).max(-max), offset.y));
+                keys_scroll.set_offset(point(x.min(px(0.)).max(-max.x), y.min(px(0.)).max(-max.y)));
                 cx.stop_propagation();
                 window.refresh();
             });
@@ -417,10 +450,167 @@ impl<T: TableRecord> RenderOnce for Table<T> {
         for p in plugins.iter().rev() {
             out = p.transform_table_context(out, window, cx);
         }
-        let mut root = div().w_full().min_w_0();
+        let mut root = div()
+            .w_full()
+            .min_w_0()
+            .when(block, |d| d.h_full().flex().flex_col());
         root.style().refine(&self.style);
         root.child(out)
     }
+}
+
+/// Builds a product row: its cells through every plugin, then the row
+/// (shared by the full body and the windowed one).
+struct RowBuilder<T: TableRecord> {
+    name: String,
+    data: Rc<[T]>,
+    identity: Rc<[super::model::RowIdentity]>,
+    columns: Rc<Vec<TableColumn<T>>>,
+    plugins: Rc<[Rc<dyn TablePlugin<T>>]>,
+    context: TableRenderContext,
+    row_model: super::plugin::RowModel,
+    header_rows: usize,
+    tracks: Vec<GridTrack>,
+    count: usize,
+    style: TableStyle,
+    scroll: ScrollHandle,
+    rows_shown: usize,
+    /// Column windowing: which columns mount.
+    mounted: Option<Rc<[bool]>>,
+    focused_column: Entity<Option<SharedString>>,
+    /// Windowed rows: their minimum height, and where they report the
+    /// height they painted at.
+    measure: Option<(f32, Rc<std::cell::RefCell<Vec<f32>>>)>,
+}
+
+impl<T: TableRecord> RowBuilder<T> {
+    fn build(
+        &self,
+        i: usize,
+        display: usize,
+        aria_row_index: Option<usize>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (AnyElement, Vec<AnyElement>) {
+        let id = &self.identity[i];
+        let item = &TableItem::new(self.data.clone(), i);
+        let row_context = TableRowContext {
+            key: id.key.clone(),
+            identity_status: id.status,
+            kind: if self.row_model == super::plugin::RowModel::Flat {
+                RowKind::Product
+            } else {
+                RowKind::Unknown
+            },
+            logical_index: i,
+            logical_row_count: self.data.len(),
+            header_row_count: self.header_rows,
+            render: self.context.clone(),
+        };
+        let row_key = id.key.as_ref().map_or_else(|| format!("i{i}"), key_text);
+        let last_row = if self.measure.is_some() {
+            i + 1 == self.data.len()
+        } else {
+            display + 1 == self.rows_shown
+        };
+        // The row's fill, for its pinned cells: set when the row resolves it.
+        let backdrop: RowBackdrop = Rc::default();
+        let mut cells: Vec<(AnyElement, bool)> = Vec::new();
+        for (ci, col) in self.columns.iter().enumerate() {
+            let mut props = BodyCellProps {
+                column_index: ci,
+                ..BodyCellProps::default()
+            };
+            for p in self.plugins.iter() {
+                props = p.transform_body_cell(
+                    props,
+                    col,
+                    item,
+                    &self.columns,
+                    &row_context,
+                    window,
+                    cx,
+                );
+            }
+            if let Some(mounted) = &self.mounted {
+                // Offscreen columns are not built at all.
+                if !mounted[ci] && props.pinned.is_none() {
+                    continue;
+                }
+                let (focused, key) = (self.focused_column.clone(), col.key.clone());
+                let (pressed, press_key) = (self.focused_column.clone(), col.key.clone());
+                props.hooks.push(Box::new(move |el| {
+                    el.on_key_up(move |_, _, cx| {
+                        focused.update(cx, |f, _| *f = Some(key.clone()));
+                    })
+                    .on_mouse_down(
+                        gpui::MouseButton::Left,
+                        move |_, _, cx| {
+                            pressed.update(cx, |f, _| *f = Some(press_key.clone()));
+                        },
+                    )
+                }));
+            }
+            cells.push(body_cell(
+                &self.name,
+                &row_key,
+                col,
+                item,
+                props,
+                ci,
+                self.count,
+                last_row,
+                &self.style,
+                &self.scroll,
+                &backdrop,
+                window,
+                cx,
+            ));
+        }
+        cells.sort_by_key(|(_, pinned)| *pinned);
+        let mut props = BodyRowProps {
+            children: cells.into_iter().map(|(cell, _)| cell).collect(),
+            aria_row_index,
+            ..BodyRowProps::default()
+        };
+        for p in self.plugins.iter() {
+            props = p.transform_body_row(props, item, &row_context, window, cx);
+        }
+        if let Some((min, heights)) = self.measure.clone() {
+            props.hooks.push(Box::new(move |row| {
+                row.min_h(px(min)).child(
+                    canvas(
+                        move |bounds, _, _| {
+                            heights.borrow_mut().push(f32::from(bounds.size.height))
+                        },
+                        |_, _, _, _| {},
+                    )
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full(),
+                )
+            }));
+        }
+        let after_row = std::mem::take(&mut props.after_row);
+        let row = body_row(
+            &self.name,
+            &row_key,
+            display,
+            self.tracks.clone(),
+            props,
+            &self.style,
+            &backdrop,
+            window,
+            cx,
+        );
+        (row.into_any_element(), after_row)
+    }
+}
+
+/// A usable size: finite and above zero.
+fn positive_finite(value: f64) -> bool {
+    value.is_finite() && value > 0.
 }
 
 /// A row's fill and hover, as its pinned cells replay them.
@@ -576,10 +766,40 @@ fn render_data<T: TableRecord>(
     let row_model = admitted_row_model(plugins);
     // Canonical identity when a plugin needs it (FR16): id_key values with
     // missing, invalid and duplicate keys marked.
-    let canonical = plugins.iter().any(|p| p.needs_canonical_identity());
-    let identity = resolve_identity(data, this.id_key.as_ref(), canonical);
+    let virt = this.virtualization.unwrap_or_default();
+    let canonical = virt.rows.is_some() || plugins.iter().any(|p| p.needs_canonical_identity());
+    let identity: Rc<[super::model::RowIdentity]> =
+        resolve_identity(data, this.id_key.as_ref(), canonical).into();
     let header_rows = usize::from(count > 0);
+    let row_plan = plugins.iter().find_map(|p| p.row_plan());
+    // Rows window only where every row keeps the fixed pitch: flat rows
+    // with valid unique keys, default or fixed-height cells, no wrapping
+    // (FR6, FR14). Anything else renders every row.
+    let virtual_rows = virt.rows.filter(|v| {
+        positive_finite(v.row_height as f64)
+            && positive_finite(v.initial_viewport_height as f64)
+            && row_model == super::plugin::RowModel::Flat
+            && row_plan.is_none()
+            && !(this.text_overflow_set && this.text_overflow == TableTextOverflow::Wrap)
+            && identity
+                .iter()
+                .all(|id| id.status == super::model::IdentityStatus::Valid && id.key.is_some())
+            && columns
+                .iter()
+                .all(|c| (c.has_default_renderer() || c.fixed_height) && c.wrappers.is_empty())
+    });
+    // Windowed rows truncate unless told otherwise.
+    let style_owned = TableStyle {
+        text_overflow: if virtual_rows.is_some() && !this.text_overflow_set {
+            TableTextOverflow::Truncate
+        } else {
+            style.text_overflow
+        },
+        ..*style
+    };
+    let style = &style_owned;
     let context = TableRenderContext {
+        block_viewport: virtual_rows.is_some(),
         table: name.clone().into(),
         mode: TableMode::Data,
         row_model,
@@ -604,12 +824,61 @@ fn render_data<T: TableRecord>(
         table_props = p.transform_table(table_props, window, cx);
     }
 
+    // ---- Column windowing --------------------------------------------------
+    // The column a focused cell is in stays mounted (recorded as keys and
+    // presses reach a cell); it is forgotten once focus leaves the table.
+    let focused_column = window.use_keyed_state(
+        ElementId::Name(format!("{name}-focused-column").into()),
+        cx,
+        |_, _| None::<SharedString>,
+    );
+    if !focus.contains_focused(window, cx) && focused_column.read(cx).is_some() {
+        focused_column.update(cx, |f, _| *f = None);
+    }
+    let mounted: Option<Rc<[bool]>> = virt
+        .columns
+        .filter(|c| positive_finite(c.initial_viewport_width as f64))
+        .map(|c| {
+            // An overflowing table renders at its minimum width: the
+            // columns' floors place them.
+            let floors = super::model::resolve_column_floor_widths(&columns);
+            let measured = f32::from(scroll.bounds().size.width);
+            let viewport = if measured > 0. {
+                measured
+            } else {
+                c.initial_viewport_width
+            };
+            let from = -f32::from(scroll.offset().x);
+            let mut x = 0.;
+            let spans: Vec<(f32, f32)> = floors
+                .iter()
+                .map(|w| {
+                    let start = x;
+                    x += w;
+                    (start, x)
+                })
+                .collect();
+            let first = spans.iter().position(|(_, end)| *end > from).unwrap_or(0);
+            let last = spans
+                .iter()
+                .rposition(|(start, _)| *start < from + viewport)
+                .unwrap_or(spans.len().saturating_sub(1));
+            // One column past each edge.
+            let (lo, hi) = (first.saturating_sub(1), last + 1);
+            let focused = focused_column.read(cx).clone();
+            columns
+                .iter()
+                .enumerate()
+                .map(|(i, col)| (lo..=hi).contains(&i) || focused.as_ref() == Some(&col.key))
+                .collect()
+        });
+
     // ---- The header (FR2, FR11) ------------------------------------------
     let header_row = (count > 0).then(|| {
         let mut cells: Vec<(AnyElement, bool)> = columns
             .iter()
             .enumerate()
-            .map(|(i, col)| {
+            .filter_map(|(i, col)| {
                 let content = match &col.header {
                     Some(ColumnHeader::Text(text)) => text.clone().into_any_element(),
                     Some(ColumnHeader::Element(f)) => f(window, cx),
@@ -632,10 +901,14 @@ fn render_data<T: TableRecord>(
                     props = p.transform_header_cell(props, col, &columns, window, cx);
                 }
                 let pinned = props.pinned.is_some();
-                (
+                // An unmounted column's track stays; it just has no cell.
+                if !pinned && mounted.as_ref().is_some_and(|m| !m[i]) {
+                    return None;
+                }
+                Some((
                     header_cell(&name, col, props, i, count, style, scroll, window, cx),
                     pinned,
-                )
+                ))
             })
             .collect();
         // Pinned cells paint over the cells that scroll under them.
@@ -668,110 +941,103 @@ fn render_data<T: TableRecord>(
     let mut body: Vec<AnyElement> = Vec::new();
     // The body's rows: a plugin's plan (synthetic rows among the product
     // rows), else every product row in order.
-    let plan: Rc<[PlanRow]> = plugins
-        .iter()
-        .find_map(|p| p.row_plan())
-        .unwrap_or_else(|| (0..data.len()).map(PlanRow::Product).collect());
+    let plan: Rc<[PlanRow]> =
+        row_plan.unwrap_or_else(|| (0..data.len()).map(PlanRow::Product).collect());
     let rows_shown = plan.len();
-    for (display, entry) in plan.iter().enumerate() {
-        let i = match entry {
-            PlanRow::Product(i) if *i < data.len() => *i,
-            PlanRow::Product(_) => continue,
-            PlanRow::Synthetic(row) => {
-                body.push(synthetic_row(
-                    &name,
-                    row,
-                    &context,
-                    tracks.clone(),
-                    count,
-                    aria_indexes.then_some(first_index + display),
-                    window,
-                    cx,
-                ));
-                continue;
-            }
-        };
-        let id = &identity[i];
-        let item = &TableItem::new(data.clone(), i);
-        let row_context = TableRowContext {
-            key: id.key.clone(),
-            identity_status: id.status,
-            kind: if row_model == super::plugin::RowModel::Flat {
-                RowKind::Product
-            } else {
-                RowKind::Unknown
-            },
-            logical_index: i,
-            logical_row_count: data.len(),
-            header_row_count: header_rows,
-            render: context.clone(),
-        };
-        let row_key = id.key.as_ref().map_or_else(|| format!("i{i}"), key_text);
-        // The row's fill, for its pinned cells: set when the row resolves it.
-        let backdrop: RowBackdrop = Rc::default();
-        let mut cells: Vec<(AnyElement, bool)> = columns
-            .iter()
-            .enumerate()
-            .map(|(ci, col)| {
-                let mut props = BodyCellProps {
-                    style: StyleRefinement::default(),
-                    context_menu: Vec::new(),
-                    column_index: ci,
-                    content_suppressed: false,
-                    pinned: None,
-                    hooks: Vec::new(),
-                };
-                for p in plugins {
-                    props =
-                        p.transform_body_cell(props, col, item, &columns, &row_context, window, cx);
-                }
-                body_cell(
-                    &name,
-                    &row_key,
-                    col,
-                    item,
-                    props,
-                    ci,
-                    count,
-                    display + 1 == rows_shown,
-                    style,
-                    scroll,
-                    &backdrop,
-                    window,
-                    cx,
-                )
-            })
-            .collect();
-        cells.sort_by_key(|(_, pinned)| *pinned);
-        let cells: Vec<AnyElement> = cells.into_iter().map(|(cell, _)| cell).collect();
-        let mut props = BodyRowProps {
-            style: StyleRefinement::default(),
-            children: cells,
-            after_row: Vec::new(),
-            aria_row_index: aria_indexes.then_some(first_index + display),
-            paint: super::plugin::RowPaint::default(),
-            tab_stop: None,
-            key_shortcuts: Vec::new(),
-            row_action: None,
-            hooks: Vec::new(),
-        };
-        for p in plugins {
-            props = p.transform_body_row(props, item, &row_context, window, cx);
-        }
-        let after_row = std::mem::take(&mut props.after_row);
-        let row = body_row(
-            &name,
-            &row_key,
-            display,
-            tracks.clone(),
-            props,
-            style,
-            &backdrop,
-            window,
+    // Windowed rows: equal rows taller than `row_height` become the pitch
+    // (FR17), measured as they paint.
+    let pitch = virtual_rows.map(|v| {
+        let measured = window.use_keyed_state(
+            ElementId::Name(format!("{name}-row-pitch").into()),
             cx,
+            |_, _| {
+                (
+                    None::<f32>,
+                    Rc::new(std::cell::RefCell::new(Vec::<f32>::new())),
+                )
+            },
         );
-        body.push(row.into_any_element());
-        body.extend(after_row);
+        let heights = measured.read(cx).1.clone();
+        let seen = std::mem::take(&mut *heights.borrow_mut());
+        if let Some(first) = seen.first().copied()
+            && seen.iter().all(|h| (h - first).abs() <= 0.75)
+        {
+            let pitch = (first > v.row_height + 0.75).then_some(first);
+            if measured.read(cx).0 != pitch {
+                measured.update(cx, |m, _| m.0 = pitch);
+            }
+        }
+        let pitch = measured.read(cx).0.unwrap_or(v.row_height);
+        (v, pitch, heights)
+    });
+    let builder = Rc::new(RowBuilder {
+        name: name.clone(),
+        data: data.clone(),
+        identity: identity.clone(),
+        columns: Rc::new(columns),
+        plugins: plugins.to_vec().into(),
+        context: context.clone(),
+        row_model,
+        header_rows,
+        tracks: tracks.clone(),
+        count,
+        style: *style,
+        scroll: scroll.clone(),
+        rows_shown,
+        mounted: mounted.clone(),
+        focused_column: focused_column.clone(),
+        measure: pitch
+            .as_ref()
+            .map(|(v, _, heights)| (v.row_height, heights.clone())),
+    });
+    match &pitch {
+        Some((v, pitch, _)) => {
+            let keys: Rc<[RowKey]> = identity.iter().filter_map(|id| id.key.clone()).collect();
+            let rows = builder.clone();
+            body.push(
+                WindowedList::new(
+                    ElementId::Name(format!("{name}-window").into()),
+                    keys,
+                    ListPitch::Fixed(px(*pitch)),
+                    // Truthful positions: the header's rows, then the row's
+                    // place in the full data (FR5).
+                    move |i, window, cx| rows.build(i, i, Some(header_rows + i + 1), window, cx).0,
+                )
+                .scroll(scroll)
+                .viewport_focus(focus)
+                .initial_viewport(px(v.initial_viewport_height))
+                .w_full()
+                .into_any_element(),
+            );
+        }
+        None => {
+            for (display, entry) in plan.iter().enumerate() {
+                match entry {
+                    PlanRow::Product(i) if *i < data.len() => {
+                        let (row, after_row) = builder.build(
+                            *i,
+                            display,
+                            aria_indexes.then_some(first_index + display),
+                            window,
+                            cx,
+                        );
+                        body.push(row);
+                        body.extend(after_row);
+                    }
+                    PlanRow::Product(_) => {}
+                    PlanRow::Synthetic(row) => body.push(synthetic_row(
+                        &name,
+                        row,
+                        &context,
+                        tracks.clone(),
+                        count,
+                        aria_indexes.then_some(first_index + display),
+                        window,
+                        cx,
+                    )),
+                }
+            }
+        }
     }
     // Empty when no row shows: collapsed groups' headers still count.
     let empty = if rows_shown == 0 {
@@ -802,7 +1068,11 @@ fn render_data<T: TableRecord>(
     }
     // An unknown total (ARIA's -1, while more rows may come or with no
     // count given) has no AccessKit form: no count is exposed then.
-    if let Some(total) = this.row_count.filter(|_| !has_more) {
+    // Windowed rows expose the full table's count (FR5).
+    let total = this
+        .row_count
+        .or_else(|| virtual_rows.is_some().then_some(data.len()));
+    if let Some(total) = total.filter(|_| !has_more) {
         table = table.aria_row_count(total + header_rows);
     }
     theme.refine(table.style(), "table", &[], None);

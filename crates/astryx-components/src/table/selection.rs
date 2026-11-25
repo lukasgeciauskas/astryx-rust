@@ -132,6 +132,7 @@ impl<T: 'static> TableSelection<T> {
         );
         let this = self.clone();
         TableColumn::new(SELECTION_COLUMN_KEY)
+            .fixed_height()
             .width(pixel(36.))
             .resizable(false)
             .header_element(move |_, cx| {

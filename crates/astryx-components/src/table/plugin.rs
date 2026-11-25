@@ -91,6 +91,9 @@ pub struct TableRenderContext {
     pub header_row_count: usize,
     /// The scroll container around the table.
     pub viewport: ScrollHandle,
+    /// The table windows its rows in its own block viewport (it scrolls
+    /// both ways, sized by its parent).
+    pub block_viewport: bool,
     /// The scroll container's focus: where focus goes when chrome that held
     /// it goes away (infinite scroll's exhausted command).
     pub viewport_focus: Option<FocusHandle>,
