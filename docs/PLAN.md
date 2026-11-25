@@ -565,6 +565,15 @@ The remaining primitives:
     - `coarse_primary_pointer` (`astryx_primitives::modality`): upstream's
       `(pointer: coarse)` remembers the last pointer through key presses, so typing never
       flips a field's surface.
+  - Stage 6b (done): DateInput's bottom sheet (`date_input/sheet.rs`): the read-only
+    combobox (opened by ArrowDown, Enter or Space, FR8), the month model of any calendar
+    (`month_model.rs`, FR21), the month pager (`month_scroller.rs`: six-row month grids drawn
+    around the shown month, swipes and trackpads settling onto a month, the day grid's keys
+    moving by date across months), the month and year wheels (`month_year_wheels.rs`, leap
+    months by name, era labels by the kept day), the header (the month-and-year toggle, arrows
+    that hide at the range's ends and hand their focus on, FR22, Reset) and the weekday row
+    (FR19). A tapped day commits and the sheet stays open (FR9); under a finger the wheels move
+    a chosen date, keeping its day (FR23).
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
     `entryErrorBehavior: complete` (`table/filtering.rs` shows none until then).
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

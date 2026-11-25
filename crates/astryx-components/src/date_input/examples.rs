@@ -4,7 +4,7 @@ use astryx_i18n::CalendarSystem;
 use astryx_i18n::date::{PlainDate, SharedDateFormat, Weekday};
 use gpui::{AnyElement, App, IntoElement, ParentElement, Styled, Window, px};
 
-use crate::date_input::{DateInput, DateInputEntryError};
+use crate::date_input::{DateInput, DateInputEntryError, PickerPresentation};
 use crate::field::InputStatus;
 use crate::layout::{SpacingStep, Stack};
 
@@ -16,6 +16,7 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let due = window.use_keyed_state("date-input-due", cx, |_, _| Some(date(2026, 11, 18)));
     let start = window.use_keyed_state("date-input-start", cx, |_, _| None::<PlainDate>);
     let persian = window.use_keyed_state("date-input-persian", cx, |_, _| Some(date(2026, 10, 30)));
+    let trip = window.use_keyed_state("date-input-trip", cx, |_, _| Some(date(2026, 12, 4)));
     let error = window.use_keyed_state("date-input-error", cx, |_, _| None::<DateInputEntryError>);
     let store = |state: gpui::Entity<Option<PlainDate>>| {
         move |value: Option<PlainDate>, window: &mut Window, cx: &mut App| {
@@ -57,6 +58,15 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
             }
             field
         })
+        .child(
+            DateInput::new("trip", "Trip day", *trip.read(cx))
+                .description("Picked in a bottom sheet")
+                .presentation(PickerPresentation::BottomSheet)
+                .min(date(2026, 11, 1))
+                .max(date(2027, 6, 30))
+                .clear(true)
+                .on_change(store(trip.clone())),
+        )
         .child(
             DateInput::new("persian", "Persian date", *persian.read(cx))
                 .calendar(CalendarSystem::Persian)

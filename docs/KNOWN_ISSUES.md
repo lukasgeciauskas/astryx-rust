@@ -209,6 +209,13 @@
 - **The scrolling column's tip is projected flat (M8).** Upstream tips each row with
   `rotateX` under a perspective; here a row scales by the same angle's cosine vertically and
   by 0.86 at the edges, without the perspective's trapezoid.
+- **The touch calendar's pager settles after its momentum (M8).** Upstream's month pager is
+  a native scroll-snapping scroller, whose momentum picks a month as the finger lifts. Here a
+  swipe coasts on GPUI's touch momentum (or the platform's, on a trackpad) and then glides
+  onto the nearest month.
+- **Only the shown month's day is a tab stop (M8).** Upstream's pager keeps one tab stop in
+  every mounted month pane, so Tab can reach months scrolled out of view. Here only the shown
+  pane has one; the arrow keys still cross months.
 - **TimeInput's sheet opens from the keyboard (M8).** Upstream's FR7 notes an
   implementation gap: Enter, Space and ArrowDown do not open its sheet. Here they do, as
   DateInput's sheet field does, so the wheels are reachable by keyboard as FR7 requires.

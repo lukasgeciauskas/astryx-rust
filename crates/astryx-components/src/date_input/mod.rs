@@ -5,8 +5,12 @@
 #[allow(clippy::module_inception)]
 mod date_input;
 pub mod examples;
+pub(crate) mod month_model;
+pub(crate) mod month_scroller;
+pub(crate) mod month_year_wheels;
 pub(crate) mod presentation;
 pub(crate) mod segment;
+mod sheet;
 pub(crate) mod typed;
 
 #[cfg(test)]
@@ -23,7 +27,7 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
 }
 
 const LATER_SURFACES: &str =
-    "the bottom sheet and the platform picker; the pointer field shows meanwhile";
+    "the platform picker (a later M8 stage); the pointer field shows in its place meanwhile";
 
 pub const DATE_INPUT_DOC: ComponentDoc = ComponentDoc {
     name: "DateInput",

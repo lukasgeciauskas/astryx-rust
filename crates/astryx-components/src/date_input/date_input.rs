@@ -50,38 +50,38 @@ type ValueFn = Rc<dyn Fn(Option<PlainDate>, &mut Window, &mut App)>;
 /// ```
 #[derive(IntoElement)]
 pub struct DateInput {
-    id: ElementId,
-    label: SharedString,
-    value: Option<PlainDate>,
-    on_change: Option<ValueFn>,
-    change_action: Option<ActionFn<Option<PlainDate>>>,
-    label_hidden: bool,
-    description: Option<SharedString>,
-    optional: bool,
-    required: bool,
-    disabled: bool,
-    disabled_message: Option<SharedString>,
-    loading: bool,
-    min: Option<PlainDate>,
-    max: Option<PlainDate>,
-    date_constraints: Vec<DateConstraint>,
-    placeholder: Option<SharedString>,
-    size: Option<ElementSize>,
-    status: Option<InputStatus>,
-    on_entry_error_change: Option<ReportFn<DateInputEntryError>>,
-    entry_error_behavior: Option<EntryErrorBehavior>,
-    status_placement: StatusPlacement,
-    label_tooltip: Option<SharedString>,
-    clear: bool,
-    number_of_months: u8,
-    week_starts_on: Weekday,
-    format: DateInputFormat,
-    calendar: Option<CalendarSystem>,
-    presentation: Option<PickerPresentation>,
-    native_picker: Option<LegacyNativePicker>,
-    width: Option<Length>,
-    control_style: StyleRefinement,
-    style: StyleRefinement,
+    pub(super) id: ElementId,
+    pub(super) label: SharedString,
+    pub(super) value: Option<PlainDate>,
+    pub(super) on_change: Option<ValueFn>,
+    pub(super) change_action: Option<ActionFn<Option<PlainDate>>>,
+    pub(super) label_hidden: bool,
+    pub(super) description: Option<SharedString>,
+    pub(super) optional: bool,
+    pub(super) required: bool,
+    pub(super) disabled: bool,
+    pub(super) disabled_message: Option<SharedString>,
+    pub(super) loading: bool,
+    pub(super) min: Option<PlainDate>,
+    pub(super) max: Option<PlainDate>,
+    pub(super) date_constraints: Vec<DateConstraint>,
+    pub(super) placeholder: Option<SharedString>,
+    pub(super) size: Option<ElementSize>,
+    pub(super) status: Option<InputStatus>,
+    pub(super) on_entry_error_change: Option<ReportFn<DateInputEntryError>>,
+    pub(super) entry_error_behavior: Option<EntryErrorBehavior>,
+    pub(super) status_placement: StatusPlacement,
+    pub(super) label_tooltip: Option<SharedString>,
+    pub(super) clear: bool,
+    pub(super) number_of_months: u8,
+    pub(super) week_starts_on: Weekday,
+    pub(super) format: DateInputFormat,
+    pub(super) calendar: Option<CalendarSystem>,
+    pub(super) presentation: Option<PickerPresentation>,
+    pub(super) native_picker: Option<LegacyNativePicker>,
+    pub(super) width: Option<Length>,
+    pub(super) control_style: StyleRefinement,
+    pub(super) style: StyleRefinement,
 }
 
 impl DateInput {
@@ -317,14 +317,17 @@ impl RenderOnce for DateInput {
         let i18n = i18n(cx);
         let calendar = self.calendar.unwrap_or_else(|| i18n.calendar_system());
 
-        // ORD1: the surface. The bottom sheet and the platform picker land in
-        // later M8 stages; until then every surface is the pointer field.
+        // ORD1: the surface. The platform picker lands in a later M8 stage;
+        // until then it is the pointer field.
         let policy = calendar_picker(
             effective_picker(self.presentation, self.native_picker, "DateInput"),
             calendar,
             "DateInput",
         );
-        let _surface: Surface = resolve_picker(policy, coarse_pointer(window, cx));
+        let surface: Surface = resolve_picker(policy, coarse_pointer(window, cx));
+        if surface == Surface::Sheet {
+            return super::sheet::render_sheet(self, window, cx);
+        }
 
         let optimistic = Rc::new(Optimistic::<Option<PlainDate>>::new(&self.id, window, cx));
         let shown_value = optimistic.shown(self.value, cx);

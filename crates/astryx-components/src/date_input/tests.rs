@@ -359,3 +359,231 @@ fn ast111_fr2_the_provider_calendar_applies(cx: &mut TestAppContext) {
     type_text(cx, "11/2/2569");
     assert_eq!(*log.borrow(), [Some(d(2026, 11, 2))], "Buddhist year 2569");
 }
+
+// ---- The bottom-sheet surface ----------------------------------------------
+
+use crate::date_input::PickerPresentation;
+use gpui::{
+    Modifiers, ScrollDelta, ScrollEvent, ScrollSource, TouchEvent, TouchId, TouchPhase, point, px,
+};
+
+fn sheet(
+    cx: &mut TestAppContext,
+    initial: Option<PlainDate>,
+    configure: impl Fn(DateInput) -> DateInput + 'static,
+) -> (&mut VisualTestContext, Rc<Log>) {
+    field(cx, initial, move |f| {
+        configure(f.presentation(PickerPresentation::BottomSheet))
+    })
+}
+
+fn settle(cx: &mut VisualTestContext) {
+    for _ in 0..3 {
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+}
+
+fn wait(cx: &mut VisualTestContext, ms: u64) {
+    cx.executor().advance_clock(Duration::from_millis(ms));
+    settle(cx);
+}
+
+fn bounds_of(cx: &mut VisualTestContext, selector: String) -> Option<gpui::Bounds<gpui::Pixels>> {
+    cx.debug_bounds(Box::leak(selector.into_boxed_str()))
+}
+
+fn sheet_day(date: PlainDate) -> String {
+    super::month_scroller::day_selector(&"di-months".into(), date)
+}
+
+/// Whether `date`'s day sits inside the scrollport: its month is shown.
+fn shows_month_of(cx: &mut VisualTestContext, date: PlainDate) -> bool {
+    let (Some(port), Some(day)) = (
+        bounds_of(cx, "di-months".into()),
+        bounds_of(cx, sheet_day(date)),
+    ) else {
+        return false;
+    };
+    day.left() >= port.left() - px(0.5) && day.right() <= port.right() + px(0.5)
+}
+
+fn tap(cx: &mut VisualTestContext, selector: String) {
+    let at = bounds_of(cx, selector.clone())
+        .unwrap_or_else(|| panic!("nothing at {selector}"))
+        .center();
+    cx.simulate_click(at, Modifiers::none());
+    settle(cx);
+}
+
+/// Tab to the field and open its sheet from the keyboard; it rises.
+fn open_sheet(cx: &mut VisualTestContext) {
+    press(cx, "tab");
+    press(cx, "down");
+    settle(cx);
+    wait(cx, 1000);
+}
+
+fn touch_somewhere(cx: &mut VisualTestContext) {
+    for phase in [TouchPhase::Started, TouchPhase::Ended] {
+        cx.simulate_event(TouchEvent {
+            id: TouchId(9),
+            phase,
+            position: point(px(1500.), px(20.)),
+            ..Default::default()
+        });
+    }
+    settle(cx);
+}
+
+#[gpui::test]
+fn fr8_the_sheet_opens_from_the_keyboard_on_the_value_s_month(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(d(2026, 12, 4)), |f| f);
+    assert!(bounds_of(cx, sheet_day(d(2026, 12, 4))).is_none());
+    open_sheet(cx);
+    assert!(shows_month_of(cx, d(2026, 12, 4)));
+    assert!(log.changes.borrow().is_empty());
+}
+
+#[gpui::test]
+fn fr9_a_tapped_day_commits_and_the_sheet_stays_open(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(d(2026, 11, 18)), |f| f);
+    open_sheet(cx);
+    tap(cx, sheet_day(d(2026, 11, 20)));
+    assert_eq!(*log.changes.borrow(), [Some(d(2026, 11, 20))]);
+    assert!(shows_month_of(cx, d(2026, 11, 20)), "still open");
+    tap(cx, sheet_day(d(2026, 11, 21)));
+    assert_eq!(
+        log.changes.borrow().last(),
+        Some(&Some(d(2026, 11, 21))),
+        "a second tap corrects"
+    );
+    tap(cx, "di-save".into());
+    wait(cx, 1000);
+    assert!(
+        bounds_of(cx, sheet_day(d(2026, 11, 21))).is_none(),
+        "Save closes"
+    );
+    assert_eq!(log.changes.borrow().len(), 2, "and commits nothing");
+}
+
+#[gpui::test]
+fn fr5_a_day_outside_the_bounds_refuses_to_commit(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(d(2026, 11, 18)), |f| {
+        f.min(d(2026, 11, 10))
+            .date_constraint(|date| date != d(2026, 11, 20))
+    });
+    open_sheet(cx);
+    tap(cx, sheet_day(d(2026, 11, 5)));
+    tap(cx, sheet_day(d(2026, 11, 20)));
+    assert!(log.changes.borrow().is_empty());
+}
+
+#[gpui::test]
+fn fr22_an_arrow_at_the_range_end_hands_its_focus_to_the_other(cx: &mut TestAppContext) {
+    let (cx, _) = sheet(cx, Some(d(2026, 11, 20)), |f| {
+        f.min(d(2026, 11, 1)).max(d(2026, 12, 31))
+    });
+    open_sheet(cx);
+    // The previous arrow is hidden at the first month: Tab reaches the next.
+    tap(cx, "di-month-year".into());
+    tap(cx, "di-month-year".into());
+    press(cx, "tab");
+    press(cx, "enter");
+    wait(cx, 1000);
+    assert!(shows_month_of(cx, d(2026, 12, 4)), "on to December");
+    // The next arrow hid; Enter now presses the previous one.
+    press(cx, "enter");
+    wait(cx, 1000);
+    assert!(shows_month_of(cx, d(2026, 11, 4)), "back to November");
+}
+
+#[gpui::test]
+fn swiping_pages_to_the_next_month(cx: &mut TestAppContext) {
+    let (cx, _) = sheet(cx, Some(d(2026, 11, 18)), |f| f);
+    open_sheet(cx);
+    let port = bounds_of(cx, "di-months".into()).unwrap();
+    cx.simulate_event(ScrollEvent {
+        position: port.center(),
+        delta: ScrollDelta::Pixels(point(-port.size.width * 0.7, px(0.))),
+        source: ScrollSource::Touch,
+        touch_phase: TouchPhase::Ended,
+        ..Default::default()
+    });
+    settle(cx);
+    wait(cx, 1000);
+    assert!(shows_month_of(cx, d(2026, 12, 10)));
+}
+
+#[gpui::test]
+fn fr23_under_a_finger_the_month_wheel_moves_the_date_keeping_its_day(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(d(2026, 1, 31)), |f| f);
+    touch_somewhere(cx);
+    open_sheet(cx);
+    tap(cx, "di-month-year".into());
+    wait(cx, 500);
+    let month = bounds_of(cx, "di-wheels-month".into())
+        .expect("the wheels")
+        .center();
+    for phase in [TouchPhase::Started, TouchPhase::Ended] {
+        cx.simulate_event(TouchEvent {
+            id: TouchId(1),
+            phase,
+            position: month,
+            ..Default::default()
+        });
+    }
+    settle(cx);
+    press(cx, "down");
+    assert_eq!(log.changes.borrow().last(), Some(&Some(d(2026, 2, 28))));
+}
+
+#[gpui::test]
+fn fr23_with_a_mouse_the_wheels_move_only_the_calendar(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(d(2026, 1, 31)), |f| f);
+    open_sheet(cx);
+    tap(cx, "di-month-year".into());
+    wait(cx, 500);
+    tap(cx, "di-wheels-month".into());
+    press(cx, "down");
+    wait(cx, 500);
+    assert!(log.changes.borrow().is_empty());
+    tap(cx, "di-done".into());
+    wait(cx, 500);
+    assert!(
+        shows_month_of(cx, d(2026, 2, 10)),
+        "the calendar is on February"
+    );
+}
+
+#[gpui::test]
+fn fr11_the_sheet_field_clears(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(d(2026, 11, 18)), |f| f.clear(true));
+    press(cx, "tab");
+    press(cx, "tab");
+    press(cx, "enter");
+    settle(cx);
+    assert_eq!(*log.changes.borrow(), [None]);
+}
+
+#[gpui::test]
+fn fr12_a_disabled_sheet_field_never_opens(cx: &mut TestAppContext) {
+    let (cx, _) = sheet(cx, Some(d(2026, 11, 18)), |f| f.disabled(true));
+    open_sheet(cx);
+    assert!(bounds_of(cx, sheet_day(d(2026, 11, 18))).is_none());
+}
+
+#[gpui::test]
+fn reset_clears_the_date_and_returns_to_today_s_month(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(d(2027, 2, 4)), |f| f);
+    open_sheet(cx);
+    assert!(shows_month_of(cx, d(2027, 2, 4)));
+    // Focus enters on the month-and-year button: the arrows, then Reset.
+    press(cx, "tab");
+    press(cx, "tab");
+    press(cx, "tab");
+    press(cx, "enter");
+    wait(cx, 1000);
+    assert_eq!(*log.changes.borrow(), [None]);
+    assert!(shows_month_of(cx, d(2026, 11, 25)), "today's month");
+}
