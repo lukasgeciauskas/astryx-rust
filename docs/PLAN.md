@@ -378,6 +378,17 @@ The remaining primitives:
     and typeahead (AR1); focus kept when a branch collapses around it (AR2); and the
     theme's `tree-disclosure` mark (FR10). Theme indicators (`indicator::set_theme_indicator`,
     Indicator FR7) also give Spinner a theme's `spinner` picture.
+  - Long-list windowing (done): `astryx_primitives::list_window`, upstream's one private
+    windowing module (`virtualization/`, `architecture:list-windowing`). The fixed-pitch
+    window with four rows of overscan, the range over items of varying size, first-visible-key
+    anchoring and the focus island are ported with upstream's tests. The record's FR1-FR4,
+    where upstream has gaps, are built too: the end (follow) and given-item anchors,
+    measured rows of varying size, and container and page scroll (`WindowedList` reads its
+    place under every clip above it and moves the scroller it sits in, its own or the
+    page's `ScrollHost`, which the gallery provides). Both axes, with the inline insets and
+    right-to-left. Table's row and column virtualization (M7) are its consumers; Selector
+    renders every option, as upstream's does. INV5's byte budget measures a JavaScript
+    bundle and has no Rust counterpart.
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.

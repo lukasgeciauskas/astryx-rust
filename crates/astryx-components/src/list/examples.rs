@@ -116,5 +116,52 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                 }),
             ),
         )
+        .child(label(
+            "Windowed: 10,000 rows, opened at row 5,000; only rows in view render",
+        ))
+        .child(windowed(window, cx))
+        .into_any_element()
+}
+
+/// A long list through the shared windowing module: the rows that show,
+/// plus four past each edge, render; the rest are gaps of their size.
+fn windowed(window: &mut Window, cx: &mut App) -> AnyElement {
+    use astryx_primitives::{ListAnchor, ListPitch, ListWindowKey, WindowedList};
+    use gpui::{InteractiveElement, StatefulInteractiveElement};
+    let theme = astryx_theme::current(window, cx);
+    let t = theme.tokens();
+    let keys: std::rc::Rc<[ListWindowKey]> = (0..10_000usize).map(ListWindowKey::from).collect();
+    let scroll = window
+        .use_keyed_state("list-windowed-scroll", cx, |_, _| gpui::ScrollHandle::new())
+        .read(cx)
+        .clone();
+    gpui::div()
+        .id("list-windowed-scroller")
+        .w(px(320.))
+        .h(px(280.))
+        .border_1()
+        .border_color(t.color.border)
+        .rounded(t.radius.container)
+        .overflow_y_scroll()
+        .track_scroll(&scroll)
+        .child(
+            List::new("windowed").label("Ten thousand rows").child(
+                WindowedList::new(
+                    "windowed-rows",
+                    keys,
+                    ListPitch::Estimated(px(48.)),
+                    |i, _, _| {
+                        ListItem::new(("row", i), format!("Row {}", i + 1))
+                            .description(format!("Item {} of 10,000", i + 1))
+                            .on_click(|_, _, _| {})
+                            .into_any_element()
+                    },
+                )
+                .scroll(&scroll)
+                .anchor(ListAnchor::Item(ListWindowKey::from(4999usize)))
+                .initial_viewport(px(280.))
+                .w_full(),
+            ),
+        )
         .into_any_element()
 }

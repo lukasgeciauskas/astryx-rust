@@ -13,6 +13,8 @@ pub mod hotkeys;
 pub mod layer;
 pub mod link;
 pub mod list_focus;
+#[doc(hidden)]
+pub mod list_window;
 pub mod modality;
 pub mod props;
 pub mod size;
@@ -33,6 +35,10 @@ pub use layer::{
 };
 pub use link::{LinkHandler, Navigation, link_provider, set_link_handler, use_link_handler};
 pub use list_focus::{ListFocus, ListKeys, ListOrientation};
+#[doc(hidden)]
+pub use list_window::{
+    ListAnchor, ListPitch, ListWindowKey, ScrollHost, WindowedList, WindowedListAxis,
+};
 pub use modality::{
     InteractionModality, interaction_modality, is_focus_visible, is_focus_within_visible,
     prefers_reduced_motion, set_reduced_motion,

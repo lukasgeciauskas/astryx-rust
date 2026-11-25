@@ -16,6 +16,14 @@
 
 ## Components
 
+- **A windowed list needs its scroller to hold its anchor.** `WindowedList` windows from
+  the clips above it wherever it sits. To keep its first visible row (or its end, or a
+  given item) in place as rows change, it must move the scroller, so it needs a
+  `ScrollHandle`: its `.scroll(..)`, or the nearest `ScrollHost` a page provides. Without
+  one, rows still window but the scroll position does not follow the changes, and a scroll
+  mounts its new rows one frame late. Rows the List does not hold directly get no
+  dividers, so a windowed List draws none.
+
 - **Butter's status fields show no status border, as upstream's do.** Butter's
   `text-input` base rule sets `borderColor` in the theme layer, which outranks the status
   border in upstream's CSS too; only the status icon and message show the status. The port

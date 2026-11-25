@@ -183,7 +183,11 @@ impl Render for Gallery {
                             .min_w_0()
                             .overflow_y_scroll()
                             .p(t.spacing.s8)
-                            .child(self.page.render(&resolved, window, cx)),
+                            // The page's scroller, for windowed lists on it.
+                            .child(astryx::primitives::provide(
+                                astryx::primitives::ScrollHost(self.scroll.clone()),
+                                self.page.render(&resolved, window, cx),
+                            )),
                     ),
             )
             // Toasts shown from any page.
