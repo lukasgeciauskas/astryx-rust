@@ -10,9 +10,10 @@
 //!   to English, then to the key itself.
 
 mod catalog;
+pub mod date;
 pub mod datetime;
 mod local;
-mod locale;
+pub(crate) mod locale;
 mod logical;
 pub mod message;
 pub mod number;

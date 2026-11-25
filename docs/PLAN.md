@@ -495,6 +495,22 @@ The remaining primitives:
     the full and windowed bodies share.
 - **M8 Dates:** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
   DateRangeInput, DateTimeInput, TimeInput.
+  - Stage 1 (done): calendar systems and Calendar. `astryx_i18n::date` ports
+    `plainDate`, `calendarSystem`, `calendarDateParser`, `dateParser`, `timeParser` and
+    `timeFormat`: ICU4X's `icu_calendar` does Temporal's arithmetic (month codes,
+    constrain and reject) and `icu_datetime` writes Intl's text, read as parts. The typed
+    date parser learns each locale and calendar from that output and passes upstream's
+    round-trip matrix (every calendar, native locales, English and Swedish, 1900-2100,
+    FR9-FR14). A locale's `-u-ca-` keyword never picks a calendar, Timestamp included
+    (FR2). `tools/export/export-cldr.mjs` exports upstream's weekday-header and
+    month-capital tables and Intl's calendar and week-field names into `spec/cldr.json`.
+    Calendar: one or two APG month grids, a roving tab stop per month, the keyboard model
+    resolving its target day by date (arrows skip disabled days and cross months, Page
+    keys step calendar months, Shift+Page calendar years), single and range selection
+    with spans and announcements, week numbers, bounds, constraints, the handle, theme
+    targets (`calendar`, `calendar-nav`, `calendar-day`, `calendar-range`,
+    `calendar-range-preview`), and the public `use_calendar_days`,
+    `use_calendar_navigation` and `use_calendar_constraints`.
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
     `entryErrorBehavior: complete` (`table/filtering.rs` shows none until then).
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

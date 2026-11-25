@@ -72,20 +72,20 @@ impl NumberSymbols {
     }
 }
 
-fn nfkc(text: &str) -> Cow<'_, str> {
+pub(crate) fn nfkc(text: &str) -> Cow<'_, str> {
     ComposingNormalizerBorrowed::new_nfkc().normalize(text)
 }
 
 /// Upstream `INVISIBLE_CHARS`: zero-width and bidirectional marks that
 /// copied numbers carry.
-fn is_invisible(ch: char) -> bool {
+pub(crate) fn is_invisible(ch: char) -> bool {
     matches!(
         ch,
         '\u{200B}'..='\u{200F}' | '\u{061C}' | '\u{2066}'..='\u{2069}' | '\u{FEFF}'
     )
 }
 
-fn strip_invisible(text: &str) -> String {
+pub(crate) fn strip_invisible(text: &str) -> String {
     text.chars().filter(|&ch| !is_invisible(ch)).collect()
 }
 

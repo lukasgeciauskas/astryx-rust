@@ -3,6 +3,7 @@
 
 pub mod breadcrumbs;
 pub mod button;
+pub mod calendar;
 pub mod choice;
 pub mod collapsible;
 pub mod complex_selector;

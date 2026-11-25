@@ -5,11 +5,13 @@
 //! - `crates/astryx-themes/src/generated/*.rs`: one module per theme.
 //! - `crates/astryx-icons/src/generated.rs`: the embedded icon files.
 //! - `crates/astryx-i18n/src/generated/catalogs.rs`: message catalogs.
+//! - `crates/astryx-i18n/src/generated/cldr.rs`: CLDR tables for dates.
 //! - `docs/theme-overrides-todo.md`: overrides that need a hand port.
 //!
 //! `--check` writes nothing and fails when any file differs from what it
 //! would generate.
 
+mod cldr;
 mod literal;
 mod locales;
 mod themes;
@@ -147,6 +149,10 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
     files.push((
         PathBuf::from("crates/astryx-i18n/src/generated/catalogs.rs"),
         rustfmt(&locales::render(&spec)?)?,
+    ));
+    files.push((
+        PathBuf::from("crates/astryx-i18n/src/generated/cldr.rs"),
+        rustfmt(&cldr::render(&spec)?)?,
     ));
     files.push((
         PathBuf::from("docs/theme-overrides-todo.md"),

@@ -98,14 +98,23 @@ fn icu_zone_of(
         .with_zone_name_timestamp(ZoneNameTimestamp::from_epoch_seconds(unix_seconds))
 }
 
-/// The locale with a calendar keyword, as `Intl` takes `-u-ca-`.
+/// The locale with its calendar keyword set to `calendar`: a `-u-ca-`
+/// keyword the locale carries never chooses the calendar (AST-111 FR2).
 fn with_calendar(locale: &Locale, calendar: CalendarSystem) -> Locale {
-    if calendar == CalendarSystem::Gregory {
-        return locale.clone();
+    let mut locale = locale.clone();
+    let id = if calendar == CalendarSystem::Iso8601 {
+        "gregory"
+    } else {
+        calendar.identifier()
+    };
+    if let Ok(value) = icu_locale::extensions::unicode::Value::try_from_str(id) {
+        locale
+            .extensions
+            .unicode
+            .keywords
+            .set(icu_locale::extensions::unicode::key!("ca"), value);
     }
-    format!("{}-u-ca-{}", locale.id, calendar.identifier())
-        .parse()
-        .unwrap_or_else(|_| locale.clone())
+    locale
 }
 
 /// Formats an instant, upstream `formatInstant`.
@@ -348,6 +357,19 @@ mod tests {
         let utc = TimeZoneChoice::Iana("UTC".into());
         assert_eq!(f(InstantFormat::SystemTime, &utc, false), "21:51:07");
         assert_eq!(f(InstantFormat::UnixSeconds, &utc, false), "1742593867");
+    }
+
+    #[test]
+    fn a_locale_keyword_never_chooses_the_calendar() {
+        let text = format_instant(
+            &"th-TH-u-ca-buddhist".parse().unwrap(),
+            T0,
+            InstantFormat::Date,
+            &la(),
+            false,
+            CalendarSystem::Gregory,
+        );
+        assert!(text.contains("2025"), "{text}");
     }
 
     #[test]

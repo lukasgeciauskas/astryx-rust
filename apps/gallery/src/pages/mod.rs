@@ -31,6 +31,7 @@ pub enum Page {
     Wayfinding,
     Collections,
     Tables,
+    Dates,
 }
 
 impl Page {
@@ -56,6 +57,7 @@ impl Page {
         Page::Wayfinding,
         Page::Collections,
         Page::Tables,
+        Page::Dates,
     ];
 
     pub fn title(self) -> &'static str {
@@ -81,6 +83,7 @@ impl Page {
             Page::Wayfinding => "Wayfinding",
             Page::Collections => "Collections",
             Page::Tables => "Tables",
+            Page::Dates => "Dates",
         }
     }
 
@@ -106,6 +109,7 @@ impl Page {
             Page::Navigation => astryx::components::segmented::examples::examples(window, cx),
             Page::Wayfinding => astryx::components::pagination::examples::examples(window, cx),
             Page::Tables => astryx::components::table::examples::examples(window, cx),
+            Page::Dates => astryx::components::calendar::examples::examples(window, cx),
             Page::Collections => gpui::div()
                 .flex()
                 .flex_col()

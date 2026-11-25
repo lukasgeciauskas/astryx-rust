@@ -176,6 +176,27 @@
 - **The Menu key's name depends on the platform.** ContextMenu opens on Shift+F10 and on
   a key GPUI names `menu`, `contextmenu` or `apps`; a platform that names the Menu key
   otherwise opens it only with Shift+F10.
+- **Dates: ICU4X stands in for `Intl` and `Temporal` (M8).** Every calendar always works
+  (ICU4X compiles its data in), so upstream's Gregorian fallback for a runtime without
+  `Temporal` (AST-111 FR5) and the lunisolar server/browser caveat (FR19) never apply.
+  ICU4X's CLDR data differs from V8's in places, and the date code follows ICU4X's own
+  output so a field always reads back what it writes (FR13):
+  - Amharic writes Ethiopic dates month first (`2/23/2019 AM`), where V8 writes them day
+    first; typed Amharic Ethiopic dates read month first.
+  - ICU4X writes some locales' lunisolar days in Han numerals and Hebrew dates in Hebrew
+    letters; the shared formatter writes them in the locale's digits, as `Intl` does.
+    Numeric Hebrew months are their position in the year (FR9), not ICU4X's `06a`/`06b`.
+  - Some locales' numeric formats order fields differently from format to format
+    (Finnish Chinese dates are `1905 5 17` and `17.5.1905`; Arabic Coptic's weekday format
+    is month first); the parser learns each numeric format's separators and order.
+  - Calendar display names and the week-of-year field name come from Node's `Intl` at
+    export time (`spec/cldr.json`); a locale outside its list uses English.
+- **The Gregorian fallback parser approximates `new Date(text)` (M8).** `parse_date_input`'s
+  last step reads the date forms V8's lenient parser accepts (English month and weekday
+  names anywhere, M/D/Y and Y/M/D numbers, a time of day); stranger text V8 reads is not
+  read.
+- **No server render, so today is always known (M8).** Calendar FR12's hydration rules
+  (an empty month until today is known) have nothing to apply to.
 
 ## Tooling
 

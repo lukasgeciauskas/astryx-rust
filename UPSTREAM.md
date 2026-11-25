@@ -18,7 +18,9 @@ snapshots in `spec/` and never runs Node.
 1. Update `../Astryx`, then run `pnpm install` and
    `pnpm -F @astryxdesign/core build` there.
 2. Run `node tools/export/export-all.mjs ../Astryx` from this repository. It
-   rewrites `spec/`.
+   rewrites `spec/`. `spec/cldr.json` also takes calendar and week-field display names
+   from Node's own `Intl` (Node 22 or later, which imports upstream's generated `.ts`
+   tables directly), so use a current Node.
 3. Run `cargo xtask codegen` to regenerate the Rust sources from `spec/`.
 4. Run `cargo test --workspace`, and review the diff of `spec/` to see what
    changed upstream.

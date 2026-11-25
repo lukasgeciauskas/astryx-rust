@@ -5,14 +5,15 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-25, at the end of M7 (Table)._
+_Last updated: 2026-11-25, during M8 (Dates): stage 1 done._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6 and M7; M8 (Dates) is next. Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6 and M7; M8 (Dates) is under way
+  (stage 1, calendar systems and Calendar, is done). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 83 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 84 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** M7's seven stages, from `cceff1a` (Table and its parts)
   through sorting, selection and activation, pagination and filtering, tree and grouped
@@ -28,8 +29,7 @@ _Last updated: 2026-11-25, at the end of M7 (Table)._
 
 ### Not yet ported (27)
 
-- **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
-  TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
+- **M8:** DateInput, DateRangeInput, DateTimeInput, TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
@@ -176,7 +176,12 @@ families, selection's toolbar and activation), fork patches R14 and R15, tests i
 time controls (M8 below) and row expansion's glide (M11).
 
 M8 builds the date and time inputs on calendar systems (jiff + icu4x, AST-111): Calendar,
-DateInput (segmented), DateRangeInput, DateTimeInput and TimeInput. Carried into it:
+DateInput (segmented), DateRangeInput, DateTimeInput and TimeInput. Stage 1 is done: the
+date and time foundations in `astryx_i18n::date` (calendar arithmetic, formatting as parts,
+the typed date and time parsers) and Calendar with its three public hooks
+(`crates/astryx-components/src/calendar/`). The owner approved the calendar crates; ICU4X
+and jiff were already dependencies. Next: DateInput (stage 2), then TimeInput,
+DateTimeInput, DateRangeInput, and the carried items. Carried into M8:
 - PowerSearch's date and time values (`time`, `date_absolute`, `date_relative`,
   `date_range`, `timezoneID`, FR25, FR26).
 - FormLayout's `defaultEntryErrorBehavior` readers.

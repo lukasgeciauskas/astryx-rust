@@ -7,6 +7,7 @@
 pub mod anchored;
 pub mod announce;
 pub mod context;
+pub mod diagnostics;
 pub mod editing;
 pub mod focus;
 pub mod hotkeys;
@@ -25,6 +26,7 @@ pub mod typeahead;
 pub use anchored::{LayerAlign, LayerOptions, LayerPosition, Placement, position_layer};
 pub use announce::{Politeness, announce, announcer};
 pub use context::{Provider, provide, use_context, with_context};
+pub use diagnostics::dev_warn_once;
 pub use focus::{
     FocusNext, FocusPrevious, OutOfTabOrder, RovingScope, control_focus, request_focus,
     take_focus_request,

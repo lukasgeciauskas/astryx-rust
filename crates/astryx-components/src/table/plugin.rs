@@ -22,20 +22,7 @@ use gpui::{
 use super::model::{IdentityStatus, RowKey, TableColumn, TableItem};
 use crate::icon::IconSource;
 
-/// A development diagnostic, printed once per `key` in debug builds
-/// (upstream's deduplicated `devWarning`).
-pub(crate) fn dev_warn_once(key: &str, message: impl FnOnce() -> String) {
-    if !cfg!(debug_assertions) {
-        return;
-    }
-    thread_local! {
-        static SEEN: std::cell::RefCell<std::collections::HashSet<String>> =
-            std::cell::RefCell::default();
-    }
-    if SEEN.with(|s| s.borrow_mut().insert(key.to_string())) {
-        eprintln!("astryx: {}", message());
-    }
-}
+pub(crate) use astryx_primitives::dev_warn_once;
 
 /// A change to an element the table builds: handlers, attributes.
 pub type ElementHook = Box<dyn FnOnce(Stateful<Div>) -> Stateful<Div>>;

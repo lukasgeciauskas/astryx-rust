@@ -27,6 +27,8 @@ icu_properties.workspace = true
 icu_plurals.workspace = true
 icu_time.workspace = true
 jiff.workspace = true
+unicode-segmentation.workspace = true
+web-time.workspace = true
 writeable.workspace = true
 
 [dev-dependencies]
