@@ -23,7 +23,7 @@
 use std::rc::Rc;
 
 use astryx_i18n::{Arg, current as i18n, use_direction};
-use astryx_primitives::editing::{EditorStyle, FieldSettings, TextEditState, text_editor};
+use astryx_primitives::editing::TextEditState;
 use astryx_primitives::typeahead::is_shortcut_chord;
 use astryx_primitives::{
     ElementSize, EscapeBehavior, FocusNext, FocusPrevious, LayerAlign, LayerOptions, LayerPosition,
@@ -712,7 +712,7 @@ pub(crate) fn selector_state(
 
 /// The trigger's one-line box (upstream `sizeStyles`): the line, capped to
 /// what the size token holds, and the padding that centers it.
-fn trigger_line(
+pub(crate) fn trigger_line(
     size: ElementSize,
     t: &astryx_theme::Tokens,
     rem: Pixels,
@@ -1894,135 +1894,41 @@ impl Selector {
         };
 
         // The search row: a magnifier, a borderless field and a clear button.
+        let t18 = i18n(cx);
         let search_focus = gpui::Focusable::focus_handle(editor.read(cx), cx);
-        {
-            let (on_change, on_key) = (shared.clone(), shared.clone());
-            editor.update(cx, |e, _| {
-                e.set_settings(FieldSettings {
-                    spell_check: false,
-                    ..FieldSettings::default()
-                });
-                e.on_change = Some(Rc::new(
-                    move |text: String, window: &mut Window, cx: &mut App| {
-                        on_change.set_query(text, window, cx)
-                    },
-                ));
-                e.on_key_down = Some(Rc::new(
-                    move |event: &KeyDownEvent, window: &mut Window, cx: &mut App| {
+        let row = super::search_row::panel_search(
+            super::search_row::PanelSearch {
+                id: self.id.clone(),
+                editor: editor.clone(),
+                has_query: !ctx.query.is_empty(),
+                label: t18.t("@astryx.selector.searchOptions"),
+                placeholder: ctx.search_placeholder.clone(),
+                required: ctx.required,
+                pad_x,
+                target: "selector-search",
+                on_query: {
+                    let shared = shared.clone();
+                    Rc::new(move |text, window, cx| shared.set_query(text, window, cx))
+                },
+                on_key: {
+                    let shared = shared.clone();
+                    Rc::new(move |event, window, cx| {
                         let key = event.keystroke.key.as_str();
-                        if matches!(
+                        matches!(
                             key,
                             "down" | "up" | "pageup" | "pagedown" | "enter" | "escape"
-                        ) && on_key.combobox_key(event, window, cx)
-                        {
-                            cx.stop_propagation();
-                        }
-                    },
-                ));
-            });
-        }
-        let t18 = i18n(cx);
-        let search_label = t18.t("@astryx.selector.searchOptions");
-        let style = EditorStyle {
-            text_color: t.color.text_primary,
-            placeholder: Some(ctx.search_placeholder.clone()),
-            placeholder_color: t.color.text_secondary,
-            selection_color: crate::input::selection_color(t),
-            caret_color: t.color.text_primary,
-            multiline: false,
-            min_lines: 1,
-            max_lines: Some(1),
-            height: None,
-            reduced_motion: prefers_reduced_motion(cx),
-            spelling_color: t.color.error,
-        };
-        let field = text_editor("query", &editor, style, cx)
-            .flex_1()
-            .min_w_0()
-            .font_stack(&t.font.family.body)
-            .text_size(t.text.label.size)
-            .line_height(relative(t.text.label.leading))
-            .role(Role::ComboBox)
-            .aria_label(search_label.clone())
-            .aria_expanded(true)
-            .aria_required(ctx.required);
-        let clear = (!ctx.query.is_empty()).then(|| {
-            let (shared, editor, focus) = (shared.clone(), editor.clone(), search_focus.clone());
-            IconButton::new(
-                ElementId::Name(format!("{}-search-clear", self.id).into()),
-                t18.format(
-                    "@astryx.textInput.clearLabel",
-                    &[("label", search_label.as_ref().into())],
-                ),
-                Icon::new("close")
-                    .size(IconSize::Sm)
-                    .color(IconColor::Secondary),
-            )
-            .variant(ButtonVariant::Ghost)
-            .size(ElementSize::Sm)
-            .h(px(20.))
-            .on_click(move |_, window, cx| {
-                cx.stop_propagation();
-                editor.update(cx, |e, cx| e.set_text("", cx));
-                shared.set_query(String::new(), window, cx);
-                window.focus(&focus, cx);
-            })
-        });
-        let mut input_box = div()
-            .relative()
-            .flex()
-            .items_center()
-            .gap(t.spacing.s2)
-            .w_full()
-            .py(t.spacing.s1_5)
-            .px(t.spacing.s2)
-            .rounded(t.radius.element)
-            .child(
-                Icon::new("search")
-                    .size(IconSize::Sm)
-                    .color(IconColor::Secondary),
-            )
-            .child(field)
-            .children(clear);
-        // The keyboard's focus ring, inset (the field sits inside the panel).
-        if is_focus_visible(&search_focus, window) {
-            input_box = input_box.shadow(vec![gpui::BoxShadow {
-                color: t.color.accent,
-                offset: point(px(0.), px(0.)),
-                blur_radius: px(0.),
-                spread_radius: px(2.),
-                inset: true,
-            }]);
-        }
-        let mut row = div()
-            .id(ElementId::Name(format!("{}-search-row", self.id).into()))
-            .flex_none()
-            .py(t.spacing.s1)
-            .px(pad_x)
-            .child(input_box)
-            .child(focus_probe(&state, search_focus.clone()));
-        theme.refine(row.style(), "selector-search", &[], None);
-        // Tab: to the clear button while a query shows it, else out of the
-        // closing list (from the trigger, as upstream's focus return does).
-        {
-            let (shared, focus) = (shared.clone(), search_focus.clone());
-            row = row.on_action(move |_: &FocusNext, window, cx| {
-                let has_query = !shared.state.read(cx).query.is_empty();
-                if !(focus.is_focused(window) && has_query) {
-                    shared.close(window, cx);
-                }
-                cx.propagate();
-            });
-        }
-        {
-            let (shared, focus) = (shared.clone(), search_focus.clone());
-            row = row.on_action(move |_: &FocusPrevious, window, cx| {
-                if focus.is_focused(window) {
-                    shared.close(window, cx);
-                }
-                cx.propagate();
-            });
-        }
+                        ) && shared.combobox_key(event, window, cx)
+                    })
+                },
+                on_close: {
+                    let shared = shared.clone();
+                    Rc::new(move |window, cx| shared.close(window, cx))
+                },
+                focus_probe: focus_probe(&state, search_focus),
+            },
+            window,
+            cx,
+        );
         div()
             .flex()
             .flex_col()

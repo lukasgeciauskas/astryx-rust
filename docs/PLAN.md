@@ -331,6 +331,13 @@ The remaining primitives:
     tokens (FR17), one tall sheet with its bordered search, checkbox rows over a draft
     in stable order, the Create row, 50-row batches, the pinned footer, Clear all and
     discard confirmations, and Save reporting the last edit that holds (FR18-FR27).
+  - MultiSelector (done): count, labels and badge triggers (input, secondary, ghost),
+    a caller's trigger (`render_trigger`) and `MultiSelectorController`, checkbox rows
+    with select-all, sections and dividers, search with the Create row, the selection
+    order fixed at open, the grid popup for options with actions (arrow keys reach an
+    action cell; Enter presses its control), announcements, busy and read-only states,
+    and the shared sheet presentation (FR1-FR18). Selector and MultiSelector share the
+    panel's search row (`selector::search_row`).
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.

@@ -61,12 +61,17 @@
   `searchSource` object; a Rust value built in `render` is new every frame. A source kept
   in an `Rc` (`CommandPalette::from_rc`) or named with `source_key` re-runs the open
   palette's query when it changes (FR9); a plain `new(source)` never does.
-- **Selector's empty texts are text.** Upstream's `emptyText` and `emptySearchText`
-  take any node and announce the words it renders; here they are strings, which the
-  live region speaks. A trigger whose search makes it a button is always described as
+- **Selector's and MultiSelector's empty texts are text.** Upstream's `emptyText` and
+  `emptySearchText` take any node and announce the words it renders; here they are
+  strings, which the live region speaks. A trigger whose search makes it a button is always described as
   required when it is, since its name is the bare label (upstream's name can carry the
   label's marker).
-- **A Selector's `on_focus` misses focus coming back from its clear button.** GPUI's
+- **Enter on a MultiSelector action cell presses Astryx buttons only.** Upstream clicks
+  the first focusable control in the cell. GPUI cannot click an element from code, so
+  the cell presses what registered with it: controls on the shared press path (Button,
+  IconButton and what is built on them). A custom element with its own `on_click` in
+  an action cell answers the pointer only.
+- **A Selector's (or MultiSelector's) `on_focus` misses focus coming back from its clear button.** GPUI's
   focus-in listener does not fire when focus moves between an element and its
   descendants, and the clear button sits inside the trigger's box. A press on the clear
   button also focuses the trigger first, where upstream leaves focus as it was.

@@ -86,7 +86,7 @@
   `layout::host_children(children, padding, corners)`: `ContainerPadding`,
   `ContainerCorners` and each child's `ContainerChild` place, which full-bleed
   content (a Divider, a TabList, a bleeding List) reads.
-- **Comboboxes** (Selector, and MultiSelector after it): focus stays on the trigger or
+- **Comboboxes** (Selector, MultiSelector): focus stays on the trigger or
   the search field, and the highlighted option claims it with
   `aria_active_descendant_of(&focus)` (fork patch R13), since the list sits in
   another layer. The keys are `selector::combobox::Combobox::key` (pure; apply its
@@ -94,7 +94,13 @@
   and pick on the release of a press that began in the list (a window
   `MouseUpEvent` listener registered while the list is drawn), never on click.
   `AnchoredLayer::position_with` places a layer by any rule (Selector's selected
-  option over its trigger).
+  option over its trigger). (MultiSelector's rows toggle on click and keep the list
+  open, as upstream's do.) The panel's search row is `selector::search_row::panel_search`.
+- **Grids with action cells** (MultiSelector FR10): wrap the caller's control in
+  `provide(OutOfTabOrder, provide(ActionCell, ...))`. `OutOfTabOrder` takes every
+  `control_focus` under it out of the tab order; `press::ActionCell` collects the
+  activation of a control on the shared press path (Button, IconButton), so Enter on
+  the cell presses it with a keyboard `ClickEvent`.
 - **Tooltip props:** a component's `tooltip` goes through `overlay::with_tooltip(id,
   text, acts, el)`; `labelTooltip` is an InfoTip in the label row (`FieldLabel`);
   `disabledMessage` is `overlay::disabled_reason`, which shows on any focus; a tooltip

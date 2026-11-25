@@ -161,6 +161,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::typeahead::BASE_TYPEAHEAD_DOC,
     crate::typeahead::TYPEAHEAD_ITEM_DOC,
     crate::tokenizer::TOKENIZER_DOC,
+    crate::multi_selector::MULTI_SELECTOR_DOC,
 ];
 
 /// The registered doc for an upstream component name.

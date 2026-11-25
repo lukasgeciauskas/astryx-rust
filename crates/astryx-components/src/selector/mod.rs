@@ -10,6 +10,7 @@ pub(crate) mod combobox;
 pub mod examples;
 mod option;
 pub(crate) mod options;
+pub(crate) mod search_row;
 #[allow(clippy::module_inception)]
 mod selector;
 
@@ -18,6 +19,7 @@ mod tests;
 
 pub use option::SelectorOption;
 pub use options::{OptionActionFn, SelectorEntry, SelectorOptionData, selectable_options};
+pub(crate) use selector::trigger_line;
 pub use selector::{Selector, SelectorIndicatorPosition, SelectorVariant};
 
 use crate::doc::{ComponentDoc, PropMapping, RustApi};

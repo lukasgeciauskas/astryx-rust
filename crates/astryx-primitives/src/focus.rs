@@ -58,6 +58,7 @@ pub fn init(cx: &mut App) {
 ///
 /// Inside a [`RovingScope`] (a Toolbar), the control registers with the
 /// scope and is a tab stop only while it is the scope's active control.
+/// Under [`OutOfTabOrder`] it is no tab stop.
 pub fn control_focus(id: &gpui::ElementId, window: &mut Window, cx: &mut App) -> FocusHandle {
     let handle = window
         .use_keyed_state(
@@ -67,6 +68,9 @@ pub fn control_focus(id: &gpui::ElementId, window: &mut Window, cx: &mut App) ->
         )
         .read(cx)
         .clone();
+    if crate::use_context::<OutOfTabOrder>(cx).is_some() {
+        return handle.tab_stop(false);
+    }
     match crate::use_context::<RovingScope>(cx) {
         Some(scope) => {
             let active = scope.register(&handle);
@@ -75,6 +79,12 @@ pub fn control_focus(id: &gpui::ElementId, window: &mut Window, cx: &mut App) ->
         None => handle,
     }
 }
+
+/// Provided around controls that are reached some other way than Tab (a
+/// grid's action cells, which the arrow keys reach; upstream
+/// `tabIndex={-1}`): each control's focus handle is no tab stop.
+#[derive(Clone, Copy, Debug)]
+pub struct OutOfTabOrder;
 
 #[derive(Default)]
 struct RovingState {

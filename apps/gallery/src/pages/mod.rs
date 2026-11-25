@@ -113,6 +113,12 @@ impl Page {
                 .child(astryx::components::typeahead::examples::examples(
                     window, cx,
                 ))
+                .child(astryx::components::tokenizer::examples::examples(
+                    window, cx,
+                ))
+                .child(astryx::components::multi_selector::examples::examples(
+                    window, cx,
+                ))
                 .into_any_element(),
         }
     }

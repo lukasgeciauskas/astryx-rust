@@ -17,6 +17,35 @@ use crate::focus::focus_ring;
 
 pub(crate) type ClickFn = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 
+/// Provided around a grid's action cell (MultiSelector FR10): the control
+/// in it registers its activation here, so Enter on the cell presses it
+/// (upstream clicks the cell's first control).
+#[derive(Clone, Default)]
+pub(crate) struct ActionCell(Rc<std::cell::RefCell<Option<ClickFn>>>);
+
+impl ActionCell {
+    /// Presses the registered control; false when there is none.
+    pub(crate) fn activate(
+        &self,
+        bounds: gpui::Bounds<Pixels>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> bool {
+        let f = self.0.borrow().clone();
+        match f {
+            Some(f) => {
+                let event = ClickEvent::Keyboard(gpui::KeyboardClickEvent {
+                    button: gpui::KeyboardButton::Enter,
+                    bounds,
+                });
+                f(&event, window, cx);
+                true
+            }
+            None => false,
+        }
+    }
+}
+
 /// How a control presses.
 pub(crate) struct Press<'a> {
     /// The resting fill the overlays composite over (`None` is clear).
@@ -69,6 +98,11 @@ pub(crate) fn apply_press(
             .hover(move |_| hover)
             .active(move |_| active);
         if let Some(on_click) = on_click {
+            if let Some(cell) = astryx_primitives::use_context::<ActionCell>(cx)
+                && cell.0.borrow().is_none()
+            {
+                *cell.0.borrow_mut() = Some(on_click.clone());
+            }
             el = el.on_click(move |event, window, cx| {
                 // A control's click is its own; a ClickableCard around it
                 // never sees it (upstream: the card fires on its surface only).
