@@ -107,6 +107,28 @@ impl PlainTime {
         self.hour as u32 * 3600 + self.minute as u32 * 60 + self.second as u32
     }
 
+    /// The time of day in the system's time zone, or the time
+    /// [`set_time_now`] holds.
+    pub fn now() -> Self {
+        if let Some(now) = NOW.with(std::cell::Cell::get) {
+            return now;
+        }
+        let seconds = web_time::SystemTime::now()
+            .duration_since(web_time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or_default();
+        let timestamp =
+            jiff::Timestamp::from_second(seconds).unwrap_or(jiff::Timestamp::UNIX_EPOCH);
+        let time = timestamp
+            .to_zoned_datetime(jiff::tz::TimeZone::system())
+            .time();
+        Self {
+            hour: time.hour() as u8,
+            minute: time.minute() as u8,
+            second: time.second() as u8,
+        }
+    }
+
     /// The time without its seconds when `include_seconds` is false, as a
     /// round trip through `formatISOTime` leaves it.
     pub fn truncated(self, include_seconds: bool) -> Self {
@@ -126,6 +148,16 @@ impl fmt::Display for PlainTime {
             write!(f, "{:02}:{:02}:{:02}", self.hour, self.minute, self.second)
         }
     }
+}
+
+thread_local! {
+    static NOW: std::cell::Cell<Option<PlainTime>> = const { std::cell::Cell::new(None) };
+}
+
+/// Holds the time [`PlainTime::now`] answers on this thread, or releases it
+/// with `None`: for tests and screenshots.
+pub fn set_time_now(now: Option<PlainTime>) {
+    NOW.with(|cell| cell.set(now));
 }
 
 /// "2:30 PM" for 14:30 (`formatDisplayTime12h`).

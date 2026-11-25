@@ -62,8 +62,6 @@ pub enum LegacyNativePicker {
 /// The surface a presentation renders now.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Surface {
-    // TimeInput's typed field alone; TimeInput lands in the next M8 stage.
-    #[allow(dead_code)]
     TextInput,
     Desktop,
     Sheet,
@@ -102,7 +100,6 @@ pub(crate) fn effective_picker(
 
 /// The effective policy of TimeInput (`effectiveInputPresentation`): its
 /// released `never` is the typed field.
-#[allow(dead_code)]
 pub(crate) fn effective_input(
     presentation: Option<InputPresentation>,
     native_picker: Option<LegacyNativePicker>,
@@ -172,7 +169,6 @@ pub(crate) fn resolve_picker(presentation: PickerPresentation, coarse: bool) -> 
 }
 
 /// The surface any policy renders (`resolveInputPresentation`).
-#[allow(dead_code)]
 pub(crate) fn resolve_input(presentation: InputPresentation, coarse: bool) -> Surface {
     let picker = match presentation {
         InputPresentation::TextInput => return Surface::TextInput,

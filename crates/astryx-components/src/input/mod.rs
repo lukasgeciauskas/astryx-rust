@@ -4,7 +4,7 @@
 
 pub(crate) mod control;
 pub mod examples;
-mod field_menu;
+pub(crate) mod field_menu;
 pub(crate) mod file_input;
 pub(crate) mod group;
 pub(crate) mod number_input;

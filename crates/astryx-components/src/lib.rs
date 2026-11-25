@@ -43,6 +43,7 @@ pub mod table;
 pub mod tabs;
 pub mod text;
 pub mod time;
+pub mod time_input;
 pub mod token;
 pub mod tokenizer;
 pub mod toolbar;

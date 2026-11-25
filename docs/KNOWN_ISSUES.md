@@ -195,6 +195,8 @@
   last step reads the date forms V8's lenient parser accepts (English month and weekday
   names anywhere, M/D/Y and Y/M/D numbers, a time of day); stranger text V8 reads is not
   read.
+- **TimeInput commits a typed prefix (M8).** As upstream (its FR3 implementation gap),
+  typing "2.30pm" in English commits 02:00 as soon as "2" parses, and keeps it at blur.
 - **No server render, so today is always known (M8).** Calendar FR12's hydration rules
   (an empty month until today is known) have nothing to apply to.
 

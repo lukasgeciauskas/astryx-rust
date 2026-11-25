@@ -116,6 +116,9 @@ impl Page {
                 .child(astryx::components::date_input::examples::examples(
                     window, cx,
                 ))
+                .child(astryx::components::time_input::examples::examples(
+                    window, cx,
+                ))
                 .child(astryx::components::calendar::examples::examples(window, cx))
                 .into_any_element(),
             Page::Collections => gpui::div()

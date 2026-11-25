@@ -525,6 +525,13 @@ The remaining primitives:
     its reason, the format hint and calendar description (AR9), InputGroup membership, and
     AST-043's presentation vocabulary (`date_input/presentation.rs`); the sheet and native
     surfaces come in later stages.
+  - Stage 3 (done): TimeInput's typed field (`time_input/`): a draft that commits as soon
+    as it parses to an in-range time, in the locale's digits, separators and day periods
+    (FR3), ArrowUp and ArrowDown stepping by `increment` from the value or now with a
+    polite announcement (FR4), the locale's hour cycle or `hour_format` with the format
+    hint (FR5), Enter and blur commits that keep a rejected draft (`time_input/typed.rs`,
+    upstream `useTypedTime`, FR13-FR15), clear, `changeAction`, disabled with its reason,
+    and InputGroup membership with its status announced through the shared channel (FR10).
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
     `entryErrorBehavior: complete` (`table/filtering.rs` shows none until then).
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

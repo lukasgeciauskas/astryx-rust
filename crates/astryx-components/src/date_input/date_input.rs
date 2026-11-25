@@ -681,6 +681,16 @@ impl RenderOnce for DateInput {
             .read(cx)
             .clone();
         control = control.track_focus(&field_focus.clone().tab_stop(false));
+        // The browser's text-field context menu.
+        control = crate::input::field_menu::with_field_menu(
+            control,
+            &self.id,
+            &editor_state,
+            &focus,
+            self.disabled,
+            window,
+            cx,
+        );
 
         // The calendar toggle, before the text (upstream's `<button>`).
         let toggle_id = ElementId::Name(format!("{}-toggle", self.id).into());
