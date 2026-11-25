@@ -533,6 +533,7 @@ impl RenderOnce for Pagination {
                         dot = dot.child(focus_ring(t, dot_size.to_pixels(rem) / 2., rem));
                     }
                     dot.role(Role::RadioButton)
+                        .aria_disabled(self.disabled)
                         .aria_label(
                             i18n.format("@astryx.pagination.goToPage", &[("page", (i + 1).into())]),
                         )

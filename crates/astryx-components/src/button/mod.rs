@@ -577,7 +577,11 @@ impl RenderOnce for Button {
         } else {
             Role::Button
         };
-        let mut el = el.role(role).aria_label(self.label);
+        let mut el = el
+            .role(role)
+            .aria_label(self.label)
+            .aria_disabled(disabled)
+            .aria_busy(busy);
         if let Some(pressed) = self.pressed {
             el = el.aria_toggled(if pressed {
                 gpui::Toggled::True

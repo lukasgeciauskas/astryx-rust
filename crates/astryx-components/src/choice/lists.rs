@@ -50,6 +50,12 @@ impl GroupField {
         }
     }
 
+    fn invalid(&self) -> bool {
+        self.status
+            .as_ref()
+            .is_some_and(|s| s.status == crate::field::StatusType::Error)
+    }
+
     fn field(&self, id: &ElementId) -> Field {
         let mut field = Field::new(
             ElementId::Name(format!("{id:?}-field").into()),
@@ -373,6 +379,7 @@ impl RenderOnce for RadioList {
                 });
             }
             row.role(Role::RadioButton)
+                .aria_disabled(item_disabled)
                 .aria_label(item.aria_label.unwrap_or(item.label))
                 .aria_toggled(if checked {
                     Toggled::True
@@ -400,6 +407,11 @@ impl RenderOnce for RadioList {
             .on_key_down(list.key_down_listener())
             .role(Role::RadioGroup)
             .aria_label(self.field.label.clone())
+            .aria_disabled(self.field.disabled)
+            .aria_required(
+                crate::field::resolve(self.field.required, self.field.optional, cx).required,
+            )
+            .aria_invalid(self.field.invalid())
             .children(rows);
         self.field.field(&self.id).child(group)
     }
@@ -693,6 +705,9 @@ impl RenderOnce for CheckboxList {
                     });
             }
             row.role(Role::CheckBox)
+                .aria_disabled(disabled)
+                .aria_busy(busy)
+                .aria_read_only(self.read_only)
                 .aria_label(item.aria_label.unwrap_or(item.label))
                 .aria_toggled(match state {
                     IndicatorState::Unchecked => Toggled::False,
@@ -716,6 +731,8 @@ impl RenderOnce for CheckboxList {
             .id(ElementId::Name(format!("{:?}-group", self.id).into()))
             .role(Role::Group)
             .aria_label(self.field.label.clone())
+            .aria_disabled(self.field.disabled)
+            .aria_invalid(self.field.invalid())
             .children(rows);
         self.field.field(&self.id).child(list)
     }

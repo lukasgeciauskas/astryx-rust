@@ -58,6 +58,10 @@ pub(crate) struct ChoiceRow {
     pub disabled: bool,
     /// Busy or read-only: focusable at full opacity, but never toggles.
     pub inert: bool,
+    /// Busy, for assistive technology (`aria-busy`).
+    pub busy: bool,
+    /// Read-only, for assistive technology (`aria-readonly`).
+    pub read_only: bool,
     pub position: LabelPosition,
     pub spacing: LabelSpacing,
     pub status: Option<InputStatus>,
@@ -142,10 +146,19 @@ impl ChoiceRow {
         if let Some(description) = &self.label.description {
             name = format!("{name}, {description}");
         }
+        let invalid = self
+            .status
+            .as_ref()
+            .is_some_and(|s| s.status == crate::field::StatusType::Error);
         let row = row
             .role(self.role)
             .aria_label(SharedString::from(name))
-            .aria_toggled(self.toggled);
+            .aria_toggled(self.toggled)
+            .aria_disabled(self.disabled)
+            .aria_busy(self.busy)
+            .aria_read_only(self.read_only)
+            .aria_required(self.label.required && !self.label.optional)
+            .aria_invalid(invalid);
 
         let status = self.status.and_then(|status| {
             status.message.map(|message| {

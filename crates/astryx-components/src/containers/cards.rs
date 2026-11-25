@@ -122,7 +122,10 @@ impl PressableCard {
         if is_focus_visible(&focus, window) {
             el = el.child(focus_ring(t, radius, rem));
         }
-        let el = el.role(role).aria_label(self.label);
+        let el = el
+            .role(role)
+            .aria_label(self.label)
+            .aria_disabled(self.disabled);
         match toggled {
             Some(toggled) => el.aria_toggled(toggled),
             None => el,

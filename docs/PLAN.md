@@ -222,11 +222,22 @@ The remaining primitives:
     Item's core (from M6; swipe actions wait for M11).
   - Carried into later milestones, recorded in each doc: tooltips, InfoTips and disabled
     messages (M5); TabMenu, BreadcrumbItem menus and Pagination's page-size selector (M5);
-    Pagination's input box (M4); the SegmentedControl lens and Item swipe actions (M11);
+    the SegmentedControl lens and Item swipe actions (M11);
     Stepper's on-track indicators and collapsed horizontal mode (to schedule).
   - A gallery test renders every page, so an example that panics fails `cargo test`.
-- **M4 Editing engine & fields:** TextInput, TextArea, NumberInput, InputGroup, FormLayout,
-  FileInput (`cx.prompt_for_paths`); Field's attached status meets its bordered inputs.
+- **M4 Editing engine & fields (done):**
+  - GPUI fork patch R6 (ARIA states: disabled, read-only, required, invalid, busy, modal,
+    multiselectable), adopted by every control.
+  - Primitives: `editing` (EditBuffer: graphemes, words, selection, IME composition,
+    undo; TextEditState: the IME client, editing actions and key bindings, mouse
+    selection, masking, insert filters, paste/focus/blur/key callbacks; the editor
+    element: wrapping, selection, caret blink, scrolling).
+  - i18n: locale number parsing (`parse_number`, `editable_number`, `number_symbols`) and
+    `conjunction` lists.
+  - Components: TextInput, TextArea, NumberInput, InputGroup(+Text), FormLayout, FileInput,
+    Field (attached, detached and tooltip status), Pagination's input box.
+  - Carried into later milestones, recorded in each doc: disabled-message, label and
+    status tooltips (M5); FormLayout's `defaultEntryErrorBehavior` readers (M8).
 - **M5 Layer runtime & overlays:** Tooltip, InfoTip, Popover, HoverCard, Overlay,
   Dialog(+Header, imperative), AlertDialog, Drawer, Toast(+viewport/queue), DropdownMenu
   (submenus, menu press), ContextMenu, MoreMenu, Lightbox, CommandPalette.

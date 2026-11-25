@@ -40,6 +40,12 @@
 - **Roving composites:** data-driven lists (RadioList, SegmentedControl, TabList) use
   `ListFocus`; a Toolbar of arbitrary controls uses `RovingScope`, which every control
   built on `control_focus` joins.
+- **Joined groups** (InputGroup, ButtonGroup): CSS's `:first-child` and `:last-child`
+  become a context the group provides around each direct child (its place), which the
+  member reads; a member clears it for its own insides. A joined member's focus ring is
+  painted `deferred` so the next member never covers it.
+- **Accessibility states:** set `aria_disabled`, `aria_read_only`, `aria_required`,
+  `aria_invalid` and `aria_busy` (fork patch R6) on the element that carries the role.
 - **Pressables** (Button and everything built on it) share `press::apply_press`, which
   provides:
   - a tab stop (`control_focus`);

@@ -533,6 +533,7 @@ impl RenderOnce for Slider {
             thumb
                 .role(Role::Slider)
                 .aria_label(name)
+                .aria_disabled(disabled)
                 .aria_numeric_value(v)
                 .aria_min_numeric_value(scale.min)
                 .aria_max_numeric_value(scale.max)

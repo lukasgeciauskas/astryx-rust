@@ -30,6 +30,15 @@ from another version may not exist here.
   `.key_context("MyContext").track_focus(&focus).on_action(cx.listener(|this, _: &Increment, window, cx| ..))`.
 - Focus: `let focus = cx.focus_handle();`, `window.focus(&focus, cx)`,
   `focus.is_focused(window)`.
+- A key that matches a binding dispatches its action first, and the action stops the
+  event: element `on_key_down` and `capture_key_down` listeners never see Backspace,
+  Enter or arrows in a text field. To see every key first, use
+  `cx.intercept_keystrokes(..)` (it runs before actions; `cx.stop_propagation()` there
+  cancels the action). The editing engine does this for `on_key_down`.
+- Enter and Space on a focused element with `on_click` arrive as a keyboard click
+  (`ClickEvent::Keyboard`); do not also handle them in `on_key_down`.
+- `cx.on_focus` and `cx.on_blur` (and every focus listener) fire only in the active
+  window. Test windows start inactive: call `window.activate_window()` first.
 
 ## Layout and style
 
@@ -74,3 +83,9 @@ from another version may not exist here.
   - Elements: `cx.add_empty_window().draw(origin, space, |window, cx| element)`.
   - Working examples: `crates/astryx-primitives/src/tests.rs`,
     `crates/astryx-theme/src/tests.rs`.
+  - Layout: give an element `.debug_selector(|| "name".into())` (a no-op in release) and
+    read `cx.debug_bounds("name")`. Astryx's text controls carry `<id>-control`.
+  - Text input: `cx.simulate_input("abc")`; file dialogs:
+    `cx.simulate_path_prompt_response(|_| Some(paths))`; OS file drops:
+    `cx.simulate_event(FileDropEvent::Entered { position, paths })`, then `Pending` and
+    `Submit`.

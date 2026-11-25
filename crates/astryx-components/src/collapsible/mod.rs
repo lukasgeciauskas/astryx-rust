@@ -234,7 +234,10 @@ impl RenderOnce for Collapsible {
         if is_focus_visible(&focus, window) {
             trigger = trigger.child(focus_ring(t, px(0.), rem));
         }
-        let trigger = trigger.role(Role::Button).aria_expanded(open);
+        let trigger = trigger
+            .role(Role::Button)
+            .aria_expanded(open)
+            .aria_disabled(self.disabled);
 
         let content = open.then(|| {
             let mut content = div()

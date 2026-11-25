@@ -304,6 +304,7 @@ impl RenderOnce for SegmentedControl {
                 seg = seg.child(focus_ring(t, inner_radius, rem));
             }
             seg.role(Role::RadioButton)
+                .aria_disabled(item_disabled)
                 .aria_label(item.label)
                 .aria_toggled(if is_selected {
                     Toggled::True
