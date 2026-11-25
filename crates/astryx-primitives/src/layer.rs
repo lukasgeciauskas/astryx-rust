@@ -140,6 +140,7 @@ pub fn layer(
         source: Location::caller(),
         depth: 0,
         min_depth: 0,
+        light_dismiss: true,
     }
 }
 
@@ -153,6 +154,7 @@ pub struct Layer {
     source: &'static Location<'static>,
     depth: usize,
     min_depth: usize,
+    light_dismiss: bool,
 }
 
 impl Layer {
@@ -166,6 +168,13 @@ impl Layer {
     /// What Escape does while this layer is topmost.
     pub fn escape(mut self, behavior: EscapeBehavior) -> Self {
         self.escape = behavior;
+        self
+    }
+
+    /// Whether a press outside the layer dismisses it; on by default. A
+    /// layer that covers the window takes its own presses.
+    pub fn light_dismiss(mut self, light_dismiss: bool) -> Self {
+        self.light_dismiss = light_dismiss;
         self
     }
 
@@ -341,8 +350,9 @@ impl Element for Layer {
     ) {
         let stack = window_stack(window, cx);
         let entry = Rc::downgrade(&state.0);
+        let light_dismiss = self.light_dismiss;
         window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
-            if phase != DispatchPhase::Capture {
+            if phase != DispatchPhase::Capture || !light_dismiss {
                 return;
             }
             let Some(entry) = entry.upgrade() else { return };

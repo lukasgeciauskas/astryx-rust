@@ -25,15 +25,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use astryx_i18n::{current as i18n, use_direction};
-use astryx_primitives::{EscapeBehavior, layer, prefers_reduced_motion, provide, use_context};
+use astryx_primitives::{prefers_reduced_motion, provide, use_context};
 use astryx_theme::{ThemeStyled, current};
 use gpui::{
     AnyElement, App, ElementId, Entity, FocusHandle, IntoElement, Length, MouseButton,
-    ParentElement, Pixels, Point, RenderOnce, Role, SharedString, StyleRefinement, Styled, Window,
-    div, point, prelude::*, px,
+    ParentElement, Pixels, RenderOnce, Role, SharedString, StyleRefinement, Styled, Window, div,
+    prelude::*, px,
 };
 use smallvec::SmallVec;
-use web_time::Instant;
 
 use crate::button::{ButtonVariant, IconButton};
 use crate::icon::Icon;
@@ -101,6 +100,18 @@ impl FocusScope {
     fn title(&self, focus: FocusHandle, text: SharedString) {
         *self.0.title.borrow_mut() = Some((focus, text));
     }
+
+    pub(crate) fn requested(&self) -> Option<FocusHandle> {
+        self.0.requested.borrow().clone()
+    }
+
+    pub(crate) fn title_focus(&self) -> Option<FocusHandle> {
+        self.0.title.borrow().as_ref().map(|(f, _)| f.clone())
+    }
+
+    pub(crate) fn title_text(&self) -> Option<SharedString> {
+        self.0.title.borrow().as_ref().map(|(_, t)| t.clone())
+    }
 }
 
 /// The focus scope of the layer being rendered, if any.
@@ -108,22 +119,13 @@ pub(crate) fn focus_scope(cx: &App) -> Option<FocusScope> {
     use_context::<FocusScope>(cx)
 }
 
-/// What a DialogHeader learns from its dialog.
+/// What a DialogHeader learns from its dialog: the inset it reaches past.
 #[derive(Clone, Copy)]
-struct DialogInset(Pixels);
+pub(crate) struct DialogInset(Pixels);
 
-/// A dialog's state between frames.
-struct DialogState {
-    open: bool,
-    return_to: Option<FocusHandle>,
-    surface: FocusHandle,
-    shown_at: Option<Instant>,
-    /// Where the entrance comes from: toward the opener.
-    direction: Point<Pixels>,
-    pending_focus: bool,
-    focus: FocusScope,
-    /// The header's title, the dialog's name, as of last frame.
-    title: Option<SharedString>,
+/// The inset a surface gives its DialogHeader or DrawerHeader.
+pub(crate) fn inset(padding: Pixels) -> DialogInset {
+    DialogInset(padding)
 }
 
 /// A modal surface that blocks the page until the user responds, upstream
@@ -229,49 +231,6 @@ impl Styled for Dialog {
     }
 }
 
-fn dialog_state(id: &ElementId, window: &mut Window, cx: &mut App) -> Entity<DialogState> {
-    window.use_keyed_state(
-        ElementId::Name(format!("{id}-dialog").into()),
-        cx,
-        |_, cx| DialogState {
-            open: false,
-            return_to: None,
-            surface: cx.focus_handle().tab_stop(false),
-            shown_at: None,
-            direction: point(px(0.), px(16.)),
-            pending_focus: false,
-            focus: FocusScope::default(),
-            title: None,
-        },
-    )
-}
-
-/// Moves focus in, right after the frame that first drew the surface.
-fn enter_focus(state: &Entity<DialogState>, window: &mut Window, cx: &mut App) {
-    let Some((surface, scope)) = state.update(cx, |s, _| {
-        std::mem::take(&mut s.pending_focus).then(|| (s.surface.clone(), s.focus.clone()))
-    }) else {
-        return;
-    };
-    // A control that focused itself keeps it.
-    if surface.contains_focused(window, cx) && window.focused(cx).as_ref() != Some(&surface) {
-        return;
-    }
-    if let Some(requested) = scope.0.requested.borrow().clone() {
-        requested.focus(window, cx);
-        return;
-    }
-    if let Some((title, _)) = scope.0.title.borrow().clone() {
-        title.focus(window, cx);
-        return;
-    }
-    surface.focus(window, cx);
-    window.focus_next(cx);
-    if window.focused(cx).is_none() {
-        surface.focus(window, cx);
-    }
-}
-
 impl RenderOnce for Dialog {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
@@ -308,48 +267,13 @@ impl RenderOnce for Dialog {
             return surface.into_any_element();
         }
 
-        let state = dialog_state(&self.id, window, cx);
-        // Open and close transitions, with their focus moves.
-        let was_open = state.read(cx).open;
-        if self.open != was_open {
-            if self.open {
-                let focused = window.focused(cx);
-                // The entrance comes from the opener's side: toward the
-                // pointer when a press opened it.
-                let viewport = window.viewport_size();
-                let direction = if window.last_input_was_keyboard() {
-                    point(px(0.), px(16.))
-                } else {
-                    let mouse = window.mouse_position();
-                    let dx = f32::from(mouse.x - viewport.width / 2.);
-                    let dy = f32::from(mouse.y - viewport.height / 2.);
-                    let dist = (dx * dx + dy * dy).sqrt().max(1.);
-                    point(px(dx / dist * 16.), px(dy / dist * 16.))
-                };
-                state.update(cx, |s, _| {
-                    s.open = true;
-                    s.return_to = focused;
-                    s.shown_at = None;
-                    s.direction = direction;
-                    s.pending_focus = true;
-                    s.focus = FocusScope::default();
-                });
-            } else {
-                let (surface, return_to) = state.update(cx, |s, _| {
-                    s.open = false;
-                    s.pending_focus = false;
-                    (s.surface.clone(), s.return_to.take())
-                });
-                let lost = window.focused(cx).is_none() || surface.contains_focused(window, cx);
-                if lost && let Some(target) = return_to {
-                    let target = target.clone();
-                    window.defer(cx, move |window, cx| target.focus(window, cx));
-                }
-            }
-        }
-        let wrapper = div().id(self.id.clone()).display_contents();
+        let state = super::modal::modal_state(&self.id, window, cx);
+        super::modal::sync_open(&state, self.open, window, cx);
         if !self.open {
-            return wrapper.into_any_element();
+            return div()
+                .id(self.id.clone())
+                .display_contents()
+                .into_any_element();
         }
 
         let viewport = window.viewport_size();
@@ -439,37 +363,7 @@ impl RenderOnce for Dialog {
         }
         theme.refine(surface.style(), "dialog", &[], None);
         surface.style().refine(&self.style);
-        // Focus enters once the surface has been drawn.
-        if state.read(cx).pending_focus {
-            let state = state.clone();
-            surface = surface.child(
-                gpui::canvas(
-                    |_, _, _| {},
-                    move |_, _, window, cx| {
-                        let state = state.clone();
-                        window.defer(cx, move |window, cx| enter_focus(&state, window, cx));
-                    },
-                )
-                .absolute()
-                .size_0(),
-            );
-        }
-        // The header names the dialog from the next frame.
-        {
-            let state = state.clone();
-            let scope = scope.clone();
-            surface = surface.child(
-                gpui::canvas(
-                    move |_, _, cx| {
-                        let title = scope.0.title.borrow().as_ref().map(|(_, t)| t.clone());
-                        state.update(cx, |s, _| s.title = title);
-                    },
-                    |_, _, _, _| {},
-                )
-                .absolute()
-                .size_0(),
-            );
-        }
+        let surface = surface.children(super::modal::probes(&state, cx));
         let surface = surface.child(provide(
             scope,
             provide(
@@ -482,28 +376,14 @@ impl RenderOnce for Dialog {
         // takes its presses, and places the surface.
         let position = self.position.unwrap_or_default();
         let info = self.purpose == DialogPurpose::Info;
-        let backdrop_close = close.clone();
-        let mut backdrop = div()
-            .id(ElementId::Name(format!("{}-backdrop", self.id).into()))
-            .absolute()
-            .top_0()
-            .left_0()
-            .w(viewport.width)
-            .h(viewport.height)
-            .occlude()
-            .flex()
-            .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                if info {
-                    backdrop_close(window, cx);
-                }
-            });
-        if !fullscreen {
-            let dim = gpui::Hsla {
-                a: t.color.overlay.a * eased,
-                ..t.color.overlay
-            };
-            backdrop = backdrop.bg(dim);
-        }
+        let press: super::modal::CloseFn = Rc::new(close.clone());
+        let mut backdrop = super::modal::backdrop(
+            &self.id,
+            (!fullscreen).then(|| super::modal::faded(t.color.overlay, eased)),
+            info.then_some(press),
+            window,
+        )
+        .flex();
         let (start, end) = if rtl {
             (position.end, position.start)
         } else {
@@ -521,19 +401,7 @@ impl RenderOnce for Dialog {
         };
         let backdrop = backdrop.child(surface);
 
-        let escape = if self.purpose == DialogPurpose::Required {
-            EscapeBehavior::Block
-        } else {
-            EscapeBehavior::Close
-        };
-        wrapper
-            .child(
-                layer(backdrop, close)
-                    .anchor(point(px(0.), px(0.)), gpui::Anchor::TopLeft)
-                    .modal()
-                    .escape(escape),
-            )
-            .into_any_element()
+        super::modal::modal_layer(&self.id, backdrop, true, self.purpose, close)
     }
 }
 
@@ -548,6 +416,9 @@ pub struct DialogHeader {
     start_content: Option<AnyElement>,
     end_content: Option<AnyElement>,
     divider: bool,
+    /// The title takes focus first and names the surface (a dialog's; a
+    /// drawer's does neither).
+    names: bool,
 }
 
 impl DialogHeader {
@@ -560,7 +431,16 @@ impl DialogHeader {
             start_content: None,
             end_content: None,
             divider: true,
+            names: true,
         }
+    }
+
+    /// A header whose title neither takes focus nor names the surface, and
+    /// with no divider unless asked (DrawerHeader).
+    pub(crate) fn plain(mut self) -> Self {
+        self.names = false;
+        self.divider = false;
+        self
     }
 
     astryx_primitives::setters! {
@@ -602,7 +482,9 @@ impl RenderOnce for DialogHeader {
             )
             .read(cx)
             .clone();
-        if let Some(scope) = focus_scope(cx) {
+        if self.names
+            && let Some(scope) = focus_scope(cx)
+        {
             scope.title(title_focus.clone(), self.title.clone());
         }
         let inset = use_context::<DialogInset>(cx).map_or(px(0.), |i| i.0);
@@ -623,16 +505,15 @@ impl RenderOnce for DialogHeader {
                 .tooltip(label)
                 .on_click(move |_, window, cx| f(false, window, cx))
         });
-        let title = div()
-            .id(ElementId::Name(
-                format!("dialog-header-title-{}", self.title).into(),
-            ))
-            .track_focus(&title_focus)
-            .child(
-                Heading::new(HeadingLevel::H2, self.title.clone()).id(ElementId::Name(
-                    format!("dialog-title-{}", self.title).into(),
-                )),
-            );
+        let mut title = div().id(ElementId::Name(
+            format!("dialog-header-title-{}", self.title).into(),
+        ));
+        if self.names {
+            title = title.track_focus(&title_focus);
+        }
+        let title = title.child(Heading::new(HeadingLevel::H2, self.title.clone()).id(
+            ElementId::Name(format!("dialog-title-{}", self.title).into()),
+        ));
         let title_block = div()
             .flex()
             .flex_col()

@@ -11,8 +11,9 @@ use crate::icon::Icon;
 use crate::input::TextInput;
 use crate::layout::{SpacingStep, Stack};
 use crate::overlay::{
-    AlertDialog, Dialog, DialogHeader, DialogPurpose, HoverCard, InfoTip, Overlay, OverlayPosition,
-    OverlayShowOn, Popover, PopoverRole, Tooltip,
+    AlertDialog, BottomSheet, Dialog, DialogHeader, DialogPurpose, Drawer, DrawerHeader, HoverCard,
+    InfoTip, Overlay, OverlayPosition, OverlayShowOn, Popover, PopoverPresentation, PopoverRole,
+    SheetHeight, SnapPoint, Tooltip,
 };
 use crate::text::{Text, TextType};
 
@@ -31,6 +32,11 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let (open_rename, close_rename) = (toggle(&rename_open, true), toggle(&rename_open, false));
     let (open_delete, close_delete) = (toggle(&delete_open, true), toggle(&delete_open, false));
     let close_rename_header = close_rename.clone();
+    let drawer_open = window.use_keyed_state("drawer-open", cx, |_, _| false);
+    let sheet_open = window.use_keyed_state("sheet-open", cx, |_, _| false);
+    let (open_drawer, close_drawer) = (toggle(&drawer_open, true), toggle(&drawer_open, false));
+    let (open_sheet, close_sheet) = (toggle(&sheet_open, true), toggle(&sheet_open, false));
+    let close_drawer_header = close_drawer.clone();
     let close_rename_cancel = close_rename.clone();
     let label = |text: &'static str| Text::new(text).text_type(TextType::Supporting);
     let placed = |id: &'static str, placement: Placement, text: &'static str| {
@@ -185,6 +191,67 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                     close_delete(window, cx)
                 }
             }),
+        )
+        .child(label("Drawer and BottomSheet"))
+        .child(
+            Stack::horizontal()
+                .gap(SpacingStep::S3)
+                .child(
+                    Button::new("drawer-button", "Inspect order")
+                        .variant(ButtonVariant::Secondary)
+                        .on_click(move |_, window, cx| open_drawer(window, cx)),
+                )
+                .child(
+                    Button::new("sheet-button", "Share")
+                        .variant(ButtonVariant::Secondary)
+                        .on_click(move |_, window, cx| open_sheet(window, cx)),
+                )
+                .child(
+                    Popover::new("sheet-popover", "Sort by")
+                        .presentation(PopoverPresentation::Adaptive)
+                        .content(
+                            Stack::vertical()
+                                .child(Button::new("sort-new", "Newest").variant(ButtonVariant::Ghost))
+                                .child(Button::new("sort-old", "Oldest").variant(ButtonVariant::Ghost)),
+                        )
+                        .child(Button::new("sort-button", "Sort").variant(ButtonVariant::Secondary)),
+                ),
+        )
+        .child(
+            Drawer::new("order-drawer", *drawer_open.read(cx), "Order 1042")
+                .on_open_change(move |open, window, cx| {
+                    if !open {
+                        close_drawer(window, cx)
+                    }
+                })
+                .child(
+                    DrawerHeader::new("Order 1042")
+                        .subtitle("Placed 2 hours ago")
+                        .on_open_change(move |_, window, cx| close_drawer_header(window, cx)),
+                )
+                .child(
+                    Stack::vertical()
+                        .gap(SpacingStep::S3)
+                        .child(Text::new("3 items, shipping to Lisbon.").text_type(TextType::Body))
+                        .child(TextInput::new("order-note", "Note", "")),
+                ),
+        )
+        .child(
+            BottomSheet::new("share-sheet", *sheet_open.read(cx), "Share")
+                .height(SheetHeight::Capped)
+                .snap_points([SnapPoint::Fraction(0.3)])
+                .on_open_change(move |open, window, cx| {
+                    if !open {
+                        close_sheet(window, cx)
+                    }
+                })
+                .child(
+                    Stack::vertical()
+                        .gap(SpacingStep::S2)
+                        .child(Text::new("Share").text_type(TextType::Label))
+                        .child(Button::new("share-copy", "Copy link").variant(ButtonVariant::Ghost))
+                        .child(Button::new("share-mail", "Email").variant(ButtonVariant::Ghost)),
+                ),
         )
         .child(label("Overlay"))
         .child(

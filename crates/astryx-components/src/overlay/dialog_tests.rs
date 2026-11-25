@@ -4,8 +4,9 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, Context, InteractiveElement as _, IntoElement, Modifiers, ParentElement, Render,
-    Styled, TestAppContext, VisualTestContext, Window, div, point, prelude::FluentBuilder as _, px,
+    AnyElement, Context, InteractiveElement as _, IntoElement, Modifiers, MouseButton,
+    ParentElement, Render, Styled, TestAppContext, VisualTestContext, Window, div, point,
+    prelude::FluentBuilder as _, px,
 };
 
 use super::*;
@@ -290,4 +291,119 @@ fn overlay_shows_on_hover_and_always(cx: &mut TestAppContext) {
     cx.simulate_mouse_move(point(px(100.), px(100.)), None, Modifiers::none());
     settle(cx);
     assert!(cx.debug_bounds("hover-scrim").is_some());
+}
+
+// ----------------------------------------------------------------------------
+// Drawer and BottomSheet
+
+#[test]
+fn a_released_sheet_rests_at_the_nearest_stop_or_dismisses() {
+    use super::sheet::settle;
+    let stops = [px(300.)];
+    assert_eq!(settle(px(600.), &stops, px(100.), true), Some(px(600.)));
+    assert_eq!(settle(px(600.), &stops, px(250.), true), Some(px(300.)));
+    // 150px showing is well under 300px less 40%.
+    assert_eq!(settle(px(600.), &stops, px(450.), true), None);
+    assert_eq!(settle(px(600.), &stops, px(450.), false), Some(px(300.)));
+}
+
+fn drawer(scrim: bool, clicks: Rc<Cell<usize>>) -> impl Fn(Rc<Cell<bool>>) -> AnyElement + 'static {
+    move |open| {
+        let close = open.clone();
+        let clicks = clicks.clone();
+        div()
+            .child(
+                div().debug_selector(|| "page-button".into()).child(
+                    Button::new("page-button", "Page")
+                        .on_click(move |_, _, _| clicks.set(clicks.get() + 1)),
+                ),
+            )
+            .child(
+                Drawer::new("d", open.get(), "Order 1042")
+                    .scrim(scrim)
+                    .on_open_change(move |is_open, window, _| {
+                        close.set(is_open);
+                        window.refresh();
+                    })
+                    .child(DrawerHeader::new("Order 1042"))
+                    .child(div().debug_selector(|| "d-content".into()).child("Details")),
+            )
+            .into_any_element()
+    }
+}
+
+#[gpui::test]
+fn a_drawer_closes_on_escape(cx: &mut TestAppContext) {
+    let (cx, open) = page(cx, drawer(true, Rc::default()));
+    open.set(true);
+    assert!(shown(cx));
+    press(cx, "escape");
+    assert!(!open.get());
+}
+
+#[gpui::test]
+fn a_drawer_without_a_scrim_leaves_the_page_interactive(cx: &mut TestAppContext) {
+    let clicks: Rc<Cell<usize>> = Rc::default();
+    let (cx, open) = page(cx, drawer(false, clicks.clone()));
+    open.set(true);
+    assert!(shown(cx));
+    // The page button sits on its own line under the opener.
+    cx.simulate_click(point(px(40.), px(68.)), Modifiers::none());
+    assert_eq!(clicks.get(), 1, "the page took the press");
+    assert!(open.get(), "and the drawer stayed open");
+}
+
+#[gpui::test]
+fn a_bottom_sheet_swiped_down_dismisses(cx: &mut TestAppContext) {
+    let (cx, open) = page(cx, |open| {
+        let close = open.clone();
+        BottomSheet::new("s", open.get(), "Filters")
+            .on_open_change(move |is_open, window, _| {
+                close.set(is_open);
+                window.refresh();
+            })
+            .child(div().debug_selector(|| "d-content".into()).child("Filters"))
+            .into_any_element()
+    });
+    open.set(true);
+    assert!(shown(cx));
+    let content = cx.debug_bounds("d-content").expect("shown");
+    // The handle band is the sheet's top 24px, above the content.
+    let handle = point(content.center().x, content.top() - px(20.));
+    cx.simulate_mouse_down(handle, MouseButton::Left, Modifiers::none());
+    settle(cx);
+    cx.simulate_mouse_move(
+        point(handle.x, px(760.)),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    cx.simulate_mouse_up(
+        point(handle.x, px(760.)),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    settle(cx);
+    assert!(!open.get(), "pulled away, it closed");
+}
+
+#[gpui::test]
+fn a_popover_can_present_as_a_sheet(cx: &mut TestAppContext) {
+    let (cx, _) = page(cx, |_| {
+        div()
+            .child(
+                Popover::new("p", "Filters")
+                    .presentation(PopoverPresentation::BottomSheet)
+                    .content(div().debug_selector(|| "d-content".into()).child("Options"))
+                    .child(Button::new("trigger", "Filters")),
+            )
+            .into_any_element()
+    });
+    // The trigger sits on its own line under the opener.
+    cx.simulate_click(point(px(40.), px(68.)), Modifiers::none());
+    assert!(shown(cx));
+    press(cx, "escape");
+    // It slides away, then is gone.
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(1));
+    assert!(!shown(cx));
 }

@@ -4,12 +4,15 @@
 mod alert_dialog;
 mod dialog;
 mod disclosure;
+mod drawer;
 pub mod examples;
 mod hover_card;
 mod info_tip;
+mod modal;
 mod motion;
-mod scrim;
 mod popover;
+mod scrim;
+mod sheet;
 mod tooltip;
 
 #[cfg(test)]
@@ -25,10 +28,12 @@ pub use dialog::{
     AutoFocus, Dialog, DialogController, DialogHeader, DialogPosition, DialogPurpose, DialogVariant,
 };
 pub(crate) use disclosure::disclosure;
+pub use drawer::{Drawer, DrawerHeader, DrawerSide};
 pub use hover_card::HoverCard;
 pub use info_tip::InfoTip;
+pub use popover::{Popover, PopoverController, PopoverPresentation, PopoverRole};
 pub use scrim::{Overlay, OverlayAlign, OverlayPosition, OverlayScrim, OverlayShowOn};
-pub use popover::{Popover, PopoverController, PopoverRole};
+pub use sheet::{BottomSheet, BottomSheetSwitcher, SheetHeight, SnapPoint};
 pub(crate) use tooltip::tooltip_description;
 pub use tooltip::{FocusTrigger, Tooltip, TooltipContent, TooltipController, TouchTrigger};
 
@@ -149,13 +154,7 @@ pub const POPOVER_DOC: ComponentDoc = ComponentDoc {
         p("hasAutoFocus", RustApi::Method("auto_focus")),
         p("hasLightDismiss", RustApi::Method("light_dismiss")),
         p("hasEscapeDismiss", RustApi::Method("escape_dismiss")),
-        p(
-            "presentation",
-            RustApi::Pending(
-                "presentation",
-                "the sheet presentations land with BottomSheet in M5",
-            ),
-        ),
+        p("presentation", RustApi::Method("presentation")),
         p("xstyle", RustApi::Trait("Styled")),
     ],
     example: include_str!("examples.rs"),
@@ -280,6 +279,84 @@ pub const OVERLAY_DOC: ComponentDoc = ComponentDoc {
         p("className", RustApi::Trait("Styled")),
         p("style", RustApi::Trait("Styled")),
         p("ref", RustApi::Waived("GPUI elements have no refs")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const DRAWER_DOC: ComponentDoc = ComponentDoc {
+    name: "Drawer",
+    rust_type: "astryx::components::overlay::Drawer",
+    props: &[
+        p("isOpen", RustApi::Argument("open")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p("label", RustApi::Argument("label")),
+        p("children", RustApi::Trait("ParentElement")),
+        p("side", RustApi::Method("side")),
+        p("width", RustApi::Method("width")),
+        p("experimental", RustApi::Method("full_width_on_mobile")),
+        p("hasScrim", RustApi::Method("scrim")),
+        p("purpose", RustApi::Method("purpose")),
+        p("padding", RustApi::Method("padding")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const DRAWER_HEADER_DOC: ComponentDoc = ComponentDoc {
+    name: "DrawerHeader",
+    rust_type: "astryx::components::overlay::DrawerHeader",
+    props: &[
+        p("title", RustApi::Argument("title")),
+        p("subtitle", RustApi::Method("subtitle")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p("startContent", RustApi::Method("start_content")),
+        p("endContent", RustApi::Method("end_content")),
+        p(
+            "endContentEdgeCompensation",
+            RustApi::Waived("the header compensates its end slot from its own layout"),
+        ),
+        p("hasDivider", RustApi::Method("divider")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const BOTTOM_SHEET_DOC: ComponentDoc = ComponentDoc {
+    name: "BottomSheet",
+    rust_type: "astryx::components::overlay::BottomSheet",
+    props: &[
+        p("isOpen", RustApi::Argument("open")),
+        p("onOpenChange", RustApi::Method("on_open_change")),
+        p(
+            "finalFocusRef",
+            RustApi::Waived("GPUI has no refs: focus returns to what had it when the sheet opened"),
+        ),
+        p("purpose", RustApi::Method("purpose")),
+        p("sheetId", RustApi::Method("sheet_id")),
+        p("label", RustApi::Argument("label")),
+        p("children", RustApi::Trait("ParentElement")),
+        p("padding", RustApi::Method("padding")),
+        p("height", RustApi::Method("height")),
+        p("snapPoints", RustApi::Method("snap_points")),
+        p("hasScrim", RustApi::Method("scrim")),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const BOTTOM_SHEET_SWITCHER_DOC: ComponentDoc = ComponentDoc {
+    name: "BottomSheetSwitcher",
+    rust_type: "astryx::components::overlay::BottomSheetSwitcher",
+    props: &[
+        p("ref", RustApi::Waived("GPUI elements have no refs")),
+        p(
+            "onCancel",
+            RustApi::Waived("Escape reaches the active sheet, which asks to close per its purpose"),
+        ),
+        p("activeSheet", RustApi::Argument("active_sheet")),
+        p(
+            "onActiveSheetChange",
+            RustApi::Method("on_active_sheet_change"),
+        ),
+        p("hasScrim", RustApi::Method("scrim")),
+        p("children", RustApi::Method("sheet")),
     ],
     example: include_str!("examples.rs"),
 };

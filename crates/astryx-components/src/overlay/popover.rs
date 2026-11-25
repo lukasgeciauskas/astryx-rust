@@ -45,6 +45,18 @@ pub enum PopoverRole {
     None,
 }
 
+/// Upstream `presentation`: the surface that holds the content.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PopoverPresentation {
+    /// Anchored to the trigger.
+    #[default]
+    Popover,
+    /// A modal BottomSheet named by the popover's label.
+    BottomSheet,
+    /// A BottomSheet on a compact touch screen, else anchored.
+    Adaptive,
+}
+
 /// A popover's state between frames.
 pub(crate) struct PopoverState {
     pub(crate) open: bool,
@@ -235,6 +247,7 @@ pub struct Popover {
     auto_focus: bool,
     light_dismiss: bool,
     escape_dismiss: bool,
+    presentation: PopoverPresentation,
     style: StyleRefinement,
 }
 
@@ -261,6 +274,7 @@ impl Popover {
             auto_focus: true,
             light_dismiss: true,
             escape_dismiss: true,
+            presentation: PopoverPresentation::Popover,
             style: StyleRefinement::default(),
         }
     }
@@ -292,6 +306,8 @@ impl Popover {
         light_dismiss: bool,
         /// Upstream `hasEscapeDismiss`: Escape closes it.
         escape_dismiss: bool,
+        /// Upstream `presentation`.
+        presentation: PopoverPresentation,
     }
 
     /// Upstream `children`: the trigger, a Button or anything built on it.
@@ -372,6 +388,36 @@ impl RenderOnce for Popover {
             },
             self.trigger.unwrap_or_else(|| div().into_any_element()),
         );
+        // The sheet presentations: the trigger stays where it is, and a
+        // BottomSheet holds the content.
+        let sheet = match self.presentation {
+            PopoverPresentation::Popover => false,
+            PopoverPresentation::BottomSheet => true,
+            PopoverPresentation::Adaptive => {
+                window.viewport_size().width <= gpui::px(640.) && window.last_input_was_touch()
+            }
+        };
+        if sheet {
+            let content = self.content;
+            let sheet_state = state.clone();
+            let mut bottom = super::sheet::BottomSheet::new(
+                ElementId::Name(format!("{}-sheet", self.id).into()),
+                open,
+                self.label.clone().unwrap_or_default(),
+            )
+            .on_open_change(move |open, window, cx| request(&sheet_state, open, window, cx));
+            if let Some(build) = content {
+                bottom = bottom.child(build(window, cx));
+            }
+            return div()
+                .display_contents()
+                .child(anchored_layer(
+                    ElementId::Name(format!("{}-layer", self.id).into()),
+                    trigger,
+                ))
+                .child(bottom)
+                .into_any_element();
+        }
         let mut layer = anchored_layer(
             ElementId::Name(format!("{}-layer", self.id).into()),
             trigger,
@@ -384,7 +430,7 @@ impl RenderOnce for Popover {
         });
         if !open {
             state.update(cx, |s, _| s.shown_at = None);
-            return layer;
+            return layer.into_any_element();
         }
 
         let now = cx.background_executor().now();
@@ -494,6 +540,6 @@ impl RenderOnce for Popover {
             .on_placed(move |position, _, cx| {
                 placed.update(cx, |s, _| s.side = position.side);
             });
-        layer
+        layer.into_any_element()
     }
 }
