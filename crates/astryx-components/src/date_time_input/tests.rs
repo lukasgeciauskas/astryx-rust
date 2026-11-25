@@ -212,3 +212,162 @@ fn fr9_a_disabled_field_changes_nothing(cx: &mut TestAppContext) {
     press(cx, "up");
     assert!(log.changes.borrow().is_empty());
 }
+
+// ---- The bottom-sheet surface ----------------------------------------------
+
+use crate::date_input::PickerPresentation;
+use gpui::{Modifiers, TouchEvent, TouchId, point, px};
+use std::time::Duration;
+
+fn sheet(
+    cx: &mut TestAppContext,
+    initial: Option<PlainDateTime>,
+    configure: impl Fn(DateTimeInput) -> DateTimeInput + 'static,
+) -> (&mut VisualTestContext, Rc<Log>) {
+    field(cx, initial, move |f| {
+        configure(f.presentation(PickerPresentation::BottomSheet))
+    })
+}
+
+fn settle(cx: &mut VisualTestContext) {
+    for _ in 0..3 {
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+}
+
+fn wait(cx: &mut VisualTestContext, ms: u64) {
+    cx.executor().advance_clock(Duration::from_millis(ms));
+    settle(cx);
+}
+
+fn bounds_of(cx: &mut VisualTestContext, selector: String) -> Option<gpui::Bounds<gpui::Pixels>> {
+    cx.debug_bounds(Box::leak(selector.into_boxed_str()))
+}
+
+fn tap(cx: &mut VisualTestContext, selector: String) {
+    let at = bounds_of(cx, selector.clone())
+        .unwrap_or_else(|| panic!("nothing at {selector}"))
+        .center();
+    cx.simulate_click(at, Modifiers::none());
+    settle(cx);
+}
+
+fn day(date: PlainDate) -> String {
+    crate::date_input::month_scroller::day_selector(&"dti-months".into(), date)
+}
+
+/// Opens the sheet from a segment (1: the date, 2: the time) and lets it rise.
+fn open_from(cx: &mut VisualTestContext, tabs: usize) {
+    for _ in 0..tabs {
+        press(cx, "tab");
+    }
+    press(cx, "enter");
+    settle(cx);
+    wait(cx, 1000);
+}
+
+#[gpui::test]
+fn fr2_a_tapped_day_keeps_the_time_and_the_sheet_stays_open(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(at(d(2026, 12, 2), t(9, 15))), |f| f);
+    open_from(cx, 1);
+    tap(cx, day(d(2026, 12, 10)));
+    assert_eq!(*log.changes.borrow(), [Some(at(d(2026, 12, 10), t(9, 15)))]);
+    assert!(bounds_of(cx, day(d(2026, 12, 11))).is_some(), "still open");
+}
+
+#[gpui::test]
+fn fr6_a_day_on_the_minimum_s_date_clamps_its_time(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(at(d(2026, 12, 2), t(7, 30))), |f| {
+        f.min(at(d(2026, 11, 26), t(8, 0)))
+    });
+    open_from(cx, 1);
+    tap(cx, "dti-prev-month".into());
+    wait(cx, 1000);
+    tap(cx, day(d(2026, 11, 26)));
+    assert_eq!(
+        log.changes.borrow().last(),
+        Some(&Some(at(d(2026, 11, 26), t(8, 0))))
+    );
+}
+
+#[gpui::test]
+fn fr2_a_time_before_any_date_waits_for_one(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, None, |f| f);
+    open_from(cx, 2);
+    tap(cx, "dti-time-minute".into());
+    press(cx, "down");
+    assert!(log.changes.borrow().is_empty(), "no date yet");
+    // Back to the date, by the switch.
+    tap(cx, "dti-mode-date".into());
+    tap(cx, day(d(2026, 11, 27)));
+    assert_eq!(
+        *log.changes.borrow(),
+        [Some(at(d(2026, 11, 27), t(10, 16)))],
+        "with the draft time"
+    );
+}
+
+#[gpui::test]
+fn save_date_moves_on_to_the_time(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(at(d(2026, 12, 2), t(9, 15))), |f| f);
+    open_from(cx, 1);
+    tap(cx, "dti-save-date".into());
+    // The time panel is the one in view: its wheels take the press.
+    tap(cx, "dti-time-minute".into());
+    press(cx, "down");
+    assert_eq!(*log.changes.borrow(), [Some(at(d(2026, 12, 2), t(9, 16)))]);
+}
+
+#[gpui::test]
+fn fr14_under_a_finger_the_month_wheel_moves_the_date_keeping_its_day_and_time(
+    cx: &mut TestAppContext,
+) {
+    let (cx, log) = sheet(cx, Some(at(d(2027, 1, 31), t(9, 15))), |f| f);
+    for phase in [gpui::TouchPhase::Started, gpui::TouchPhase::Ended] {
+        cx.simulate_event(TouchEvent {
+            id: TouchId(9),
+            phase,
+            position: point(px(1500.), px(20.)),
+            ..Default::default()
+        });
+    }
+    settle(cx);
+    open_from(cx, 1);
+    tap(cx, "dti-month-year".into());
+    wait(cx, 500);
+    let month = bounds_of(cx, "dti-wheels-month".into())
+        .expect("the wheels")
+        .center();
+    for phase in [gpui::TouchPhase::Started, gpui::TouchPhase::Ended] {
+        cx.simulate_event(TouchEvent {
+            id: TouchId(1),
+            phase,
+            position: month,
+            ..Default::default()
+        });
+    }
+    settle(cx);
+    press(cx, "down");
+    assert_eq!(
+        log.changes.borrow().last(),
+        Some(&Some(at(d(2027, 2, 28), t(9, 15))))
+    );
+}
+
+#[gpui::test]
+fn fr9_a_loading_sheet_field_never_opens(cx: &mut TestAppContext) {
+    let (cx, _) = sheet(cx, Some(at(d(2026, 12, 2), t(9, 15))), |f| f.loading(true));
+    open_from(cx, 1);
+    assert!(bounds_of(cx, day(d(2026, 12, 10))).is_none());
+}
+
+#[gpui::test]
+fn the_sheet_field_clears(cx: &mut TestAppContext) {
+    let (cx, log) = sheet(cx, Some(at(d(2026, 12, 2), t(9, 15))), |f| f.clear(true));
+    press(cx, "tab");
+    press(cx, "tab");
+    press(cx, "enter");
+    settle(cx);
+    assert_eq!(*log.changes.borrow(), [None]);
+}

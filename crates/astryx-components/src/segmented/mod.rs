@@ -196,6 +196,15 @@ impl RenderOnce for SegmentedControl {
             }
         });
         let tab_stop = list.tab_stop(selected, window);
+        // A composing component's focus request for a segment
+        // (`request_focus` with the segment's id).
+        for (index, value) in values.iter().enumerate() {
+            let item_id = ElementId::Name(format!("{:?}-{}", self.id, value).into());
+            if astryx_primitives::take_focus_request(&item_id, cx) {
+                let handle = list.handle(index).clone();
+                window.defer(cx, move |window, cx| window.focus(&handle, cx));
+            }
+        }
         let hint = crate::keyboard_hint::use_keyboard_hint(
             &self.id,
             crate::keyboard_hint::KeyboardHintOptions::default().enabled(!self.disabled),
@@ -280,10 +289,12 @@ impl RenderOnce for SegmentedControl {
                     .text_ellipsis()
                     .child(item.label.clone())
             });
+            let selector = format!("{}-{}", self.id, item.value);
             let mut seg = seg
                 .id(ElementId::Name(
                     format!("{:?}-{}", self.id, item.value).into(),
                 ))
+                .debug_selector(move || selector.clone())
                 .track_focus(&handle)
                 .children(icon_el)
                 .children(label);

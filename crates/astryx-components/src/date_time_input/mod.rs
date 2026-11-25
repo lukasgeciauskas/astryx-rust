@@ -4,6 +4,7 @@
 #[allow(clippy::module_inception)]
 mod date_time_input;
 pub mod examples;
+mod sheet;
 
 #[cfg(test)]
 mod tests;
@@ -17,7 +18,7 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
 }
 
 const LATER_SURFACES: &str =
-    "the bottom sheet and the platform pickers; the pointer field shows meanwhile";
+    "the platform pickers (a later M8 stage); the pointer field shows in their place meanwhile";
 
 pub const DATE_TIME_INPUT_DOC: ComponentDoc = ComponentDoc {
     name: "DateTimeInput",

@@ -2,7 +2,7 @@
 //! system specs AST-043, AST-117, AST-118).
 
 pub mod examples;
-mod sheet;
+pub(crate) mod sheet;
 #[allow(clippy::module_inception)]
 mod time_input;
 pub(crate) mod typed;

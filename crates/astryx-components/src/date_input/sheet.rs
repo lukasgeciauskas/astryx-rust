@@ -187,7 +187,7 @@ impl Ctx {
 }
 
 /// A small pressable in the sheet's header: an arrow or the title.
-fn header_button(
+pub(crate) fn header_button(
     id: ElementId,
     focus: &FocusHandle,
     label: SharedString,

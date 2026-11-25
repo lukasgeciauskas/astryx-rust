@@ -21,7 +21,7 @@ use super::wheel_rules::{
     hour_rows_in_half, hour12_from_24, hour24_from_12, meridiem_rows, minute_rows, second_rows,
     wheel_bounds,
 };
-use super::wheels::TimeWheels;
+use super::wheels::{TimeCommit, TimeWheels};
 use crate::button::{Button, ButtonVariant, IconButton};
 use crate::choice::action::{ActionFn, Optimistic};
 use crate::field::{Field, StatusPlacement, StatusType};
@@ -320,7 +320,20 @@ pub(super) fn render_sheet(
                 on_commit: Rc::new(move |time, window, cx| commit.commit(time, window, cx)),
             });
         } else {
-            wheels = mouse_wheels(wheels, &input, &ctx, wheel_time, hour_format, &i18n);
+            let commit = ctx.clone();
+            wheels = mouse_time_wheels(
+                wheels,
+                MouseWheels {
+                    id: &input.id,
+                    time: wheel_time,
+                    hour_format,
+                    seconds: input.seconds,
+                    min: input.min,
+                    max: input.max,
+                    commit: Rc::new(move |time, window, cx| commit.commit(time, window, cx)),
+                },
+                &i18n,
+            );
         }
     }
     let close = open_state.clone();
@@ -397,17 +410,25 @@ pub(super) fn render_sheet(
     field.child(control).into_any_element()
 }
 
+/// What a commit from the mouse wheels needs.
+pub(crate) struct MouseWheels<'a> {
+    pub id: &'a ElementId,
+    pub time: PlainTime,
+    pub hour_format: HourFormat,
+    pub seconds: bool,
+    pub min: Option<PlainTime>,
+    pub max: Option<PlainTime>,
+    pub commit: TimeCommit,
+}
+
 /// The wheels under a mouse: each turns only its own part of the time.
-fn mouse_wheels(
+pub(crate) fn mouse_time_wheels(
     mut wheels: gpui::Div,
-    input: &TimeInput,
-    ctx: &SheetCtx,
-    time: PlainTime,
-    hour_format: HourFormat,
+    m: MouseWheels<'_>,
     i18n: &astryx_i18n::I18n,
 ) -> gpui::Div {
-    let bounds = wheel_bounds(input.min, input.max);
-    let seconds = input.seconds;
+    let bounds = wheel_bounds(m.min, m.max);
+    let (time, seconds, hour_format) = (m.time, m.seconds, m.hour_format);
     let compose = move |hour: u8, minute: u8, second: u8| PlainTime {
         hour,
         minute,
@@ -418,13 +439,13 @@ fn mouse_wheels(
                  rows: Vec<WheelOption>,
                  value: i64,
                  make: Rc<dyn Fn(i64) -> PlainTime>| {
-        let ctx = ctx.clone();
+        let commit = m.commit.clone();
         Wheel::new(
-            ElementId::Name(format!("{}-{key}", input.id).into()),
+            ElementId::Name(format!("{}-{key}", m.id).into()),
             i18n.t(label),
             rows.into(),
             value,
-            move |value, window, cx| ctx.commit(make(value), window, cx),
+            move |value, window, cx| commit(make(value), window, cx),
         )
     };
     let hour_value = match hour_format {

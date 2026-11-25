@@ -10,7 +10,7 @@ pub(crate) mod month_scroller;
 pub(crate) mod month_year_wheels;
 pub(crate) mod presentation;
 pub(crate) mod segment;
-mod sheet;
+pub(crate) mod sheet;
 pub(crate) mod typed;
 
 #[cfg(test)]

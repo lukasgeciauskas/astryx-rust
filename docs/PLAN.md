@@ -574,6 +574,14 @@ The remaining primitives:
     that hide at the range's ends and hand their focus on, FR22, Reset) and the weekday row
     (FR19). A tapped day commits and the sheet stays open (FR9); under a finger the wheels move
     a chosen date, keeping its day (FR23).
+  - Stage 6c (done): DateTimeInput's bottom sheet (`date_time_input/sheet.rs`): two read-only
+    segments opening one sheet with a Date and a Time panel (a SegmentedControl switches
+    them; "Save date" moves on to the time and its segment takes focus). The Date panel is
+    DateInput's touch calendar, the Time panel TimeInput's wheels. A day keeps the time,
+    clamped into a bound on that day; a time chosen before any date waits as a draft (FR2,
+    FR6). Only disabled and loading lock the sheet; a pending Action still edits (FR9).
+    Under a finger the month wheel moves a chosen date, keeping its day and time (FR14).
+    SegmentedControl's segments now honour `request_focus` and carry debug selectors.
   - Table filtering's `date_absolute` and `time` controls, DateInput and TimeInput with
     `entryErrorBehavior: complete` (`table/filtering.rs` shows none until then).
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

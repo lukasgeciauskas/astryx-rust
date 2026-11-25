@@ -5,7 +5,7 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M8 (Dates): stages 1 to 5, 6a and 6b done._
+_Last updated: 2026-11-26, during M8 (Dates): stages 1 to 6 done._
 
 ## State
 
@@ -30,8 +30,8 @@ _Last updated: 2026-11-26, during M8 (Dates): stages 1 to 5, 6a and 6b done._
 
 ### Not yet ported (26)
 
-- **M8:** every date component is ported; DateInput's, TimeInput's and DateTimeInput's
-  sheet and native surfaces come later in M8. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
+- **M8:** every date component is ported, sheets included; the native surfaces of DateInput,
+  TimeInput and DateTimeInput come later in M8. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
@@ -201,8 +201,7 @@ and jiff were already dependencies. Stage 2 added DateInput's pointer field (`cr
 shared entry-error report (`field/entry_report.rs`). Stage 3 added TimeInput's typed field (`time_input/`). Stage 4 added DateTimeInput's pointer field (`date_time_input/`), stage 5 DateRangeInput
 (`date_range_input/`), stage 6a the picker wheels (`wheel/`, with the motion math pulled forward
 into `astryx_primitives::motion`) and TimeInput's sheet, stage 6b DateInput's sheet (the month pager, the month and year
-wheels). The remaining stages, in order: DateTimeInput's sheet (6c) (MonthScroller,
-the month/year and time wheels), the native pickers (a fork patch: a hidden
+wheels), stage 6c DateTimeInput's sheet. The remaining stages, in order: the native pickers (a fork patch: a hidden
 `<input type="date">` and `showPicker()` on the web, the Common Controls month calendar and
 date-time picker on Windows), then the carried items. Carried into M8:
 - PowerSearch's date and time values (`time`, `date_absolute`, `date_relative`,
