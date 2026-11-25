@@ -365,10 +365,11 @@ The remaining primitives:
     and searchable fields (FR13) and the value step with its Operator group and choice
     lists (FR14, FR17), Add filter's content search with its inline suggestions and
     FR30's value-only rows and "More" rows (FR13, FR30), nested groups in the value step
-    (FR14), and numbers staged as they are typed (FR17). Remaining: the FR16 focus rules,
-    a people field's "More" row opening its Tokenizer sheet directly and "More" rows
-    carrying the typed text into a search editor's opening query (FR30, BaseTypeahead
-    FR18), and the sheets' announcements (AR6, FR19).
+    (FR14), numbers staged as they are typed (FR17), FR16's focus rules (through the new
+    `astryx_primitives::request_focus`), and the result count's announcement in both
+    presentations (FR19). Remaining: a people field's "More" row opening its Tokenizer
+    sheet directly, and "More" rows carrying the typed text into a search editor's
+    opening query (FR30, BaseTypeahead FR18).
   - TreeList (done): data-driven rows with chevrons, guides, start and end content,
     density and variants; row actions (FR7); the WAI-ARIA tree keys as the
     `astryx_primitives::tree_focus` primitive (upstream `useTreeFocus`) with one tab stop

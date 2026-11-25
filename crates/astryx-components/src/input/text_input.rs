@@ -332,6 +332,12 @@ impl RenderOnce for TextInput {
             s.on_key_down = self.on_key_down.clone().filter(|_| !self.disabled);
         });
         let focus = state.read(cx).focus_handle(cx);
+        if astryx_primitives::take_focus_request(&self.id, cx) {
+            let target = focus.clone();
+            window.defer(cx, move |window, cx| {
+                window.defer(cx, move |window, cx| target.focus(window, cx));
+            });
+        }
         if self.auto_focus {
             let done = window.use_keyed_state(
                 ElementId::Name(format!("{:?}-autofocused", self.id).into()),

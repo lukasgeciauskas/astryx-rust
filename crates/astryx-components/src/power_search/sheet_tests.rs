@@ -411,3 +411,53 @@ fn fr14_a_nested_operator_edits_its_group_in_the_step(cx: &mut TestAppContext) {
     assert!(shown(cx, "ps-sheet-value"), "the step stays");
     assert!(logged(&log).is_empty());
 }
+
+#[gpui::test]
+fn fr16_focus_follows_the_step(cx: &mut TestAppContext) {
+    let (cx, _, log) = host(
+        cx,
+        vec![
+            emma(),
+            PowerSearchFilter::new("genre", "is", FilterValue::Enum("fiction".into())),
+            PowerSearchFilter::new("genre", "is", FilterValue::Enum("history".into())),
+        ],
+    );
+    click(cx, "ps-trigger");
+    // A removal: focus moves to the nearest remaining remove action, so
+    // Enter removes the next one.
+    click(cx, "ps-sheet-remove-1");
+    press(cx, "enter");
+    assert!(
+        shown(cx, "ps-sheet-row-0") && !shown(cx, "ps-sheet-row-1"),
+        "two removals by one aim"
+    );
+    // A one-tap field adds at once: focus lands on its row, whose tap
+    // removes it.
+    click(cx, "ps-sheet-add");
+    click(cx, "ps-sheet-field-starred");
+    assert!(shown(cx, "ps-sheet-row-1"));
+    press(cx, "enter");
+    assert!(
+        !shown(cx, "ps-sheet-row-1"),
+        "Enter on the new row removed it"
+    );
+    // A creation through the value step lands on the header's Add filter.
+    click(cx, "ps-sheet-add");
+    click(cx, "ps-sheet-field-genre");
+    click(cx, "Name(\"ps-sheet-value-is\")-history");
+    click(cx, "ps-sheet-confirm");
+    press(cx, "enter");
+    assert!(
+        shown(cx, "ps-sheet-fields"),
+        "Enter on Add filter opened it again"
+    );
+    press(cx, "escape");
+    // Done closes the flow; focus returns to the trigger.
+    click(cx, "ps-sheet-done");
+    assert!(!logged(&log).is_empty());
+    press(cx, "enter");
+    assert!(
+        shown(cx, "ps-sheet-filters"),
+        "Enter on the trigger reopens the flow"
+    );
+}

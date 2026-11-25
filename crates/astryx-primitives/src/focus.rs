@@ -68,6 +68,14 @@ pub fn control_focus(id: &gpui::ElementId, window: &mut Window, cx: &mut App) ->
         )
         .read(cx)
         .clone();
+    if take_focus_request(id, cx) {
+        // After this frame's own focus moves (a closing sheet's return): a
+        // deferral that defers again runs after those the frame queued.
+        let target = handle.clone();
+        window.defer(cx, move |window, cx| {
+            window.defer(cx, move |window, cx| target.focus(window, cx));
+        });
+    }
     if crate::use_context::<OutOfTabOrder>(cx).is_some() {
         return handle.tab_stop(false);
     }
@@ -174,5 +182,37 @@ impl RovingScope {
             }
             cx.stop_propagation();
         }
+    }
+}
+
+/// Controls asked to take focus when they next render (see
+/// [`request_focus`]).
+#[derive(Default)]
+struct FocusRequests(Vec<String>);
+
+impl gpui::Global for FocusRequests {}
+
+/// Asks the control with `id` to take focus once it next renders: a
+/// composing component's focus rule for a control it does not hold the
+/// handle of (PowerSearch's sheets move focus to a row, a remove action, a
+/// header button). Controls built on [`control_focus`] honor it; text
+/// fields check [`take_focus_request`].
+pub fn request_focus(id: &gpui::ElementId, cx: &mut App) {
+    let key = format!("{id:?}");
+    let requests = cx.default_global::<FocusRequests>();
+    if !requests.0.contains(&key) {
+        requests.0.push(key);
+    }
+}
+
+/// Whether `id` was asked to take focus, clearing the request.
+pub fn take_focus_request(id: &gpui::ElementId, cx: &mut App) -> bool {
+    let key = format!("{id:?}");
+    match cx.try_global::<FocusRequests>() {
+        Some(requests) if requests.0.contains(&key) => {
+            cx.global_mut::<FocusRequests>().0.retain(|k| *k != key);
+            true
+        }
+        _ => false,
     }
 }

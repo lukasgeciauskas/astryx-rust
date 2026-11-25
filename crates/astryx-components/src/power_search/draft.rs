@@ -122,7 +122,6 @@ impl SheetDraft {
 
 /// Upstream `nearestEditableIndex` (FR16): after a removal at
 /// `removed`, the nearest row that is a button (the following one on a tie).
-#[allow(dead_code)] // FR16's focus rules, the flow's next part, use it.
 pub(crate) fn nearest_button_row(
     filters: &[PowerSearchFilter],
     removed: usize,

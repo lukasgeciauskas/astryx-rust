@@ -23,7 +23,10 @@ pub mod typeahead;
 pub use anchored::{LayerAlign, LayerOptions, LayerPosition, Placement, position_layer};
 pub use announce::{Politeness, announce, announcer};
 pub use context::{Provider, provide, use_context, with_context};
-pub use focus::{FocusNext, FocusPrevious, OutOfTabOrder, RovingScope, control_focus};
+pub use focus::{
+    FocusNext, FocusPrevious, OutOfTabOrder, RovingScope, control_focus, request_focus,
+    take_focus_request,
+};
 pub use hotkeys::{Hotkey, hotkeys};
 pub use layer::{
     AnchoredLayer, EscapeBehavior, Layer, PositionFn, anchored_layer, has_open_layer, layer,

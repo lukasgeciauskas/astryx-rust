@@ -65,6 +65,9 @@ enum Entry {
 struct Staged {
     /// Editing the draft's filter at this index, or creating.
     index: Option<usize>,
+    /// Where Cancel from a creation returns focus: the field row, or the
+    /// content search (FR16).
+    opener: Option<String>,
     field: SharedString,
     operator: Option<SharedString>,
     value: Option<FilterValue>,
@@ -199,14 +202,16 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
     let config = p.config.clone();
 
     let close_flow: ActFn = {
-        let state = state.clone();
-        Rc::new(move |window, _cx| {
-            state.update(_cx, |s, _| {
+        let (state, flow_id) = (state.clone(), p.id.clone());
+        Rc::new(move |window, cx| {
+            state.update(cx, |s, _| {
                 s.open = false;
                 s.adding = false;
                 s.staged = None;
                 s.confirm = None;
             });
+            // FR16: after the flow closes, the trigger.
+            focus_next_render(format!("{flow_id}-trigger"), cx);
             window.refresh();
         })
     };
@@ -257,7 +262,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
     // Choosing a field (FR13): an empty-only field adds at once; else the
     // value step opens on its default operator.
     let choose_field: KeyActFn = {
-        let (state, config) = (state.clone(), config.clone());
+        let (state, config, flow_id) = (state.clone(), config.clone(), p.id.clone());
         Rc::new(
             move |key: SharedString, window: &mut Window, cx: &mut App| {
                 let Some(field) = config.find_field(&key) else {
@@ -277,6 +282,9 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                         s.adding = false;
                         s.entry = Entry::Filters;
                     });
+                    // FR16: the filter's row.
+                    let row = state.read(cx).draft.filters.len().saturating_sub(1);
+                    focus_next_render(format!("{flow_id}-sheet-row-{row}"), cx);
                     announce(
                         i18n(cx).format(
                             "@astryx.tokenizer.tokenAdded",
@@ -297,6 +305,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                     state.update(cx, |s, _| {
                         s.staged = Some(Staged {
                             index: None,
+                            opener: Some(format!("{flow_id}-sheet-field-{}", field.key)),
                             field: field.key.clone(),
                             operator: op,
                             value,
@@ -311,7 +320,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
     // any other opens the value step on its field and operator, a "More"
     // row carrying the typed text into a text field.
     let choose_suggestion: SuggestionFn = {
-        let (state, config) = (state.clone(), config.clone());
+        let (state, config, flow_id) = (state.clone(), config.clone(), p.id.clone());
         Rc::new(
             move |item: super::source::PowerSearchItem, window: &mut Window, cx: &mut App| {
                 let data = item.data.clone();
@@ -331,6 +340,9 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                         s.entry = Entry::Filters;
                         s.content_query.clear();
                     });
+                    // FR16: the filter's row.
+                    let row = state.read(cx).draft.filters.len().saturating_sub(1);
+                    focus_next_render(format!("{flow_id}-sheet-row-{row}"), cx);
                     announce(
                         i18n(cx).format(
                             "@astryx.tokenizer.tokenAdded",
@@ -357,6 +369,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                 state.update(cx, |s, _| {
                     s.staged = Some(Staged {
                         index: None,
+                        opener: Some(format!("{flow_id}-sheet-content-search")),
                         field: field.key.clone(),
                         operator: op.map(|o| o.key.clone()),
                         value,
@@ -375,6 +388,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
             state.update(cx, |s, _| {
                 s.staged = Some(Staged {
                     index: Some(index),
+                    opener: None,
                     field: filter.field.clone(),
                     operator: Some(filter.operator.clone()),
                     value: Some(filter.value.clone()),
@@ -384,13 +398,23 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
         })
     };
     let remove_row: IndexFn = {
-        let (state, config) = (state.clone(), config.clone());
+        let (state, config, flow_id) = (state.clone(), config.clone(), p.id.clone());
         Rc::new(move |index: usize, window: &mut Window, cx: &mut App| {
             let Some(filter) = state.read(cx).draft.filters.get(index).cloned() else {
                 return;
             };
             let label = row_label_text(&config, &filter, cx);
             state.update(cx, |s, _| s.draft.remove(index));
+            // FR16: the nearest remaining remove action, else Add filter.
+            let rows = state.read(cx).draft.filters.clone();
+            let target = match super::draft::nearest_button_row(&rows, index, |f| {
+                interactive && !f.read_only
+            }) {
+                Some(n) => format!("{flow_id}-sheet-remove-{n}"),
+                None if rows.is_empty() => format!("{flow_id}-sheet-empty-add"),
+                None => format!("{flow_id}-sheet-add"),
+            };
+            focus_next_render(target, cx);
             announce(
                 i18n(cx).format(
                     "@astryx.tokenizer.tokenRemoved",
@@ -849,7 +873,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                 .on_click(move |_, window, cx| done(window, cx)),
             )
         });
-        let (state_d, dismiss) = (state.clone(), dismiss_bottom.clone());
+        let (state_d, dismiss, fields_id) = (state.clone(), dismiss_bottom.clone(), p.id.clone());
         BottomSheet::new(
             ElementId::Name(format!("{}-sheet-fields", p.id).into()),
             open && adding,
@@ -865,6 +889,16 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                 dismiss(window, cx);
             } else {
                 state_d.update(cx, |s, _| s.adding = false);
+                // FR16: the Filters header's Add filter, or the empty state's.
+                let rows = state_d.read(cx).draft.filters.len();
+                focus_next_render(
+                    if rows == 0 {
+                        format!("{fields_id}-sheet-empty-add")
+                    } else {
+                        format!("{fields_id}-sheet-add")
+                    },
+                    cx,
+                );
                 window.refresh();
             }
         })
@@ -1151,14 +1185,23 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
             }
         });
         let cancel = {
-            let state = state.clone();
+            let (state, flow_id) = (state.clone(), p.id.clone());
             move |window: &mut Window, cx: &mut App| {
+                // FR16: an edit's Cancel returns to its row; a creation's to
+                // the field row or the content search that opened it.
+                let target = state.read(cx).staged.as_ref().and_then(|s| match s.index {
+                    Some(i) => Some(format!("{flow_id}-sheet-row-{i}")),
+                    None => s.opener.clone(),
+                });
                 state.update(cx, |s, _| s.staged = None);
+                if let Some(target) = target {
+                    focus_next_render(target, cx);
+                }
                 window.refresh();
             }
         };
         let confirm_action = {
-            let (state, config) = (state.clone(), config.clone());
+            let (state, config, flow_id) = (state.clone(), config.clone(), p.id.clone());
             let staged = staged.clone();
             move |window: &mut Window, cx: &mut App| {
                 let (Some(op), Some(value)) = (
@@ -1194,6 +1237,11 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
                         window,
                         cx,
                     );
+                }
+                // FR16: a creation lands on Filters' Add filter; an edit on its row.
+                match staged.index {
+                    Some(i) => focus_next_render(format!("{flow_id}-sheet-row-{i}"), cx),
+                    None => focus_next_render(format!("{flow_id}-sheet-add"), cx),
                 }
                 window.refresh();
             }
@@ -1277,20 +1325,34 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
             ),
         };
         let safe = {
-            let state = state.clone();
+            let (state, flow_id) = (state.clone(), p.id.clone());
             Rc::new(move |window: &mut Window, cx: &mut App| {
                 state.update(cx, |s, _| s.confirm = None);
+                // FR16: Keep filters returns to Clear all.
+                if which == Confirm::ClearAll {
+                    focus_next_render(format!("{flow_id}-sheet-clear"), cx);
+                }
                 window.refresh();
             }) as ActFn
         };
         let destroy = {
-            let (state, close) = (state.clone(), close_flow.clone());
+            let (state, close, flow_id) = (state.clone(), close_flow.clone(), p.id.clone());
             Rc::new(move |window: &mut Window, cx: &mut App| match which {
                 Confirm::ClearAll => {
                     state.update(cx, |s, _| {
                         s.draft.clear_all();
                         s.confirm = None;
                     });
+                    // FR16: the first remaining control, Add filter.
+                    let rows = state.read(cx).draft.filters.len();
+                    focus_next_render(
+                        if rows == 0 {
+                            format!("{flow_id}-sheet-empty-add")
+                        } else {
+                            format!("{flow_id}-sheet-add")
+                        },
+                        cx,
+                    );
                     window.refresh();
                 }
                 Confirm::Discard => close(window, cx),
@@ -1361,6 +1423,12 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
         .children(value_sheet)
         .children(confirmation)
         .into_any_element()
+}
+
+/// FR16: asks the flow's control named `name` to take focus when it next
+/// renders.
+fn focus_next_render(name: String, cx: &mut App) {
+    astryx_primitives::request_focus(&ElementId::Name(name.into()), cx);
 }
 
 /// A filter's whole text, for announcements (AR6).

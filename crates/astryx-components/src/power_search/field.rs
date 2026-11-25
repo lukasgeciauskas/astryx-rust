@@ -621,6 +621,24 @@ impl RenderOnce for PowerSearch {
             }
         };
 
+        // FR19: the result count, announced when it changes after mount.
+        let count_text: Option<SharedString> = self.result_count.as_ref().map(|c| match c {
+            ResultCount::Count(n) => t18.format(
+                "@astryx.powersearch.resultCount",
+                &[("count", Arg::Num(*n as f64))],
+            ),
+            ResultCount::Text(text) => text.clone(),
+        });
+        match state.read(cx).announced.clone() {
+            None => state.update(cx, |s, _| s.announced = Some(count_text.clone())),
+            Some(previous) if previous != count_text => {
+                state.update(cx, |s, _| s.announced = Some(count_text.clone()));
+                if let Some(text) = &count_text {
+                    announce(text.clone(), Politeness::Polite, window, cx);
+                }
+            }
+            _ => {}
+        }
         if sheet {
             let count_text: Option<SharedString> = self.result_count.as_ref().map(|c| match c {
                 ResultCount::Count(n) => t18.format(
@@ -1046,24 +1064,6 @@ impl RenderOnce for PowerSearch {
             }
         };
 
-        // FR19: the result count, announced when it changes after mount.
-        let count_text: Option<SharedString> = self.result_count.as_ref().map(|c| match c {
-            ResultCount::Count(n) => t18.format(
-                "@astryx.powersearch.resultCount",
-                &[("count", Arg::Num(*n as f64))],
-            ),
-            ResultCount::Text(text) => text.clone(),
-        });
-        match state.read(cx).announced.clone() {
-            None => state.update(cx, |s, _| s.announced = Some(count_text.clone())),
-            Some(previous) if previous != count_text => {
-                state.update(cx, |s, _| s.announced = Some(count_text.clone()));
-                if let Some(text) = &count_text {
-                    announce(text.clone(), Politeness::Polite, window, cx);
-                }
-            }
-            _ => {}
-        }
         let end_content = match (count_text.clone(), self.end_content.take()) {
             (None, None) => None,
             (count, content) => Some(
