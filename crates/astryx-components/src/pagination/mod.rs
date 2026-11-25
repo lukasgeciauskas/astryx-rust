@@ -1,8 +1,6 @@
 //! Pagination. Upstream: `Pagination/`.
 //!
-//! The `input` variant's page box lands with NumberInput (M4): until then it
-//! shows "Page n / total" with first and last buttons. The page-size
-//! selector lands with Selector (M5).
+//! The page-size selector lands with Selector (M5).
 
 pub mod examples;
 
@@ -15,7 +13,7 @@ use astryx_i18n::{LogicalStyled, current as i18n, use_direction};
 use astryx_primitives::{
     ElementSize, ListFocus, ListKeys, Politeness, announce, is_focus_visible, use_link_handler,
 };
-use astryx_theme::current;
+use astryx_theme::{ThemeStyled, current};
 use gpui::{
     AnyElement, App, ElementId, IntoElement, RenderOnce, Role, SharedString, StyleRefinement,
     Styled, Task, Toggled, Window, div, prelude::*,
@@ -24,8 +22,10 @@ use gpui::{
 use crate::button::{Button, ButtonVariant, IconButton};
 use crate::choice::action::{ActionFn, Optimistic};
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
+use crate::field::StatusPlacement;
 use crate::focus::focus_ring;
 use crate::icon::{Icon, IconSize};
+use crate::input::NumberInput;
 use crate::text::{Text, TextColor, TextSize, TextType};
 
 /// Upstream `variant`: what sits between previous and next.
@@ -414,16 +414,91 @@ impl RenderOnce for Pagination {
                 )
                 .into_any_element(),
             ),
-            (PaginationVariant::Input, Some(total)) => {
+            (PaginationVariant::Input, _) => {
+                // "Page [n] of N": a NumberInput named "Go to page" that
+                // commits a page in range; while it rejects what was typed
+                // it widens to show its status icon.
                 let noun = self
                     .page_label
                     .clone()
                     .unwrap_or_else(|| i18n.t("@astryx.pagination.pageLabel"));
-                let of = i18n.format(
-                    "@astryx.pagination.ofTotalPages",
-                    &[("total", total.into())],
+                let rejected = window.use_keyed_state(
+                    ElementId::Name(format!("{}-page-rejected", self.id).into()),
+                    cx,
+                    |_, _| false,
                 );
-                Some(text(format!("{noun} {page} {of}")).into_any_element())
+                let box_width = if sm {
+                    t.size.element_sm
+                } else {
+                    t.size.element_md
+                }
+                .to_pixels(rem);
+                let width = if *rejected.read(cx) {
+                    box_width + t.spacing.s10.to_pixels(rem)
+                } else {
+                    box_width
+                };
+                let label_style = if sm {
+                    &t.text.supporting
+                } else {
+                    &t.text.label
+                };
+                let label = |content: SharedString, target: &str| {
+                    let mut el = div()
+                        .whitespace_nowrap()
+                        .text_style(label_style)
+                        .text_color(t.color.text_secondary);
+                    theme.refine(el.style(), target, &[("size", self.size.as_str())], None);
+                    el.child(content)
+                };
+                let go = go.clone();
+                let mut input = NumberInput::new(
+                    ElementId::Name(format!("{}-page", self.id).into()),
+                    i18n.t("@astryx.pagination.goToPageInput"),
+                    Some(page as f64),
+                )
+                .label_hidden(true)
+                .min(1.)
+                .integer_only(true)
+                .size(self.size)
+                .status_placement(StatusPlacement::Tooltip)
+                .width(width)
+                .disabled(self.disabled || total.is_none())
+                .on_entry_error_change({
+                    let rejected = rejected.clone();
+                    move |error, window, cx| {
+                        rejected.update(cx, |r, _| *r = error.is_some());
+                        window.refresh();
+                    }
+                })
+                .on_change(move |next, window, cx| {
+                    if let Some(next) = next.filter(|n| *n >= 1.)
+                        && next as usize != page
+                    {
+                        go(next as usize, window, cx);
+                    }
+                });
+                if let Some(total) = total {
+                    input = input.max(total as f64);
+                }
+                Some(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(t.spacing.s1)
+                        .child(label(noun, "pagination-input-label"))
+                        .child(input)
+                        .children(total.map(|total| {
+                            label(
+                                i18n.format(
+                                    "@astryx.pagination.ofTotalPages",
+                                    &[("total", total.into())],
+                                ),
+                                "pagination-input-total",
+                            )
+                        }))
+                        .into_any_element(),
+                )
             }
             (PaginationVariant::Dots, Some(total)) => {
                 let list = ListFocus::new(&self.id, total, ListKeys::horizontal(), window, cx)
@@ -590,13 +665,7 @@ pub const PAGINATION_DOC: ComponentDoc = ComponentDoc {
         p("pageSize", RustApi::Method("page_size")),
         p("pageSizeOptions", RustApi::Waived(SELECTOR)),
         p("onPageSizeChange", RustApi::Waived(SELECTOR)),
-        p(
-            "variant",
-            RustApi::Pending(
-                "variant",
-                "the input variant's page box lands with NumberInput in M4",
-            ),
-        ),
+        p("variant", RustApi::Method("variant")),
         p("pageLabel", RustApi::Method("page_label")),
         p("hasFirstLast", RustApi::Method("first_last")),
         p("step", RustApi::Method("step")),

@@ -40,9 +40,15 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                 .item(BreadcrumbItem::new("Settings").on_click(|_, _, _| {}))
                 .item(BreadcrumbItem::new("Notifications")),
         )
-        .child(label("Pagination: pages, count, compact, dots"))
+        .child(label("Pagination: pages, input, count, compact, dots"))
         .child(
             Pagination::new("pages", *pages.read(cx))
+                .total_pages(20)
+                .on_change(store(pages.clone())),
+        )
+        .child(
+            Pagination::new("input", *pages.read(cx))
+                .variant(PaginationVariant::Input)
                 .total_pages(20)
                 .on_change(store(pages.clone())),
         )

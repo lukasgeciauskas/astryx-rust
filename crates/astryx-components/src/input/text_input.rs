@@ -419,7 +419,7 @@ impl RenderOnce for TextInput {
             );
         }
         if let Some(status) = status
-            && self.status_placement == StatusPlacement::Attached
+            && self.status_placement != StatusPlacement::Detached
             && place.is_none()
         {
             control = control.child(status_icon(status, &part));

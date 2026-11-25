@@ -717,7 +717,7 @@ impl RenderOnce for FileInput {
                 false,
             ));
             if let Some(status) = status_type
-                && placement == StatusPlacement::Attached
+                && placement != StatusPlacement::Detached
             {
                 surface = surface.child(status_icon(status, &part));
             }

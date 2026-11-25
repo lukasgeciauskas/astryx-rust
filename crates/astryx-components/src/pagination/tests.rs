@@ -107,3 +107,36 @@ fn breadcrumb_links_navigate_but_the_current_page_does_not(cx: &mut TestAppConte
     assert!(opened.iter().all(|href| href == "/"), "{opened:?}");
     assert!(!opened.is_empty());
 }
+
+#[gpui::test]
+fn the_input_variant_goes_to_a_typed_page(cx: &mut TestAppContext) {
+    cx.update(astryx_primitives::editing::init);
+    let pages = Rc::new(RefCell::new(Vec::new()));
+    let cx = host(cx, {
+        let pages = pages.clone();
+        move || {
+            let pages = pages.clone();
+            Pagination::new("p", 3)
+                .variant(PaginationVariant::Input)
+                .total_pages(20)
+                .on_change(move |page, _, _| pages.borrow_mut().push(page))
+                .into_any_element()
+        }
+    });
+    // Tabbing in selects the text: focus events need the active window.
+    cx.update(|window, _| window.activate_window());
+    cx.run_until_parked();
+    // First, previous, then the page box.
+    press(cx, "tab");
+    press(cx, "tab");
+    press(cx, "tab");
+    cx.simulate_input("12");
+    press(cx, "enter");
+    cx.simulate_input("99");
+    press(cx, "enter");
+    assert_eq!(
+        *pages.borrow(),
+        [12, 20],
+        "a page past the last clamps to it"
+    );
+}

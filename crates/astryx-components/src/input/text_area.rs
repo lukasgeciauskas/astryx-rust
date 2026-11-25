@@ -431,7 +431,7 @@ impl RenderOnce for TextArea {
         let length = characters(&shown);
         let over = self.max_length.is_some_and(|limit| length > limit);
         let status_glyph = status
-            .filter(|_| self.status_placement == StatusPlacement::Attached)
+            .filter(|_| self.status_placement != StatusPlacement::Detached)
             .map(|status| status_icon(status, &part));
 
         // FR7: the text keeps clear of the icons, spinner and counter.

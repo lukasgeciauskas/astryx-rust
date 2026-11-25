@@ -263,6 +263,8 @@ pub struct FieldStatus {
     status: StatusType,
     message: SharedString,
     variant: FieldStatusVariant,
+    /// Announces without drawing a box (`tooltip` placement).
+    announce_only: bool,
     style: StyleRefinement,
 }
 
@@ -278,8 +280,14 @@ impl FieldStatus {
             status,
             message: message.into(),
             variant: FieldStatusVariant::Attached,
+            announce_only: false,
             style: StyleRefinement::default(),
         }
+    }
+
+    pub(crate) fn announce_only(mut self) -> Self {
+        self.announce_only = true;
+        self
     }
 
     astryx_primitives::setters! {
@@ -314,6 +322,9 @@ impl RenderOnce for FieldStatus {
                 Politeness::Polite
             };
             announce(self.message.clone(), politeness, window, cx);
+        }
+        if self.announce_only {
+            return div().id(self.id).into_any_element();
         }
 
         let (bg, fg) = self.status.colors(t);
@@ -366,7 +377,7 @@ impl RenderOnce for FieldStatus {
             None,
         );
         el.style().refine(&self.style);
-        el.id(self.id)
+        el.id(self.id).into_any_element()
     }
 }
 
@@ -381,6 +392,10 @@ pub enum StatusPlacement {
     Attached,
     /// Its own box below the control.
     Detached,
+    /// No message box: the control's status icon carries it, and the
+    /// message describes the field and announces itself. The icon's tooltip
+    /// lands with Tooltip (M5).
+    Tooltip,
 }
 
 /// The shell of a custom control: a label above, the control, and a status
@@ -499,9 +514,18 @@ impl RenderOnce for Field {
                 )
                 .variant(match self.status_placement {
                     StatusPlacement::Attached => FieldStatusVariant::Attached,
-                    StatusPlacement::Detached => FieldStatusVariant::Detached,
+                    StatusPlacement::Detached | StatusPlacement::Tooltip => {
+                        FieldStatusVariant::Detached
+                    }
                 }),
             )
+            .map(|status| {
+                if self.status_placement == StatusPlacement::Tooltip {
+                    status.announce_only()
+                } else {
+                    status
+                }
+            })
         });
         let control = match self.status_placement {
             // The status slides under the control: listed first and laid
@@ -512,7 +536,7 @@ impl RenderOnce for Field {
                 .children(status)
                 .child(div().flex().flex_col().children(self.children))
                 .into_any_element(),
-            StatusPlacement::Detached => div()
+            StatusPlacement::Detached | StatusPlacement::Tooltip => div()
                 .flex()
                 .flex_col()
                 .children(self.children)
