@@ -168,6 +168,13 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::power_search::POWER_SEARCH_DOC,
     crate::reorderable::CREATE_REORDERABLE_DOC,
     crate::keyboard_hint::USE_KEYBOARD_HINT_DOC,
+    crate::table::TABLE_DOC,
+    crate::table::TABLE_HEADER_DOC,
+    crate::table::TABLE_BODY_DOC,
+    crate::table::TABLE_FOOTER_DOC,
+    crate::table::TABLE_ROW_DOC,
+    crate::table::TABLE_CELL_DOC,
+    crate::table::TABLE_HEADER_CELL_DOC,
 ];
 
 /// The registered doc for an upstream component name.

@@ -25,6 +25,14 @@
   drag, which upstream's mouse drag has no key for. Under shift feedback the passed items
   jump to their slots; their slide waits for the motion layer (M11).
 
+- **Table: what GPUI's layout and AccessKit change.** A table's scroll region shows no
+  edge fade where it can scroll; the shared scroll behavior lands with ScrollableArea
+  (M9). An unknown row total (ARIA's `aria-rowcount=-1`, while more rows may load) has no
+  AccessKit form, so no count is exposed then. A composed table's columns fit their
+  content as a grid's `auto` tracks, which share leftover width equally rather than by
+  content as HTML's automatic table layout does. A plugin transform cannot throw, so
+  FR10's failure isolation has nothing to catch.
+
 - **The keyboard hint anchors to a focus ring.** GPUI tells no element's bounds by its
   focus, so the arrow-key hint (TabList, Toolbar, SegmentedControl) sits below the
   innermost focus ring drawn inside its composite, one frame after focus enters. A

@@ -221,11 +221,22 @@ fn rules(components: &Value) -> Result<Vec<ComponentRule>> {
             Some("focus-visible") => Some(RuleState::FocusVisible),
             _ => None,
         };
-        // A nested selector with no GPUI form is skipped, as codegen skips it.
-        if rule["selector"].is_string() && state.is_none() {
+        // A table row's even or odd stripe is its `parity`, as codegen maps
+        // it; any other nested selector has no GPUI form and is skipped.
+        let parity = rule["selector"].as_str().and_then(|s| {
+            let s = s.trim();
+            if s.starts_with(":nth-child(even") {
+                Some("even")
+            } else if s.starts_with(":nth-child(odd") {
+                Some("odd")
+            } else {
+                None
+            }
+        });
+        if rule["selector"].is_string() && state.is_none() && parity.is_none() {
             continue;
         }
-        let when = rule["when"]
+        let mut when = rule["when"]
             .as_array()
             .into_iter()
             .flatten()
@@ -236,6 +247,9 @@ fn rules(components: &Value) -> Result<Vec<ComponentRule>> {
                 )
             })
             .collect::<Vec<_>>();
+        if let Some(parity) = parity {
+            when.push((Cow::Borrowed("parity"), Cow::Borrowed(parity)));
+        }
         let props = rule["props"].as_object().context("rule props")?;
         out.push(ComponentRule {
             target: Cow::Owned(rule["target"].as_str().unwrap_or_default().to_string()),

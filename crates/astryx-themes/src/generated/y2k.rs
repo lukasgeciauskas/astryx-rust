@@ -3104,6 +3104,48 @@ pub const COMPONENTS: &[ComponentRule] = &[
     },
     ComponentRule {
         target: Cow::Borrowed("table-row"),
+        when: Cow::Borrowed(&[
+            (Cow::Borrowed("striped"), Cow::Borrowed("true")),
+            (Cow::Borrowed("parity"), Cow::Borrowed("even")),
+        ]),
+        state: None,
+        light: Cow::Borrowed(&[
+            Declaration::Token(
+                Cow::Borrowed("--color-text-accent"),
+                TokenValue::Color(hsla(0.08333334, 0.25, 0.14117648, 1.0)),
+            ),
+            Declaration::Token(
+                Cow::Borrowed("--color-text-primary"),
+                TokenValue::Color(hsla(0.08333334, 0.25, 0.14117648, 1.0)),
+            ),
+            Declaration::Token(
+                Cow::Borrowed("--color-text-secondary"),
+                TokenValue::Color(hsla(0.09166667, 0.124999985, 0.3137255, 1.0)),
+            ),
+            Declaration::Style(StyleProp::TextColor(hsla(
+                0.08333334, 0.25, 0.14117648, 1.0,
+            ))),
+        ]),
+        dark: Cow::Borrowed(&[
+            Declaration::Token(
+                Cow::Borrowed("--color-text-accent"),
+                TokenValue::Color(hsla(0.6444444, 0.7142862, 0.95882356, 1.0)),
+            ),
+            Declaration::Token(
+                Cow::Borrowed("--color-text-primary"),
+                TokenValue::Color(hsla(0.6444444, 0.7142862, 0.95882356, 1.0)),
+            ),
+            Declaration::Token(
+                Cow::Borrowed("--color-text-secondary"),
+                TokenValue::Color(hsla(0.6458333, 0.36923078, 0.74509805, 1.0)),
+            ),
+            Declaration::Style(StyleProp::TextColor(hsla(
+                0.6444444, 0.7142862, 0.95882356, 1.0,
+            ))),
+        ]),
+    },
+    ComponentRule {
+        target: Cow::Borrowed("table-row"),
         when: Cow::Borrowed(&[(Cow::Borrowed("striped"), Cow::Borrowed("true"))]),
         state: None,
         light: Cow::Borrowed(&[]),

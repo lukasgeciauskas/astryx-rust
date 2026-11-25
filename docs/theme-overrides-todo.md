@@ -20,7 +20,6 @@ component it targets.
 - `multi-selector` [variant:secondary] `:not(.astryx-input-group *)`: selector has no GPUI form
 - `multi-selector` [variant:secondary] `:hover:not([data-disabled], [data-readonly], .astryx-input-group *)`: selector has no GPUI form
 - `complex-selector` [variant:secondary] `:hover:not(:has(> :is(:disabled, [aria-disabled="true"])))`: selector has no GPUI form
-- `table-row` [striped:true] `:nth-child(even of :not([data-expansion-panel]))`: selector has no GPUI form
 
 ## chocolate
 
@@ -31,7 +30,6 @@ component it targets.
 
 - `selector` [variant:secondary] `:not(.astryx-input-group *)`: selector has no GPUI form
 - `multi-selector` [variant:secondary] `:not(.astryx-input-group *)`: selector has no GPUI form
-- `table-row` [striped:true] `:nth-child(even of :not([data-expansion-panel]))`: selector has no GPUI form
 
 ## neutral
 
@@ -61,4 +59,3 @@ component it targets.
 - `multi-selector` [variant:secondary] `:hover:not([data-disabled], [data-readonly], .astryx-input-group *)`: selector has no GPUI form
 - `complex-selector` [variant:secondary] `:hover:not(:has(> :is(:disabled, [aria-disabled="true"])))`: selector has no GPUI form
 - `badge` []: `borderColor: color-mix(in srgb, currentColor 30%, transparent)` (currentColor depends on where the token is used)
-- `table-row` [striped:true] `:nth-child(even of :not([data-expansion-panel]))`: selector has no GPUI form

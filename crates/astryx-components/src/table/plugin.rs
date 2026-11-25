@@ -1,0 +1,408 @@
+//! The plugin pipeline (upstream `TablePlugin` and the render props it
+//! transforms, `types.ts`): a plugin rewrites the columns, then each
+//! structural level's props as the table renders.
+//!
+//! Plugins compose in order: each transform receives what the plugins before
+//! it returned (FR10). The order is the named record's (FR9): the known names
+//! in the sequence `columnSettings`, `sort`, `tree`, `selection`,
+//! `pagination`, then every other name in insertion order. Context
+//! transforms run in reverse, so the first plugin wraps outermost (FR11).
+//!
+//! Upstream's props carry HTML attributes and event handlers; here a
+//! plugin adds handlers and attributes to an element through its props'
+//! `hooks`, each a function of the element the table builds.
+
+use std::rc::Rc;
+
+use gpui::{AnyElement, App, Div, ScrollHandle, SharedString, Stateful, StyleRefinement, Window};
+
+use super::model::{IdentityStatus, RowKey, TableColumn};
+use crate::icon::IconSource;
+
+/// A change to an element the table builds: handlers, attributes.
+pub type ElementHook = Box<dyn FnOnce(Stateful<Div>) -> Stateful<Div>>;
+
+/// The branch a table renders.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TableMode {
+    /// Rows from `data`.
+    Data,
+    /// The caller's composition.
+    Children,
+}
+
+/// The row model the plugins admit (FR17).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RowModel {
+    Flat,
+    Tree,
+    Grouped,
+    Detail,
+    Custom,
+}
+
+/// What a row is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RowKind {
+    /// A row of a flat dataset.
+    Product,
+    Synthetic,
+    Unknown,
+}
+
+/// Facts about the table the row, cell and wrapper transforms read
+/// (upstream `TableRenderContext`).
+#[derive(Clone)]
+pub struct TableRenderContext {
+    pub mode: TableMode,
+    pub row_model: RowModel,
+    /// The product rows in the complete data.
+    pub logical_row_count: usize,
+    /// 1 when the table renders a header, else 0.
+    pub header_row_count: usize,
+    /// The scroll container around the table.
+    pub viewport: ScrollHandle,
+}
+
+/// Facts about one body row (upstream `TableRowContext`).
+#[derive(Clone)]
+pub struct TableRowContext {
+    /// Its `id_key` value, or its index without one.
+    pub key: Option<RowKey>,
+    pub identity_status: IdentityStatus,
+    pub kind: RowKind,
+    /// Its position in the complete data.
+    pub logical_index: usize,
+    pub logical_row_count: usize,
+    pub header_row_count: usize,
+    pub render: TableRenderContext,
+}
+
+type SelectFn = Rc<dyn Fn(&mut Window, &mut App)>;
+type ActionsFn = Rc<dyn Fn(&mut App) -> Vec<TableContextAction>>;
+
+/// One right-click action a plugin contributes (upstream
+/// `TableContextAction`).
+#[derive(Clone)]
+pub struct TableContextAction {
+    /// Unique within a menu.
+    pub id: SharedString,
+    pub label: SharedString,
+    pub icon: Option<IconSource>,
+    pub on_select: SelectFn,
+    pub disabled: bool,
+    /// Related actions cluster, with a divider between groups, in first-seen
+    /// order; actions without one form a trailing group.
+    pub group: Option<SharedString>,
+    /// Drawn checked (the active sort direction).
+    pub checked: Option<bool>,
+    /// In the error colour (Delete row).
+    pub destructive: bool,
+}
+
+impl TableContextAction {
+    pub fn new(
+        id: impl Into<SharedString>,
+        label: impl Into<SharedString>,
+        on_select: impl Fn(&mut Window, &mut App) + 'static,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            label: label.into(),
+            icon: None,
+            on_select: Rc::new(on_select),
+            disabled: false,
+            group: None,
+            checked: None,
+            destructive: false,
+        }
+    }
+
+    pub fn icon(mut self, icon: impl Into<IconSource>) -> Self {
+        self.icon = Some(icon.into());
+        self
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+
+    pub fn group(mut self, group: impl Into<SharedString>) -> Self {
+        self.group = Some(group.into());
+        self
+    }
+
+    pub fn checked(mut self, checked: bool) -> Self {
+        self.checked = Some(checked);
+        self
+    }
+
+    pub fn destructive(mut self, destructive: bool) -> Self {
+        self.destructive = destructive;
+        self
+    }
+}
+
+/// A cell's actions: a list, or a getter run when the menu opens (upstream
+/// `TableContextActions`).
+#[derive(Clone)]
+pub enum TableContextActions {
+    List(Vec<TableContextAction>),
+    Lazy(ActionsFn),
+}
+
+impl TableContextActions {
+    pub fn lazy(f: impl Fn(&mut App) -> Vec<TableContextAction> + 'static) -> Self {
+        TableContextActions::Lazy(Rc::new(f))
+    }
+
+    pub(crate) fn resolve(&self, cx: &mut App) -> Vec<TableContextAction> {
+        match self {
+            TableContextActions::List(list) => list.clone(),
+            TableContextActions::Lazy(f) => f(cx),
+        }
+    }
+}
+
+/// The `<table>` element's props.
+#[derive(Default)]
+pub struct TableRenderProps {
+    pub style: StyleRefinement,
+    pub hooks: Vec<ElementHook>,
+}
+
+/// The header row's props: its cells, built.
+pub struct HeaderRowProps {
+    pub style: StyleRefinement,
+    pub children: Vec<AnyElement>,
+    pub hooks: Vec<ElementHook>,
+}
+
+/// A header cell's props, in named slots so plugins do not collide
+/// (upstream `HeaderCellRenderProps`): `before` the label (a selection
+/// checkbox), the label `content` (a sort control may wrap it), `after` it
+/// (a sort indicator), an `overlay` laid over the cell (a resize handle,
+/// never part of the header's name) and content `below` it (inline filters).
+pub struct HeaderCellProps {
+    pub style: StyleRefinement,
+    pub before: Vec<AnyElement>,
+    pub content: Option<AnyElement>,
+    pub after: Vec<AnyElement>,
+    pub overlay: Vec<AnyElement>,
+    pub below: Vec<AnyElement>,
+    pub context_menu: Vec<TableContextActions>,
+    /// The header's accessible name, when a plugin names it.
+    pub aria_label: Option<SharedString>,
+    /// Its place among the final columns.
+    pub column_index: usize,
+    pub hooks: Vec<ElementHook>,
+}
+
+/// A body row's props: its cells, built (upstream `BodyRowRenderProps`).
+pub struct BodyRowProps {
+    pub style: StyleRefinement,
+    pub children: Vec<AnyElement>,
+    /// Rendered right after the row: a detail panel.
+    pub after_row: Vec<AnyElement>,
+    pub aria_row_index: Option<usize>,
+    /// Selection's published state (FR21): the row is selected, and paints
+    /// its wash when `highlight`.
+    pub selected: Option<RowPaint>,
+    pub hooks: Vec<ElementHook>,
+}
+
+/// What a row plugin publishes for the row's paint (upstream
+/// `rowPaint.ts`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RowPaint {
+    pub selected: bool,
+    pub highlight: bool,
+    pub active: bool,
+}
+
+/// A body cell's props (upstream `BodyCellRenderProps`).
+pub struct BodyCellProps {
+    pub style: StyleRefinement,
+    pub context_menu: Vec<TableContextActions>,
+    pub column_index: usize,
+    /// The cell renders empty: neither the column's renderer nor the default
+    /// one runs (a row a plugin replaces wholesale).
+    pub content_suppressed: bool,
+    pub hooks: Vec<ElementHook>,
+}
+
+/// The scroll wrapper's props: the container around the table (upstream
+/// `ScrollWrapperRenderProps`).
+pub struct ScrollWrapperProps {
+    pub style: StyleRefinement,
+    /// Chrome inside the scroll container, before and after the table.
+    pub before_table: Vec<AnyElement>,
+    pub after_table: Vec<AnyElement>,
+    pub hooks: Vec<ElementHook>,
+}
+
+/// A table plugin (upstream `TablePlugin<T>`): every transform is optional
+/// and receives what the plugins before it produced.
+#[allow(unused_variables)]
+pub trait TablePlugin<T> {
+    /// The row model its body transforms keep (`Flat` for one product row
+    /// per item). A body transform without one makes the model `Custom`.
+    fn row_model(&self) -> Option<RowModel> {
+        None
+    }
+
+    /// Whether it transforms body rows or cells (for the row model).
+    fn transforms_body(&self) -> bool {
+        false
+    }
+
+    /// Whether the table's data is loading (upstream `renderState`): an
+    /// empty table that loads shows no default empty state.
+    fn is_loading(&self, cx: &App) -> Option<bool> {
+        None
+    }
+
+    /// Whether more rows may come (upstream `renderState.hasMore`).
+    fn has_more(&self, cx: &App) -> Option<bool> {
+        None
+    }
+
+    /// Filters, reorders or adds columns, before any element transform.
+    fn transform_columns(
+        &self,
+        columns: Vec<TableColumn<T>>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Vec<TableColumn<T>> {
+        columns
+    }
+
+    fn transform_table(
+        &self,
+        props: TableRenderProps,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> TableRenderProps {
+        props
+    }
+
+    fn transform_header_row(
+        &self,
+        props: HeaderRowProps,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> HeaderRowProps {
+        props
+    }
+
+    fn transform_header_cell(
+        &self,
+        props: HeaderCellProps,
+        column: &TableColumn<T>,
+        columns: &[TableColumn<T>],
+        window: &mut Window,
+        cx: &mut App,
+    ) -> HeaderCellProps {
+        props
+    }
+
+    fn transform_body_row(
+        &self,
+        props: BodyRowProps,
+        item: &T,
+        context: &TableRowContext,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> BodyRowProps {
+        props
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn transform_body_cell(
+        &self,
+        props: BodyCellProps,
+        column: &TableColumn<T>,
+        item: &T,
+        columns: &[TableColumn<T>],
+        context: &TableRowContext,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> BodyCellProps {
+        props
+    }
+
+    fn transform_scroll_wrapper(
+        &self,
+        props: ScrollWrapperProps,
+        context: &TableRenderContext,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> ScrollWrapperProps {
+        props
+    }
+
+    /// Wraps the table in providers.
+    fn transform_table_context(
+        &self,
+        child: AnyElement,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> AnyElement {
+        child
+    }
+}
+
+/// The canonical sequence of the known plugin names (FR9).
+pub const KNOWN_PLUGIN_ORDER: [&str; 5] =
+    ["columnSettings", "sort", "tree", "selection", "pagination"];
+
+/// The plugins in pipeline order: the known names in their sequence, then
+/// the others as given (FR9).
+pub(crate) fn order_plugins<P: Clone>(named: &[(SharedString, P)]) -> Vec<P> {
+    let mut out = Vec::with_capacity(named.len());
+    for known in KNOWN_PLUGIN_ORDER {
+        out.extend(
+            named
+                .iter()
+                .filter(|(n, _)| n.as_ref() == known)
+                .map(|(_, p)| p.clone()),
+        );
+    }
+    out.extend(
+        named
+            .iter()
+            .filter(|(n, _)| !KNOWN_PLUGIN_ORDER.contains(&n.as_ref()))
+            .map(|(_, p)| p.clone()),
+    );
+    out
+}
+
+/// The row model the plugins admit (upstream `resolveTableAdmission`).
+pub(crate) fn admitted_row_model<T>(plugins: &[Rc<dyn TablePlugin<T>>]) -> RowModel {
+    let modifier = plugins.iter().find(|p| {
+        p.row_model() != Some(RowModel::Flat) && (p.row_model().is_some() || p.transforms_body())
+    });
+    match modifier {
+        None => RowModel::Flat,
+        Some(p) => p.row_model().unwrap_or(RowModel::Custom),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fr9_known_names_first_in_their_sequence_then_the_rest_as_given() {
+        let named: Vec<(SharedString, &str)> =
+            ["mine", "pagination", "sort", "other", "columnSettings"]
+                .iter()
+                .map(|n| (SharedString::from(*n), *n))
+                .collect();
+        assert_eq!(
+            order_plugins(&named),
+            ["columnSettings", "sort", "pagination", "mine", "other"]
+        );
+    }
+}

@@ -9,7 +9,7 @@ _Last updated: 2026-11-25, at the end of M6 (Collections)._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5 and M6. Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5 and M6; M7 (Table) is in progress. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
 - **Parity:** 82 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
@@ -28,7 +28,7 @@ _Last updated: 2026-11-25, at the end of M6 (Collections)._
 
 ### Not yet ported (28)
 
-- **M7:** Table. **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
+- **M7 (in progress):** Table's plugins and windowing (see "Next" below). **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
   TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
@@ -151,22 +151,24 @@ time:
 
 ## Next: M7 Table
 
-PLAN.md's M7 entry: BaseTable and Table parts, then the 14 plugins as a trait-based
-pipeline (columnResize, columnSettings, filtering, groupedRows, infiniteScroll,
-pagination, rowExpansion, rowIndex, rowStatus, selection, sortable, stickyColumns,
-tree, virtualization). Suggested order, each a commit:
+Stages, each a commit:
 
-1. The table model and BaseTable's layout (columns, cells, header, the sticky
-   header), with Table's props and its doc.
-2. Row virtualization and column virtualization on `astryx_primitives::list_window`
-   (`useTableRowsVirtualization`'s `initialViewportHeight`, DEC-6; the column window's
-   insets from pinned columns): the module is built and tested for both axes.
-3. The plugins, in the spec's order, grouping those that share state (selection and
-   rowStatus; tree, groupedRows and rowExpansion; columnResize, columnSettings and
-   stickyColumns; sortable, filtering and pagination; infiniteScroll; rowIndex).
-4. Table's `reorderable` (columnSettings' column order) on `reorderable::attach` or a
-   Table adapter of the session, as upstream's Table adopts `createReorderable`.
+1. ~~Table and its parts~~ (done: `table/`: model, plugin trait, data and children modes).
+2. Sorting: `useTableSortableState` and `useTableSortable` (FR5: the sort control around
+   the label, the indicator, multi-sort priority, the header's context actions, the cut
+   heading's keyboard-focus tooltip).
+3. Selection, activation and row status: `useTableSelectionState`, `useTableSelection`
+   (FR6), `TableSelectionToolbar`, `useTableActivation` (an accepted contract upstream
+   has not built; FR21's paint path), `useTableRowStatus`, `useTableRowIndex`.
+4. Pagination, filtering (`useTableFilterState`, `useTableFiltering` over PowerSearch's
+   config) and infinite scroll (the loading source, FR22).
+5. Tree (`useTableTreeData`, `useTableTreeState`), grouped rows and row expansion (FR7;
+   its `animatedLayout`, FR15, waits for M11's motion layer).
+6. Column resize, column settings (with its state) and sticky columns (FR14's dividers in
+   pinned cells).
+7. Virtualization: rows and columns on `astryx_primitives::list_window` (FR18-FR20, FR23,
+   DEC-5, DEC-6), then the `virtualization` builder (Pending in TABLE_DOC until then).
 
-Before starting, read `../Astryx/packages/core/src/Table/` (its `tableRuntime.ts`,
-`BaseTable.tsx` and `plugins/`), the Table specs under
-`docs/specs/components/Table/`, and `architecture/list-windowing.md`.
+Before each, read the plugin's file under `../Astryx/packages/core/src/Table/plugins/`,
+its `.doc.mjs` and its spec under `docs/specs/components/Table/plugins/` where there is
+one, plus Table.spec.md's FR rows for it.

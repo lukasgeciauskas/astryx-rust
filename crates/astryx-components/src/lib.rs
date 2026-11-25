@@ -37,6 +37,7 @@ pub mod selector;
 pub mod slider;
 pub mod status;
 pub mod stepper;
+pub mod table;
 pub mod tabs;
 pub mod text;
 pub mod time;

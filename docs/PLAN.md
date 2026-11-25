@@ -413,9 +413,22 @@ The remaining primitives:
     AvatarGroup's one tab stop across its interactive members with wrapping arrows, Home
     and End (FR4) and its spoken hint (FR5), interactive Avatars taking focus, and
     AvatarGroupOverflow's `onClick` and `children`.
-- **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
-  columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
-  rowStatus, selection, sortable, stickyColumns, tree, virtualization.
+- **M7 Table (in progress):** BaseTable/Table parts plus 14 plugins as a trait-based pipeline:
+  columnResize, columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion,
+  rowIndex, rowStatus, selection, sortable, stickyColumns, tree, virtualization.
+  - Table and its parts (done): `table::Table<T>` over any `TableRecord` (a typed row, or the
+    `Record` map), columns with `proportional`/`pixel` widths and their floors (FR13), row
+    identity (FR16), the default cell text with missing values empty (FR25) and generated
+    columns; the `TablePlugin<T>` trait with every transform, the header cell's slots and
+    FR9's ordering, row and render contexts (FR17), a loading source (FR22) and context-menu
+    actions gathered into one menu per header cell and per row; density, dividers, stripes,
+    hover, vertical alignment, wrapping or truncating text with the default cell's tooltip,
+    the named scroll region that becomes a tab stop and scrolls by keys (FR1), container
+    bleed, row indexes and the empty state (FR8). A data-driven table lays out as one fixed
+    grid template per row; children mode (`Table::composed` with TableHeader, TableBody,
+    TableFooter, TableRow, TableHeaderCell and TableCell) as one shared grid whose columns
+    fit their content (FR24). Themes' even-row stripe (`:nth-child(even)`) now maps to the
+    row's `parity`, in codegen and at run time.
 - **M8 Dates:** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
   DateRangeInput, DateTimeInput, TimeInput.
   - PowerSearch's date and time values: the `time`, `date_absolute`, `date_relative` and

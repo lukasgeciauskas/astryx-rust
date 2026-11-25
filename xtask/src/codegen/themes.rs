@@ -144,7 +144,16 @@ pub fn render_theme(
                 )
             })
             .collect();
-        let selector = rule["selector"].as_str();
+        let mut when = when;
+        let mut selector = rule["selector"].as_str();
+        // A table row's even stripe: upstream's rows carry `parity`, so the
+        // selector becomes that condition.
+        if let Some(parity) = selector.and_then(parity_selector) {
+            when.push(format!(
+                "(Cow::Borrowed(\"parity\"), Cow::Borrowed({parity:?}))"
+            ));
+            selector = None;
+        }
         let state = match rule["state"].as_str() {
             Some("hover") => "Some(RuleState::Hover)",
             Some("active") => "Some(RuleState::Active)",
@@ -325,4 +334,17 @@ pub fn render_todo(todo: &BTreeMap<String, Vec<String>>) -> String {
         }
     }
     out
+}
+
+/// `:nth-child(even ...)` or `:nth-child(odd ...)`: the parity a table row
+/// publishes, the one structural selector with a GPUI form.
+fn parity_selector(selector: &str) -> Option<&'static str> {
+    let s = selector.trim();
+    if s.starts_with(":nth-child(even") {
+        Some("even")
+    } else if s.starts_with(":nth-child(odd") {
+        Some("odd")
+    } else {
+        None
+    }
 }
