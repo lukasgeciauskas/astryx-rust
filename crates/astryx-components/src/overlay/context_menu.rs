@@ -508,3 +508,64 @@ pub(crate) fn with_context_menu(
             }),
     )
 }
+
+/// A row menu (List FR13; upstream `useContextMenu` on a row): the row
+/// `area` opens `entries` on its context request.
+pub(crate) fn with_row_menu(
+    area: Stateful<Div>,
+    id: ElementId,
+    entries: Vec<MenuEntry>,
+    label: Option<SharedString>,
+    window: &mut Window,
+    cx: &mut App,
+) -> Stateful<Div> {
+    with_context_menu(
+        area,
+        ContextSpec {
+            id,
+            entries,
+            entries_fn: None,
+            menu_width: None,
+            size: MenuSize::Md,
+            label,
+            on_open_change: None,
+            on_invoke: None,
+            presentation: PopoverPresentation::Popover,
+            disabled: false,
+        },
+        window,
+        cx,
+    )
+}
+
+/// The visible "More actions" button of a row with a menu and no focusable
+/// part of its own (List FR13): the keyboard's and a screen reader's path
+/// to the row menu `menu`, opening it at the button. Render it in the same
+/// render scope as the row's [`with_row_menu`].
+pub(crate) fn context_menu_button(
+    id: ElementId,
+    menu: ElementId,
+    label: SharedString,
+    window: &mut Window,
+    cx: &mut App,
+) -> AnyElement {
+    let state = context_state(&menu, window, cx);
+    let root = menu_root(&menu, window, cx);
+    crate::button::IconButton::new(id, label.clone(), crate::icon::Icon::new("moreHorizontal"))
+        .variant(crate::button::ButtonVariant::Ghost)
+        .size(astryx_primitives::ElementSize::Sm)
+        .tooltip(label)
+        .on_click(move |event, window, cx| {
+            cx.stop_propagation();
+            open_at(
+                &state,
+                &root,
+                event.position(),
+                event.is_keyboard(),
+                None,
+                window,
+                cx,
+            );
+        })
+        .into_any_element()
+}

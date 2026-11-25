@@ -4,6 +4,7 @@
 //! with its catalogs or overrides.
 
 const ENGLISH: &[(&str, &str)] = &[
+    ("@astryx.listItem.moreActions", "More actions for {label}"),
     ("@astryx.textField.addToDictionary", "Add to dictionary"),
     ("@astryx.textField.copy", "Copy"),
     ("@astryx.textField.cut", "Cut"),

@@ -11,8 +11,9 @@ use astryx_i18n::{LogicalStyled, use_direction};
 use astryx_primitives::{control_focus, is_focus_visible, use_link_handler};
 use astryx_theme::current;
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, IntoElement, ParentElement, RenderOnce, Role,
-    SharedString, StyleRefinement, Styled, Window, div, prelude::*, relative,
+    AnyElement, App, ClickEvent, ElementId, FocusHandle, IntoElement, MouseButton, ParentElement,
+    Pixels, RenderOnce, Role, SharedString, StyleRefinement, Styled, Window, div, prelude::*, px,
+    relative,
 };
 
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
@@ -60,6 +61,10 @@ pub enum ItemLayout {
 }
 
 type ClickFn = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+type ActivateFn = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// The least hit target a row offers under a finger (List FR10).
+const TOUCH_TARGET: f32 = 44.;
 
 /// A row with start content, label, description and end content, upstream
 /// `Item`.
@@ -83,6 +88,8 @@ pub struct Item {
     href: Option<SharedString>,
     target: Option<SharedString>,
     bare: bool,
+    delegate: Option<(FocusHandle, ActivateFn)>,
+    touch_band: Option<(Option<Pixels>, Option<Pixels>)>,
     style: StyleRefinement,
 }
 
@@ -108,8 +115,32 @@ impl Item {
             href: None,
             target: None,
             bare: false,
+            delegate: None,
+            touch_band: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Upstream `interactiveRef`: a control inside the row (a checkbox in
+    /// the start content) that owns its keyboard access and action. The row
+    /// becomes a larger target for it, with no tab stop of its own: a press
+    /// on the row's surface focuses `focus` and runs `activate`, while a
+    /// press on a control inside the row stays that control's. It takes the
+    /// place of `on_click` and `href`.
+    pub fn interactive(
+        mut self,
+        focus: FocusHandle,
+        activate: impl Fn(&mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.delegate = Some((focus, Rc::new(activate)));
+        self
+    }
+
+    /// Under a finger, how far the row's hit target may grow up and down
+    /// (`None`: as far as it needs) to reach 44px.
+    pub(crate) fn touch_band(mut self, up: Option<Pixels>, down: Option<Pixels>) -> Self {
+        self.touch_band = Some((up, down));
+        self
     }
 
     astryx_primitives::setters! {
@@ -182,8 +213,8 @@ impl Item {
         self
     }
 
-    fn interactive(&self) -> bool {
-        self.on_click.is_some() || self.href.is_some()
+    fn is_interactive(&self) -> bool {
+        self.on_click.is_some() || self.href.is_some() || self.delegate.is_some()
     }
 }
 
@@ -199,15 +230,17 @@ impl RenderOnce for Item {
         let t = theme.tokens();
         let rem = window.rem_size();
         let dir = use_direction(cx);
-        let interactive = self.interactive();
+        let interactive = self.is_interactive();
 
         let clamp = |el: gpui::Div, lines: Option<usize>| match lines {
             Some(1) => el.overflow_hidden().text_ellipsis().whitespace_nowrap(),
             Some(n) if n > 1 => el.overflow_hidden().line_clamp(n),
             _ => el,
         };
+        let label_selector = format!("{}-label", self.id);
         let label = clamp(
             div()
+                .debug_selector(move || label_selector)
                 .text_size(t.text.body.size)
                 .line_height(relative(t.text.body.leading))
                 .text_color(t.color.text_primary)
@@ -306,42 +339,169 @@ impl RenderOnce for Item {
         );
         el.style().refine(&self.style);
 
-        let el = el.id(self.id.clone());
+        let row_selector = self.id.to_string();
+        let el = el.id(self.id.clone()).debug_selector(move || row_selector);
         if !interactive {
             return el.into_any_element();
         }
-        let focus = control_focus(&self.id, window, cx);
-        let mut el = el.track_focus(&focus);
-        if self.disabled {
-            el = el.on_click(|_, _, cx| cx.stop_propagation());
-        } else {
+        let touch = window.last_input_was_touch();
+        let radius = t.radius.element.to_pixels(rem);
+        // What activating the row does: the caller's click, its link, or its
+        // delegate control (upstream `interactiveRef`).
+        let activate: ClickFn = {
             let on_click = self.on_click.clone();
             let navigation = self
                 .href
                 .clone()
                 .map(|href| (href, self.target.clone(), use_link_handler(cx)));
+            let delegate = self.delegate.clone();
+            Rc::new(
+                move |event: &ClickEvent, window: &mut Window, cx: &mut App| {
+                    cx.stop_propagation();
+                    if let Some((focus, activate)) = &delegate {
+                        focus.focus(window, cx);
+                        activate(window, cx);
+                        return;
+                    }
+                    if let Some(f) = &on_click {
+                        f(event, window, cx);
+                        if window.default_prevented() {
+                            return;
+                        }
+                    }
+                    if let Some((href, target, handler)) = &navigation {
+                        handler.open(href, target.clone(), window, cx);
+                    }
+                },
+            )
+        };
+        let mut el = match &self.delegate {
+            // A delegate row is a larger target for its control: no tab stop
+            // of its own, its ring when the control has keyboard focus.
+            Some((focus, _)) => {
+                let mut el = el;
+                if is_focus_visible(focus, window) {
+                    el = el.child(focus_ring(t, radius, rem));
+                }
+                el
+            }
+            None => {
+                let focus = control_focus(&self.id, window, cx);
+                let mut el = el.track_focus(&focus);
+                if is_focus_visible(&focus, window) {
+                    el = el.child(focus_ring(t, radius, rem));
+                }
+                el
+            }
+        };
+        if self.disabled {
+            el = el.on_click(|_, _, cx| cx.stop_propagation());
+        } else {
             let (hover, pressed) = (t.color.overlay_hover, t.color.overlay_pressed);
-            if !self.bare && !self.selected {
+            if !self.bare && !self.selected && !touch {
                 el = el.hover(move |s| s.bg(hover));
             }
             if !self.bare {
-                el = el.active(move |s| s.bg(pressed));
-            }
-            el = el.cursor_pointer().on_click(move |event, window, cx| {
-                cx.stop_propagation();
-                if let Some(f) = &on_click {
-                    f(event, window, cx);
-                    if window.default_prevented() {
-                        return;
+                if touch {
+                    // FR11: under a finger the press paints at once and its
+                    // release fades on the exit motion.
+                    let state = window.use_keyed_state(
+                        ElementId::Name(format!("{:?}-pressed", self.id).into()),
+                        cx,
+                        |_, _| false,
+                    );
+                    let held = *state.read(cx);
+                    let fade = crate::motion::transition(
+                        format!("{:?}-press", self.id),
+                        held,
+                        t.duration.exit,
+                        t.ease.exit,
+                        window,
+                        cx,
+                    );
+                    let strength = if held { 1. } else { fade };
+                    if strength > 0. {
+                        // Above the row's own fill, below its content.
+                        let mut tint = pressed;
+                        tint.a *= strength;
+                        let base = if self.selected {
+                            t.color.accent_muted
+                        } else if self.highlighted {
+                            t.color.overlay_hover
+                        } else {
+                            gpui::transparent_black()
+                        };
+                        el = el.bg(astryx_theme::color::composite(base, tint));
                     }
+                    let (down, up, out) = (state.clone(), state.clone(), state);
+                    el = el
+                        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                            down.update(cx, |p, _| *p = true);
+                            window.refresh();
+                        })
+                        .on_mouse_up(MouseButton::Left, move |_, window, cx| {
+                            up.update(cx, |p, _| *p = false);
+                            window.refresh();
+                        })
+                        .on_mouse_up_out(MouseButton::Left, move |_, window, cx| {
+                            out.update(cx, |p, _| *p = false);
+                            window.refresh();
+                        });
+                } else {
+                    el = el.active(move |s| s.bg(pressed));
                 }
-                if let Some((href, target, handler)) = &navigation {
-                    handler.open(href, target.clone(), window, cx);
-                }
+            }
+            el = el.cursor_pointer().on_click({
+                let activate = activate.clone();
+                move |event, window, cx| activate(event, window, cx)
             });
+            // FR10: under a finger the row's hit target reaches 44px where
+            // its neighbors leave room, with no visual change.
+            if touch && let Some((up, down)) = self.touch_band {
+                let height = window.use_keyed_state(
+                    ElementId::Name(format!("{:?}-height", self.id).into()),
+                    cx,
+                    |_, _| px(0.),
+                );
+                let need = ((px(TOUCH_TARGET) - *height.read(cx)) / 2.).max(px(0.));
+                let (top, bottom) = (
+                    up.map_or(need, |u| need.min(u)),
+                    down.map_or(need, |d| need.min(d)),
+                );
+                el = el.child(
+                    gpui::canvas(
+                        move |bounds, _, cx| {
+                            if *height.read(cx) != bounds.size.height {
+                                height.update(cx, |h, _| *h = bounds.size.height);
+                            }
+                        },
+                        |_, _, _, _| {},
+                    )
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full(),
+                );
+                if top > px(0.) || bottom > px(0.) {
+                    let activate = activate.clone();
+                    el = el.child(
+                        div()
+                            .id(ElementId::Name(format!("{:?}-hit", self.id).into()))
+                            .absolute()
+                            .left_0()
+                            .right_0()
+                            .top(-top)
+                            .bottom(-bottom)
+                            .on_click(move |event, window, cx| activate(event, window, cx)),
+                    );
+                }
+            }
         }
-        if is_focus_visible(&focus, window) {
-            el = el.child(focus_ring(t, t.radius.element.to_pixels(rem), rem));
+        if self.delegate.is_some() {
+            return el.into_any_element();
+        }
+        if self.selected {
+            el = el.aria_current(gpui::AriaCurrent::True);
         }
         let role = if self.href.is_some() {
             Role::Link
@@ -378,10 +538,7 @@ pub const ITEM_DOC: ComponentDoc = ComponentDoc {
         p("descriptionLines", RustApi::Method("description_lines")),
         p("layout", RustApi::Method("layout")),
         p("onClick", RustApi::Method("on_click")),
-        p(
-            "interactiveRef",
-            RustApi::Waived("GPUI elements have no refs"),
-        ),
+        p("interactiveRef", RustApi::Method("interactive")),
         p("href", RustApi::Method("href")),
         p("target", RustApi::Method("target")),
         p("rel", RustApi::Waived("GPUI opens URLs without a referrer")),

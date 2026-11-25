@@ -15,7 +15,10 @@ pub use misc::{
     AspectFit, AspectRatio, AspectShape, Center, CenterAxis, Divider, DividerVariant, Orientation,
     VisuallyHidden,
 };
-pub use spacing::{ContainerPadding, Padding, Sizing, SpacingStep};
+pub(crate) use spacing::host_children;
+pub use spacing::{
+    ContainerChild, ContainerCorners, ContainerPadding, Padding, Sizing, SpacingStep,
+};
 pub(crate) use spacing::{padding_setters, size_setters};
 pub use stack::{Stack, StackAlign, StackDirection, StackItem, StackItemSize, StackWrap};
 

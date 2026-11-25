@@ -202,6 +202,63 @@ impl Sizing {
     }
 }
 
+/// The corners of the container an element sits in, inside its border
+/// (upstream's `--container-corner-*`, logical): a rounded host publishes
+/// them so a bleeding List's first and last rows can follow its curve.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ContainerCorners {
+    pub start_start: gpui::Pixels,
+    pub start_end: gpui::Pixels,
+    pub end_start: gpui::Pixels,
+    pub end_end: gpui::Pixels,
+}
+
+impl ContainerCorners {
+    /// The same radius at every corner.
+    pub fn all(radius: gpui::Pixels) -> Self {
+        ContainerCorners {
+            start_start: radius,
+            start_end: radius,
+            end_start: radius,
+            end_end: radius,
+        }
+    }
+}
+
+/// A host's direct child's place among its siblings (CSS `:first-child` and
+/// `:last-child` of the host's content), which hosts provide around each
+/// child.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ContainerChild {
+    pub first: bool,
+    pub last: bool,
+}
+
+/// A host's children with what it publishes: its padding and corners
+/// around all of them, and each one's place.
+pub(crate) fn host_children(
+    children: impl IntoIterator<Item = gpui::AnyElement>,
+    padding: ContainerPadding,
+    corners: ContainerCorners,
+) -> gpui::AnyElement {
+    use gpui::{IntoElement, ParentElement, Styled};
+    let children: Vec<gpui::AnyElement> = children.into_iter().collect();
+    let count = children.len();
+    let placed = children.into_iter().enumerate().map(|(i, child)| {
+        astryx_primitives::provide(
+            ContainerChild {
+                first: i == 0,
+                last: i + 1 == count,
+            },
+            child,
+        )
+        .into_any_element()
+    });
+    let content = gpui::div().flex().flex_col().children(placed);
+    astryx_primitives::provide(padding, astryx_primitives::provide(corners, content))
+        .into_any_element()
+}
+
 /// The padding of the container an element sits in, upstream's
 /// `--container-padding-*` variables. Cards and layout containers provide
 /// it; a full-bleed Divider reads it to reach the container's edges.

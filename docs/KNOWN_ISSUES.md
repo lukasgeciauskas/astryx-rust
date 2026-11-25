@@ -70,6 +70,20 @@
   focus-in listener does not fire when focus moves between an element and its
   descendants, and the clear button sits inside the trigger's box. A press on the clear
   button also focuses the trigger first, where upstream leaves focus as it was.
+- **A List is named by `label`, not its header.** Upstream points `aria-labelledby` at
+  the header; a GPUI element cannot name another, so a List takes its name as text.
+- **A bleeding List's corners follow its host's direct child.** Hosts tell each direct
+  child whether it is first or last; a List nested deeper (in a Stack inside a Card)
+  reads its ancestor's place, where CSS's `:first-child` reads the List's own.
+- **A delegate row cannot mark its control current.** Upstream writes `aria-current`
+  on a selected row's `interactiveRef` control; GPUI cannot set another element's
+  accessibility state, so the control reports it itself if it should.
+- **The touch hit band knows only its List.** Between rows it reaches half the list's
+  gap, and past the first and last rows as far as it needs; upstream also measures
+  other neighbouring controls.
+- **OverflowList cannot see a flex-row parent.** Upstream gives a single row its unfolded
+  width in a flex row and lets it shrink first; GPUI cannot read the parent's display,
+  so in a flex row give the list `flex_1()` or a width.
 - **The Menu key's name depends on the platform.** ContextMenu opens on Shift+F10 and on
   a key GPUI names `menu`, `contextmenu` or `apps`; a platform that names the Menu key
   otherwise opens it only with Shift+F10.

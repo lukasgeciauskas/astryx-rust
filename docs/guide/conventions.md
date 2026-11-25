@@ -82,6 +82,10 @@
   and Tokenizer should too. Selector filters its own options, as upstream does. A
   source built in `render` has no identity: keep it in an `Rc` or name it with a key
   when a change must re-run a query.
+- **Hosts** (Card, Section, Dialog, BottomSheet) wrap their children with
+  `layout::host_children(children, padding, corners)`: `ContainerPadding`,
+  `ContainerCorners` and each child's `ContainerChild` place, which full-bleed
+  content (a Divider, a TabList, a bleeding List) reads.
 - **Comboboxes** (Selector, and MultiSelector after it): focus stays on the trigger or
   the search field, and the highlighted option claims it with
   `aria_active_descendant_of(&focus)` (fork patch R13), since the list sits in

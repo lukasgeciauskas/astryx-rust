@@ -304,6 +304,18 @@ The remaining primitives:
     combobox's active descendant.
   - Pagination's page-size selector (done), which closes the M3 item; `page_href` now
     receives the page size, as upstream's `getPageHref(page, pageSize)`.
+  - List and ListItem (done): density, dividers, markers (disc, circle, numbers in one
+    shared column, task boxes for Markdown), the four edge treatments against the host's
+    padding and corners (FR1-FR8), the inline clip (FR9), the touch hit band (FR10) and
+    press fade (FR11), and row menus with a "More actions" path (FR13). Hosts (Card,
+    Section, Dialog, BottomSheet) now publish their corners and each child's place
+    (`ContainerCorners`, `ContainerChild`) besides their padding.
+  - Item's remaining props: `interactiveRef` (`Item::interactive`, a delegate control),
+    `aria-current` on a selected interactive row; swipe actions wait for M11.
+  - MetadataList and MetadataListItem (done) on R7 grid tracks; OverflowList (done) with
+    upstream's `computeOverflow` fit over a hidden measuring copy.
+  - Carried: List's `animatedLayout` to the motion layer (M11), like Collapsible's;
+    `reorderable` lands with TreeList at the end of M6.
 - **M7 Table:** BaseTable/Table parts plus 14 plugins as a trait-based pipeline: columnResize,
   columnSettings, filtering, groupedRows, infiniteScroll, pagination, rowExpansion, rowIndex,
   rowStatus, selection, sortable, stickyColumns, tree, virtualization.

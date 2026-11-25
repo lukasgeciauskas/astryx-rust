@@ -6,7 +6,7 @@ mod effects;
 mod tokens;
 
 use astryx::theme::ResolvedTheme;
-use gpui::{AnyElement, App, Window};
+use gpui::{AnyElement, App, IntoElement, ParentElement, Styled, Window};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Page {
@@ -102,7 +102,15 @@ impl Page {
             Page::Overlays => astryx::components::overlay::examples::examples(window, cx),
             Page::Navigation => astryx::components::segmented::examples::examples(window, cx),
             Page::Wayfinding => astryx::components::pagination::examples::examples(window, cx),
-            Page::Collections => astryx::components::selector::examples::examples(window, cx),
+            Page::Collections => gpui::div()
+                .flex()
+                .flex_col()
+                .gap(gpui::px(48.))
+                .child(astryx::components::selector::examples::examples(window, cx))
+                .child(astryx::components::list::examples::examples(window, cx))
+                .child(astryx::components::metadata::examples::examples(window, cx))
+                .child(astryx::components::overflow::examples::examples(window, cx))
+                .into_any_element(),
         }
     }
 }

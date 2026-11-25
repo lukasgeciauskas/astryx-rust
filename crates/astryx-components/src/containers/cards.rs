@@ -69,7 +69,8 @@ impl PressableCard {
         let sizing = self.card.size;
 
         // The card fills the pressable box, which carries its size.
-        let (card, padding) = self.card.root(&theme, dir, rem);
+        let (mut card, padding) = self.card.root(&theme, dir, rem);
+        let corners = super::corners_of(&mut card, &theme, rem);
         let mut card = card.relative();
         card.style().size.width = Some(Length::from(gpui::relative(1.)));
         if sizing.height.is_some() {
@@ -99,7 +100,12 @@ impl PressableCard {
             }
         }
         let card = card
-            .child(container_children(self.card.children, padding, part))
+            .child(container_children(
+                self.card.children,
+                padding,
+                corners,
+                part,
+            ))
             .child(overlay);
 
         let mut el = div().relative().flex().flex_col();

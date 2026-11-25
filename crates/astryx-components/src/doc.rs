@@ -152,6 +152,11 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::overlay::COMMAND_PALETTE_LIST_DOC,
     crate::selector::SELECTOR_DOC,
     crate::selector::SELECTOR_OPTION_DOC,
+    crate::list::LIST_DOC,
+    crate::list::LIST_ITEM_DOC,
+    crate::metadata::METADATA_LIST_DOC,
+    crate::metadata::METADATA_LIST_ITEM_DOC,
+    crate::overflow::OVERFLOW_LIST_DOC,
 ];
 
 /// The registered doc for an upstream component name.

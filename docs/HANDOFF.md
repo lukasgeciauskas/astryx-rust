@@ -5,15 +5,15 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-25, during M6 (Selector done)._
+_Last updated: 2026-11-25, during M6 (Selector, List and its relatives done)._
 
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4 and M5; M6 is in progress (Selector,
-  SelectorOption and Pagination's page-size selector are done). Details and dates are in
+  Pagination's page-size selector, List, MetadataList and OverflowList are done). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 73 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 76 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** the commit that added this file; `af61065` docs: M5 is done; `f8b5551` Lightbox,
   use_lightbox, CommandPalette and search sources; `9af8f12` menus. CI is green
@@ -26,11 +26,10 @@ _Last updated: 2026-11-25, during M6 (Selector done)._
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (37)
+### Not yet ported (34)
 
-- **M6 Collections (in progress):** List, MultiSelector, Typeahead, Tokenizer,
-  ComplexSelector, TreeList, OverflowList, MetadataList, PowerSearch. Item's core
-  exists (`crates/astryx-components/src/item/`); its swipe actions wait for M11.
+- **M6 Collections (in progress):** MultiSelector, Typeahead, Tokenizer,
+  ComplexSelector, TreeList, PowerSearch. Item's swipe actions wait for M11.
 - **M7:** Table. **M8:** Calendar, DateInput, DateRangeInput, DateTimeInput,
   TimeInput. **M9:** AppShell, Layout, Resizable, ScrollableArea, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
@@ -45,7 +44,7 @@ _Last updated: 2026-11-25, during M6 (Selector done)._
 
 | What | Waits for |
 |---|---|
-| Item swipe actions, SegmentedControl's sliding lens, Collapsible's animated layout | Motion layer (M11) |
+| Item swipe actions, SegmentedControl's sliding lens, Collapsible's and List's animated layout | Motion layer (M11) |
 | Lightbox springs (it eases over 280ms now) | Motion layer (M11) |
 | Lightbox video playback and `hasAutoPlay` (a video opens in the system player now) | MediaPlayer's decoder (M13) |
 | Dialog content inset done by the dialog itself | Layout (M9) |
@@ -132,8 +131,8 @@ Suggested order, each a commit:
 
 1. ~~**Selector**, then Pagination's page-size selector~~ (done: `selector/`,
    fork patch R13; Selector filters its own options, as upstream does).
-2. **List** (and Item's remaining props), then **MetadataList**,
-   **OverflowList**.
+2. ~~**List** (and Item's remaining props), then **MetadataList**,
+   **OverflowList**~~ (done; List's `reorderable` comes with step 4).
 3. **Typeahead** and **Tokenizer** (share `search::`), **MultiSelector**,
    **ComplexSelector**, **PowerSearch**.
 4. **TreeList** (tree focus), virtualization for long lists, reordering.

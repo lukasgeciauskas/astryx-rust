@@ -7,7 +7,6 @@ pub mod examples;
 pub use cards::{CLICKABLE_CARD_DOC, ClickableCard, SELECTABLE_CARD_DOC, SelectableCard};
 
 use astryx_i18n::{Direction, LogicalStyled, use_direction};
-use astryx_primitives::provide;
 use astryx_theme::{ResolvedTheme, ThemeStyled, Tokens, current, scope};
 use gpui::{
     AbsoluteLength, AnyElement, App, DefiniteLength, Div, Hsla, IntoElement, ParentElement, Pixels,
@@ -16,7 +15,7 @@ use gpui::{
 use smallvec::SmallVec;
 
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
-use crate::layout::{ContainerPadding, Padding, Sizing, SpacingStep};
+use crate::layout::{ContainerCorners, ContainerPadding, Padding, Sizing, SpacingStep};
 use crate::text::{Heading, HeadingLevel};
 
 /// The padding a container's style ended with, as `ContainerPadding` for
@@ -47,15 +46,26 @@ fn container_padding(
     }
 }
 
+/// A card's corners inside its border, which a bleeding List follows.
+fn corners_of(el: &mut Div, theme: &ResolvedTheme, rem: Pixels) -> ContainerCorners {
+    let border = theme.tokens().border.width.to_pixels(rem);
+    let radius = el
+        .style()
+        .corner_radii
+        .top_left
+        .map_or(px(0.), |r| r.to_pixels(rem));
+    ContainerCorners::all((radius - border).max(px(0.)))
+}
+
 /// Children wrapped in the container's context: its padding, and the
 /// token re-definitions its theme rule gives its parts.
 fn container_children(
     children: SmallVec<[AnyElement; 2]>,
     padding: ContainerPadding,
+    corners: ContainerCorners,
     part_theme: Option<ResolvedTheme>,
 ) -> AnyElement {
-    let content = div().flex().flex_col().children(children);
-    let content = provide(padding, content).into_any_element();
+    let content = crate::layout::host_children(children, padding, corners);
     match part_theme {
         Some(theme) => scope(theme, content).into_any_element(),
         None => content,
@@ -248,9 +258,11 @@ impl ParentElement for Card {
 impl RenderOnce for Card {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
-        let (el, padding) = self.root(&theme, use_direction(cx), window.rem_size());
+        let rem = window.rem_size();
+        let (mut el, padding) = self.root(&theme, use_direction(cx), rem);
+        let corners = corners_of(&mut el, &theme, rem);
         let part = theme.for_part("card", &[("variant", self.variant.as_str())]);
-        el.child(container_children(self.children, padding, part))
+        el.child(container_children(self.children, padding, corners, part))
     }
 }
 
@@ -373,7 +385,12 @@ impl RenderOnce for Section {
         el = self.padding.apply(el, t, dir);
         el.style().refine(&self.style);
         let padding = container_padding(el.style(), px(0.), rem, dir);
-        el.child(container_children(self.children, padding, None))
+        el.child(container_children(
+            self.children,
+            padding,
+            ContainerCorners::default(),
+            None,
+        ))
     }
 }
 

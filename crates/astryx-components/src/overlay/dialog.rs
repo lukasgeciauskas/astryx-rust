@@ -260,7 +260,16 @@ impl RenderOnce for Dialog {
                 .role(Role::Group)
                 .child(provide(
                     DialogInset(padding),
-                    div().flex().flex_col().children(self.children),
+                    crate::layout::host_children(
+                        self.children,
+                        crate::layout::ContainerPadding {
+                            inline_start: padding,
+                            inline_end: padding,
+                            block_start: padding,
+                            block_end: padding,
+                        },
+                        crate::layout::ContainerCorners::all(t.radius.container.to_pixels(rem)),
+                    ),
                 ));
             theme.refine(surface.style(), "dialog", &[], None);
             surface.style().refine(&self.style);
@@ -364,11 +373,25 @@ impl RenderOnce for Dialog {
         theme.refine(surface.style(), "dialog", &[], None);
         surface.style().refine(&self.style);
         let surface = surface.children(super::modal::probes(&state, cx));
+        let corners = if fullscreen {
+            crate::layout::ContainerCorners::default()
+        } else {
+            crate::layout::ContainerCorners::all(t.radius.container.to_pixels(rem))
+        };
         let surface = surface.child(provide(
             scope,
             provide(
                 DialogInset(padding),
-                div().flex().flex_col().children(self.children),
+                crate::layout::host_children(
+                    self.children,
+                    crate::layout::ContainerPadding {
+                        inline_start: padding,
+                        inline_end: padding,
+                        block_start: padding,
+                        block_end: padding,
+                    },
+                    corners,
+                ),
             ),
         ));
 

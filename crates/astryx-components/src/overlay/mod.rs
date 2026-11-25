@@ -42,6 +42,7 @@ pub use command_palette::{
 };
 pub use context_menu::ContextMenu;
 pub(crate) use context_menu::{ContextSpec, InvokeFn, with_context_menu};
+pub(crate) use context_menu::{context_menu_button, with_row_menu};
 pub(crate) use dialog::focus_scope;
 pub use dialog::{
     AutoFocus, Dialog, DialogController, DialogHeader, DialogPosition, DialogPurpose, DialogVariant,

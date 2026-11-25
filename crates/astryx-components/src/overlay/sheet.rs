@@ -264,7 +264,20 @@ impl RenderOnce for BottomSheet {
                 state.read(cx).focus.clone(),
                 provide(
                     inset(padding),
-                    div().flex().flex_col().children(self.children),
+                    crate::layout::host_children(
+                        self.children,
+                        crate::layout::ContainerPadding {
+                            inline_start: padding,
+                            inline_end: padding,
+                            block_start: padding.max(handle_band),
+                            block_end: padding,
+                        },
+                        crate::layout::ContainerCorners {
+                            start_start: t.radius.container.to_pixels(rem),
+                            start_end: t.radius.container.to_pixels(rem),
+                            ..Default::default()
+                        },
+                    ),
                 ),
             ));
         let mut sheet = div()
