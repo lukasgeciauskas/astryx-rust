@@ -4,6 +4,13 @@
 //!
 //! Offsets are UTF-8 byte offsets on grapheme boundaries. The IME speaks
 //! UTF-16, so the buffer converts.
+//!
+//! Inline objects (a chat composer's tokens) are atomic: each is one
+//! [`OBJECT`] character in the text, and the buffer keeps their ids in text
+//! order beside it. Edits keep the ids in step, undo restores them, and caret
+//! movement and deletion treat each as one grapheme. Text typed, pasted or set
+//! from outside never carries the character; only [`EditBuffer::insert_object`]
+//! and [`EditBuffer::set_content`] place objects.
 
 use std::ops::Range;
 
@@ -29,11 +36,19 @@ pub enum Direction {
     Forward,
 }
 
+/// The character that stands for an inline object in the text (U+FFFC,
+/// OBJECT REPLACEMENT CHARACTER).
+pub const OBJECT: char = '\u{FFFC}';
+
+/// An inline object's id, chosen by whoever inserts it.
+pub type ObjectId = u64;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Snapshot {
     text: String,
     selection: Range<usize>,
     reversed: bool,
+    objects: Vec<ObjectId>,
 }
 
 /// The kind of the last edit, so typing and deleting coalesce into one undo
@@ -59,6 +74,8 @@ pub struct EditBuffer {
     undo: Vec<Snapshot>,
     redo: Vec<Snapshot>,
     last_edit: EditKind,
+    /// The inline objects' ids, in the order of their characters in `text`.
+    objects: Vec<ObjectId>,
 }
 
 /// Undo keeps this many steps.
@@ -78,11 +95,22 @@ impl EditBuffer {
             undo: Vec::new(),
             redo: Vec::new(),
             last_edit: EditKind::Other,
+            objects: Vec::new(),
         }
     }
 
     /// Single-line fields hold no line breaks: pasted ones become spaces.
+    /// Plain text holds no object characters.
     fn clean(text: String, multiline: bool) -> String {
+        let text = if text.contains(OBJECT) {
+            text.replace(OBJECT, "")
+        } else {
+            text
+        };
+        Self::clean_breaks(text, multiline)
+    }
+
+    fn clean_breaks(text: String, multiline: bool) -> String {
         if multiline {
             text.replace("\r\n", "\n").replace('\r', "\n")
         } else if text.contains(['\n', '\r']) {
@@ -167,6 +195,74 @@ impl EditBuffer {
         self.undo.clear();
         self.redo.clear();
         self.last_edit = EditKind::Other;
+        self.objects.clear();
+    }
+
+    /// Replaces the content from outside, objects included: `text` holds one
+    /// [`OBJECT`] per entry of `objects`, in order (extra characters are
+    /// dropped, missing ids are 0). The caret goes to the end and the history
+    /// restarts, as with [`Self::set_text`].
+    pub fn set_content(&mut self, text: impl Into<String>, objects: &[ObjectId]) {
+        let (text, objects) = Self::clean_rich(text.into(), objects, self.multiline);
+        self.text = text;
+        self.objects = objects;
+        let end = self.text.len();
+        self.selection = end..end;
+        self.reversed = false;
+        self.marked = None;
+        self.undo.clear();
+        self.redo.clear();
+        self.last_edit = EditKind::Other;
+    }
+
+    /// Text that may hold objects, with exactly one id per object character.
+    fn clean_rich(text: String, objects: &[ObjectId], multiline: bool) -> (String, Vec<ObjectId>) {
+        let mut ids = objects.iter().copied();
+        let mut kept = Vec::new();
+        let mut out = String::with_capacity(text.len());
+        for ch in text.chars() {
+            if ch == OBJECT {
+                kept.push(ids.next().unwrap_or(0));
+            }
+            out.push(ch);
+        }
+        (Self::clean_breaks(out, multiline), kept)
+    }
+
+    /// The inline objects' ids, in text order.
+    pub fn objects(&self) -> &[ObjectId] {
+        &self.objects
+    }
+
+    /// Each inline object's offset in the text, with its id.
+    pub fn object_offsets(&self) -> Vec<(usize, ObjectId)> {
+        self.text
+            .match_indices(OBJECT)
+            .map(|(i, _)| i)
+            .zip(self.objects.iter().copied())
+            .collect()
+    }
+
+    /// The object whose character starts at `offset`, if any.
+    pub fn object_at(&self, offset: usize) -> Option<ObjectId> {
+        if !self.text.get(offset..)?.starts_with(OBJECT) {
+            return None;
+        }
+        let nth = self.text[..offset].matches(OBJECT).count();
+        self.objects.get(nth).copied()
+    }
+
+    /// Keeps the object ids in step with replacing `range` by text holding
+    /// `inserted` objects. Call before the text changes.
+    fn splice_objects(&mut self, range: &Range<usize>, inserted: &[ObjectId]) {
+        if self.objects.is_empty() && inserted.is_empty() {
+            return;
+        }
+        let before = self.text[..range.start].matches(OBJECT).count();
+        let within = self.text[range.clone()].matches(OBJECT).count();
+        let end = (before + within).min(self.objects.len());
+        let before = before.min(end);
+        self.objects.splice(before..end, inserted.iter().copied());
     }
 
     // ------------------------------------------------------------------
@@ -174,19 +270,32 @@ impl EditBuffer {
 
     /// The grapheme boundary before `offset`.
     pub fn previous_grapheme(&self, offset: usize) -> usize {
-        self.text
+        let previous = self
+            .text
             .grapheme_indices(true)
             .rev()
             .find_map(|(i, _)| (i < offset).then_some(i))
-            .unwrap_or(0)
+            .unwrap_or(0);
+        // An object is a grapheme of its own: nothing combines with it.
+        match self.text[previous..offset].rfind(OBJECT) {
+            Some(i) if previous + i + OBJECT.len_utf8() == offset => previous + i,
+            Some(i) => previous + i + OBJECT.len_utf8(),
+            None => previous,
+        }
     }
 
     /// The grapheme boundary after `offset`.
     pub fn next_grapheme(&self, offset: usize) -> usize {
-        self.text
+        let next = self
+            .text
             .grapheme_indices(true)
             .find_map(|(i, _)| (i > offset).then_some(i))
-            .unwrap_or(self.text.len())
+            .unwrap_or(self.text.len());
+        match self.text[offset..next].find(OBJECT) {
+            Some(0) => offset + OBJECT.len_utf8(),
+            Some(i) => offset + i,
+            None => next,
+        }
     }
 
     /// The start of the word at or before `offset`, skipping the whitespace
@@ -312,6 +421,7 @@ impl EditBuffer {
             text: self.text.clone(),
             selection: self.selection.clone(),
             reversed: self.reversed,
+            objects: self.objects.clone(),
         }
     }
 
@@ -354,6 +464,7 @@ impl EditBuffer {
             EditKind::Other
         };
         self.record(kind);
+        self.splice_objects(&range, &[]);
         self.text.replace_range(range.clone(), &text);
         let caret = range.start + text.len();
         self.selection = caret..caret;
@@ -366,6 +477,31 @@ impl EditBuffer {
     pub fn insert(&mut self, text: &str) -> bool {
         let range = self.marked.clone().unwrap_or(self.selection.clone());
         self.replace(range, text)
+    }
+
+    /// Puts inline object `id` over the composition, else the selection, the
+    /// caret after it: one undo step.
+    pub fn insert_object(&mut self, id: ObjectId) -> bool {
+        let range = self.marked.clone().unwrap_or(self.selection.clone());
+        self.replace_rich(range, &OBJECT.to_string(), &[id])
+    }
+
+    /// Replaces `range` with `text`, which may hold objects: one [`OBJECT`]
+    /// per id in `objects`, in order. The caret goes after it; one undo step.
+    pub fn replace_rich(&mut self, range: Range<usize>, text: &str, objects: &[ObjectId]) -> bool {
+        let (text, objects) = Self::clean_rich(text.to_string(), objects, self.multiline);
+        let range = range.start.min(self.text.len())..range.end.min(self.text.len());
+        if text.is_empty() && range.is_empty() {
+            return false;
+        }
+        self.record(EditKind::Other);
+        self.splice_objects(&range, &objects);
+        self.text.replace_range(range.clone(), &text);
+        let caret = range.start + text.len();
+        self.selection = caret..caret;
+        self.reversed = false;
+        self.marked = None;
+        true
     }
 
     /// Backspace or Delete (with `granularity` for Ctrl): removes the
@@ -394,6 +530,8 @@ impl EditBuffer {
         if self.marked.is_none() {
             self.record(EditKind::Other);
         }
+        let text = &Self::clean(text.to_string(), self.multiline);
+        self.splice_objects(&range, &[]);
         self.text.replace_range(range.clone(), text);
         self.marked = (!text.is_empty()).then(|| range.start..range.start + text.len());
         self.selection = match selected {
@@ -448,6 +586,7 @@ impl EditBuffer {
         self.text = snapshot.text;
         self.selection = snapshot.selection;
         self.reversed = snapshot.reversed;
+        self.objects = snapshot.objects;
         self.marked = None;
         self.last_edit = EditKind::Other;
     }
@@ -604,6 +743,49 @@ mod tests {
         let b = buffer("hello world");
         assert_eq!(b.word_range_at(7), 6..11);
         assert_eq!(b.word_range_at(5), 5..6, "the space between");
+    }
+
+    #[test]
+    fn objects_are_atomic_graphemes_kept_in_step_with_edits() {
+        let mut b = EditBuffer::new("", true);
+        b.insert("hi ");
+        b.insert_object(7);
+        b.insert("\u{A0}");
+        b.insert_object(8);
+        assert_eq!(b.objects(), &[7, 8]);
+        let first = b.text().find(OBJECT).unwrap();
+        assert_eq!(b.object_at(first), Some(7));
+        // The caret steps over an object in one move.
+        b.move_to(first);
+        b.move_by(Granularity::Grapheme, Direction::Forward, false);
+        assert_eq!(b.cursor(), first + OBJECT.len_utf8());
+        b.move_by(Granularity::Grapheme, Direction::Backward, false);
+        assert_eq!(b.cursor(), first);
+        // A combining mark typed after an object does not join it.
+        b.move_to(first + OBJECT.len_utf8());
+        b.insert("\u{301}");
+        assert_eq!(b.next_grapheme(first), first + OBJECT.len_utf8());
+        b.delete(Granularity::Grapheme, Direction::Backward);
+        // Backspace after an object removes it, and its id.
+        b.delete(Granularity::Grapheme, Direction::Backward);
+        assert_eq!(b.objects(), &[8]);
+        assert_eq!(b.text().matches(OBJECT).count(), 1);
+        // Undo brings it back with its id.
+        b.undo();
+        assert_eq!(b.objects(), &[7, 8]);
+    }
+
+    #[test]
+    fn plain_text_never_carries_object_characters() {
+        let mut b = EditBuffer::new("a\u{FFFC}b", true);
+        assert_eq!(b.text(), "ab");
+        b.insert("\u{FFFC}");
+        assert_eq!(b.text(), "ab");
+        b.set_content("x\u{FFFC}y\u{FFFC}", &[3]);
+        assert_eq!(b.objects(), &[3, 0]);
+        b.select_all();
+        b.insert("z");
+        assert!(b.objects().is_empty());
     }
 
     #[test]

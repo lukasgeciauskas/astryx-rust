@@ -234,6 +234,7 @@ fn icon_only_buttons_are_square() {
         None,
         astryx_i18n::Direction::Ltr,
         rem,
+        None,
     );
     let height = theme.tokens().size.element_md;
     assert_eq!(el.style().size.height, Some(Length::from(height)));
@@ -261,6 +262,7 @@ fn group_members_round_only_the_outer_corners() {
             Some(member(first, last)),
             ltr,
             rem,
+            None,
         );
         let c = el.style().corner_radii.clone();
         let divider = el.style().border_widths.left.is_some();

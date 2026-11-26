@@ -138,6 +138,11 @@ struct ButtonState {
     reveal_scheduled: bool,
 }
 
+/// The corner a ChatComposer gives the buttons inside it (upstream's
+/// `--_button-radius`: its own corner less its padding).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ButtonRadius(pub Pixels);
+
 /// An action trigger, upstream `Button`.
 ///
 /// ```ignore
@@ -281,10 +286,17 @@ impl Button {
         group: Option<GroupMember>,
         dir: astryx_i18n::Direction,
         rem: Pixels,
+        concentric: Option<Pixels>,
     ) -> gpui::Div {
         let t = theme.tokens();
         let (fill, fg) = self.variant.colors(t);
         let height = element_height(size, t);
+        // Inside a ChatComposer the corner follows the composer's (never under the
+        // element radius); a theme's button radius still wins.
+        let corner: gpui::AbsoluteLength = match concentric {
+            Some(c) => c.max(t.radius.element.to_pixels(rem)).into(),
+            None => t.radius.element,
+        };
         let mut el = div()
             .relative()
             .inline_flex()
@@ -294,7 +306,7 @@ impl Button {
             .gap(t.spacing.s2)
             .h(height)
             .min_w_0()
-            .rounded(t.radius.element)
+            .rounded(corner)
             .text_color(fg)
             .text_style(&t.text.label)
             .font_weight(t.font.weight.medium)
@@ -450,7 +462,8 @@ impl RenderOnce for Button {
             scope.request(focus.clone());
         }
 
-        let mut el = self.root(&theme, size, group, dir, rem);
+        let concentric = astryx_primitives::use_context::<ButtonRadius>(cx).map(|r| r.0);
+        let mut el = self.root(&theme, size, group, dir, rem, concentric);
         // An open menu's trigger keeps the pressed tint.
         if self.pressed != Some(true)
             && crate::overlay::disclosure(cx).is_some_and(|d| d.open_tint && d.expanded)

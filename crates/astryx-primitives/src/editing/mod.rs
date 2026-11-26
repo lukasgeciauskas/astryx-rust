@@ -25,7 +25,7 @@ mod state;
 #[cfg(test)]
 mod tests;
 
-pub use buffer::{Direction, EditBuffer, Granularity};
+pub use buffer::{Direction, EditBuffer, Granularity, OBJECT, ObjectId};
 pub use element::EditorStyle;
 pub use state::{
     Backspace, Copy, Cut, Delete, DeleteWordBackward, DeleteWordForward, DocumentEnd,
@@ -34,8 +34,9 @@ pub use state::{
     SelectWordLeft, SelectWordRight, ShowCharacterPalette, Undo, Up, WordLeft, WordRight,
 };
 pub use state::{
-    ChangeFn, EnterFn, FieldMenu, FieldSettings, FocusFn, InsertFilter, KEY_CONTEXT, KeyDownFn,
-    KeyboardHints, PasteFn, TextEditState, init,
+    ChangeFn, EnterFn, FieldMenu, FieldSettings, FocusFn, InlineObjects, InsertFilter, KEY_CONTEXT,
+    KeyDownFn, KeyboardHints, ObjectRenderFn, ObjectTextFn, PasteFn, PasteOverrideFn,
+    TextEditState, init,
 };
 
 use gpui::{

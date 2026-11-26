@@ -749,7 +749,8 @@ The remaining primitives:
     interrupts it; a second navigation ends the first; `scroll_on_click(false)` (FR4).
     Uncontrolled, the current heading follows the scroll on the activation line (FR5).
     `use_outline_from_container` lists the headings with ids inside a container.
-    - Carried to M10: `useOutlineFromMarkdown`, which shares Markdown's parser and slugs.
+    - Carried to M10: `useOutlineFromMarkdown`, which shares Markdown's parser and slugs
+      (done in M10 stage 4).
   - Stage 11 (done): Carousel and `useSnapPaging` (`carousel/`). A row that scrolls sideways
     (Shift with the wheel too), with edge fades and previous and next buttons that hide,
     leaving no tab stop, when their direction runs out, a keyboard-pressed one handing
@@ -868,6 +869,29 @@ The remaining primitives:
     as upstream finds them in the DOM.
     - Carried to M11: `useChatKeyboard`'s virtual-keyboard lift (the touch layer's keyboard
       clearance).
+  - Stage 6 (done): the composer. The editing engine (`astryx_primitives::editing`) gained
+    inline objects: each token is one U+FFFC in the buffer with its id beside the text,
+    atomic to the caret, deletion, IME and undo, drawn as an inline box of its measured
+    width (lines holding one wrap with a UAX #14 wrapper), and copied as its value. On it:
+    ChatComposer (slots, status, density, elevation, the shell's context for custom inputs),
+    ChatComposerInput (inline tokens, trigger menus over sync or async sources, history,
+    paste-as-token with ChatPastedTextToken, files, Enter to send), ChatComposerTokenElement,
+    ChatComposerDrawer, ChatTokenizedText and ChatSendButton. Buttons inside the composer
+    follow its corner (`ButtonRadius`).
+    - Carried to M11: the drawer's collapse height and fade, and the pasted token's touch
+      tap-stop.
+  - Stage 7 (done): ChatToolCalls (a row, or a group disclosure of the calls with the
+    latest one and the count, each call a disclosure of its result detail), and dictation:
+    `useSpeechRecognition` over a pluggable `SpeechRecognitionProvider` (the session's
+    events, the transcript rules and upstream's volume analyser over the provider's
+    frequency frames), with the browser's own Web Speech API and Web Audio as the provider
+    on the web build; `useChatDictation` writing into the composer through
+    `DictationTarget` (interim words in place, loud speech upper-cased, start and stop sounds
+    synthesized as upstream's plops); ChatDictationButton with its voice bars. The Chat
+    family's doc.
+    - Carried to M11: the tool-call group's height animation.
+  - M10 done: Markdown, CodeBlock and SyntaxTheme, and the Chat family (less its lab parts,
+    which M13 builds).
 - **M11 Motion & touch:** springs, decay, rubber-band, gesture recognizers on GPUI pointer and
   touch events, keyboard clearance, dragToSnapPoints.
   - Components: BottomSheet(+Switcher), Swipe, coarse-pointer variants (sheet-backed

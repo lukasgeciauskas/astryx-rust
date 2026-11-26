@@ -23,7 +23,7 @@ use super::stream_scroll::{ChatScrollToBottomOptions, use_chat_stream_scroll};
 /// Upstream `ChatLayout`.
 ///
 /// ```ignore
-/// ChatLayout::new("chat", ChatComposer::new("composer"))
+/// ChatLayout::new("chat", ChatComposer::new("composer", |text, _, _| send(text)))
 ///     .child(ChatMessageList::new("log").children(messages))
 /// ```
 #[derive(IntoElement)]

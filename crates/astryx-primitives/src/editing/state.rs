@@ -10,15 +10,15 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    Action, App, Autocapitalize, Bounds, ClipboardItem, Context, EntityInputHandler, FocusHandle,
-    Focusable, KeyBinding, KeyBindingContextPredicate, KeyDownEvent, OperatingSystem, Pixels,
-    Point, Subscription, TextInputAction, TextInputConfiguration, TextInputMode, UTF16Selection,
-    Window, WrappedLine, actions, point, px,
+    Action, AnyElement, App, Autocapitalize, Bounds, ClipboardItem, Context, EntityInputHandler,
+    FocusHandle, Focusable, KeyBinding, KeyBindingContextPredicate, KeyDownEvent, OperatingSystem,
+    Pixels, Point, Subscription, TextInputAction, TextInputConfiguration, TextInputMode,
+    UTF16Selection, Window, WrappedLine, actions, point, px,
 };
 use unicode_segmentation::UnicodeSegmentation;
 use web_time::Instant;
 
-use super::buffer::{Direction, EditBuffer, Granularity};
+use super::buffer::{Direction, EditBuffer, Granularity, OBJECT, ObjectId};
 
 actions!(
     astryx_text,
@@ -158,6 +158,27 @@ pub type EnterFn = Rc<dyn Fn(&mut Window, &mut App)>;
 /// Told every key pressed in a focused field, before the field acts on it.
 pub type KeyDownFn = Rc<dyn Fn(&KeyDownEvent, &mut Window, &mut App)>;
 
+/// Draws an inline object: its element, laid out at its max-content width and
+/// one line high.
+pub type ObjectRenderFn = Rc<dyn Fn(ObjectId, &mut Window, &mut App) -> AnyElement>;
+/// The text an inline object copies as.
+pub type ObjectTextFn = Rc<dyn Fn(ObjectId, &App) -> String>;
+/// Takes over a paste: given the clipboard's content, the field inserts
+/// nothing itself.
+pub type PasteOverrideFn = Rc<dyn Fn(ClipboardItem, &mut Window, &mut App)>;
+
+/// How a field shows and copies its inline objects (see
+/// [`super::buffer::OBJECT`]): set by its component every render.
+#[derive(Clone)]
+pub struct InlineObjects {
+    pub render: ObjectRenderFn,
+    pub text: ObjectTextFn,
+}
+
+/// What a no-break space is in the display text: each object shows as one,
+/// widened to the object's box.
+pub(crate) const OBJECT_STAND_IN: char = '\u{A0}';
+
 /// The last layout of a field, for hit testing and the IME.
 #[derive(Clone)]
 pub(crate) struct EditorLayout {
@@ -265,6 +286,13 @@ pub struct TextEditState {
     pub on_paste: Option<PasteFn>,
     pub on_focus: Option<FocusFn>,
     pub on_blur: Option<FocusFn>,
+    /// Inline objects' drawing and copied text.
+    pub inline_objects: Option<InlineObjects>,
+    /// Takes every paste instead of the field (a chat composer's paste rules):
+    /// called after the paste with the clipboard's content.
+    pub on_paste_override: Option<PasteOverrideFn>,
+    /// A paste waiting for `on_paste_override`.
+    paste_waiting: Option<ClipboardItem>,
     /// The misspelled ranges last found, and the text they were found in.
     spelling: Option<(String, Vec<Range<usize>>)>,
     /// Whether the field has had focus: browsers check its text from then on.
@@ -317,6 +345,9 @@ impl TextEditState {
             on_paste: None,
             on_focus: None,
             on_blur: None,
+            inline_objects: None,
+            on_paste_override: None,
+            paste_waiting: None,
             spelling: None,
             spell_armed: false,
             _subscriptions: vec![keys],
@@ -376,6 +407,12 @@ impl TextEditState {
         let entity = cx.entity();
         window
             .observe(&entity, cx, |entity, window, cx| {
+                let (waiting, take_paste) = entity.update(cx, |s, _| {
+                    (s.paste_waiting.take(), s.on_paste_override.clone())
+                });
+                if let (Some(text), Some(f)) = (waiting, take_paste) {
+                    f(text, window, cx);
+                }
                 let (pasted, on_paste) =
                     entity.update(cx, |s, _| (s.pasted.take(), s.on_paste.clone()));
                 if let (Some(text), Some(f)) = (pasted, on_paste) {
@@ -564,9 +601,8 @@ impl TextEditState {
         if self.buffer.is_collapsed() || self.settings.masked {
             return;
         }
-        cx.write_to_clipboard(ClipboardItem::new_string(
-            self.buffer.selected_text().to_string(),
-        ));
+        let copied = self.plain_text(self.buffer.selection(), cx);
+        cx.write_to_clipboard(ClipboardItem::new_string(copied));
         if cut
             && self.editable()
             && self
@@ -580,6 +616,13 @@ impl TextEditState {
     /// Inserts the clipboard's text (the Paste command).
     pub fn paste(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.editable() {
+            return;
+        }
+        if self.on_paste_override.is_some() {
+            if let Some(item) = cx.read_from_clipboard() {
+                self.paste_waiting = Some(item);
+                cx.notify();
+            }
             return;
         }
         if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
@@ -634,6 +677,127 @@ impl TextEditState {
         if self.buffer.insert(&text) {
             self.edited(Self::now(cx), window, cx);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Editing from the component (reported like the user's own edits)
+
+    /// The text of `range` with each inline object as its copied text.
+    pub fn plain_text(&self, range: Range<usize>, cx: &App) -> String {
+        let text = &self.buffer.text()[range.clone()];
+        let Some(objects) = self
+            .inline_objects
+            .as_ref()
+            .filter(|_| text.contains(OBJECT))
+        else {
+            return text.to_string();
+        };
+        let mut out = String::with_capacity(text.len());
+        let ids: Vec<(usize, ObjectId)> = self.buffer.object_offsets();
+        for (i, ch) in text.char_indices() {
+            if ch == OBJECT {
+                let at = range.start + i;
+                if let Some((_, id)) = ids.iter().find(|(offset, _)| *offset == at) {
+                    out.push_str(&(objects.text)(*id, cx));
+                }
+            } else {
+                out.push(ch);
+            }
+        }
+        out
+    }
+
+    /// Types `text` at the caret (over the selection), as the user would.
+    pub fn insert_text(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.insert(text, window, cx);
+    }
+
+    /// Puts inline object `id` at the caret (over the selection).
+    pub fn insert_object(&mut self, id: ObjectId, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.editable() {
+            return;
+        }
+        if self.buffer.insert_object(id) {
+            self.edited(Self::now(cx), window, cx);
+        }
+    }
+
+    /// Replaces `range` with `text` holding `objects` (see
+    /// [`EditBuffer::replace_rich`]), the caret after it: one undo step.
+    pub fn replace_rich(
+        &mut self,
+        range: Range<usize>,
+        text: &str,
+        objects: &[ObjectId],
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.editable() {
+            return;
+        }
+        if self.buffer.replace_rich(range, text, objects) {
+            self.edited(Self::now(cx), window, cx);
+        }
+    }
+
+    /// Replaces the whole content, objects included (see
+    /// [`EditBuffer::set_content`]): a recalled draft. With `report`, it is
+    /// reported as a change.
+    pub fn set_content(
+        &mut self,
+        text: &str,
+        objects: &[ObjectId],
+        report: bool,
+        cx: &mut Context<Self>,
+    ) {
+        self.buffer.set_content(text, objects);
+        self.goal_x = None;
+        self.caret_since = Some(Self::now(cx));
+        if report {
+            self.changed = true;
+        }
+        cx.notify();
+    }
+
+    /// [`Self::replace_rich`] from outside any window (speech arriving in the
+    /// background): the platform's input method is not told.
+    pub fn replace_rich_detached(
+        &mut self,
+        range: Range<usize>,
+        text: &str,
+        objects: &[ObjectId],
+        cx: &mut Context<Self>,
+    ) {
+        if !self.editable() {
+            return;
+        }
+        if self.buffer.replace_rich(range, text, objects) {
+            self.changed = true;
+            self.goal_x = None;
+            self.caret_since = Some(Self::now(cx));
+            cx.notify();
+        }
+    }
+
+    /// Where `offset` was last drawn, in window coordinates: a line-high caret.
+    pub fn offset_bounds(&self, offset: usize) -> Option<Bounds<Pixels>> {
+        let layout = self.layout.as_ref()?;
+        let at = self.position_for_offset(offset.min(self.buffer.text().len()))?;
+        let origin = layout.bounds.origin - layout.scroll + at;
+        Some(Bounds::new(origin, gpui::size(px(1.), layout.line_height)))
+    }
+
+    /// Selects `range`, the caret at its end (or start, `reversed`).
+    pub fn select_range(
+        &mut self,
+        range: Range<usize>,
+        reversed: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.buffer.select(range, reversed);
+        self.goal_x = None;
+        self.touched(Self::now(cx), window, cx);
     }
 
     // ------------------------------------------------------------------
@@ -789,8 +953,10 @@ impl TextEditState {
     pub(crate) fn display_text(&self) -> String {
         if self.settings.masked {
             "•".repeat(self.buffer.text().graphemes(true).count())
-        } else {
+        } else if self.buffer.objects().is_empty() {
             self.buffer.text().to_string()
+        } else {
+            self.buffer.text().replace(OBJECT, "\u{A0}")
         }
     }
 
@@ -798,8 +964,12 @@ impl TextEditState {
     pub(crate) fn offset_to_display(&self, offset: usize) -> usize {
         if self.settings.masked {
             self.buffer.text()[..offset].graphemes(true).count() * '•'.len_utf8()
-        } else {
+        } else if self.buffer.objects().is_empty() {
             offset
+        } else {
+            let shrink = OBJECT.len_utf8() - OBJECT_STAND_IN.len_utf8();
+            let offset = offset.min(self.buffer.text().len());
+            offset - self.buffer.text()[..offset].matches(OBJECT).count() * shrink
         }
     }
 
@@ -812,8 +982,21 @@ impl TextEditState {
                 .grapheme_indices(true)
                 .nth(nth)
                 .map_or(self.buffer.text().len(), |(i, _)| i)
-        } else {
+        } else if self.buffer.objects().is_empty() {
             offset
+        } else {
+            let mut display = 0;
+            for (i, ch) in self.buffer.text().char_indices() {
+                if display >= offset {
+                    return i;
+                }
+                display += if ch == OBJECT {
+                    OBJECT_STAND_IN.len_utf8()
+                } else {
+                    ch.len_utf8()
+                };
+            }
+            self.buffer.text().len()
         }
     }
 

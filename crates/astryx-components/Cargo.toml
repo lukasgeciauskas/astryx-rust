@@ -27,6 +27,9 @@ serde_json.workspace = true
 
 [target.'cfg(target_family = "wasm")'.dependencies]
 gpui_web.workspace = true
+# The browser's speech recognition and Web Audio, for dictation on the web.
+wasm-bindgen.workspace = true
+js-sys = "0.3"
 
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

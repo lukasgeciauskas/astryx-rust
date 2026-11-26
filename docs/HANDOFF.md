@@ -5,22 +5,19 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M10 (Content): stages 1 to 5 done (the syntax engine and SyntaxTheme, CodeBlock, Markdown's core and extensions, Chat's layout and messages)._
+_Last updated: 2026-11-26, after M10 (Content)._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8 and M9; M10 is under way (stage 1:
-  the syntax engine, `astryx-syntax`, and SyntaxTheme; stage 2: CodeBlock; stage 3: Markdown's
-  core, on `astryx-markdown`, upstream's own parser ported; stage 4: its plugins, streaming,
-  citations, math, heading links, `useOutlineFromMarkdown` and `useContainerReveal`; stage 5: Chat's layout and messages). Stage 6 (the composer) is
-  next. Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8, M9 and M10. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 102 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 105 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
-- **Last commits on `main`:** M9's eleven stages, from `a08759f` (fork patch R17,
-  scroll chaining and scrollbars) through ScrollableArea, Resizable, Layout, the navs,
-  MobileNav, AppShell with R18 (sticky positioning) and Outline, to Carousel. CI runs on
+- **Last commits on `main`:** M10's stages: the syntax engine (`astryx-syntax`) and
+  SyntaxTheme, CodeBlock, Markdown on `astryx-markdown` (upstream's own parser, its plugin
+  system and incremental parsing, all checked against fixtures of upstream's output), and
+  the Chat family. CI runs on
   ubuntu, windows and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
@@ -30,15 +27,14 @@ _Last updated: 2026-11-26, during M10 (Content): stages 1 to 5 done (the syntax 
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (19)
+### Not yet ported (5)
 
-- **M10:** Chat,
-  ChatDictationButton, ChatToolCalls.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
   LinkProvider, MediaTheme, Theme. All five already exist as Rust APIs
   (`astryx_i18n::provider`, `astryx_primitives::layer`, `link_provider`,
   `ResolvedTheme::on_surface` with `scope`, `astryx_theme::scope`); registering their docs
-  is a quick win. SyntaxTheme has its doc (M10 stage 1).
+  is a quick win, except MediaTheme's `auto` mode, which needs the surface's luminance
+  (GPUI cannot read a parent's background from a child).
 
 ### Carried into later milestones (recorded in each doc and in KNOWN_ISSUES)
 
@@ -52,7 +48,8 @@ _Last updated: 2026-11-26, during M10 (Content): stages 1 to 5 done (the syntax 
 | ChatTypingIndicator, ChatUnreadDivider, ChatVirtualizer, ChatEmojiPicker, ChatReactionBar (lab components) | Lab (M13) |
 | Table row expansion's `animatedLayout` glide (FR15) | Motion layer (M11) |
 | TreeList's `animatedLayout` and expand glide (FR8, FR9) | Motion layer (M11) |
-| Resizable's pane slide and rubber-band overshoot (FR8, AST-105 FR9); SideNav's rail reveal (FR6); TopNav's drawer groups' height (TopNavMenu FR7, TopNavMegaMenu FR9); AppShell's content swap (FR17); CodeBlock's collapse (FR5) | Motion layer (M11) |
+| Resizable's pane slide and rubber-band overshoot (FR8, AST-105 FR9); SideNav's rail reveal (FR6); TopNav's drawer groups' height (TopNavMenu FR7, TopNavMegaMenu FR9); AppShell's content swap (FR17); CodeBlock's collapse (FR5); ChatComposerDrawer's collapse; ChatToolCalls' group height | Motion layer (M11) |
+| ChatPastedTextToken's touch tap-stop | Touch layer (M11) |
 | Native date and time pickers on macOS and Linux (`Native` shows the Astryx surface there) | Fork patch R16 built and checked on those platforms |
 
 ## The owner's standing instructions
@@ -197,21 +194,21 @@ time:
   "http://127.0.0.1:8080/?page=dates&backend=webgl"`, with a scratch
   `--user-data-dir`. The query picks the page, theme, mode and scroll.
 
-## Next: M10 Content
+## Next: M11 Motion & touch
 
-M9 (Shell & navigation) is done: fork patches R17 (scroll chaining, overscroll
-containment and scrollbars) and R18 (sticky positioning); ScrollableArea and
-`useScrollableArea`; Resizable and `useResizable`; Layout and its regions (dialogs, drawers
-and sheets compose one); NavIcon and NavHeadingMenu; SideNav; TopNav with its menus, mega
-menu and heading, on one hover recognizer (`top_nav/hover.rs`); MobileNav; AppShell and
-`useAppShellMobile` (the theme now carries `widthBreakpoints`); Outline and
-`useOutlineFromDOM` on in-page anchors (`astryx_primitives::anchor`); Carousel and
-`useSnapPaging`. Its carried items are in the table below: motion to M11; `useOutlineFromMarkdown`, carried
-to M10, landed in M10 stage 4.
+M10 (Content) is done: the syntax engine and SyntaxTheme; CodeBlock; Markdown on
+`astryx-markdown`, a port of upstream's own parser with its plugin system, incremental
+streaming parse and released shapes, every part checked against exported fixtures of
+upstream's output; Markdown's renderer with citations, math, inline plugins, code
+languages, heading links and streaming fade-in; `useStreamingText`, `useContainerReveal`
+and `useOutlineFromMarkdown`; and the Chat family: layout and stream scroll, messages, the
+composer (the editing engine now holds inline atomic tokens), tool calls and dictation
+behind a pluggable speech provider (the browser's own on the web). Its carried items are in
+the table below: motion and the virtual keyboard to M11, backdrop blur to fork patch R2, and
+the Chat family's lab parts to M13.
 
-M10 ports Markdown (upstream's own parser, ported as `astryx-markdown` and checked against
-fixtures of upstream's output; upstream plugins, streaming parse, URL safety), CodeBlock (the in-house grammar tokenizer on `fancy-regex`, 30
-languages, 12 syntax presets) and the Chat suite (see `PLAN.md`). Stages 1 to 5 are done; stage 6 (the composer) is next. Start with
-`cargo run -q -p astryx-cli -- component <Name> --dense` for each and the upstream specs
-in `../Astryx/docs/specs/components/`.
+M11 builds the motion and touch layer (see `PLAN.md`): springs, decay, rubber-band, gesture
+recognizers, keyboard clearance and snap points, BottomSheet, Swipe and the coarse-pointer
+variants, and with them every animation earlier milestones carried (the table). Start with
+`cargo run -q -p astryx-cli -- docs effects` and the upstream motion sources.
 

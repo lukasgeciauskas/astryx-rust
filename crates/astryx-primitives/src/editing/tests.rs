@@ -278,3 +278,98 @@ fn the_touch_keyboard_follows_the_field() {
     assert!(!password.suggestions && !password.autocorrect);
     assert_eq!(password.spellcheck, Some(false));
 }
+
+// ----------------------------------------------------------------------------
+// Inline objects
+
+/// A field whose objects are 40px boxes, copying as `<id>`.
+fn with_objects(cx: &mut VisualTestContext, state: &Entity<TextEditState>) {
+    state.update(cx, |s, _| {
+        s.inline_objects = Some(InlineObjects {
+            render: Rc::new(|id, _, _| {
+                div()
+                    .debug_selector(move || format!("object-{id}"))
+                    .w(px(40.))
+                    .h(px(10.))
+                    .into_any_element()
+            }),
+            text: Rc::new(|id, _| format!("<{id}>")),
+        })
+    });
+}
+
+fn x_of(cx: &mut VisualTestContext, state: &Entity<TextEditState>, offset: usize) -> gpui::Pixels {
+    state.read_with(cx, |s, _| s.position_for_offset(offset).unwrap().x)
+}
+
+#[gpui::test]
+fn an_object_takes_its_box_width_in_the_line(cx: &mut TestAppContext) {
+    let (cx, state, log) = field(cx, "", true);
+    with_objects(cx, &state);
+    cx.simulate_input("ab");
+    cx.update(|window, cx| state.update(cx, |s, cx| s.insert_object(9, window, cx)));
+    cx.simulate_input("cd");
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    let object = buffer::OBJECT.len_utf8();
+    let (before, after) = (x_of(cx, &state, 2), x_of(cx, &state, 2 + object));
+    assert!(
+        (after - before - px(40.)).abs() < px(0.5),
+        "the caret steps over the 40px box: {before:?} -> {after:?}"
+    );
+    let drawn = cx.debug_bounds("object-9").expect("the object is drawn");
+    assert!(
+        (drawn.origin.x - (px(10.) + before)).abs() < px(0.5),
+        "at its character"
+    );
+    assert_eq!(
+        log.borrow().last().map(String::as_str),
+        Some("ab\u{FFFC}cd")
+    );
+
+    // Backspace removes the whole object; copying gives its text.
+    cx.simulate_keystrokes("left left backspace");
+    assert_eq!(text(cx, &state), "abcd");
+    assert!(state.read_with(cx, |s, _| s.buffer().objects().is_empty()));
+    cx.simulate_keystrokes("ctrl-z");
+    assert_eq!(
+        state.read_with(cx, |s, _| s.buffer().objects().to_vec()),
+        vec![9]
+    );
+    cx.simulate_keystrokes("ctrl-a ctrl-c");
+    let copied = cx.update(|_, cx| cx.read_from_clipboard().and_then(|c| c.text()));
+    assert_eq!(copied.as_deref(), Some("ab<9>cd"));
+}
+
+#[gpui::test]
+fn lines_with_objects_wrap_at_their_widened_width(cx: &mut TestAppContext) {
+    let (cx, state, _) = field(cx, "", true);
+    with_objects(cx, &state);
+    cx.simulate_input("one two three four five six seven ");
+    for id in 0..4 {
+        cx.update(|window, cx| state.update(cx, |s, cx| s.insert_object(id, window, cx)));
+        cx.simulate_input("\u{A0}word ");
+    }
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    let end = state.read_with(cx, |s, _| s.text().len());
+    let last = state.read_with(cx, |s, _| s.position_for_offset(end).unwrap());
+    assert!(last.y > px(0.), "it wrapped onto more rows: {last:?}");
+    let rows = state.read_with(cx, |s, _| {
+        let layout = s.layout.as_ref().unwrap();
+        layout
+            .lines
+            .iter()
+            .map(|(_, l)| l.wrap_boundaries().len() + 1)
+            .sum::<usize>()
+    });
+    for id in 0..4 {
+        let b = cx
+            .debug_bounds(Box::leak(format!("object-{id}").into_boxed_str()))
+            .unwrap();
+        assert!(b.right() <= px(311.), "object {id} fits its row: {b:?}");
+    }
+    assert!(rows >= 2);
+}

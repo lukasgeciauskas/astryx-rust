@@ -307,10 +307,12 @@ dependencies = [
  "gpui",
  "gpui_web",
  "image",
+ "js-sys",
  "serde_json",
  "smallvec",
  "unicode-linebreak",
  "unicode-segmentation",
+ "wasm-bindgen",
  "web-time",
 ]
 
@@ -395,6 +397,7 @@ dependencies = [
  "icu_normalizer",
  "serde_json",
  "spellbook",
+ "unicode-linebreak",
  "unicode-segmentation",
  "web-sys",
  "web-time",

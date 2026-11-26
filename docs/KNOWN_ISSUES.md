@@ -288,6 +288,20 @@
   platform reads logs, and a ChatMessage is named by its sender fallback, not its `name`.
   The frosted dock has no blur (fork patch R2), and a bubble's name row lowers the avatar
   a frame after it first renders.
+- **The composer's edges (M10).** Lines holding tokens wrap with the port's own greedy
+  wrapper, which assumes left-to-right glyph order, so right-to-left text beside a token may
+  wrap wrongly. A caller cancels a built-in key with `window.prevent_default()` and must
+  also `cx.stop_propagation()` to keep the key from the field. Only clipboard file paths
+  reach `on_files` (a pasted bitmap has no file). The trigger menu is placed where the
+  trigger was a frame earlier. ChatTokenizedText inside a Text paragraph is one inline box.
+  The drawer's custom summary still takes clicks, its focus ring draws inside the toggle
+  row, and hover colors apply on every pointer. The `chat-composer` theme target sits on the
+  painted body (the spec's FR7 fix; upstream as shipped puts it on the frame, OQ1).
+- **Dictation needs a recognizer on native platforms (M10).** The web build uses the
+  browser's speech recognition and Web Audio, as upstream does; GPUI offers neither
+  natively, so a native app installs a `SpeechRecognitionProvider` (and plays the
+  start and stop sounds through its `play_samples`). Without one, the dictation button
+  hides.
 - **Grammar word boundaries are Unicode (M10).** CodeBlock's grammars use JS's ASCII `\b`;
   `fancy-regex` has no ASCII boundary, so a keyword directly beside a non-ASCII letter
   (`éfor`) can paint differently. `\w` and `\d` keep JS's ASCII meaning.

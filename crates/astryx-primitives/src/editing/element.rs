@@ -7,15 +7,21 @@
 //! Industries).
 
 use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use gpui::{
-    App, AvailableSpace, Bounds, Element, ElementId, ElementInputHandler, Entity, GlobalElementId,
-    Hsla, InspectorElementId, LayoutId, Pixels, Point, SharedString, Size, Style, TextRun,
-    UnderlineStyle, Window, WrappedLine, fill, point, px, relative, size,
+    AnyElement, App, AvailableSpace, Bounds, ContentMask, Element, ElementId, ElementInputHandler,
+    Entity, GlobalElementId, Hsla, InspectorElementId, IntoElement as _, LayoutId, LineLayout,
+    ParentElement as _, Pixels, Point, ShapedRun, SharedString, Size, Style, Styled as _, TextRun,
+    UnderlineStyle, Window, WrapBoundary, WrappedLine, WrappedLineLayout, div, fill, point, px,
+    relative, size,
 };
+use unicode_linebreak::linebreaks;
+use unicode_segmentation::UnicodeSegmentation;
 
-use super::state::{EditorLayout, TextEditState};
+use super::buffer::ObjectId;
+use super::state::{EditorLayout, OBJECT_STAND_IN, TextEditState};
 
 /// How a field's text looks, set by its component.
 #[derive(Clone)]
@@ -47,6 +53,17 @@ pub(crate) struct EditorElement {
     pub style: EditorStyle,
 }
 
+/// An inline object's box for this frame.
+pub(crate) struct ObjectBox {
+    /// Where its character is in the buffer.
+    offset: usize,
+    element: AnyElement,
+    width: Pixels,
+}
+
+/// Each object's display offset and width, for shaping.
+type ObjectWidths = Rc<[(usize, Pixels)]>;
+
 pub(crate) struct Prepainted {
     lines: Rc<[(usize, WrappedLine)]>,
     placeholder: Option<WrappedLine>,
@@ -63,6 +80,155 @@ fn rows<'a>(lines: impl IntoIterator<Item = &'a WrappedLine>) -> usize {
         .map(|line| line.wrap_boundaries.len() + 1)
         .sum::<usize>()
         .max(1)
+}
+
+/// Shapes `text` as [`shape`] does, with each inline object's stand-in
+/// widened to its box (`objects`: display offsets and widths, in order). A
+/// logical line holding an object is shaped unwrapped, widened, then wrapped
+/// here at the line-break opportunities (UAX #14), a word longer than the line
+/// breaking between graphemes; other lines wrap as GPUI wraps them.
+fn shape_lines(
+    text: &str,
+    runs: &[TextRun],
+    font_size: Pixels,
+    wrap_width: Option<Pixels>,
+    objects: &[(usize, Pixels)],
+    window: &Window,
+) -> Vec<(usize, WrappedLine)> {
+    if objects.is_empty() {
+        return shape(text, runs, font_size, wrap_width, window);
+    }
+    let mut lines = shape(text, runs, font_size, None, window);
+    let mut wrapped: Vec<Option<WrappedLine>> = match wrap_width {
+        Some(width) => shape(text, runs, font_size, Some(width), window)
+            .into_iter()
+            .map(|(_, line)| Some(line))
+            .collect(),
+        None => Vec::new(),
+    };
+    for (i, (start, line)) in lines.iter_mut().enumerate() {
+        let end = *start + line.len();
+        let here: Vec<(usize, Pixels)> = objects
+            .iter()
+            .filter(|(offset, _)| *offset >= *start && *offset < end)
+            .map(|(offset, width)| (offset - *start, *width))
+            .collect();
+        if here.is_empty() {
+            if let Some(plain) = wrapped.get_mut(i).and_then(Option::take) {
+                *line = plain;
+            }
+            continue;
+        }
+        let widened = widen(&line.unwrapped_layout, &here);
+        let wrap_boundaries = match wrap_width {
+            Some(width) => wrap(&widened, &text[*start..end], width)
+                .into_iter()
+                .collect(),
+            None => Default::default(),
+        };
+        let layout: &mut Arc<WrappedLineLayout> = line;
+        *layout = Arc::new(WrappedLineLayout {
+            unwrapped_layout: Arc::new(widened),
+            wrap_boundaries,
+            wrap_width,
+        });
+    }
+    lines
+}
+
+/// A copy of `layout` with each object's stand-in as wide as its box: every
+/// glyph after it moves right by the difference.
+fn widen(layout: &LineLayout, objects: &[(usize, Pixels)]) -> LineLayout {
+    let stand_in = OBJECT_STAND_IN.len_utf8();
+    let deltas: Vec<(usize, Pixels)> = objects
+        .iter()
+        .map(|(offset, width)| {
+            let advance = layout.x_for_index(offset + stand_in) - layout.x_for_index(*offset);
+            (offset + stand_in, *width - advance)
+        })
+        .collect();
+    let shift = |index: usize| -> Pixels {
+        deltas
+            .iter()
+            .filter(|(after, _)| *after <= index)
+            .map(|(_, delta)| *delta)
+            .fold(px(0.), |a, b| a + b)
+    };
+    let runs = layout
+        .runs
+        .iter()
+        .map(|run| ShapedRun {
+            font_id: run.font_id,
+            glyphs: run
+                .glyphs
+                .iter()
+                .map(|glyph| {
+                    let mut glyph = glyph.clone();
+                    glyph.position.x += shift(glyph.index);
+                    glyph
+                })
+                .collect(),
+        })
+        .collect();
+    LineLayout {
+        font_size: layout.font_size,
+        width: layout.width + shift(layout.len),
+        ascent: layout.ascent,
+        descent: layout.descent,
+        runs,
+        len: layout.len,
+    }
+}
+
+/// Where a widened line wraps at `width`: greedy, at the last break
+/// opportunity that fits, else between graphemes; trailing white space hangs.
+fn wrap(layout: &LineLayout, text: &str, width: Pixels) -> Vec<WrapBoundary> {
+    let opportunities: Vec<usize> = linebreaks(text).map(|(i, _)| i).collect();
+    let mut boundaries: Vec<usize> = Vec::new();
+    let mut row_start = 0;
+    let mut row_x = px(0.);
+    let mut last_break: Option<usize> = None;
+    let mut previous = 0;
+    let ends: Vec<usize> = text
+        .grapheme_indices(true)
+        .map(|(i, g)| i + g.len())
+        .collect();
+    for end in ends {
+        let grapheme = &text[previous..end];
+        let overflows = layout.x_for_index(end) - row_x > width;
+        if overflows && !grapheme.trim().is_empty() {
+            let at = match last_break {
+                Some(at) if at > row_start => at,
+                _ if previous > row_start => previous,
+                _ => end,
+            };
+            if at < text.len() {
+                boundaries.push(at);
+                row_start = at;
+                row_x = layout.x_for_index(at);
+            }
+            last_break = None;
+        }
+        if opportunities.binary_search(&end).is_ok() {
+            last_break = Some(end);
+        }
+        previous = end;
+    }
+    let mut out: Vec<WrapBoundary> = Vec::new();
+    for at in boundaries {
+        let found = layout.runs.iter().enumerate().find_map(|(run_ix, run)| {
+            run.glyphs
+                .iter()
+                .position(|glyph| glyph.index >= at)
+                .map(|glyph_ix| WrapBoundary { run_ix, glyph_ix })
+        });
+        if let Some(boundary) = found
+            && out.last() != Some(&boundary)
+        {
+            out.push(boundary);
+        }
+    }
+    out
 }
 
 /// Shapes `text` into one wrapped line per logical line, with each one's start.
@@ -94,8 +260,56 @@ fn shape(
         .collect()
 }
 
+impl EditorElement {
+    /// Lays out each inline object's element, one line high.
+    fn layout_objects(
+        &self,
+        line_height: Pixels,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Vec<ObjectBox> {
+        let state = self.state.read(cx);
+        let Some(objects) = state.inline_objects.clone() else {
+            return Vec::new();
+        };
+        let offsets: Vec<(usize, ObjectId)> = state.buffer().object_offsets();
+        offsets
+            .into_iter()
+            .map(|(offset, id)| {
+                let mut element = div()
+                    .h(line_height)
+                    .flex()
+                    .items_center()
+                    .child((objects.render)(id, window, cx))
+                    .into_any_element();
+                let measured = element.layout_as_root(
+                    size(
+                        AvailableSpace::MaxContent,
+                        AvailableSpace::Definite(line_height),
+                    ),
+                    window,
+                    cx,
+                );
+                ObjectBox {
+                    offset,
+                    element,
+                    width: measured.width,
+                }
+            })
+            .collect()
+    }
+
+    fn object_widths(&self, boxes: &[ObjectBox], cx: &App) -> ObjectWidths {
+        let state = self.state.read(cx);
+        boxes
+            .iter()
+            .map(|b| (state.offset_to_display(b.offset), b.width))
+            .collect()
+    }
+}
+
 impl Element for EditorElement {
-    type RequestLayoutState = ();
+    type RequestLayoutState = Vec<ObjectBox>;
     type PrepaintState = Prepainted;
 
     fn id(&self) -> Option<ElementId> {
@@ -114,15 +328,17 @@ impl Element for EditorElement {
         cx: &mut App,
     ) -> (LayoutId, Self::RequestLayoutState) {
         let line_height = window.line_height();
+        let boxes = self.layout_objects(line_height, window, cx);
+        let widths = self.object_widths(&boxes, cx);
         let mut style = Style::default();
         style.size.width = relative(1.).into();
         if !self.style.multiline {
             style.size.height = line_height.into();
-            return (window.request_layout(style, [], cx), ());
+            return (window.request_layout(style, [], cx), boxes);
         }
         if let Some(height) = self.style.height {
             style.size.height = height.into();
-            return (window.request_layout(style, [], cx), ());
+            return (window.request_layout(style, [], cx), boxes);
         }
         // A multiline field is as tall as its wrapped text, within its rows.
         let state = self.state.clone();
@@ -136,10 +352,11 @@ impl Element for EditorElement {
             });
             let text = state.read(cx).display_text();
             let runs = [text_style.to_run(text.len())];
-            let lines: Vec<WrappedLine> = shape(&text, &runs, font_size, width, window)
-                .into_iter()
-                .map(|(_, line)| line)
-                .collect();
+            let lines: Vec<WrappedLine> =
+                shape_lines(&text, &runs, font_size, width, &widths, window)
+                    .into_iter()
+                    .map(|(_, line)| line)
+                    .collect();
             let mut count = rows(&lines[..]).max(min);
             if let Some(max) = max {
                 count = count.min(max.max(min));
@@ -150,7 +367,7 @@ impl Element for EditorElement {
                 .fold(px(0.), Pixels::max);
             size(width.unwrap_or(widest), line_height * count as f32)
         });
-        (layout, ())
+        (layout, boxes)
     }
 
     fn prepaint(
@@ -158,10 +375,11 @@ impl Element for EditorElement {
         _: Option<&GlobalElementId>,
         _: Option<&InspectorElementId>,
         bounds: Bounds<Pixels>,
-        _: &mut Self::RequestLayoutState,
+        boxes: &mut Self::RequestLayoutState,
         window: &mut Window,
         cx: &mut App,
     ) -> Self::PrepaintState {
+        let widths = self.object_widths(boxes, cx);
         let text_style = window.text_style();
         let font_size = text_style.font_size.to_pixels(window.rem_size());
         let line_height = window.line_height();
@@ -195,6 +413,7 @@ impl Element for EditorElement {
             ));
         }
         for range in misspelled {
+            let range = state.offset_to_display(range.start)..state.offset_to_display(range.end);
             decorations.push((
                 range,
                 UnderlineStyle {
@@ -228,7 +447,7 @@ impl Element for EditorElement {
             .collect();
         runs.retain(|r| r.len > 0);
         let lines: Rc<[(usize, WrappedLine)]> =
-            shape(&display, &runs, font_size, wrap, window).into();
+            shape_lines(&display, &runs, font_size, wrap, &widths, window).into();
         let placeholder = match (&self.style.placeholder, display.is_empty()) {
             (Some(placeholder), true) => {
                 let runs = [TextRun {
@@ -320,6 +539,15 @@ impl Element for EditorElement {
         }
         let caret =
             collapsed.then(|| Bounds::new(origin + caret_at, size(CARET_WIDTH, line_height)));
+        let places: Vec<Point<Pixels>> = boxes
+            .iter()
+            .map(|b| origin + state.position_for_offset(b.offset).unwrap_or_default())
+            .collect();
+        window.with_content_mask(Some(ContentMask { bounds }), |window| {
+            for (object, at) in boxes.iter_mut().zip(places) {
+                object.element.prepaint_at(at, window, cx);
+            }
+        });
         self.state.update(cx, |state, _| {
             if let Some(layout) = &mut state.layout {
                 layout.scroll = scroll;
@@ -340,7 +568,7 @@ impl Element for EditorElement {
         _: Option<&GlobalElementId>,
         _: Option<&InspectorElementId>,
         bounds: Bounds<Pixels>,
-        _: &mut Self::RequestLayoutState,
+        boxes: &mut Self::RequestLayoutState,
         prepainted: &mut Self::PrepaintState,
         window: &mut Window,
         cx: &mut App,
@@ -393,6 +621,9 @@ impl Element for EditorElement {
                 )
                 .ok();
                 y += line.size(line_height).height;
+            }
+            for object in boxes.iter_mut() {
+                object.element.paint(window, cx);
             }
 
             // The caret: solid for a moment after each change, then blinking

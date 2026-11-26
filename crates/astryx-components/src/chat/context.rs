@@ -4,7 +4,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use astryx_primitives::{use_context, use_layer_context};
-use gpui::{App, Bounds, ElementId, Pixels};
+use gpui::{App, Bounds, ElementId, Pixels, SharedString, Window};
 
 use super::stream_scroll::ChatStreamScroll;
 
@@ -92,4 +92,54 @@ pub struct ChatLayoutContext {
 /// Upstream `useChatLayoutContext`: the enclosing ChatLayout's context, if any.
 pub fn use_chat_layout_context(cx: &App) -> Option<ChatLayoutContext> {
     use_context::<ChatLayoutContext>(cx)
+}
+
+// =============================================================================
+// Composer context: shared between ChatComposer, its input and its send button
+
+/// A composer value callback: the draft, or the value to submit.
+pub type ChatValueFn = Rc<dyn Fn(SharedString, &mut Window, &mut App)>;
+/// A composer action without arguments (upstream `onStop`).
+pub type ChatActionFn = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// Upstream `ChatComposerInputControl`: what the composer shell can ask of its input
+/// slot. The body's click-to-focus calls `focus`.
+#[derive(Clone)]
+pub struct ChatComposerInputControl {
+    /// Moves keyboard focus into the input, the caret after the draft.
+    pub focus: ChatActionFn,
+    /// The editor's focus, when the input has one: keyboard focus on it draws the
+    /// body's focus ring (FR8).
+    pub focus_handle: Option<gpui::FocusHandle>,
+}
+
+/// Upstream `ChatComposerContextValue`: the composer's draft and operations, for
+/// ChatComposerInput, ChatSendButton and custom inputs.
+#[derive(Clone)]
+pub struct ChatComposerContext {
+    /// Upstream `value`: the current serialized draft.
+    pub value: SharedString,
+    /// Upstream `onChange`: reports a new draft through the composer's channel.
+    pub on_change: ChatValueFn,
+    /// Upstream `onSubmit`: trims the value, ignores an empty or disabled one,
+    /// calls the composer's `on_submit` and clears the draft.
+    pub on_submit: ChatValueFn,
+    /// Upstream `placeholder`.
+    pub placeholder: SharedString,
+    /// Upstream `isDisabled`.
+    pub disabled: bool,
+    /// Upstream `isStopShown`.
+    pub stop_shown: bool,
+    /// Upstream `canSend`: a non-empty draft in an enabled composer.
+    pub can_send: bool,
+    /// Upstream `onStop`.
+    pub on_stop: Option<ChatActionFn>,
+    /// Upstream `inputControlRef`: the input slot registers its control here each
+    /// frame it renders; the shell reads it to focus the input.
+    pub input_control: Rc<RefCell<Option<ChatComposerInputControl>>>,
+}
+
+/// Upstream `useChatComposerContext`: the enclosing ChatComposer's context, if any.
+pub fn use_chat_composer_context(cx: &App) -> Option<ChatComposerContext> {
+    use_context::<ChatComposerContext>(cx)
 }
