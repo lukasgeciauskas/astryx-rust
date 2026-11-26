@@ -67,6 +67,12 @@ _Last updated: 2026-11-26, after M10 (Content)._
 - **Permissions.** Ask before installing software or accepting any agreement.
   Don't capture other apps' windows; only the gallery.
 - **Privacy.** The owner's email never goes to an outside service.
+- **Publish the gallery after each milestone.** Once a milestone is closed and its CI is
+  green, run `cargo xtask deploy --scope lamit`: it builds the browser gallery in release
+  and publishes it to https://astryx-gallery.vercel.app (the `astryx-gallery` project of
+  the "lamit" Vercel team) through the logged-in Vercel CLI.
+- **After M11:** the web gallery must let the browser's own context menu open on
+  right-click (so the page can be inspected); GPUI's web platform currently swallows it.
 - **Commits.** Each stage: run the gate, then commit and push to `main` with the
   global git identity. Messages end with the attribution lines the session
   supplies (`Co-Authored-By: ...`). Never commit a

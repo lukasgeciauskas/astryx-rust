@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=0" />
+    <title>Astryx for GPUI: component gallery</title>
+    <meta name="description" content="Meta's Astryx design system, ported to Rust on Zed's GPUI and running in the browser through WebAssembly." />
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1b1b; }
+      #splash {
+        position: fixed; inset: 0; display: flex; flex-direction: column; gap: 12px;
+        align-items: center; justify-content: center; color: #e8e8e8;
+        font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; text-align: center; padding: 24px;
+      }
+      #splash h1 { margin: 0; font-size: 22px; font-weight: 600; }
+      #splash p { margin: 0; color: #a8a8a8; max-width: 460px; }
+      #bar { width: 240px; height: 4px; border-radius: 2px; background: #333; overflow: hidden; }
+      #fill { width: 0; height: 100%; background: #8ab4ff; transition: width 0.2s; }
+      @media (prefers-color-scheme: light) {
+        html, body { background: #fafafa; }
+        #splash { color: #1b1b1b; }
+        #splash p { color: #555; }
+        #bar { background: #ddd; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="splash">
+      <h1>Astryx for GPUI</h1>
+      <p>Meta's Astryx design system, rewritten in Rust on Zed's GPUI and rendered here by WebAssembly.</p>
+      <div id="bar"><div id="fill"></div></div>
+      <p id="status">Downloading the gallery…</p>
+    </div>
+    <script type="module">
+      import init from './astryx-gallery.js';
+      // The wasm's size, written in by `cargo xtask deploy`.
+      const EXPECTED = __WASM_BYTES__;
+      const fill = document.getElementById('fill');
+      const status = document.getElementById('status');
+      // Stream the module so the bar shows real progress.
+      async function fetchWithProgress(url) {
+        const response = await fetch(url);
+        if (!response.body) return response;
+        const reader = response.body.getReader();
+        const chunks = [];
+        let received = 0;
+        for (;;) {
+          const {done, value} = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          received += value.length;
+          // The served size may be compressed: show the share of it, capped, and the
+          // megabytes received.
+          fill.style.width = Math.min(100, Math.round((received / EXPECTED) * 100)) + '%';
+          status.textContent = 'Downloading the gallery… ' + (received / 1048576).toFixed(1) + ' MB';
+        }
+        return new Response(new Blob(chunks), {headers: {'content-type': 'application/wasm'}});
+      }
+      try {
+        const module = await fetchWithProgress('./astryx-gallery_bg.wasm');
+        status.textContent = 'Starting…';
+        await init({module_or_path: module});
+        document.getElementById('splash').remove();
+      } catch (error) {
+        status.textContent = 'The gallery could not start: ' + error;
+        console.error(error);
+      }
+    </script>
+  </body>
+</html>
