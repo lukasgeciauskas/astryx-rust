@@ -83,6 +83,20 @@ pub fn use_table_sticky_columns(
 }
 
 impl<T> TablePlugin<T> for TableStickyColumns {
+    /// Pinned runs mark their overflow with a shadow, so their edges do not fade
+    /// (upstream `scrollEdgeFadeOff`).
+    fn transform_scroll_wrapper(
+        &self,
+        mut props: super::plugin::ScrollWrapperProps,
+        _context: &super::plugin::TableRenderContext,
+        _window: &mut Window,
+        _cx: &mut App,
+    ) -> super::plugin::ScrollWrapperProps {
+        props.fade_off_start |= !self.start_keys.is_empty();
+        props.fade_off_end |= !self.end_keys.is_empty();
+        props
+    }
+
     fn transform_header_cell(
         &self,
         mut props: HeaderCellProps,

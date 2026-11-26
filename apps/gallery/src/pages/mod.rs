@@ -32,6 +32,7 @@ pub enum Page {
     Collections,
     Tables,
     Dates,
+    Shell,
 }
 
 impl Page {
@@ -58,6 +59,7 @@ impl Page {
         Page::Collections,
         Page::Tables,
         Page::Dates,
+        Page::Shell,
     ];
 
     pub fn title(self) -> &'static str {
@@ -84,6 +86,7 @@ impl Page {
             Page::Collections => "Collections",
             Page::Tables => "Tables",
             Page::Dates => "Dates",
+            Page::Shell => "Shell",
         }
     }
 
@@ -109,6 +112,14 @@ impl Page {
             Page::Navigation => astryx::components::segmented::examples::examples(window, cx),
             Page::Wayfinding => astryx::components::pagination::examples::examples(window, cx),
             Page::Tables => astryx::components::table::examples::examples(window, cx),
+            Page::Shell => gpui::div()
+                .flex()
+                .flex_col()
+                .gap(gpui::px(48.))
+                .child(astryx::components::scrollable_area::examples::examples(
+                    window, cx,
+                ))
+                .into_any_element(),
             Page::Dates => gpui::div()
                 .flex()
                 .flex_col()

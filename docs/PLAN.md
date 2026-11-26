@@ -625,6 +625,22 @@ The remaining primitives:
     the platform does (FR15), styled by `scrollbar_thin`, `scrollbar_none` and
     `scrollbar_color` (CSS `scrollbar-width` and `scrollbar-color`). Every scroll region
     already ported gains them; TabList's strip hides its bar, as upstream's does.
+  - Stage 2 (done): ScrollableArea and `useScrollableArea` (AST-025).
+    `astryx_primitives::scroll_area` is the hook: the requested logical axes, the
+    effective-axis and edge state measured after each layout and published at most once
+    a frame when it changes (FR4-FR9, PR1), a named tab stop only while a requested axis
+    scrolls that keeps focus when the overflow goes (FR12-FR13, AR1-AR2), the scrolling
+    keys (arrows, Page, Home, End, and Space from the viewport) passing on at an edge
+    (FR14), and `overscroll: contain` on the effective axes. ScrollableArea composes it
+    with a real content box (FR2), padding that the box publishes as container inset and
+    `full_bleed` for the viewport (FR5), the neutral thumb under a fine pointer (FR3) and
+    the `scrollable-area` theme target.
+    - Carried in: Table's scroll region gets the shared edge fade under a coarse pointer,
+      off on the edges its pinned columns mark (FR22, FR19), and contains sideways
+      scrolling. Tokenizer in an InputGroup now scrolls its tokens in one track, with a
+      hidden scrollbar, faded edges and keyboard focus revealing its token, as upstream's
+      `TokenTrack`.
+    - The gallery has a Shell page for M9.
 - **M10 Content:**
   - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
     URL safety.

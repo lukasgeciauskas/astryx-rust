@@ -370,6 +370,8 @@ impl<T: TableRecord> RenderOnce for Table<T> {
             before_table: Vec::new(),
             after_table: Vec::new(),
             hooks: Vec::new(),
+            fade_off_start: false,
+            fade_off_end: false,
         };
         for p in &plugins {
             wrapper = p.transform_scroll_wrapper(wrapper, &render_context, window, cx);
@@ -391,6 +393,9 @@ impl<T: TableRecord> RenderOnce for Table<T> {
             .track_scroll(&scroll)
             .when(!block, |d| d.overflow_x_scroll())
             .when(block, |d| d.overflow_scroll().flex_1().min_h_0())
+            // Upstream `overscroll: 'contain'`, with the block axis chaining when the
+            // table windows its rows in its own viewport.
+            .when(scroll.max_offset().x > px(0.), |d| d.overscroll_x_contain())
             .relative()
             .role(Role::Group)
             .aria_label(region_name)
@@ -415,9 +420,31 @@ impl<T: TableRecord> RenderOnce for Table<T> {
                 cx.stop_propagation();
                 window.refresh();
             });
-        if astryx_primitives::is_focus_visible(&focus, window) {
-            region_el = region_el.child(crate::focus::focus_ring_inset(t, px(0.), rem));
+        // The ring and the edge fades sit over the visible area (AST-025 FR22).
+        let focus_visible = astryx_primitives::is_focus_visible(&focus, window);
+        let axis = if block {
+            astryx_primitives::scroll_area::ScrollAxis::Both
+        } else {
+            astryx_primitives::scroll_area::ScrollAxis::Inline
+        };
+        let scroll_state = astryx_primitives::scroll_area::measure(axis, &scroll);
+        let mut overlay = crate::scrollable_area::fade::visible_box(&scroll).children(
+            crate::scrollable_area::fade::scroll_edge_fades(
+                &format!("{name}-scroll"),
+                scroll_state.inline,
+                crate::scrollable_area::fade::FadeScrollbar::Native,
+                astryx_primitives::coarse_primary_pointer(window, cx),
+                focus_visible,
+                (wrapper.fade_off_start, wrapper.fade_off_end),
+                t.spacing.s8.to_pixels(rem),
+                dir,
+                t,
+            ),
+        );
+        if focus_visible {
+            overlay = overlay.child(crate::focus::focus_ring_inset(t, px(0.), rem));
         }
+        region_el = region_el.child(overlay);
         // It bleeds to its padding host's edges (containerBleed).
         if let Some(host) = host {
             region_el = region_el

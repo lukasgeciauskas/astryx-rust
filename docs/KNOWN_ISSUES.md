@@ -37,9 +37,7 @@
   drag, which upstream's mouse drag has no key for. Under shift feedback the passed items
   jump to their slots; their slide waits for the motion layer (M11).
 
-- **Table: what GPUI's layout and AccessKit change.** A table's scroll region shows no
-  edge fade where it can scroll; the shared scroll behavior lands with ScrollableArea
-  (M9). An unknown row total (ARIA's `aria-rowcount=-1`, while more rows may load) has no
+- **Table: what GPUI's layout and AccessKit change.** An unknown row total (ARIA's `aria-rowcount=-1`, while more rows may load) has no
   AccessKit form, so no count is exposed then. A composed table's columns fit their
   content as a grid's `auto` tracks, which share leftover width equally rather than by
   content as HTML's automatic table layout does. A plugin transform cannot throw, so
@@ -246,6 +244,16 @@
 - **The browser's picker popup is not in captures (M8).** It is drawn outside the page,
   so a headless capture shows the native field but not the popup. The Windows popups
   were captured from the gallery and the fork's `astryx_native_picker` example.
+
+- **Nothing sticks, so sticky containment has no effect (M9).** GPUI has no
+  `position: sticky`; ScrollableArea's `sticky_containment` (and the hook's option) is
+  accepted and both values behave alike. Table pins its sticky columns itself.
+- **A named scroll viewport keeps its own tab stop (M9).** Upstream's
+  `contentOrViewport` hands forward Tab entry to a lone leading native button or link
+  inside; GPUI's focus handles carry no element kind, so the viewport stays a stop.
+- **Scroll-edge fades blend into the body background (M9).** GPUI cannot mask by alpha, so
+  Table's and Tokenizer's fades (AST-025 FR22) are gradient overlays in
+  `background-body`; on another surface that color shows at the edge.
 
 ## Tooling
 

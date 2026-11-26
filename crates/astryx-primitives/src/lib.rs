@@ -20,6 +20,7 @@ pub mod list_window;
 pub mod modality;
 pub mod motion;
 pub mod props;
+pub mod scroll_area;
 pub mod size;
 pub mod spell;
 pub mod tree_focus;

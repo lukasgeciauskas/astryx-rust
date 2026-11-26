@@ -288,3 +288,57 @@ fn fr8_the_arrow_keys_resize_a_focused_boundary(cx: &mut TestAppContext) {
     let grew = ends[0].get("name") == Some(&210.) || ends[0].get("age") == Some(&110.);
     assert!(grew, "{:?}", ends[0]);
 }
+
+// ---- Scroll-edge fades (AST-025 FR22) -----------------------------------------
+
+fn wide_plain(_: &mut Window, _: &mut App) -> gpui::AnyElement {
+    div()
+        .w(px(300.))
+        .child(
+            Table::new("t")
+                .data(rows())
+                .columns([
+                    TableColumn::new("id").width(pixel(100.)),
+                    TableColumn::new("name").width(pixel(200.)),
+                    TableColumn::new("age").width(pixel(200.)),
+                ])
+                .id_key("id"),
+        )
+        .into_any_element()
+}
+
+fn touch(cx: &mut gpui::VisualTestContext) {
+    for phase in [gpui::TouchPhase::Started, gpui::TouchPhase::Ended] {
+        cx.simulate_event(gpui::TouchEvent {
+            id: gpui::TouchId(9),
+            phase,
+            position: point(px(590.), px(590.)),
+            ..Default::default()
+        });
+    }
+    settle(cx);
+}
+
+#[gpui::test]
+fn ast025_fr22_a_scrolling_table_fades_its_hidden_edge_under_a_finger(cx: &mut TestAppContext) {
+    let cx = host(cx, 600., wide_plain);
+    settle(cx);
+    assert!(
+        cx.debug_bounds("t-scroll-fade-end").is_none(),
+        "with a mouse the scrollbar shows the overflow"
+    );
+    touch(cx);
+    assert!(cx.debug_bounds("t-scroll-fade-end").is_some());
+    assert!(
+        cx.debug_bounds("t-scroll-fade-start").is_none(),
+        "nothing hides at the start"
+    );
+}
+
+#[gpui::test]
+fn ast025_fr22_pinned_columns_turn_their_edge_fades_off(cx: &mut TestAppContext) {
+    let cx = host(cx, 600., wide_table);
+    settle(cx);
+    touch(cx);
+    assert!(cx.debug_bounds("t-scroll-fade-end").is_none());
+}

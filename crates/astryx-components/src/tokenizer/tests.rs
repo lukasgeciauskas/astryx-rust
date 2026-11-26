@@ -282,3 +282,58 @@ fn fr23_the_limit_holds_in_the_draft(cx: &mut TestAppContext) {
         "an unchecked row at the limit does nothing"
     );
 }
+
+// ---- In an InputGroup: one scrolling track (AST-025 FR22) ---------------------
+
+#[gpui::test]
+fn a_grouped_row_scrolls_its_tokens_in_one_track_with_faded_edges(cx: &mut TestAppContext) {
+    cx.update(astryx_primitives::editing::init);
+    let names = [
+        "Design",
+        "Engineering",
+        "Research",
+        "Sales",
+        "Support",
+        "Marketing",
+        "Legal",
+        "Finance",
+    ];
+    let items: Vec<SearchItem> = names
+        .iter()
+        .map(|n| SearchItem::new(n.to_lowercase(), *n))
+        .collect();
+    let cx = crate::segmented::tests::host(cx, move || {
+        div()
+            .w(px(320.))
+            .child(
+                crate::input::InputGroup::new("g", "Teams").child(
+                    Tokenizer::new("k", "Teams", static_source(tags()), items.clone())
+                        .debounce(Duration::ZERO),
+                ),
+            )
+            .into_any_element()
+    });
+    for _ in 0..3 {
+        cx.run_until_parked();
+        cx.update(|window, _| window.refresh());
+    }
+    let track = cx.debug_bounds("k-track").expect("a track in a group");
+    assert!(
+        cx.debug_bounds("k-track-fade-end").is_some(),
+        "hidden tokens fade"
+    );
+    assert!(cx.debug_bounds("k-track-fade-start").is_none());
+    // Tab to the last token's remove button: its token comes into view.
+    for _ in 0..names.len() {
+        press(cx, "tab");
+    }
+    for _ in 0..3 {
+        cx.run_until_parked();
+        cx.update(|window, _| window.refresh());
+    }
+    assert!(
+        cx.debug_bounds("k-track-fade-start").is_some(),
+        "the track scrolled"
+    );
+    let _ = track;
+}

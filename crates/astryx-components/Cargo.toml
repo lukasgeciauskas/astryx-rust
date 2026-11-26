@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 astryx-primitives.workspace = true
+astryx-effects.workspace = true
 astryx-i18n.workspace = true
 astryx-icons.workspace = true
 astryx-theme.workspace = true

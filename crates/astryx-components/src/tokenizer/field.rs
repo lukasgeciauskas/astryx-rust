@@ -730,15 +730,23 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
                 window.focus(&focus, cx);
             });
         }
+        // In an InputGroup the start icon, tokens and input scroll in one track
+        // beside the end lane, on one line (upstream `TokenTrack`).
+        let grouped = place.is_some() && !folded;
+        let mut lane: Vec<AnyElement> = Vec::new();
+        let has_icon = self.start_icon.is_some();
         if let Some(icon) = self.start_icon.take() {
-            surface = surface.child(
-                div()
-                    .flex()
-                    .flex_none()
-                    .items_center()
-                    .text_color(t.color.icon_secondary)
-                    .child(provide(IconDefaultSize(IconSize::Sm), icon)),
-            );
+            let icon = div()
+                .flex()
+                .flex_none()
+                .items_center()
+                .text_color(t.color.icon_secondary)
+                .child(provide(IconDefaultSize(IconSize::Sm), icon));
+            if grouped {
+                lane.push(icon.into_any_element());
+            } else {
+                surface = surface.child(icon);
+            }
         }
         if folded {
             // Blurred: one row of tokens and a count of the rest.
@@ -767,6 +775,28 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
                     .min_w_0()
                     .child(row),
             );
+        } else if grouped {
+            // Each token's box knows when focus is inside it, for the track's reveal.
+            for (item, token) in value.iter().zip(tokens(window, cx)) {
+                let wrapper = window
+                    .use_keyed_state(
+                        ElementId::Name(format!("{id}-track-item-{}", item.id()).into()),
+                        cx,
+                        |_, cx| cx.focus_handle().tab_stop(false),
+                    )
+                    .read(cx)
+                    .clone();
+                lane.push(
+                    div()
+                        .id(ElementId::Name(
+                            format!("{id}-track-item-{}", item.id()).into(),
+                        ))
+                        .track_focus(&wrapper)
+                        .flex_none()
+                        .child(token)
+                        .into_any_element(),
+                );
+            }
         } else {
             surface = surface.children(tokens(window, cx));
         }
@@ -784,7 +814,8 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
             div()
                 .relative()
                 .flex_1()
-                .min_w(px(60.))
+                // A grouped row cannot wrap: its in-flow lane needs only 40 px.
+                .min_w(px(if grouped { 40. } else { 60. }))
                 .flex()
                 .child(parts.input)
                 .children(report.map(|report| {
@@ -797,7 +828,23 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
                 }))
                 .into_any_element()
         };
-        surface = surface.child(input);
+        if grouped {
+            lane.push(input);
+            surface = surface.child(Self::group_track(
+                &id,
+                lane,
+                has_icon,
+                &value,
+                disabled,
+                name.clone(),
+                t,
+                dir,
+                window,
+                cx,
+            ));
+        } else {
+            surface = surface.child(input);
+        }
         // The end lane.
         let can_remove = |item: &T| self.removable.as_ref().is_none_or(|f| f(item));
         let show_clear = self.clear && !disabled && value.iter().any(can_remove);
@@ -972,6 +1019,102 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
 }
 
 impl<T: Searchable> Tokenizer<T> {
+    /// The grouped row's track (upstream `TokenTrack` and its in-group styles): one
+    /// line that scrolls inline under a hidden scrollbar, its hidden edges faded
+    /// (AST-025 FR22), and a token whose remove button takes keyboard focus brought
+    /// into view. A disabled field has no remove buttons, so the track itself is
+    /// the tab stop while it overflows.
+    #[allow(clippy::too_many_arguments)]
+    fn group_track(
+        id: &ElementId,
+        lane: Vec<AnyElement>,
+        has_icon: bool,
+        value: &[T],
+        disabled: bool,
+        name: SharedString,
+        t: &astryx_theme::Tokens,
+        dir: astryx_i18n::Direction,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> AnyElement {
+        use crate::scrollable_area::fade::{FadeScrollbar, scroll_edge_fades, visible_box};
+        use astryx_primitives::scroll_area::{
+            ScrollAxis, ScrollKeyboardAccess, ScrollRole, UseScrollableAreaOptions,
+            use_scrollable_area,
+        };
+        let track_id = ElementId::Name(format!("{id}-track").into());
+        let access = if disabled {
+            ScrollKeyboardAccess::Viewport {
+                label: name,
+                role: ScrollRole::Group,
+            }
+        } else {
+            ScrollKeyboardAccess::Content
+        };
+        let area = use_scrollable_area(
+            &track_id,
+            UseScrollableAreaOptions::new(ScrollAxis::Inline, access),
+            window,
+            cx,
+        );
+        // Keyboard focus inside a token (its remove button) reveals it, once per move.
+        let keyboard = window
+            .focused(cx)
+            .is_some_and(|focus| is_focus_visible(&focus, window));
+        let focused_token = value.iter().position(|item| {
+            let wrapper = window
+                .use_keyed_state(
+                    ElementId::Name(format!("{id}-track-item-{}", item.id()).into()),
+                    cx,
+                    |_, cx| cx.focus_handle().tab_stop(false),
+                )
+                .read(cx)
+                .clone();
+            keyboard && wrapper.contains_focused(window, cx)
+        });
+        let revealed = window.use_keyed_state(
+            ElementId::Name(format!("{id}-track-revealed").into()),
+            cx,
+            |_, _| None::<usize>,
+        );
+        if *revealed.read(cx) != focused_token {
+            revealed.update(cx, |r, _| *r = focused_token);
+            if let Some(index) = focused_token {
+                area.scroll_handle()
+                    .scroll_to_item(index + usize::from(has_icon));
+            }
+        }
+        let rem = window.rem_size();
+        let fades = scroll_edge_fades(
+            &format!("{id}-track"),
+            area.state.inline,
+            FadeScrollbar::Hidden,
+            false,
+            area.is_focus_visible(window),
+            (false, false),
+            t.spacing.s6.to_pixels(rem),
+            dir,
+            t,
+        );
+        let selector = format!("{id}-track");
+        area.viewport(
+            div()
+                .relative()
+                .flex()
+                .items_center()
+                .gap(t.spacing.s1)
+                .self_stretch()
+                .flex_1()
+                .min_w_0(),
+        )
+        .debug_selector(move || selector)
+        // A scrollbar would take most of the row; the fades show the overflow.
+        .scrollbar_none()
+        .children(lane)
+        .child(visible_box(area.scroll_handle()).children(fades))
+        .into_any_element()
+    }
+
     /// FR16-FR17: the sheet presentation's field: a trigger showing the
     /// tokens (display-only) or the placeholder, and the sheet.
     fn render_sheet_field(

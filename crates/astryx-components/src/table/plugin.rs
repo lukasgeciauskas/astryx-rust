@@ -338,6 +338,10 @@ pub struct ScrollWrapperProps {
     pub before_table: Vec<AnyElement>,
     pub after_table: Vec<AnyElement>,
     pub hooks: Vec<ElementHook>,
+    /// Turns the scroll-edge fade off on an edge that marks its overflow another
+    /// way (upstream `scrollEdgeFadeOff`): pinned columns' shadows.
+    pub fade_off_start: bool,
+    pub fade_off_end: bool,
 }
 
 /// A table plugin (upstream `TablePlugin<T>`): every transform is optional
