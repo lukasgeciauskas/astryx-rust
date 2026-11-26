@@ -5,11 +5,12 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-25, at the end of M8 (Dates). Next: M9 (Shell & navigation)._
+_Last updated: 2026-11-26, during M9 (Shell & navigation): stage 1 (fork patch R17) done._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7 and M8. Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7 and M8; M9 is under way (stage 1:
+  scroll chaining and scrollbars, fork patch R17). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
 - **Parity:** 88 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
@@ -20,7 +21,7 @@ _Last updated: 2026-11-25, at the end of M8 (Dates). Next: M9 (Shell & navigatio
   ubuntu, windows and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
-  `b39b0e1a3afa568fec8d6ac16eab1d9ffa645082` (patches R1 and R5 to R16; see
+  `1aea36f6c5d49b4e82dba459a7e6dd7c5150e6c1` (patches R1 and R5 to R17; see
   [`gpui-fork.md`](gpui-fork.md)). The `[patch.crates-io]` block in
   `Cargo.toml` (async-task, calloop) is legitimate and stays.
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.

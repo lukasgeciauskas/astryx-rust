@@ -618,6 +618,13 @@ The remaining primitives:
 - **M9 Shell & navigation:** AppShell, Layout, SideNav, TopNav, NavMenu/NavHeadingMenu,
   NavItem, NavIcon, MobileNav, Outline, Resizable, ScrollableArea (AST-025), Carousel,
   SnapPaging.
+  - Stage 1 (done): fork patch R17 (`1aea36f`), the scrolling AST-025 needs from the
+    platform. A scroll moves the innermost element that can take it and chains to its
+    ancestor at the edge (FR14); `overscroll_contain` keeps it there; every scrolling
+    `div` draws scrollbars with a draggable thumb and a paging track, auto-hiding where
+    the platform does (FR15), styled by `scrollbar_thin`, `scrollbar_none` and
+    `scrollbar_color` (CSS `scrollbar-width` and `scrollbar-color`). Every scroll region
+    already ported gains them; TabList's strip hides its bar, as upstream's does.
 - **M10 Content:**
   - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
     URL safety.

@@ -597,6 +597,8 @@ impl RenderOnce for TabList {
                 .px(ring)
                 .mx(-ring)
                 .overflow_x_scroll()
+                // Upstream hides the strip's scrollbar; the arrows and fades show it.
+                .scrollbar_none()
                 .track_scroll(&scroll);
         }
 

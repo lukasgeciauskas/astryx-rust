@@ -14,6 +14,18 @@
     Those log lines are a symptom of an earlier panic, not a separate bug; look for the
     first `panicked at` line.
 
+- **Scrollbars overlay the content (fork patch R17).** Where the platform keeps scrollbars
+  (Windows with "Always show scrollbars", for example) a browser gives a scroll container a
+  gutter; here the bar always draws over the content's end edge, so a layout never
+  changes when content starts to overflow. The bar stays on the right in right-to-left
+  text, since GPUI's elements have no direction.
+- **A wheel gesture is not latched (fork patch R17).** Browsers keep one gesture on the
+  container it started in; here each event chains on its own, so a trackpad fling that
+  reaches an inner box's edge goes on to scroll the page.
+- **A scroll container measures its direct children.** GPUI sizes the scrollable content
+  from the children's boxes, not from their own overflow, so a child that should scroll
+  sideways keeps its content width (`flex_none`, or a fixed width).
+
 ## Components
 
 - **A dragged row's place shows its text, not a copy of the row.** GPUI draws an element

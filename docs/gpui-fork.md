@@ -55,6 +55,7 @@ Each patch lands before the components that need it.
 | R14 | `aria-sort` (**landed**, `d436e06`) | `aria_sort(SortDirection)` on any stateful element, setting AccessKit's sort direction; `SortDirection` is re-exported | A sortable Table column's header (M7) |
 | R15 | Named nodes and `aria-controls` (**landed**, `52f7859`) | `aria_id(name)` names an element's node as an HTML `id` does; `aria_controls(names)` points at named nodes. Both are collected per frame and resolved when the tree is finished, so a relation may name a node that comes later; unknown names are skipped | A tree table's expanders and row expansion's toggles (M7) |
 | R16 | Native pickers (**landed**, `b39b0e1`) | `Window::show_native_picker(NativePickerRequest)` opens the platform's date, time or date-and-time picker below an anchor and answers `Picked` (an ISO value), `Cleared` or `Dismissed` through a channel; `native_picker_supported(kind)` says whether one exists | The native surfaces of DateInput, TimeInput and DateTimeInput (M8) |
+| R17 | Scroll chaining, overscroll containment and scrollbars (**landed**, `1aea36f`) | A scroll moves the innermost element that can take it and chains to its ancestor at an edge; `overscroll_contain` keeps it there; every scrolling `div` draws scrollbars (drag the thumb, press the track to page), auto-hiding where the platform does; `scrollbar_thin`, `scrollbar_none` and `scrollbar_color` follow CSS | ScrollableArea and the scrolling parts of Layout, the navs and AppShell (M9, AST-025 FR14 and FR15); every scroll region already ported |
 
 ### How each patch works
 
@@ -171,6 +172,23 @@ Each patch lands before the components that need it.
   - The test platform is off by default; `set_native_pickers_supported`,
     `native_picker_request` and `simulate_native_picker` drive it.
   - Example: `crates/gpui/examples/astryx_native_picker.rs`.
+
+- **R17 (scroll chaining, overscroll containment and scrollbars), as built:**
+  - `clamp_scroll_position` keeps each element's scroll range in a shared cell, so the
+    wheel listener clamps there: when the offset moves, the element stops the event; when
+    it cannot (an edge, or nothing to scroll), the event goes on to the ancestors, unless
+    `Style::overscroll_contain` holds that axis and the element can scroll on it.
+  - `elements/scrollbars.rs`: a bar per overflowing axis along the element's end and
+    bottom edges (12 px, or 8 px thin), a thumb in proportion to the viewport (20 px at
+    least), painted after the children. The bar's hitbox sits above the children and lets
+    the wheel through. A press on the thumb drags it (window-wide until release); a press
+    on the track pages by 87.5% of the viewport.
+  - Presentation: `App::should_auto_hide_scrollbars`, read once. Auto-hiding bars show
+    for a second after a scroll or pointer movement over the element and fade over
+    300 ms, with animation frames only while they fade; otherwise they always show.
+  - Default colors: a mid-gray thumb (more opaque while hovered or dragged) on a
+    transparent track; `scrollbar_color` replaces both.
+  - Example: `crates/gpui/examples/astryx_scrolling.rs`.
 
 - **R2 (backdrop blur):**
   - A new scene primitive.
