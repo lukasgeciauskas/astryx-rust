@@ -135,6 +135,7 @@ impl Page {
                     window, cx,
                 ))
                 .child(astryx::components::outline::examples::examples(window, cx))
+                .child(astryx::components::carousel::examples::examples(window, cx))
                 .into_any_element(),
             Page::Dates => gpui::div()
                 .flex()

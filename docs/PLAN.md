@@ -750,6 +750,17 @@ The remaining primitives:
     Uncontrolled, the current heading follows the scroll on the activation line (FR5).
     `use_outline_from_container` lists the headings with ids inside a container.
     - Carried to M10: `useOutlineFromMarkdown`, which shares Markdown's parser and slugs.
+  - Stage 11 (done): Carousel and `useSnapPaging` (`carousel/`). A row that scrolls sideways
+    (Shift with the wheel too), with edge fades and previous and next buttons that hide,
+    leaving no tab stop, when their direction runs out, a keyboard-pressed one handing
+    focus to the row (FR1-FR4); wrap-around; the handle's `scroll_next`, `scroll_prev`,
+    `scroll_to` and `can_scroll_*`. GPUI has no CSS scroll snap: the stops are computed
+    as upstream's (`carousel/stops.rs`: item starts less the padding, clamped, merged, the
+    end-page rule), and the row glides onto the nearest one once a gesture ends (a
+    trackpad's release, or a wheel at rest) (FR5, FR6). Snap paging moves at most one page
+    per flick (a view or an item) from the page the drag began on (FR7); an edge button
+    steps about a view onto a stop.
+- **M9 done.** Every M9 component is ported; its carried items are in HANDOFF's table.
 - **M10 Content:**
   - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
     URL safety.

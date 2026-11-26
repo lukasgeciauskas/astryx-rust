@@ -5,19 +5,18 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 10 done (R17, ScrollableArea, Resizable, Layout, NavIcon and NavHeadingMenu, SideNav, TopNav, MobileNav, AppShell with R18, Outline)._
+_Last updated: 2026-11-26, after M9 (Shell & navigation). Next: M10 (Content)._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7 and M8; M9 is under way (stage 1:
-  scroll chaining and scrollbars, fork patch R17; stage 2: ScrollableArea and its hook; stage 3: Resizable; stage 4: Layout; stage 5: NavIcon and NavHeadingMenu; stage 6: SideNav; stage 7: TopNav; stage 8: MobileNav; stage 9: AppShell and fork patch R18, sticky positioning; stage 10: Outline). Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8 and M9. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 98 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 99 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
-- **Last commits on `main`:** M8's stages, from `90581cb` (calendar systems and
-  Calendar) through the pointer fields, DateRangeInput, the wheels and the three bottom
-  sheets and the carried items, to the native pickers. CI runs on
+- **Last commits on `main`:** M9's eleven stages, from `a08759f` (fork patch R17,
+  scroll chaining and scrollbars) through ScrollableArea, Resizable, Layout, the navs,
+  MobileNav, AppShell with R18 (sticky positioning) and Outline, to Carousel. CI runs on
   ubuntu, windows and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
@@ -27,9 +26,9 @@ _Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 10 done (
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (22)
+### Not yet ported (21)
 
-- **M9:** Carousel. **M10:** Chat,
+- **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
   LinkProvider, MediaTheme, SyntaxTheme, Theme. The first five already exist as
@@ -193,19 +192,22 @@ time:
   "http://127.0.0.1:8080/?page=dates&backend=webgl"`, with a scratch
   `--user-data-dir`. The query picks the page, theme, mode and scroll.
 
-## Next: M9 Shell & navigation
+## Next: M10 Content
 
-M8 (Dates) is done: calendar systems in `astryx_i18n::date` (ICU4X), Calendar,
-DateInput, TimeInput, DateTimeInput and DateRangeInput, each with its pointer field, its
-bottom sheet (`wheel/`, the month pager, the month and year wheels) and its native
-surface (fork patch R16: the Common Controls pickers on Windows, the browser's pickers on
-the web; `date_input/native.rs`). The motion math was pulled forward from M11 into
-`astryx_primitives::motion` and `gestures`. The items carried into M8 are done:
-PowerSearch's date and time values with `timezoneID`, Table filtering's date and time
-controls, and FormLayout's `defaultEntryErrorBehavior` readers.
+M9 (Shell & navigation) is done: fork patches R17 (scroll chaining, overscroll
+containment and scrollbars) and R18 (sticky positioning); ScrollableArea and
+`useScrollableArea`; Resizable and `useResizable`; Layout and its regions (dialogs, drawers
+and sheets compose one); NavIcon and NavHeadingMenu; SideNav; TopNav with its menus, mega
+menu and heading, on one hover recognizer (`top_nav/hover.rs`); MobileNav; AppShell and
+`useAppShellMobile` (the theme now carries `widthBreakpoints`); Outline and
+`useOutlineFromDOM` on in-page anchors (`astryx_primitives::anchor`); Carousel and
+`useSnapPaging`. Its carried items are in the table below: motion to M11, and
+`useOutlineFromMarkdown` to M10.
 
-M9 ports AppShell, Layout, SideNav, TopNav, NavMenu and NavHeadingMenu, NavItem, NavIcon,
-MobileNav, Outline, Resizable, ScrollableArea (AST-025), Carousel and SnapPaging (see
-`PLAN.md`). It carries Dialog's content inset, which Layout provides. Start with
+M10 ports Markdown (pulldown-cmark/GFM mapped to Astryx nodes, upstream plugins, streaming
+parse, URL safety), CodeBlock (the in-house grammar tokenizer on `fancy-regex`, 30
+languages, 12 syntax presets) and the Chat suite (see `PLAN.md`), and carries
+`useOutlineFromMarkdown` (it shares Markdown's parser and heading slugs). Start with
 `cargo run -q -p astryx-cli -- component <Name> --dense` for each and the upstream specs
 in `../Astryx/docs/specs/components/`.
+

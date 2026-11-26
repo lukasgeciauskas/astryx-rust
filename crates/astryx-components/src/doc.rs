@@ -76,6 +76,8 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::app_shell::USE_APP_SHELL_MOBILE_DOC,
     crate::outline::OUTLINE_DOC,
     crate::outline::USE_OUTLINE_FROM_DOM_DOC,
+    crate::carousel::CAROUSEL_DOC,
+    crate::carousel::USE_SNAP_PAGING_DOC,
     crate::top_nav::TOP_NAV_DOC,
     crate::top_nav::TOP_NAV_HEADING_DOC,
     crate::top_nav::TOP_NAV_ITEM_DOC,

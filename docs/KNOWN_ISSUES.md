@@ -244,7 +244,9 @@
 - **Sticky containment has no effect (M9).** Fork patch R18 brings `position: sticky`, but
   a ScrollableArea's viewport always clips, so it is always its descendants' sticky
   boundary: `sticky_containment: when_scrollable` (a fitting viewport lets sticky
-  descendants reach an outer scroller) behaves like `always`. Table pins its sticky
+  descendants reach an outer scroller) behaves like `always`. A viewport that stopped
+  clipping while it fits would, in GPUI's layout, grow to its content and never scroll
+  again, so this needs a layout-level clip toggle in the fork. Table pins its sticky
   columns itself.
 - **A named scroll viewport keeps its own tab stop (M9).** Upstream's
   `contentOrViewport` hands forward Tab entry to a lone leading native button or link
@@ -257,6 +259,12 @@
   display cutouts, so AppShell's `env(safe-area-inset-*)` padding is zero; and GPUI
   elements have no DOM ids, so the main region's id, the drawer id and the toggle's
   `aria-controls` have no form (the skip link moves focus to the main region directly).
+- **Carousel snapping settles after the gesture (M9).** GPUI has no CSS scroll snap or
+  platform momentum to rest on a stop, so the row scrolls freely and glides onto the
+  nearest stop when a gesture ends (a trackpad's release, or 150 ms after the last wheel
+  event); a release projects its velocity a quarter second ahead to pick the stop or the
+  page. Upstream's evidence gap applies too: the one-page-per-flick feel is not measured
+  against UIKit.
 - **Outline navigation has no history or focus move (M9).** A native window has no URL,
   so choosing a link pushes no `#id`; GPUI has no sequential focus starting point, so the
   next Tab does not continue from the heading (WCAG 2.4.3 in the browser); and the
