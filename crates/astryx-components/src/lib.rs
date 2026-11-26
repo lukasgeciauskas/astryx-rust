@@ -7,6 +7,7 @@ pub mod button;
 pub mod calendar;
 pub mod carousel;
 pub mod choice;
+pub mod code_block;
 pub mod collapsible;
 pub mod complex_selector;
 pub mod containers;

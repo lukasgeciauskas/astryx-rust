@@ -259,6 +259,11 @@
   display cutouts, so AppShell's `env(safe-area-inset-*)` padding is zero; and GPUI
   elements have no DOM ids, so the main region's id, the drawer id and the toggle's
   `aria-controls` have no form (the skip link moves focus to the main region directly).
+- **CodeBlock's copy cannot fail, and lines keep the viewport's direction (M10).** GPUI's
+  clipboard write reports no failure, so the failed-copy state (FR2) and `on_copy_error`
+  never arise. Each line renders left to right; upstream gives every line `dir="auto"`, so
+  a line that starts with a right-to-left letter reads right to left (FR16). The highlight
+  modes look alike: GPUI paints every token as a span of styled text.
 - **Grammar word boundaries are Unicode (M10).** CodeBlock's grammars use JS's ASCII `\b`;
   `fancy-regex` has no ASCII boundary, so a keyword directly beside a non-ASCII letter
   (`éfor`) can paint differently. `\w` and `\d` keep JS's ASCII meaning.
@@ -281,7 +286,7 @@
 - **A resizable pane, the SideNav rail and TopNav's drawer groups jump rather than slide
   (M9, until M11).** Upstream reveals SideNav's rail as it collapses or expands (SideNav
   FR6) while AppShell's content area swaps its old wrap for the new one in place (AppShell
-  FR17), grows the height of a TopNavMenu's or TopNavMegaMenu's group in the phone's drawer
+  FR17), grows or shrinks a collapsing CodeBlock's body (CodeBlock FR5), grows the height of a TopNavMenu's or TopNavMegaMenu's group in the phone's drawer
   as it expands (TopNavMenu FR7, TopNavMegaMenu FR9), and slides a pane
   that collapses or opens on the animated-layout system's edge reveal (Resizable FR8,
   AST-105 FR9) and draws a pull past a bound as an 8 px rubber band that springs back;

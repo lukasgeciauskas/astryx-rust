@@ -797,6 +797,17 @@ The remaining primitives:
     (`create_code_language`), the fence and diff helpers, `define_syntax_theme` and the
     presets; SyntaxTheme and `use_syntax_theme` in `syntax_theme/`, with upstream's
     defaults for unset diff slots.
+  - Stage 2 (done): CodeBlock (`code_block/`). The header (title, language label, the
+    `tsx diff` label, the disclosure control) or, headerless, the corner cluster beside the
+    first line (FR3, FR11); line numbers in file coordinates with a gutter measured in the
+    code font's `ch`, highlighted lines (FR4, FR14); the diff layer with its marker column
+    and row paint from the syntax slots, a highlight replacing it (FR9); copy with its
+    feedback and the `code-block-copy` icon slot (FR2, FR15); `end_content` before Copy
+    (FR10); collapsing at the threshold (FR5); wrapping, max height, size, width
+    (fit-content: at least 400px or the space there is), container; the viewport scrolls on
+    both axes with a tab stop only while it overflows (FR8). Long code tokenizes in the
+    background and shows plain until then.
+    - Carried to M11: the collapse's height animation.
 - **M11 Motion & touch:** springs, decay, rubber-band, gesture recognizers on GPUI pointer and
   touch events, keyboard clearance, dragToSnapPoints.
   - Components: BottomSheet(+Switcher), Swipe, coarse-pointer variants (sheet-backed

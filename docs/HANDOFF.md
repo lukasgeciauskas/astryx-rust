@@ -5,15 +5,15 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M10 (Content): stage 1 done (the syntax engine and SyntaxTheme)._
+_Last updated: 2026-11-26, during M10 (Content): stages 1 and 2 done (the syntax engine and SyntaxTheme, CodeBlock)._
 
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8 and M9; M10 is under way (stage 1:
-  the syntax engine, `astryx-syntax`, and SyntaxTheme). Details and dates are in
+  the syntax engine, `astryx-syntax`, and SyntaxTheme; stage 2: CodeBlock). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 99 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 101 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** M9's eleven stages, from `a08759f` (fork patch R17,
   scroll chaining and scrollbars) through ScrollableArea, Resizable, Layout, the navs,
@@ -27,10 +27,10 @@ _Last updated: 2026-11-26, during M10 (Content): stage 1 done (the syntax engine
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (21)
+### Not yet ported (20)
 
 - **M10:** Chat,
-  ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
+  ChatDictationButton, ChatToolCalls, Markdown.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
   LinkProvider, MediaTheme, Theme. All five already exist as Rust APIs
   (`astryx_i18n::provider`, `astryx_primitives::layer`, `link_provider`,
@@ -47,7 +47,7 @@ _Last updated: 2026-11-26, during M10 (Content): stage 1 done (the syntax engine
 | Backdrop blur (Lightbox, scrims) | Fork patch R2 |
 | Table row expansion's `animatedLayout` glide (FR15) | Motion layer (M11) |
 | TreeList's `animatedLayout` and expand glide (FR8, FR9) | Motion layer (M11) |
-| Resizable's pane slide and rubber-band overshoot (FR8, AST-105 FR9); SideNav's rail reveal (FR6); TopNav's drawer groups' height (TopNavMenu FR7, TopNavMegaMenu FR9); AppShell's content swap (FR17) | Motion layer (M11) |
+| Resizable's pane slide and rubber-band overshoot (FR8, AST-105 FR9); SideNav's rail reveal (FR6); TopNav's drawer groups' height (TopNavMenu FR7, TopNavMegaMenu FR9); AppShell's content swap (FR17); CodeBlock's collapse (FR5) | Motion layer (M11) |
 | `useOutlineFromMarkdown` (Outline's items from a Markdown string, with Markdown's parser and heading slugs) | Markdown (M10) |
 | Native date and time pickers on macOS and Linux (`Native` shows the Astryx surface there) | Fork patch R16 built and checked on those platforms |
 
