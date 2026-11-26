@@ -6,6 +6,7 @@ pub mod breadcrumbs;
 pub mod button;
 pub mod calendar;
 pub mod carousel;
+pub mod chat;
 pub mod choice;
 pub mod code_block;
 pub mod collapsible;

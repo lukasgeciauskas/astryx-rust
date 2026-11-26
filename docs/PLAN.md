@@ -782,11 +782,13 @@ The remaining primitives:
        its fade-in, heading links, and `useOutlineFromMarkdown` (carried from M9).
     5. Chat's layout and messages: ChatLayout and its scroll button, ChatMessageList with
        stream scroll and new messages, ChatMessage, its bubble and metadata,
-       ChatSystemMessage, the typing indicator, the unread divider, the virtualizer.
+       ChatSystemMessage.
     6. The composer: ChatComposer, its input (tokens, trigger menus, history, paste as
        token), drawer, token element, ChatTokenizedText, ChatSendButton.
     7. ChatToolCalls, dictation (`useSpeechRecognition` behind a pluggable provider,
-       `useChatDictation`, ChatDictationButton), the emoji picker and the reaction bar.
+       `useChatDictation`, ChatDictationButton), and the Chat family's doc.
+    - The typing indicator, unread divider, virtualizer, emoji picker and reaction bar are
+      `@astryxdesign/lab` components, so they land with the lab in M13.
   - Stage 1 (done): the syntax engine, the new `astryx-syntax` crate. `tools/export/export-code.mjs`
     exports upstream's grammars (17 built-in grammars under 42 identifiers, and the 9
     language modules), the 12 syntax presets, and fixtures of upstream's own tokenizer over
@@ -850,6 +852,22 @@ The remaining primitives:
     settled blocks and never shows partial syntax, and each new span fades in over the
     medium duration. Also `useContainerReveal` (`container_reveal/`, which heading links
     use) and `useOutlineFromMarkdown` (carried from M9) in `outline/`.
+  - Stage 5 (done): Chat's layout and messages (`chat/`). ChatLayout scrolls its messages
+    with the composer docked at the bottom (sticky, fork patch R18), or follows an
+    ancestor's scroller (`scroll_handle`, upstream `scrollRef`); `useChatStreamScroll`
+    follows new content on upstream's spring while locked, lets go when the reader scrolls
+    up and locks again at the bottom, reading the scroller once a frame after layout;
+    `useChatNewMessages` notices a new last message while unlocked, and the default
+    ChatLayoutScrollButton fades in and widens to "New messages". ChatMessageList (the log,
+    density spacing, `gap`, `align`, the empty state, older messages loading as its top
+    comes into view), ChatMessage (sender alignment, avatar, name, metadata, the density
+    chain and context), ChatMessageBubble (sender paint, ghost, grouped corners, the
+    `max(80%, 280px)` cap from the measured column, name and metadata rows),
+    ChatMessageMetadata (timestamp, footer and status with its pulse) and
+    ChatSystemMessage (notice or labelled divider). Messages register with their layout,
+    as upstream finds them in the DOM.
+    - Carried to M11: `useChatKeyboard`'s virtual-keyboard lift (the touch layer's keyboard
+      clearance).
 - **M11 Motion & touch:** springs, decay, rubber-band, gesture recognizers on GPUI pointer and
   touch events, keyboard clearance, dragToSnapPoints.
   - Components: BottomSheet(+Switcher), Swipe, coarse-pointer variants (sheet-backed

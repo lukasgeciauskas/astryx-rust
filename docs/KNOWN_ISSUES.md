@@ -283,6 +283,11 @@
   spec, so their names are the port's; diagnostics are deduplicated per parse rather than
   per process. The Remark adapter runs a Rust function over the mdast subset as
   `serde_json` values. Offsets, spans and decoration ranges are UTF-8 bytes.
+- **Chat's log announces nothing itself (M10).** GPUI exposes no live-region property or
+  `aria-labelledby`, so ChatMessageList is a `log` role that a screen reader reads as the
+  platform reads logs, and a ChatMessage is named by its sender fallback, not its `name`.
+  The frosted dock has no blur (fork patch R2), and a bubble's name row lowers the avatar
+  a frame after it first renders.
 - **Grammar word boundaries are Unicode (M10).** CodeBlock's grammars use JS's ASCII `\b`;
   `fancy-regex` has no ASCII boundary, so a keyword directly beside a non-ASCII letter
   (`éfor`) can paint differently. `\w` and `\d` keep JS's ASCII meaning.

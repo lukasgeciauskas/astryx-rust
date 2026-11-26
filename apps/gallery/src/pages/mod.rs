@@ -33,6 +33,7 @@ pub enum Page {
     Tables,
     Dates,
     Shell,
+    Chat,
 }
 
 impl Page {
@@ -60,6 +61,7 @@ impl Page {
         Page::Tables,
         Page::Dates,
         Page::Shell,
+        Page::Chat,
     ];
 
     pub fn title(self) -> &'static str {
@@ -87,6 +89,7 @@ impl Page {
             Page::Tables => "Tables",
             Page::Dates => "Dates",
             Page::Shell => "Shell",
+            Page::Chat => "Chat",
         }
     }
 
@@ -149,6 +152,7 @@ impl Page {
                 .child(astryx::components::outline::examples::examples(window, cx))
                 .child(astryx::components::carousel::examples::examples(window, cx))
                 .into_any_element(),
+            Page::Chat => astryx::components::chat::examples::examples(window, cx),
             Page::Dates => gpui::div()
                 .flex()
                 .flex_col()
