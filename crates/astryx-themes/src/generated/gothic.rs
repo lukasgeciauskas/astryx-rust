@@ -3786,6 +3786,15 @@ pub const COMPONENTS: &[ComponentRule] = &[
 /// The gothic theme's adaptations to width and pointer.
 pub const ADAPTATIONS: &[Adaptation] = &[];
 
+/// The gothic theme's named width points.
+pub const WIDTH_BREAKPOINTS: WidthBreakpoints = WidthBreakpoints {
+    sm: 640.0,
+    md: 768.0,
+    lg: 1024.0,
+    xl: 1280.0,
+    xl2: 1536.0,
+};
+
 /// Token overrides for content on a dark surface.
 pub const ON_DARK: Option<SurfaceOverride> = Some(SurfaceOverride {
     appearance: Appearance::Dark,
@@ -4009,6 +4018,7 @@ pub fn theme() -> Theme {
         dark: DARK,
         components: Cow::Borrowed(COMPONENTS),
         adaptations: Cow::Borrowed(ADAPTATIONS),
+        width_breakpoints: WIDTH_BREAKPOINTS,
         on_dark: ON_DARK,
         on_light: ON_LIGHT,
         icons: Cow::Borrowed(ICONS),

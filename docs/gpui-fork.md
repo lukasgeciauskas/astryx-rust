@@ -56,6 +56,7 @@ Each patch lands before the components that need it.
 | R15 | Named nodes and `aria-controls` (**landed**, `52f7859`) | `aria_id(name)` names an element's node as an HTML `id` does; `aria_controls(names)` points at named nodes. Both are collected per frame and resolved when the tree is finished, so a relation may name a node that comes later; unknown names are skipped | A tree table's expanders and row expansion's toggles (M7) |
 | R16 | Native pickers (**landed**, `b39b0e1`) | `Window::show_native_picker(NativePickerRequest)` opens the platform's date, time or date-and-time picker below an anchor and answers `Picked` (an ISO value), `Cleared` or `Dismissed` through a channel; `native_picker_supported(kind)` says whether one exists | The native surfaces of DateInput, TimeInput and DateTimeInput (M8) |
 | R17 | Scroll chaining, overscroll containment and scrollbars (**landed**, `1aea36f`) | A scroll moves the innermost element that can take it and chains to its ancestor at an edge; `overscroll_contain` keeps it there; every scrolling `div` draws scrollbars (drag the thumb, press the track to page), auto-hiding where the platform does; `scrollbar_thin`, `scrollbar_none` and `scrollbar_color` follow CSS | ScrollableArea and the scrolling parts of Layout, the navs and AppShell (M9, AST-025 FR14 and FR15); every scroll region already ported |
+| R18 | Sticky positioning (**landed**, `5bf80b6`) | `sticky_top`, `sticky_bottom`, `sticky_left` and `sticky_right` follow CSS `position: sticky`: an element stays at its offset from its scrollport's edge while scrolling would carry it past, never leaving its parent; a sticky element draws and takes the pointer above its siblings | AppShell's `auto` header and side region (M9, AppShell FR6); later sticky table headers and columns |
 
 ### How each patch works
 
@@ -189,6 +190,17 @@ Each patch lands before the components that need it.
   - Default colors: a mid-gray thumb (more opaque while hovered or dragged) on a
     transparent track; `scrollbar_color` replaces both.
   - Example: `crates/gpui/examples/astryx_scrolling.rs`.
+- **R18 (sticky positioning), as built:**
+  - `Style::sticky` holds an optional offset per edge. In `Div::prepaint`, a sticky
+    element's delta is computed against the current content mask (its scrollport, the
+    nearest clip) and clamped to its parent's box, which every `Div` pushes onto
+    `Window::sticky_containers` while its children prepaint. A top (left) offset wins over
+    a bottom (right) one, as in CSS. The element's bounds and its children's offset move
+    by the delta, and `paint` applies the same delta.
+  - Paint order: each child reports during `request_layout` whether it is sticky; the
+    parent prepaints and paints sticky children after the rest, so they draw and take the
+    pointer above content scrolling under them.
+  - Example: `crates/gpui/examples/astryx_sticky.rs`; unit test `div::sticky_tests`.
 
 - **R2 (backdrop blur):**
   - A new scene primitive.

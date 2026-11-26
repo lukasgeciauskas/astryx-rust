@@ -242,6 +242,22 @@ pub fn render_theme(
         adaptations.join(",\n")
     )?;
 
+    let point = |key: &str, default: f64| {
+        breakpoints
+            .and_then(|b| b.get(key))
+            .and_then(Value::as_f64)
+            .unwrap_or(default)
+    };
+    writeln!(
+        out,
+        "/// The {name} theme's named width points.\npub const WIDTH_BREAKPOINTS: WidthBreakpoints = WidthBreakpoints {{ sm: {}, md: {}, lg: {}, xl: {}, xl2: {} }};\n",
+        literal::float(point("sm", 640.)),
+        literal::float(point("md", 768.)),
+        literal::float(point("lg", 1024.)),
+        literal::float(point("xl", 1280.)),
+        literal::float(point("2xl", 1536.)),
+    )?;
+
     for (key, constant) in [("onDark", "ON_DARK"), ("onLight", "ON_LIGHT")] {
         let value = match theme[key].as_object() {
             None => "None".to_string(),
@@ -306,7 +322,7 @@ pub fn render_theme(
 
     writeln!(
         out,
-        "/// The {name} theme.\npub fn theme() -> Theme {{\n    Theme {{\n        name: Cow::Borrowed({name:?}),\n        light: LIGHT,\n        dark: DARK,\n        components: Cow::Borrowed(COMPONENTS),\n        adaptations: Cow::Borrowed(ADAPTATIONS),\n        on_dark: ON_DARK,\n        on_light: ON_LIGHT,\n        icons: Cow::Borrowed(ICONS),\n        fonts: Cow::Borrowed(FONTS),\n    }}\n}}"
+        "/// The {name} theme.\npub fn theme() -> Theme {{\n    Theme {{\n        name: Cow::Borrowed({name:?}),\n        light: LIGHT,\n        dark: DARK,\n        components: Cow::Borrowed(COMPONENTS),\n        adaptations: Cow::Borrowed(ADAPTATIONS),\n        width_breakpoints: WIDTH_BREAKPOINTS,\n        on_dark: ON_DARK,\n        on_light: ON_LIGHT,\n        icons: Cow::Borrowed(ICONS),\n        fonts: Cow::Borrowed(FONTS),\n    }}\n}}"
     )?;
     Ok(ThemeOutput { module: out, todo })
 }

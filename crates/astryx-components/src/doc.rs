@@ -72,6 +72,8 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::side_nav::SIDE_NAV_HEADING_DOC,
     crate::side_nav::SIDE_NAV_COLLAPSE_BUTTON_DOC,
     crate::mobile_nav::MOBILE_NAV_DOC,
+    crate::app_shell::APP_SHELL_DOC,
+    crate::app_shell::USE_APP_SHELL_MOBILE_DOC,
     crate::top_nav::TOP_NAV_DOC,
     crate::top_nav::TOP_NAV_HEADING_DOC,
     crate::top_nav::TOP_NAV_ITEM_DOC,

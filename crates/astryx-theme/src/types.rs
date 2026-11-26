@@ -334,6 +334,46 @@ pub enum Pointer {
     Coarse,
 }
 
+/// Upstream `widthBreakpoints`: the theme's named width points, in pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WidthBreakpoints {
+    pub sm: f32,
+    pub md: f32,
+    pub lg: f32,
+    pub xl: f32,
+    /// Upstream `2xl`.
+    pub xl2: f32,
+}
+
+impl WidthBreakpoints {
+    /// Upstream `DEFAULT_WIDTH_BREAKPOINTS`.
+    pub const DEFAULT: WidthBreakpoints = WidthBreakpoints {
+        sm: 640.,
+        md: 768.,
+        lg: 1024.,
+        xl: 1280.,
+        xl2: 1536.,
+    };
+
+    /// The point named `name` (`sm`, `md`, `lg`, `xl` or `2xl`).
+    pub fn get(&self, name: &str) -> Option<f32> {
+        match name {
+            "sm" => Some(self.sm),
+            "md" => Some(self.md),
+            "lg" => Some(self.lg),
+            "xl" => Some(self.xl),
+            "2xl" => Some(self.xl2),
+            _ => None,
+        }
+    }
+}
+
+impl Default for WidthBreakpoints {
+    fn default() -> Self {
+        WidthBreakpoints::DEFAULT
+    }
+}
+
 /// Token overrides that apply at some window widths or pointer kinds.
 #[derive(Clone, Debug)]
 pub struct Adaptation {

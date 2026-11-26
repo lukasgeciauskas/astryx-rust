@@ -5,15 +5,15 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 8 done (R17, ScrollableArea, Resizable, Layout, NavIcon and NavHeadingMenu, SideNav, TopNav, MobileNav)._
+_Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 9 done (R17, ScrollableArea, Resizable, Layout, NavIcon and NavHeadingMenu, SideNav, TopNav, MobileNav, AppShell with R18)._
 
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7 and M8; M9 is under way (stage 1:
-  scroll chaining and scrollbars, fork patch R17; stage 2: ScrollableArea and its hook; stage 3: Resizable; stage 4: Layout; stage 5: NavIcon and NavHeadingMenu; stage 6: SideNav; stage 7: TopNav; stage 8: MobileNav). Details and dates are in
+  scroll chaining and scrollbars, fork patch R17; stage 2: ScrollableArea and its hook; stage 3: Resizable; stage 4: Layout; stage 5: NavIcon and NavHeadingMenu; stage 6: SideNav; stage 7: TopNav; stage 8: MobileNav; stage 9: AppShell and fork patch R18, sticky positioning). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 96 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 97 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** M8's stages, from `90581cb` (calendar systems and
   Calendar) through the pointer fields, DateRangeInput, the wheels and the three bottom
@@ -21,15 +21,15 @@ _Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 8 done (R
   ubuntu, windows and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
-  `1aea36f6c5d49b4e82dba459a7e6dd7c5150e6c1` (patches R1 and R5 to R17; see
+  `5bf80b680955ffad05565b5b1eeb2dcf4115794d` (patches R1 and R5 to R18; see
   [`gpui-fork.md`](gpui-fork.md)). The `[patch.crates-io]` block in
   `Cargo.toml` (async-task, calloop) is legitimate and stays.
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (24)
+### Not yet ported (23)
 
-- **M9:** AppShell, Carousel,
+- **M9:** Carousel,
   Outline. **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
@@ -48,7 +48,7 @@ _Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 8 done (R
 | Backdrop blur (Lightbox, scrims) | Fork patch R2 |
 | Table row expansion's `animatedLayout` glide (FR15) | Motion layer (M11) |
 | TreeList's `animatedLayout` and expand glide (FR8, FR9) | Motion layer (M11) |
-| Resizable's pane slide and rubber-band overshoot (FR8, AST-105 FR9); SideNav's rail reveal (FR6); TopNav's drawer groups' height (TopNavMenu FR7, TopNavMegaMenu FR9) | Motion layer (M11) |
+| Resizable's pane slide and rubber-band overshoot (FR8, AST-105 FR9); SideNav's rail reveal (FR6); TopNav's drawer groups' height (TopNavMenu FR7, TopNavMegaMenu FR9); AppShell's content swap (FR17) | Motion layer (M11) |
 | Native date and time pickers on macOS and Linux (`Native` shows the Astryx surface there) | Fork patch R16 built and checked on those platforms |
 
 ## The owner's standing instructions

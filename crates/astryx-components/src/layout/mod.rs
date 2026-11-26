@@ -18,11 +18,11 @@ pub use misc::{
     AspectFit, AspectRatio, AspectShape, Center, CenterAxis, Divider, DividerVariant, Orientation,
     VisuallyHidden,
 };
-pub(crate) use regions::padding_container;
 pub use regions::{
     Layout, LayoutArea, LayoutContainerKind, LayoutContent, LayoutDividerDefault, LayoutFooter,
     LayoutHeader, LayoutHeight, LayoutPanel, LayoutSlots, PaddingContainer,
 };
+pub(crate) use regions::{layout_reset, padding_container};
 pub(crate) use spacing::host_children;
 pub use spacing::{
     ContainerChild, ContainerCorners, ContainerPadding, Padding, Sizing, SpacingStep,

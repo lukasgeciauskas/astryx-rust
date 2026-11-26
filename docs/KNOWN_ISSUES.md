@@ -241,9 +241,11 @@
   so a headless capture shows the native field but not the popup. The Windows popups
   were captured from the gallery and the fork's `astryx_native_picker` example.
 
-- **Nothing sticks, so sticky containment has no effect (M9).** GPUI has no
-  `position: sticky`; ScrollableArea's `sticky_containment` (and the hook's option) is
-  accepted and both values behave alike. Table pins its sticky columns itself.
+- **Sticky containment has no effect (M9).** Fork patch R18 brings `position: sticky`, but
+  a ScrollableArea's viewport always clips, so it is always its descendants' sticky
+  boundary: `sticky_containment: when_scrollable` (a fitting viewport lets sticky
+  descendants reach an outer scroller) behaves like `always`. Table pins its sticky
+  columns itself.
 - **A named scroll viewport keeps its own tab stop (M9).** Upstream's
   `contentOrViewport` hands forward Tab entry to a lone leading native button or link
   inside; GPUI's focus handles carry no element kind, so the viewport stays a stop.
@@ -251,6 +253,10 @@
   Table's and Tokenizer's fades (AST-025 FR22) are gradient overlays in
   `background-body`; on another surface that color shows at the edge.
 
+- **No safe-area insets, ids or `aria-controls` in AppShell (M9).** GPUI reports no
+  display cutouts, so AppShell's `env(safe-area-inset-*)` padding is zero; and GPUI
+  elements have no DOM ids, so the main region's id, the drawer id and the toggle's
+  `aria-controls` have no form (the skip link moves focus to the main region directly).
 - **MobileNav's `side: auto` reads the pointer, not the focused element (M9).** Upstream
   resolves the side from the focused opener's half of the viewport. GPUI cannot report an
   element's bounds from its focus handle, so a drawer opened by a pointer uses the
@@ -258,7 +264,8 @@
   keeps its last side, as upstream does when nothing is focused.
 - **A resizable pane, the SideNav rail and TopNav's drawer groups jump rather than slide
   (M9, until M11).** Upstream reveals SideNav's rail as it collapses or expands (SideNav
-  FR6), grows the height of a TopNavMenu's or TopNavMegaMenu's group in the phone's drawer
+  FR6) while AppShell's content area swaps its old wrap for the new one in place (AppShell
+  FR17), grows the height of a TopNavMenu's or TopNavMegaMenu's group in the phone's drawer
   as it expands (TopNavMenu FR7, TopNavMegaMenu FR9), and slides a pane
   that collapses or opens on the animated-layout system's edge reveal (Resizable FR8,
   AST-105 FR9) and draws a pull past a bound as an 8 px rubber band that springs back;

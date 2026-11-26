@@ -89,6 +89,31 @@ pub(crate) struct LayoutFrame {
     area: LayoutArea,
 }
 
+/// The layer contexts a Layout reads, each unset at a layout root (Layout FR8).
+#[derive(Clone)]
+struct FrameSlot(Option<LayoutFrame>);
+
+#[derive(Clone, Copy)]
+struct KindSlot(Option<LayoutContainerKind>);
+
+#[derive(Clone, Copy)]
+struct PaddingSlot(Option<ContainerPadding>);
+
+/// Upstream `layoutReset` (Layout FR8): below a layout root (AppShell), a Layout lays out
+/// as at the page root. The published container padding and corners reset to zero; the
+/// container, its padding, the frame and the divider default are unset.
+pub(crate) fn layout_reset(child: impl IntoElement, cx: &App) -> AnyElement {
+    let child = provide(
+        ContainerPadding::default(),
+        provide(ContainerCorners::default(), child),
+    )
+    .into_any_element();
+    let child = provide_in_layer(FrameSlot(None), child, cx).into_any_element();
+    let child = provide_in_layer(KindSlot(None), child, cx).into_any_element();
+    let child = provide_in_layer(PaddingSlot(None), child, cx).into_any_element();
+    provide_in_layer(LayoutDividerDefault(None), child, cx).into_any_element()
+}
+
 /// Every edge the same.
 fn all(len: Pixels) -> ContainerPadding {
     ContainerPadding {
@@ -106,11 +131,13 @@ fn step_px(step: SpacingStep, window: &Window, cx: &App) -> Pixels {
 
 /// The frame of the nearest Layout in the area the region sits in.
 fn frame(cx: &App) -> Option<LayoutFrame> {
-    use_layer_context::<LayoutFrame>(cx)
+    use_layer_context::<FrameSlot>(cx).and_then(|s| s.0)
 }
 
 fn container_kind(cx: &App) -> &'static str {
-    use_layer_context::<LayoutContainerKind>(cx).map_or("", |k| k.as_str())
+    use_layer_context::<KindSlot>(cx)
+        .and_then(|k| k.0)
+        .map_or("", |k| k.as_str())
 }
 
 /// Provides a container's kind and padding to a Layout inside it, in its layer.
@@ -120,9 +147,9 @@ pub(crate) fn padding_container(
     child: impl IntoElement,
     cx: &App,
 ) -> AnyElement {
-    let child = provide_in_layer(PaddingContainer(padding), child, cx).into_any_element();
+    let child = provide_in_layer(PaddingSlot(Some(padding)), child, cx).into_any_element();
     match kind {
-        Some(kind) => provide_in_layer(kind, child, cx).into_any_element(),
+        Some(kind) => provide_in_layer(KindSlot(Some(kind)), child, cx).into_any_element(),
         None => child,
     }
 }
@@ -259,7 +286,7 @@ impl RenderOnce for Layout {
         let theme = current(window, cx);
         let dir = use_direction(cx);
         let parent = use_context::<ContainerPadding>(cx).unwrap_or_default();
-        let container = use_layer_context::<PaddingContainer>(cx).map(|c| c.0);
+        let container = use_layer_context::<PaddingSlot>(cx).and_then(|c| c.0);
         let step4 = all(step_px(SpacingStep::S4, window, cx));
         let inner = container.unwrap_or(step4);
         let edge = match self.padding {
@@ -274,14 +301,16 @@ impl RenderOnce for Layout {
         };
         let (header_divider, footer_divider) =
             (Rc::new(Cell::new(false)), Rc::new(Cell::new(false)));
-        let frame = |area| LayoutFrame {
-            edge,
-            inner,
-            slots,
-            content_width: self.content_width,
-            header_divider: header_divider.clone(),
-            footer_divider: footer_divider.clone(),
-            area,
+        let frame = |area| {
+            FrameSlot(Some(LayoutFrame {
+                edge,
+                inner,
+                slots,
+                content_width: self.content_width,
+                header_divider: header_divider.clone(),
+                footer_divider: footer_divider.clone(),
+                area,
+            }))
         };
         let content = self.content.or_else(|| {
             (!self.children.is_empty()).then(|| div().children(self.children).into_any_element())

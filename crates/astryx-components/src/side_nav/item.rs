@@ -17,9 +17,10 @@ use gpui::{
     Role, SharedString, StyleRefinement, Styled, Window, div, prelude::*, px,
 };
 
-use super::{Action, ItemDepth, SideNavCollapse};
+use super::{Action, ItemDepth, SideNavCollapse, SideNavRenderMode};
 use crate::button::{ButtonVariant, IconButton};
 use crate::icon::{Icon, IconColor, IconSize};
+use crate::nav::{close_drawer_after, drawer_close};
 use crate::overlay::{Popover, PopoverController, Tooltip};
 
 type BoolFn = Rc<dyn Fn(bool, &mut Window, &mut App)>;
@@ -404,11 +405,20 @@ impl RenderOnce for SideNavItem {
         }
         if !self.disabled {
             let (toggle, activate) = (toggle_item.clone(), activate.clone());
-            row = row.on_click(move |_, window, cx| {
+            // In AppShell's drawer a row's activation closes it, except a modified
+            // click on a link.
+            let in_drawer = matches!(
+                use_context::<SideNavRenderMode>(cx),
+                Some(SideNavRenderMode::Drawer | SideNavRenderMode::DrawerContent)
+            );
+            let close = if in_drawer { drawer_close(cx) } else { None };
+            let is_link = self.href.is_some();
+            row = row.on_click(move |event, window, cx| {
                 if collapsible && !independent {
                     toggle(window, cx);
                 } else {
                     activate(window, cx);
+                    close_drawer_after(&close, is_link, &event.modifiers(), window, cx);
                 }
             });
         }

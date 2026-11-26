@@ -30,6 +30,8 @@ pub struct Theme {
     pub dark: Tokens,
     pub components: Cow<'static, [ComponentRule]>,
     pub adaptations: Cow<'static, [Adaptation]>,
+    /// Upstream `widthBreakpoints`: the named width points AppShell's mobile layout uses.
+    pub width_breakpoints: WidthBreakpoints,
     pub on_dark: Option<SurfaceOverride>,
     pub on_light: Option<SurfaceOverride>,
     /// Semantic icon name to the asset path of the SVG it draws.
@@ -47,6 +49,7 @@ impl Default for Theme {
             dark: default_theme::DARK,
             components: Cow::Borrowed(&[]),
             adaptations: Cow::Borrowed(&[]),
+            width_breakpoints: WidthBreakpoints::DEFAULT,
             on_dark: None,
             on_light: None,
             icons: Cow::Borrowed(&[]),

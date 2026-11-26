@@ -723,6 +723,22 @@ The remaining primitives:
     half of the window (FR8). The toggle shows only in AppShell's mobile layout (FR11).
     TopNav's drawer is now a MobileNav headed by its heading, and its phone bar carries the
     toggle (TopNav FR5, FR6); every drawer row closes the drawer through the context.
+  - Stage 9 (done): AppShell and `useAppShellMobile` (`app_shell/`), with fork patch R18
+    (`position: sticky`). The skip link, then a Layout of the header region (banner above
+    the top nav, `role="banner"`), the side region and the main region (`role="main"`,
+    `content_padding`, a scroll region in `fill` whose tab stop exists only while it
+    overflows), then the drawer (FR1-FR5). `fill` fills its parent (the window, for the
+    outermost frame); `auto` grows and its header sticks at the top of the page with the
+    side region sticky below it (FR6). Variant backgrounds and the elevated content's page
+    corner (FR7, FR16). Below the theme's width point (`widthBreakpoints`, now on
+    `Theme`): the side nav leaves the inline region, the top nav becomes the phone's bar
+    carrying the side nav into its drawer, or a side-nav-only bar with its toggle; the
+    auto drawer, a node, or the config's content; `false` (FR8-FR12). It provides
+    `AppShellMobile` (FR13) and resets the Layout contexts at its root (FR18). Slots are
+    builders, since a nav draws more than once. SideNav's drawer is now a MobileNav, and
+    its rows close the drawer. `defaultIsMobile` (an SSR hint) has no native form: the
+    first frame reads the window.
+    - Carried to M11: the content area's swap as the side nav collapses (FR17).
 - **M10 Content:**
   - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
     URL safety.

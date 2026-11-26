@@ -16,6 +16,7 @@ use gpui::{
 };
 
 use super::{SideNavCollapse, SideNavCollapseButton, SideNavRenderMode};
+use crate::mobile_nav::MobileNav;
 use crate::resizable::{
     ResizableRegion, ResizeHandle, ResizeHandlePosition, UseResizable, use_resizable,
 };
@@ -304,37 +305,40 @@ impl RenderOnce for SideNav {
             }
             SideNavRenderMode::Drawer | SideNavRenderMode::DrawerContent => {
                 let has_footer = self.footer.is_some() || self.footer_icons.is_some();
-                return provide(
-                    SideNavCollapse::expanded(),
-                    div()
-                        .flex()
-                        .flex_col()
-                        .children(self.header.filter(|_| mode == SideNavRenderMode::Drawer))
-                        .children(self.top_content)
-                        .children(self.children)
-                        .when(has_footer, |d| {
-                            d.child(
-                                div()
-                                    .flex()
-                                    .flex_col()
-                                    .mt_auto()
-                                    .gap(t.spacing.s2)
-                                    .pt(t.spacing.s2)
-                                    .children(self.footer)
-                                    .children(self.footer_icons.map(|icons| {
-                                        provide(
-                                            ElementSize::Sm,
-                                            div()
-                                                .flex()
-                                                .items_center()
-                                                .gap(t.spacing.s1)
-                                                .child(icons),
-                                        )
-                                    })),
-                            )
-                        }),
-                )
-                .into_any_element();
+                let body = div()
+                    .flex()
+                    .flex_col()
+                    .children(self.top_content)
+                    .children(self.children)
+                    .when(has_footer, |d| {
+                        d.child(
+                            div()
+                                .flex()
+                                .flex_col()
+                                .mt_auto()
+                                .gap(t.spacing.s2)
+                                .pt(t.spacing.s2)
+                                .children(self.footer)
+                                .children(self.footer_icons.map(|icons| {
+                                    provide(
+                                        ElementSize::Sm,
+                                        div().flex().items_center().gap(t.spacing.s1).child(icons),
+                                    )
+                                })),
+                        )
+                    });
+                let body = provide(SideNavCollapse::expanded(), body);
+                // The drawer: a MobileNav headed by the header (upstream MobileNavDrawer).
+                if mode == SideNavRenderMode::Drawer {
+                    let mut drawer =
+                        MobileNav::new(ElementId::Name(format!("{}-drawer", self.id).into()));
+                    if let Some(header) = self.header {
+                        drawer = drawer.header(header);
+                    }
+                    drawer.style().refine(&self.style);
+                    return drawer.child(body).into_any_element();
+                }
+                return body.into_any_element();
             }
             SideNavRenderMode::Rail => {}
         }

@@ -319,6 +319,22 @@ impl Theme {
             )?,
             components: Cow::Owned(rules(&spec["components"])?),
             adaptations: Cow::Owned(adaptations),
+            width_breakpoints: {
+                let point = |name: &str, default: f32| {
+                    breakpoints
+                        .and_then(|b| b.get(name))
+                        .and_then(Value::as_f64)
+                        .map_or(default, |v| v as f32)
+                };
+                let d = WidthBreakpoints::DEFAULT;
+                WidthBreakpoints {
+                    sm: point("sm", d.sm),
+                    md: point("md", d.md),
+                    lg: point("lg", d.lg),
+                    xl: point("xl", d.xl),
+                    xl2: point("2xl", d.xl2),
+                }
+            },
             on_dark: surface(&spec["onDark"])?,
             on_light: surface(&spec["onLight"])?,
             icons: base.icons.clone(),

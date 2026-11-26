@@ -18,6 +18,7 @@ pub use heading::TopNavHeading;
 pub use item::TopNavItem;
 pub use mega::{TopNavMegaMenu, TopNavMegaMenuFeaturedCard, TopNavMegaMenuItem};
 pub use menu::{TopNavMenu, TopNavMenuItemData};
+pub(crate) use top_nav::TopNavMobileContent;
 pub use top_nav::{TopNav, TopNavRenderMode, TopNavSlot};
 
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
