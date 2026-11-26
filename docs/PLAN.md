@@ -712,6 +712,17 @@ The remaining primitives:
     headed by a button that closes it). NavHeadingMenu now keeps one roving tab stop.
     - Carried to M11: the drawer groups' height animation (TopNavMenu FR7, TopNavMegaMenu
       FR9).
+  - Stage 8 (done): MobileNav and MobileNavToggle (`mobile_nav/`), with
+    `app_shell::AppShellMobile` (upstream `AppShellMobileContext`, `useAppShellMobile`) that
+    AppShell will provide. A modal layer on the shared modal pieces: the drawer slides in
+    from its inline edge over the theme's overlay dim (FR7, FR13), at most 85% of the
+    window wide (FR9), with a header (a string as a level-2 heading that names it, FR10)
+    and close button above a scrolling navigation landmark (FR14). Controlled, or AppShell's
+    state (FR2); Escape, the backdrop and the close button close it (FR4); the dialog closes
+    by 250 ms while the drawer slides out inert (FR5); `side: auto` follows the opener's
+    half of the window (FR8). The toggle shows only in AppShell's mobile layout (FR11).
+    TopNav's drawer is now a MobileNav headed by its heading, and its phone bar carries the
+    toggle (TopNav FR5, FR6); every drawer row closes the drawer through the context.
 - **M10 Content:**
   - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
     URL safety.

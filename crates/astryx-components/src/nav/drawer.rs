@@ -6,18 +6,19 @@ use std::rc::Rc;
 
 use astryx_primitives::{ElementSize, use_context};
 use astryx_theme::{ThemeStyled, Tokens};
+
+use crate::app_shell::AppShellMobile;
 use gpui::{App, Div, FontWeight, Modifiers, Stateful, Styled, Window};
 
 type Action = Rc<dyn Fn(&mut Window, &mut App)>;
 
-/// Upstream `AppShellMobileContext.closeMobileNav`: AppShell provides it around its
-/// mobile drawer.
-#[derive(Clone)]
-pub(crate) struct MobileDrawerClose(pub Action);
-
-/// The drawer's close, read while rendering a row (None outside a drawer).
+/// The AppShell drawer's close (upstream `closeMobileNav`), read while rendering a row;
+/// None outside an AppShell.
 pub(crate) fn drawer_close(cx: &App) -> Option<Action> {
-    use_context::<MobileDrawerClose>(cx).map(|c| c.0)
+    use_context::<AppShellMobile>(cx).map(|shell| {
+        let set = shell.set_open.clone();
+        Rc::new(move |window: &mut Window, cx: &mut App| set(false, window, cx)) as Action
+    })
 }
 
 /// Upstream `isModifiedClick`: Ctrl, Cmd, Shift or Alt held.

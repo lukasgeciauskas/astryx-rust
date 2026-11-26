@@ -16,7 +16,9 @@ use gpui::{
 };
 
 use super::hover::HoverGroup;
+use crate::app_shell::use_app_shell_mobile;
 use crate::layout::Divider;
+use crate::mobile_nav::{MobileNav, MobileNavToggle};
 
 /// The slot a TopNav part sits in (FR7): a menu's panel aligns to it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -158,28 +160,39 @@ impl RenderOnce for TopNav {
 
         match mode {
             // FR5: the heading yields width first; start and center content do not render.
-            TopNavRenderMode::MobileBar => landmark("mobile-bar")
-                .children(self.heading.map(|heading| {
-                    div()
-                        .flex()
-                        .items_center()
-                        .flex_grow_0()
-                        .flex_shrink(1.)
-                        .min_w_0()
-                        .truncate()
-                        .child(heading)
-                }))
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(t.spacing.s1)
-                        .flex_none()
-                        .ml_auto()
-                        .max_w_full()
-                        .children(self.end),
-                )
-                .into_any_element(),
+            TopNavRenderMode::MobileBar => {
+                // FR5: the toggle shows when the drawer has content and toggles are automatic.
+                let has_drawer_content = !start.is_empty()
+                    || self.center.is_some()
+                    || use_context::<TopNavMobileContent>(cx).is_some();
+                let toggle =
+                    (has_drawer_content && use_app_shell_mobile(cx).has_auto_toggle).then(|| {
+                        MobileNavToggle::new(ElementId::Name(format!("{}-toggle", self.id).into()))
+                    });
+                landmark("mobile-bar")
+                    .children(self.heading.map(|heading| {
+                        div()
+                            .flex()
+                            .items_center()
+                            .flex_grow_0()
+                            .flex_shrink(1.)
+                            .min_w_0()
+                            .truncate()
+                            .child(heading)
+                    }))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(t.spacing.s1)
+                            .flex_none()
+                            .ml_auto()
+                            .max_w_full()
+                            .children(self.end)
+                            .children(toggle),
+                    )
+                    .into_any_element()
+            }
             // FR6: the drawer's content: start then center content in a list, a divider,
             // then any side nav content AppShell passes. With neither, nothing.
             TopNavRenderMode::Drawer => {
@@ -189,12 +202,12 @@ impl RenderOnce for TopNav {
                     return div().into_any_element();
                 }
                 let divider = has_items && mobile.is_some();
-                div()
-                    .id(self.id.clone())
-                    .flex()
-                    .flex_col()
-                    .w_full()
-                    .children(self.heading)
+                let mut drawer =
+                    MobileNav::new(ElementId::Name(format!("{}-drawer", self.id).into()));
+                if let Some(heading) = self.heading {
+                    drawer = drawer.header(heading);
+                }
+                drawer
                     .when(has_items, |el| {
                         el.child(
                             div()

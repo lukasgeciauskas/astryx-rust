@@ -4,6 +4,8 @@ use astryx_primitives::provide;
 use astryx_theme::current;
 use gpui::{AnyElement, App, IntoElement, ParentElement, Styled, Window, div};
 
+use crate::app_shell::AppShellMobile;
+
 use super::{
     TopNav, TopNavHeading, TopNavItem, TopNavMegaMenu, TopNavMegaMenuFeaturedCard,
     TopNavMegaMenuItem, TopNavMenu, TopNavMenuItemData, TopNavRenderMode,
@@ -139,19 +141,25 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                 .into_any_element(),
         ))
         .child(
-            Text::new("The phone's bar, and the drawer's content").text_type(TextType::Supporting),
+            Text::new("The phone's bar: its toggle opens the drawer")
+                .text_type(TextType::Supporting),
         )
-        .child(frame(
-            provide(TopNavRenderMode::MobileBar, bar("top-nav-phone")).into_any_element(),
-        ))
-        .child(
-            div().w(gpui::px(320.)).child(frame(
-                provide(
-                    TopNavRenderMode::Drawer,
-                    div().p(gpui::px(8.)).child(bar("top-nav-drawer")),
-                )
-                .into_any_element(),
-            )),
-        )
+        .child(frame({
+            let state = window.use_keyed_state("top-nav-example-drawer", cx, |_, _| false);
+            let is_open = *state.read(cx);
+            let shell = AppShellMobile::new(is_open, move |open, _, cx| {
+                state.update(cx, |s, cx| {
+                    *s = open;
+                    cx.notify();
+                })
+            });
+            provide(
+                shell,
+                div()
+                    .child(provide(TopNavRenderMode::MobileBar, bar("top-nav-phone")))
+                    .child(provide(TopNavRenderMode::Drawer, bar("top-nav-drawer"))),
+            )
+            .into_any_element()
+        }))
         .into_any_element()
 }

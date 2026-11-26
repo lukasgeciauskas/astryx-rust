@@ -251,6 +251,11 @@
   Table's and Tokenizer's fades (AST-025 FR22) are gradient overlays in
   `background-body`; on another surface that color shows at the edge.
 
+- **MobileNav's `side: auto` reads the pointer, not the focused element (M9).** Upstream
+  resolves the side from the focused opener's half of the viewport. GPUI cannot report an
+  element's bounds from its focus handle, so a drawer opened by a pointer uses the
+  pointer's half, one opened from the keyboard uses AppShell's toggle, and otherwise it
+  keeps its last side, as upstream does when nothing is focused.
 - **A resizable pane, the SideNav rail and TopNav's drawer groups jump rather than slide
   (M9, until M11).** Upstream reveals SideNav's rail as it collapses or expands (SideNav
   FR6), grows the height of a TopNavMenu's or TopNavMegaMenu's group in the phone's drawer

@@ -13,7 +13,7 @@ mod hover_card;
 mod info_tip;
 mod lightbox;
 mod menu;
-mod modal;
+pub(crate) mod modal;
 mod motion;
 mod popover;
 mod scrim;

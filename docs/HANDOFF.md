@@ -5,15 +5,15 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 7 done (R17, ScrollableArea, Resizable, Layout, NavIcon and NavHeadingMenu, SideNav, TopNav)._
+_Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 8 done (R17, ScrollableArea, Resizable, Layout, NavIcon and NavHeadingMenu, SideNav, TopNav, MobileNav)._
 
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7 and M8; M9 is under way (stage 1:
-  scroll chaining and scrollbars, fork patch R17; stage 2: ScrollableArea and its hook; stage 3: Resizable; stage 4: Layout; stage 5: NavIcon and NavHeadingMenu; stage 6: SideNav; stage 7: TopNav). Details and dates are in
+  scroll chaining and scrollbars, fork patch R17; stage 2: ScrollableArea and its hook; stage 3: Resizable; stage 4: Layout; stage 5: NavIcon and NavHeadingMenu; stage 6: SideNav; stage 7: TopNav; stage 8: MobileNav). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 95 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 96 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** M8's stages, from `90581cb` (calendar systems and
   Calendar) through the pointer fields, DateRangeInput, the wheels and the three bottom
@@ -27,10 +27,10 @@ _Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 7 done (R
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (25)
+### Not yet ported (24)
 
 - **M9:** AppShell, Carousel,
-  MobileNav, Outline. **M10:** Chat,
+  Outline. **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
   LinkProvider, MediaTheme, SyntaxTheme, Theme. The first five already exist as

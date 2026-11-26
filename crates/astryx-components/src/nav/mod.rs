@@ -9,11 +9,8 @@ mod menu;
 #[cfg(test)]
 mod tests;
 
-pub use icon::NavIcon;
-// AppShell provides the drawer's close around its mobile drawer.
-#[cfg_attr(not(test), allow(unused_imports))]
-pub(crate) use drawer::MobileDrawerClose;
 pub(crate) use drawer::{close_drawer_after, drawer_close, nav_item_row};
+pub use icon::NavIcon;
 pub(crate) use menu::{NavHeadingClose, NavHeadingDismiss, NavHeadingMenuHost};
 pub use menu::{NavHeadingMenu, NavHeadingMenuItem, NavHeadingMenuSize};
 

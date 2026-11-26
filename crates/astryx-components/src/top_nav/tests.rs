@@ -11,7 +11,7 @@ use gpui::{
 };
 
 use super::*;
-use crate::nav::MobileDrawerClose;
+use crate::app_shell::AppShellMobile;
 use crate::segmented::tests::host;
 
 type Log = Rc<RefCell<Vec<String>>>;
@@ -109,12 +109,15 @@ fn fr5_the_phones_bar_keeps_the_heading_and_end_content(cx: &mut TestAppContext)
         cx,
         page(|| {
             provide(
-                TopNavRenderMode::MobileBar,
-                TopNav::new("nav")
-                    .heading(TopNavHeading::new("brand").heading("Astryx"))
-                    .start_content(TopNavItem::new("start", "Start"))
-                    .start_content(TopNavMenu::new("menu", "Menu", menu_items()))
-                    .end_content(TopNavItem::new("end", "End")),
+                AppShellMobile::new(false, |_, _, _| {}),
+                provide(
+                    TopNavRenderMode::MobileBar,
+                    TopNav::new("nav")
+                        .heading(TopNavHeading::new("brand").heading("Astryx"))
+                        .start_content(TopNavItem::new("start", "Start"))
+                        .start_content(TopNavMenu::new("menu", "Menu", menu_items()))
+                        .end_content(TopNavItem::new("end", "End")),
+                ),
             )
             .into_any_element()
         }),
@@ -122,6 +125,10 @@ fn fr5_the_phones_bar_keeps_the_heading_and_end_content(cx: &mut TestAppContext)
     settle(cx);
     assert!(shown(cx, "brand"));
     assert!(shown(cx, "end"));
+    assert!(
+        shown(cx, "nav-toggle"),
+        "the drawer has content: the toggle shows"
+    );
     assert!(!shown(cx, "start"), "start content does not render");
     assert!(
         !shown(cx, "menu"),
@@ -134,18 +141,24 @@ fn fr6_the_drawer_renders_nothing_without_items(cx: &mut TestAppContext) {
     let cx = host(
         cx,
         page(|| {
-            div()
-                .child(provide(
-                    TopNavRenderMode::Drawer,
-                    TopNav::new("empty").heading(TopNavHeading::new("lonely").heading("Astryx")),
-                ))
-                .child(provide(
-                    TopNavRenderMode::Drawer,
-                    TopNav::new("full")
-                        .heading(TopNavHeading::new("brand").heading("Astryx"))
-                        .start_content(TopNavItem::new("item", "Item")),
-                ))
-                .into_any_element()
+            let open = AppShellMobile::new(true, |_, _, _| {});
+            provide(
+                open,
+                div()
+                    .child(provide(
+                        TopNavRenderMode::Drawer,
+                        TopNav::new("empty")
+                            .heading(TopNavHeading::new("lonely").heading("Astryx")),
+                    ))
+                    .child(provide(
+                        TopNavRenderMode::Drawer,
+                        TopNav::new("full")
+                            .heading(TopNavHeading::new("brand").heading("Astryx"))
+                            .start_content(TopNavItem::new("item", "Item")),
+                    ))
+                    .into_any_element(),
+            )
+            .into_any_element()
         }),
     );
     settle(cx);
@@ -153,6 +166,7 @@ fn fr6_the_drawer_renders_nothing_without_items(cx: &mut TestAppContext) {
         !shown(cx, "lonely"),
         "no items and no side nav content: nothing"
     );
+    assert!(shown(cx, "full-drawer-drawer"), "the drawer is a MobileNav");
     assert!(shown(cx, "brand"));
     assert!(shown(cx, "item"));
 }
@@ -201,9 +215,9 @@ fn item_fr5_a_drawer_row_closes_the_drawer_but_not_after_a_modified_link_click(
         let log = log.clone();
         page(move || {
             let (a, closed) = (log.clone(), log.clone());
-            let close = MobileDrawerClose(Rc::new(move |_, _| {
-                closed.borrow_mut().push("closed".into())
-            }));
+            let close = AppShellMobile::new(true, move |open, _, _| {
+                closed.borrow_mut().push(format!("open {open}"))
+            });
             provide(
                 close,
                 provide(
@@ -222,8 +236,13 @@ fn item_fr5_a_drawer_row_closes_the_drawer_but_not_after_a_modified_link_click(
         })
     });
     settle(cx);
+    // The drawer slides in first.
+    wait(cx, 600);
     click(cx, "go");
-    assert_eq!(*log.borrow(), vec!["go".to_string(), "closed".to_string()]);
+    assert_eq!(
+        *log.borrow(),
+        vec!["go".to_string(), "open false".to_string()]
+    );
     log.borrow_mut().clear();
     let at = cx.debug_bounds("link").unwrap().center();
     cx.simulate_click(at, Modifiers::control());
@@ -381,16 +400,21 @@ fn mega_fr9_the_drawer_toggles_its_group(cx: &mut TestAppContext) {
         cx,
         page(|| {
             provide(
-                TopNavRenderMode::Drawer,
-                TopNav::new("nav").start_content(
-                    TopNavMegaMenu::new("mega", "Products")
-                        .item(TopNavMegaMenuItem::new("m-1", "One").href("https://example.com/1")),
+                AppShellMobile::new(true, |_, _, _| {}),
+                provide(
+                    TopNavRenderMode::Drawer,
+                    TopNav::new("nav").start_content(
+                        TopNavMegaMenu::new("mega", "Products").item(
+                            TopNavMegaMenuItem::new("m-1", "One").href("https://example.com/1"),
+                        ),
+                    ),
                 ),
             )
             .into_any_element()
         }),
     );
     settle(cx);
+    wait(cx, 600);
     assert!(!shown(cx, "m-1"), "collapsed content is out of reach");
     click(cx, "mega");
     assert!(shown(cx, "m-1"));
