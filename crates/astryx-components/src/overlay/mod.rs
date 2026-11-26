@@ -56,7 +56,6 @@ pub use info_tip::InfoTip;
 pub use lightbox::{
     Lightbox, LightboxHandle, LightboxMedia, LightboxMediaKind, LightboxTrigger, use_lightbox,
 };
-#[cfg(test)]
 pub(crate) use menu::in_safe_triangle;
 pub use menu::{
     MenuAction, MenuCheckboxItem, MenuEntry, MenuItem, MenuRadioGroup, MenuRadioItem, MenuSize,

@@ -1,6 +1,7 @@
 //! Navigation parts shared by SideNav and TopNav: NavIcon, NavHeadingMenu and
 //! NavHeadingMenuItem. Upstream: `NavIcon/`, `NavMenu/`.
 
+mod drawer;
 pub mod examples;
 mod icon;
 mod menu;
@@ -9,6 +10,10 @@ mod menu;
 mod tests;
 
 pub use icon::NavIcon;
+// AppShell provides the drawer's close around its mobile drawer.
+#[cfg_attr(not(test), allow(unused_imports))]
+pub(crate) use drawer::MobileDrawerClose;
+pub(crate) use drawer::{close_drawer_after, drawer_close, nav_item_row};
 pub(crate) use menu::{NavHeadingClose, NavHeadingDismiss, NavHeadingMenuHost};
 pub use menu::{NavHeadingMenu, NavHeadingMenuItem, NavHeadingMenuSize};
 

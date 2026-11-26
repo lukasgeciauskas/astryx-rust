@@ -232,6 +232,15 @@ impl PopoverController {
         self.state.read(cx).open
     }
 
+    /// Moves focus into the open surface (its first control) once it is drawn:
+    /// upstream `focusMenu` after a hover-open is confirmed.
+    pub(crate) fn focus_surface(&self, window: &mut Window, cx: &mut App) {
+        if self.state.read(cx).open {
+            self.state.update(cx, |s, _| s.pending_focus = true);
+            window.refresh();
+        }
+    }
+
     /// Opens without moving focus into the surface (upstream
     /// `show({skipAutoFocus: true})`): a typed field keeps its caret.
     pub(crate) fn show_without_focus(&self, window: &mut Window, cx: &mut App) {

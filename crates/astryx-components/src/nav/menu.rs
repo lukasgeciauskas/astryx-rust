@@ -81,6 +81,8 @@ struct MenuState {
     pressing: bool,
     /// The rows' places this frame, for a lift's hit test.
     bounds: Vec<Bounds<Pixels>>,
+    /// The row that holds the menu's one tab stop (the roving tab index).
+    active: usize,
 }
 
 /// What a menu shares with its rows.
@@ -92,13 +94,15 @@ struct MenuScope {
 }
 
 impl MenuScope {
-    fn register(&self, row: Row) {
+    /// Adds a row; its index.
+    fn register(&self, row: Row) -> usize {
         let mut s = self.state.borrow_mut();
         if s.fresh {
             s.rows.clear();
             s.fresh = false;
         }
         s.rows.push(row);
+        s.rows.len() - 1
     }
 }
 
@@ -209,6 +213,7 @@ impl RenderOnce for NavHeadingMenu {
             let rows = state.borrow().rows.clone();
             let current = rows.iter().position(|r| r.focus.is_focused(window));
             let focus = |index: usize, window: &mut Window, cx: &mut App| {
+                state.borrow_mut().active = index;
                 rows[index].focus.focus(window, cx);
             };
             match stroke.key.as_str() {
@@ -267,7 +272,7 @@ impl RenderOnce for NavHeadingMenu {
         });
         // FR8: a mouse released off the rows, after a press on one, dismisses.
         if state.borrow().pressing {
-            let (state, dismiss) = (state.clone(), close.or(dismiss));
+            let (state, dismiss) = (state.clone(), dismiss.or(close));
             menu = menu.child(
                 canvas(
                     |_, _, _| {},
@@ -323,6 +328,8 @@ pub struct NavHeadingMenuItem {
     href: Option<SharedString>,
     on_click: Option<Action>,
     disabled: bool,
+    keeps_open: bool,
+    boxed_icon: bool,
     style: StyleRefinement,
 }
 
@@ -338,8 +345,22 @@ impl NavHeadingMenuItem {
             href: None,
             on_click: None,
             disabled: false,
+            keeps_open: false,
+            boxed_icon: false,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// A choice leaves the menu open (TopNavMenu's `hasCloseOnSelect: false`).
+    pub(crate) fn keeps_open(mut self, keeps_open: bool) -> Self {
+        self.keeps_open = keeps_open;
+        self
+    }
+
+    /// TopNavMenu's row: the icon in a 40 px box, a semibold title.
+    pub(crate) fn boxed_icon(mut self) -> Self {
+        self.boxed_icon = true;
+        self
     }
 
     /// A non-string `label`: rendered as given (the string still names it).
@@ -416,7 +437,10 @@ impl RenderOnce for NavHeadingMenuItem {
             let (on_click, href, close) = (
                 self.on_click.clone(),
                 self.href.clone(),
-                scope.as_ref().and_then(|s| s.close.clone()),
+                scope
+                    .as_ref()
+                    .and_then(|s| s.close.clone())
+                    .filter(|_| !self.keeps_open),
             );
             Rc::new(move |window, cx| {
                 if let Some(f) = &on_click {
@@ -430,14 +454,21 @@ impl RenderOnce for NavHeadingMenuItem {
                 }
             })
         };
-        if let Some(scope) = &scope {
-            scope.register(Row {
+        // One tab stop: the focused row, else the last one focused, else the first.
+        let index = scope.as_ref().map(|scope| {
+            let index = scope.register(Row {
                 focus: focus.clone(),
                 label: self.label.clone(),
                 disabled: self.disabled,
                 activate: activate.clone(),
             });
-        }
+            let mut s = scope.state.borrow_mut();
+            if focus.is_focused(window) {
+                s.active = index;
+            }
+            let _ = focus.clone().tab_stop(s.active == index);
+            index
+        });
         let (pad_y, pad_x) = match size {
             NavHeadingMenuSize::Sm => (t.spacing.s1, t.spacing.s2),
             NavHeadingMenuSize::Md => (t.spacing.s2, t.spacing.s2),
@@ -497,7 +528,12 @@ impl RenderOnce for NavHeadingMenuItem {
                     }
                     // As a browser focuses a tabindex=-1 row it is pressed on.
                     window.focus(&press_focus, cx);
-                    press_state.borrow_mut().pressing = true;
+                    let mut s = press_state.borrow_mut();
+                    s.pressing = true;
+                    if let Some(index) = index {
+                        s.active = index;
+                    }
+                    drop(s);
                     window.refresh();
                 })
                 .on_mouse_up(MouseButton::Left, move |_, window, cx| {
@@ -529,6 +565,12 @@ impl RenderOnce for NavHeadingMenuItem {
         }
         let label = match self.custom_label {
             Some(custom) => custom,
+            None if self.boxed_icon => div()
+                .text_style(&t.text.label)
+                .font_weight(gpui::FontWeight::SEMIBOLD)
+                .text_color(t.color.text_primary)
+                .child(self.label.clone())
+                .into_any_element(),
             None => Text::new(self.label.clone())
                 .text_type(TextType::Body)
                 .max_lines(1)
@@ -544,7 +586,24 @@ impl RenderOnce for NavHeadingMenuItem {
                 self.description
                     .map(|d| Text::new(d).text_type(TextType::Supporting).max_lines(1)),
             );
-        let mut row = row.children(self.icon).child(content);
+        let (row, content, icon) = if self.boxed_icon {
+            let icon = self.icon.map(|icon| {
+                div()
+                    .flex()
+                    .flex_none()
+                    .items_center()
+                    .justify_center()
+                    .size(px(40.))
+                    .rounded(t.radius.element)
+                    .bg(t.color.neutral)
+                    .child(icon)
+                    .into_any_element()
+            });
+            (row.gap(t.spacing.s3), content.gap(t.spacing.s1), icon)
+        } else {
+            (row, content, self.icon)
+        };
+        let mut row = row.children(icon).child(content);
         if focused && is_focus_visible(&focus, window) {
             let ring = format!("{}-focus-ring", self.id);
             row = row.child(

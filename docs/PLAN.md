@@ -693,6 +693,25 @@ The remaining primitives:
     (links, the menu popover from the heading or its own trigger, NavHeadingMenu's close
     or dismiss by state) and SideNavCollapseButton (in the nav or controlled outside).
     - Carried to M11: the rail's reveal motion (FR6, AST-105).
+  - Stage 7 (done): TopNav (`top_nav/`). The bar: heading and start content, end content
+    at the inline end, or three regions around center content, wrapping when it runs out
+    of room (FR3, FR4); start content wins over children (FR2); the phone's bar (heading
+    and end content, FR5) and the drawer's content (FR6) for AppShell. One hover
+    recognizer (`top_nav/hover.rs`, upstream `useMenuHover` with INV11's intent) drives
+    every menu: an entry delay, an exit guard with the safe triangle, a 500 ms click
+    guard, a reopen suppression, and the nav as a group, so moving from an open menu
+    opens the next at once and opening one closes the others. TopNavItem (selected,
+    disabled with its tab stop, icon-only, the drawer row that closes the drawer except
+    after a modified link click); TopNavMenu (NavHeadingMenu rows with the 40 px icon box,
+    per-item `close_on_select`, a mouse pick leaving it open); TopNavMegaMenu (a panel
+    below the nav, aligned to the trigger's slot, two item columns and the featured
+    content, light dismiss, the hidden close button, focus to its first link on a
+    click-open, its fade and 4 px slide); TopNavMegaMenuItem and FeaturedCard (the
+    decorative image, the "label →" link mirrored in RTL); TopNavHeading (its six
+    configurations, the chevron named with the heading, the menu overlapping the block,
+    headed by a button that closes it). NavHeadingMenu now keeps one roving tab stop.
+    - Carried to M11: the drawer groups' height animation (TopNavMenu FR7, TopNavMegaMenu
+      FR9).
 - **M10 Content:**
   - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
     URL safety.

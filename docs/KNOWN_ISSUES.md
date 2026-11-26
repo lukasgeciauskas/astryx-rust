@@ -251,12 +251,14 @@
   Table's and Tokenizer's fades (AST-025 FR22) are gradient overlays in
   `background-body`; on another surface that color shows at the edge.
 
-- **A resizable pane and the SideNav rail jump rather than slide (M9, until M11).** Upstream
-  reveals SideNav's rail as it collapses or expands (SideNav FR6) and slides a pane
+- **A resizable pane, the SideNav rail and TopNav's drawer groups jump rather than slide
+  (M9, until M11).** Upstream reveals SideNav's rail as it collapses or expands (SideNav
+  FR6), grows the height of a TopNavMenu's or TopNavMegaMenu's group in the phone's drawer
+  as it expands (TopNavMenu FR7, TopNavMegaMenu FR9), and slides a pane
   that collapses or opens on the animated-layout system's edge reveal (Resizable FR8,
   AST-105 FR9) and draws a pull past a bound as an 8 px rubber band that springs back;
-  here the pane takes its new size at once and a pull stops at the bound. Both wait for
-  the motion layer's animated layout (M11).
+  here the pane takes its new size at once, a drawer group appears whole, and a pull
+  stops at the bound. They wait for the motion layer's animated layout (M11).
 - **Remembered sizes live in a file natively (M9).** `autoSaveId` writes to
   `localStorage` in a browser, as upstream does; a native app keeps the entries in
   `<data dir>/astryx/<executable>.json` (`astryx_primitives::storage`, which an app can
