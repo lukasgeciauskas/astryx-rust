@@ -255,6 +255,16 @@
   Table's and Tokenizer's fades (AST-025 FR22) are gradient overlays in
   `background-body`; on another surface that color shows at the edge.
 
+- **A resizable pane jumps rather than slides (M9, until M11).** Upstream slides a pane
+  that collapses or opens on the animated-layout system's edge reveal (Resizable FR8,
+  AST-105 FR9) and draws a pull past a bound as an 8 px rubber band that springs back;
+  here the pane takes its new size at once and a pull stops at the bound. Both wait for
+  the motion layer's animated layout (M11).
+- **Remembered sizes live in a file natively (M9).** `autoSaveId` writes to
+  `localStorage` in a browser, as upstream does; a native app keeps the entries in
+  `<data dir>/astryx/<executable>.json` (`astryx_primitives::storage`, which an app can
+  replace with `set_storage`).
+
 ## Tooling
 
 - **True hot-patching needs our patched dx.** `cargo xtask dev --hot-patch` patches

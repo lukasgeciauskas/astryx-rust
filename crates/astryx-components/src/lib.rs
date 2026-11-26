@@ -35,6 +35,7 @@ pub mod people;
 pub mod power_search;
 mod press;
 pub mod reorderable;
+pub mod resizable;
 pub mod scrollable_area;
 pub mod search;
 pub mod segmented;

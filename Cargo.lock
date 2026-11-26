@@ -302,6 +302,7 @@ dependencies = [
  "gpui",
  "gpui_web",
  "image",
+ "serde_json",
  "smallvec",
  "unicode-linebreak",
  "unicode-segmentation",
@@ -376,8 +377,10 @@ dependencies = [
  "accesskit",
  "gpui",
  "icu_normalizer",
+ "serde_json",
  "spellbook",
  "unicode-segmentation",
+ "web-sys",
  "web-time",
  "windows 0.62.2",
 ]

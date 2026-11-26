@@ -23,6 +23,7 @@ pub mod props;
 pub mod scroll_area;
 pub mod size;
 pub mod spell;
+pub mod storage;
 pub mod tree_focus;
 pub mod typeahead;
 

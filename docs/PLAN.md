@@ -641,6 +641,22 @@ The remaining primitives:
       hidden scrollbar, faded edges and keyboard focus revealing its token, as upstream's
       `TokenTrack`.
     - The gallery has a Shell page for M9.
+  - Stage 3 (done): Resizable (`resizable/`). `use_resizable` (and
+    `use_resizable_regions` for named regions) ports `createResizable`'s model: pixel,
+    exact-percentage and one-bound percentage sizes resolved against a container
+    (`ResizableBasis` and its probe) or the window (FR5, AST-010), the maximum winning
+    a conflict (FR6), a default that resolves once, snaps, collapse below the threshold on
+    a lift (with the release velocity's projection) or a key step, controlled and
+    uncontrolled collapse, `collapse`, `expand` and `resize`, and `autoSaveId`
+    persistence written once a person resizes and once per gesture
+    (`astryx_primitives::storage`: localStorage in a browser, a JSON file natively).
+    `ResizeHandle` is the APG window splitter: the separator's value, bounds and
+    "Collapsed" text, the grab zone, the grip pill and its placement, inline or overlay,
+    the divider, a pointer drag inverted under right-to-left (FR3), the arrow keys with
+    snap steps, Home, End, Enter and a double-click collapse, disabled with its tab stop,
+    a lost release cancelling the drag, and the `resize-handle` and `resize-handle-pill`
+    targets (FR1-FR4, FR7, FR9, AR1).
+    - Carried to M11: the pane slide and the rubber-band overshoot (FR8, AST-105 FR9).
 - **M10 Content:**
   - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
     URL safety.
