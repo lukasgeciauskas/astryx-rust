@@ -27,6 +27,7 @@ json-themes = ["astryx-theme/json"]
 [dependencies]
 gpui.workspace = true
 astryx-theme.workspace = true
+astryx-syntax.workspace = true
 astryx-themes = { workspace = true, optional = true }
 astryx-primitives.workspace = true
 astryx-i18n.workspace = true

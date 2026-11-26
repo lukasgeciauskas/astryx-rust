@@ -12,6 +12,7 @@ astryx-effects.workspace = true
 astryx-i18n.workspace = true
 astryx-icons.workspace = true
 astryx-theme.workspace = true
+astryx-syntax.workspace = true
 gpui.workspace = true
 smallvec = "1"
 # Decoded photos (Lightbox's examples and tests); already in GPUI's tree.

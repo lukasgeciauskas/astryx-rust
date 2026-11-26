@@ -259,6 +259,9 @@
   display cutouts, so AppShell's `env(safe-area-inset-*)` padding is zero; and GPUI
   elements have no DOM ids, so the main region's id, the drawer id and the toggle's
   `aria-controls` have no form (the skip link moves focus to the main region directly).
+- **Grammar word boundaries are Unicode (M10).** CodeBlock's grammars use JS's ASCII `\b`;
+  `fancy-regex` has no ASCII boundary, so a keyword directly beside a non-ASCII letter
+  (`éfor`) can paint differently. `\w` and `\d` keep JS's ASCII meaning.
 - **Carousel snapping settles after the gesture (M9).** GPUI has no CSS scroll snap or
   platform momentum to rest on a stop, so the row scrolls freely and glides onto the
   nearest stop when a gesture ends (a trackpad's release, or 150 ms after the last wheel

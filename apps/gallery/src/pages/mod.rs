@@ -98,7 +98,15 @@ impl Page {
             Page::Layout => astryx::components::layout::examples::examples(window, cx),
             Page::Icon => astryx::components::icon::examples::examples(window, cx),
             Page::Status => astryx::components::status::examples::examples(window, cx),
-            Page::Content => astryx::components::content::examples::examples(window, cx),
+            Page::Content => gpui::div()
+                .flex()
+                .flex_col()
+                .gap(gpui::px(48.))
+                .child(astryx::components::content::examples::examples(window, cx))
+                .child(astryx::components::syntax_theme::examples::examples(
+                    window, cx,
+                ))
+                .into_any_element(),
             Page::People => astryx::components::people::examples::examples(window, cx),
             Page::Containers => astryx::components::containers::examples::examples(window, cx),
             Page::Feedback => astryx::components::feedback::examples::examples(window, cx),

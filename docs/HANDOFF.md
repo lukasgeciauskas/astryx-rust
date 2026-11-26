@@ -5,11 +5,12 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, after M9 (Shell & navigation). Next: M10 (Content)._
+_Last updated: 2026-11-26, during M10 (Content): stage 1 done (the syntax engine and SyntaxTheme)._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8 and M9. Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8 and M9; M10 is under way (stage 1:
+  the syntax engine, `astryx-syntax`, and SyntaxTheme). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
 - **Parity:** 99 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
@@ -31,10 +32,10 @@ _Last updated: 2026-11-26, after M9 (Shell & navigation). Next: M10 (Content)._
 - **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
-  LinkProvider, MediaTheme, SyntaxTheme, Theme. The first five already exist as
-  Rust APIs (`astryx_i18n::provider`, `astryx_primitives::layer`,
-  `link_provider`, `ResolvedTheme::on_surface` with `scope`, `astryx_theme::scope`);
-  registering their docs is a quick win. SyntaxTheme lands with CodeBlock (M10).
+  LinkProvider, MediaTheme, Theme. All five already exist as Rust APIs
+  (`astryx_i18n::provider`, `astryx_primitives::layer`, `link_provider`,
+  `ResolvedTheme::on_surface` with `scope`, `astryx_theme::scope`); registering their docs
+  is a quick win. SyntaxTheme has its doc (M10 stage 1).
 
 ### Carried into later milestones (recorded in each doc and in KNOWN_ISSUES)
 

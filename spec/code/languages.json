@@ -1,0 +1,1867 @@
+{
+  "builtins": [
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "typescript",
+        "javascript",
+        "tsx",
+        "jsx",
+        "ts",
+        "js"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "`(?:[^`\\\\]|\\\\.)*`",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "@[\\w]+",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "\\b0[xX][0-9a-fA-F_]+\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b0[bB][01_]+\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b0[oO][0-7_]+\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(const|let|var|function|class|if|else|for|while|return|import|export|from|default|async|await|try|catch|throw|new|typeof|instanceof|interface|type|enum|extends|implements|switch|case|break|continue|do|in|of|void|null|undefined|true|false|this|super|yield|delete|static|public|private|protected|readonly|abstract|as|is|keyof|declare|module|namespace|require)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.]",
+          "type": "punctuation"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*\\b",
+          "type": "variable"
+        }
+      ]
+    },
+    {
+      "defaultType": "punctuation",
+      "identifiers": [
+        "json"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\]|\\\\.)*\"(?=\\s*:)",
+          "type": "property"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "-?\\b\\d+\\.?\\d*(?:[eE][+-]?\\d+)?\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(true|false|null)\\b",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\]:,]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "html",
+        "xml",
+        "svg"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "<!--[\\s\\S]*?-->",
+          "type": "comment"
+        },
+        {
+          "flags": "i",
+          "source": "<!DOCTYPE[^>]*>",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "<\\/[a-zA-Z][\\w-]*\\s*>",
+          "type": "tag"
+        },
+        {
+          "flags": "",
+          "source": "<[a-zA-Z][\\w-]*",
+          "type": "tag"
+        },
+        {
+          "flags": "",
+          "source": "\\/?>",
+          "type": "tag"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_:][\\w:.-]*(?=\\s*=)",
+          "type": "attribute"
+        },
+        {
+          "flags": "",
+          "source": "=",
+          "type": "operator"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "css",
+        "scss",
+        "less"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "--[a-zA-Z_-][\\w-]*",
+          "type": "variable"
+        },
+        {
+          "flags": "",
+          "source": "-?\\b\\d+\\.?\\d*(?:px|em|rem|%|vh|vw|vmin|vmax|ch|ex|deg|rad|turn|s|ms|fr)?\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "#[0-9a-fA-F]{3,8}\\b",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "\\b(important|inherit|initial|unset|revert|auto|none)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "@[a-zA-Z][\\w-]*",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "[.#][a-zA-Z_-][\\w-]*",
+          "type": "tag"
+        },
+        {
+          "flags": "",
+          "source": "::?[a-zA-Z][\\w-]*",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_-][\\w-]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "[a-zA-Z_-][\\w-]*(?=\\s*:)",
+          "type": "property"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];:,]",
+          "type": "punctuation"
+        },
+        {
+          "flags": "",
+          "source": "[+~>*=|^$]",
+          "type": "operator"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "python",
+        "py"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\"\"\"[\\s\\S]*?\"\"\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'''[\\s\\S]*?'''",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "f\"(?:[^\"\\\\]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "f'(?:[^'\\\\]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "#[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "@[\\w.]+",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "\\b0[xX][0-9a-fA-F_]+\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b0[bB][01_]+\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b0[oO][0-7_]+\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?j?\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(def|class|if|elif|else|for|while|return|import|from|as|with|try|except|raise|True|False|None|and|or|not|in|is|lambda|yield|async|await|pass|break|continue|del|global|nonlocal|assert|finally|print|self|cls)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_][\\w]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~@:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.]",
+          "type": "punctuation"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_][\\w]*\\b",
+          "type": "variable"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "bash",
+        "sh",
+        "zsh",
+        "shell"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "#[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'[^']*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\$\\{[^}]+\\}",
+          "type": "variable"
+        },
+        {
+          "flags": "",
+          "source": "\\$[a-zA-Z_][\\w]*",
+          "type": "variable"
+        },
+        {
+          "flags": "",
+          "source": "\\$[0-9@#?*!$-]",
+          "type": "variable"
+        },
+        {
+          "flags": "",
+          "source": "\\b\\d+\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(if|then|else|elif|fi|for|do|done|while|until|case|esac|function|in|select|return|exit|local|export|source|alias|unalias|readonly|shift|eval|exec|set|unset|trap|wait|read|echo|printf|test|true|false)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_][\\w]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "[|&<>;!]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\]]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "php"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "#[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\$[a-zA-Z_][\\w]*",
+          "type": "variable"
+        },
+        {
+          "flags": "",
+          "source": "\\b0[xX][0-9a-fA-F]+\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b\\d+\\.?\\d*(?:[eE][+-]?\\d+)?\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(function|class|if|else|elseif|for|foreach|while|return|echo|public|private|protected|static|new|try|catch|throw|namespace|use|require|require_once|include|include_once|extends|implements|interface|abstract|final|const|var|true|false|null|array|isset|unset|empty|list|match|enum|switch|case|break|continue|do|yield|fn)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_][\\w]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:.]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "@[\\w]+",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "hack"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\$[a-zA-Z_][\\w]*",
+          "type": "variable"
+        },
+        {
+          "flags": "",
+          "source": "\\b0[xX][0-9a-fA-F]+\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b\\d+\\.?\\d*(?:[eE][+-]?\\d+)?\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(function|class|if|else|for|foreach|while|return|echo|public|private|protected|static|new|try|catch|throw|namespace|use|require|include|extends|implements|interface|abstract|final|const|shape|vec|dict|keyset|async|await|concurrent|enum|type|newtype|tuple|inout)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_][\\w]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "(?<=->|::)\\b[a-zA-Z_][\\w]*\\b",
+          "type": "property"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:.]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "<<[\\w]+",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "yaml",
+        "yml"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "#[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "i",
+          "source": "\\b(true|false|yes|no|on|off|null|~)\\b",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "[&*][\\w]+",
+          "type": "variable"
+        },
+        {
+          "flags": "",
+          "source": "!!\\w+",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "\\b-?\\d+\\.?\\d*(?:[eE][+-]?\\d+)?\\b",
+          "type": "number"
+        },
+        {
+          "flags": "m",
+          "source": "^[ \\t]*[\\w][\\w ./-]*(?=\\s*:)",
+          "type": "property"
+        },
+        {
+          "flags": "",
+          "source": "---",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\.\\.\\.",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "[:|>\\-?]",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\],]",
+          "type": "punctuation"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_][\\w]*\\b",
+          "type": "variable"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "markdown",
+        "md"
+      ],
+      "patterns": [
+        {
+          "flags": "m",
+          "source": "^```[\\w]*$",
+          "type": "keyword"
+        },
+        {
+          "flags": "m",
+          "source": "^#{1,6}\\s+.*",
+          "type": "keyword"
+        },
+        {
+          "flags": "m",
+          "source": "^---$",
+          "type": "keyword"
+        },
+        {
+          "flags": "m",
+          "source": "^\\*\\*\\*$",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\*\\*(?:[^*]|\\*(?!\\*))+\\*\\*",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\*(?:[^*])+\\*",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "`[^`]+`",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "\\[(?:[^\\]])+\\]\\([^)]+\\)",
+          "type": "function"
+        },
+        {
+          "flags": "m",
+          "source": "^>\\s+.*",
+          "type": "comment"
+        },
+        {
+          "flags": "m",
+          "source": "^\\s*[-*+]\\s",
+          "type": "operator"
+        },
+        {
+          "flags": "m",
+          "source": "^\\s*\\d+\\.\\s",
+          "type": "number"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "c",
+        "h"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "m",
+          "source": "^[ \\t]*#\\s*\\w+",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:auto|break|case|char|const|continue|default|do|double|else|enum|extern|float|for|goto|if|inline|int|long|register|restrict|return|short|signed|sizeof|static|struct|switch|typedef|union|unsigned|void|volatile|while|bool|true|false|NULL|nullptr)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "cpp",
+        "c++",
+        "cc",
+        "cxx",
+        "hpp",
+        "hh"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "m",
+          "source": "^[ \\t]*#\\s*\\w+",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:u8|[uUL])?R\"([^()\\\\\\s]{0,16})\\([\\s\\S]*?\\)\\1\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:auto|break|case|char|const|continue|default|do|double|else|enum|extern|float|for|goto|if|inline|int|long|register|restrict|return|short|signed|sizeof|static|struct|switch|typedef|union|unsigned|void|volatile|while|bool|true|false|NULL|nullptr|alignas|alignof|catch|class|concept|constexpr|consteval|co_await|co_return|co_yield|decltype|delete|explicit|export|friend|mutable|namespace|new|noexcept|operator|override|private|protected|public|requires|static_assert|template|this|throw|try|typename|using|virtual|final)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "sql"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "--[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^']|'')*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\"[^\"\\n]*\"|`[^`\\n]*`",
+          "type": "property"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "i",
+          "source": "\\b(?:select|from|where|and|or|not|in|is|null|as|join|inner|left|right|full|outer|cross|on|group|by|order|having|limit|offset|union|all|distinct|insert|into|values|update|set|delete|create|table|view|index|drop|alter|add|primary|key|foreign|references|with|case|when|then|else|end|exists|between|like|asc|desc|true|false|default|returning|interval)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=<>!|]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "rust",
+        "rs"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "#!?\\[[^\\]\\n]*\\]",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_]\\w*!(?=\\s*[([{])",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\bb?r(#*)\"[\\s\\S]*?\"\\1",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'[a-z_]\\w*\\b(?!')",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:as|async|await|break|const|continue|crate|dyn|else|enum|extern|false|fn|for|if|impl|in|let|loop|match|mod|move|mut|pub|ref|return|self|Self|static|struct|super|trait|true|type|unsafe|use|where|while)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "kotlin",
+        "kt",
+        "kts"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "@\\w+",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "\"\"\"[\\s\\S]*?\"\"\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:as|break|class|continue|do|else|false|for|fun|if|in|interface|is|null|object|package|return|super|this|throw|true|try|typealias|val|var|when|while|by|constructor|init|companion|data|sealed|enum|open|override|private|protected|public|internal|suspend|inline|lateinit|import)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "swift"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "(#+)\"[\\s\\S]*?\"\\1",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "[@#]\\w+",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "\"\"\"[\\s\\S]*?\"\"\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:associatedtype|class|deinit|enum|extension|func|import|init|inout|internal|let|open|operator|private|protocol|public|static|struct|subscript|typealias|var|break|case|continue|default|defer|do|else|fallthrough|for|guard|if|in|repeat|return|switch|where|while|as|catch|false|is|nil|rethrows|super|self|Self|throw|throws|true|try|async|await|actor|some|any)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "identifiers": [
+        "go",
+        "golang"
+      ],
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "`[^`]*`",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:break|case|chan|const|continue|default|defer|else|fallthrough|for|func|go|goto|if|import|interface|map|package|range|return|select|struct|switch|type|var|true|false|nil|iota)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "defaultType": "variable",
+      "export": "dockerfile",
+      "fileExtensions": [
+        "dockerfile"
+      ],
+      "fileNames": [
+        "Dockerfile",
+        "Containerfile"
+      ],
+      "identifiers": [
+        "dockerfile",
+        "docker"
+      ],
+      "module": "dockerfile",
+      "name": "dockerfile",
+      "patterns": [
+        {
+          "flags": "",
+          "source": "#[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "im",
+          "source": "^[ \\t]*(?:FROM|RUN|CMD|LABEL|EXPOSE|ENV|ADD|COPY|ENTRYPOINT|VOLUME|USER|WORKDIR|ARG|ONBUILD|STOPSIGNAL|HEALTHCHECK|SHELL)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\bAS\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\$\\{?\\w+\\}?",
+          "type": "variable"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "[&|\\\\=]+",
+          "type": "operator"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "export": "graphql",
+      "fileExtensions": [
+        "graphql",
+        "gql"
+      ],
+      "fileNames": [],
+      "identifiers": [
+        "graphql",
+        "gql"
+      ],
+      "module": "graphql",
+      "name": "graphql",
+      "patterns": [
+        {
+          "flags": "",
+          "source": "#[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\$\\w+",
+          "type": "variable"
+        },
+        {
+          "flags": "",
+          "source": "@\\w+",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "\"\"\"[\\s\\S]*?\"\"\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:query|mutation|subscription|fragment|on|type|input|enum|interface|union|scalar|schema|extend|directive|implements|repeatable|true|false|null)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "export": "java",
+      "fileExtensions": [
+        "java"
+      ],
+      "fileNames": [],
+      "identifiers": [
+        "java"
+      ],
+      "module": "java",
+      "name": "java",
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "@\\w+",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "\"\"\"[\\s\\S]*?\"\"\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:abstract|assert|boolean|break|byte|case|catch|char|class|const|continue|default|do|double|else|enum|extends|final|finally|float|for|if|implements|import|instanceof|int|interface|long|native|new|package|private|protected|public|return|short|static|super|switch|synchronized|this|throw|throws|transient|try|var|void|volatile|while|record|sealed|permits|yield|true|false|null)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "export": "lua",
+      "fileExtensions": [
+        "lua"
+      ],
+      "fileNames": [],
+      "identifiers": [
+        "lua"
+      ],
+      "module": "lua",
+      "name": "lua",
+      "patterns": [
+        {
+          "flags": "",
+          "source": "--\\[(=*)\\[[\\s\\S]*?\\]\\1\\]",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "--[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\[(=*)\\[[\\s\\S]*?\\]\\1\\]",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:and|break|do|else|elseif|end|false|for|function|goto|if|in|local|nil|not|or|repeat|return|then|true|until|while)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "export": "objectiveC",
+      "fileExtensions": [
+        "m",
+        "mm"
+      ],
+      "fileNames": [],
+      "identifiers": [
+        "objective-c",
+        "objc",
+        "m",
+        "mm"
+      ],
+      "module": "objective-c",
+      "name": "objective-c",
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "m",
+          "source": "^[ \\t]*#\\s*\\w+",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "@\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "@\\w+",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:auto|break|case|char|const|continue|default|do|double|else|enum|extern|float|for|goto|if|inline|int|long|register|restrict|return|short|signed|sizeof|static|struct|switch|typedef|union|unsigned|void|volatile|while|bool|true|false|NULL|nullptr|alignas|alignof|catch|class|concept|constexpr|consteval|co_await|co_return|co_yield|decltype|delete|explicit|export|friend|mutable|namespace|new|noexcept|operator|override|private|protected|public|requires|static_assert|template|this|throw|try|typename|using|virtual|final|id|self|super|nil|Nil|YES|NO|SEL|BOOL|instancetype)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "export": "powershell",
+      "fileExtensions": [
+        "ps1",
+        "psm1",
+        "psd1"
+      ],
+      "fileNames": [],
+      "identifiers": [
+        "powershell",
+        "ps1",
+        "pwsh"
+      ],
+      "module": "powershell",
+      "name": "powershell",
+      "patterns": [
+        {
+          "flags": "",
+          "source": "#[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "<#[\\s\\S]*?#>",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\$[\\w:]+",
+          "type": "variable"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-z]+-[A-Z]\\w*",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "-[a-z]+\\b",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:begin|break|catch|class|continue|data|do|dynamicparam|else|elseif|end|exit|filter|finally|for|foreach|function|if|in|param|process|return|switch|throw|trap|try|until|using|while)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "export": "ruby",
+      "fileExtensions": [
+        "rb",
+        "rake",
+        "gemspec"
+      ],
+      "fileNames": [
+        "Gemfile",
+        "Rakefile"
+      ],
+      "identifiers": [
+        "ruby",
+        "rb"
+      ],
+      "module": "ruby",
+      "name": "ruby",
+      "patterns": [
+        {
+          "flags": "",
+          "source": "#[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": ":\\w+",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "@{1,2}\\w+|\\$\\w+",
+          "type": "variable"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:alias|and|begin|break|case|class|def|defined|do|else|elsif|end|ensure|false|for|if|in|module|next|nil|not|or|redo|rescue|retry|return|self|super|then|true|undef|unless|until|when|while|yield|require|attr_accessor)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "export": "thrift",
+      "fileExtensions": [
+        "thrift"
+      ],
+      "fileNames": [],
+      "identifiers": [
+        "thrift"
+      ],
+      "module": "thrift",
+      "name": "thrift",
+      "patterns": [
+        {
+          "flags": "",
+          "source": "\\/\\*[\\s\\S]*?\\*\\/",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\\/\\/[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "#[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'(?:[^'\\\\\\n]|\\\\.)*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:0[xX][\\da-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?\\d+)?)[a-zA-Z]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:namespace|include|cpp_include|typedef|enum|struct|union|exception|service|extends|oneway|void|throws|const|required|optional|bool|byte|i8|i16|i32|i64|double|string|binary|list|set|map|true|false)\\b",
+          "type": "keyword"
+        },
+        {
+          "flags": "",
+          "source": "\\b[a-zA-Z_$][\\w$]*(?=\\s*\\()",
+          "type": "function"
+        },
+        {
+          "flags": "",
+          "source": "\\b[A-Z][a-zA-Z0-9_]*\\b",
+          "type": "type"
+        },
+        {
+          "flags": "",
+          "source": "[+\\-*/%=!<>&|^~?:]+",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[{}()\\[\\];,.@]",
+          "type": "punctuation"
+        }
+      ]
+    },
+    {
+      "defaultType": "variable",
+      "export": "toml",
+      "fileExtensions": [
+        "toml"
+      ],
+      "fileNames": [],
+      "identifiers": [
+        "toml"
+      ],
+      "module": "toml",
+      "name": "toml",
+      "patterns": [
+        {
+          "flags": "",
+          "source": "#[^\\n]*",
+          "type": "comment"
+        },
+        {
+          "flags": "m",
+          "source": "^[ \\t]*\\[\\[?[^\\]\\n]+\\]\\]?",
+          "type": "tag"
+        },
+        {
+          "flags": "m",
+          "source": "^[ \\t]*[\\w.\"'-]+(?=\\s*=)",
+          "type": "property"
+        },
+        {
+          "flags": "",
+          "source": "\"\"\"[\\s\\S]*?\"\"\"|'''[\\s\\S]*?'''",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\"(?:[^\"\\\\\\n]|\\\\.)*\"",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "'[^'\\n]*'",
+          "type": "string"
+        },
+        {
+          "flags": "",
+          "source": "\\b(?:true|false)\\b",
+          "type": "constant"
+        },
+        {
+          "flags": "",
+          "source": "[+-]?\\b\\d[\\d_:.TZ+-]*\\b",
+          "type": "number"
+        },
+        {
+          "flags": "",
+          "source": "=",
+          "type": "operator"
+        },
+        {
+          "flags": "",
+          "source": "[\\[\\]{},.]",
+          "type": "punctuation"
+        }
+      ]
+    }
+  ]
+}

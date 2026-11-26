@@ -768,6 +768,35 @@ The remaining primitives:
     syntax presets.
   - Chat suite: layout, message list with stream scroll, composer with tokens and trigger
     menu, tool calls, dictation behind a pluggable speech provider.
+  - Stages, each closed with tests, a gallery check, docs, the gate, a commit and CI:
+    1. The syntax engine: the grammar tokenizer on `fancy-regex`, the built-in languages
+       and the nine importable ones, the syntax theme tokens, `defineSyntaxTheme`, the
+       presets and SyntaxTheme (with `useSyntaxTheme`).
+    2. CodeBlock: header, language label, line numbers and highlighted lines, diff, copy,
+       collapsing, wrapping, height, size, width, container, highlight mode.
+    3. Markdown's core: CommonMark and GFM onto upstream's AST, block and inline
+       rendering with the content components, density, heading levels, content width,
+       URL safety and `onLinkClick`, autolinks.
+    4. Markdown's extensions: plugins (syntax, AST transforms, renderers), inline plugins,
+       citations and sources, math through `components`, code languages, streaming with
+       its fade-in, heading links, and `useOutlineFromMarkdown` (carried from M9).
+    5. Chat's layout and messages: ChatLayout and its scroll button, ChatMessageList with
+       stream scroll and new messages, ChatMessage, its bubble and metadata,
+       ChatSystemMessage, the typing indicator, the unread divider, the virtualizer.
+    6. The composer: ChatComposer, its input (tokens, trigger menus, history, paste as
+       token), drawer, token element, ChatTokenizedText, ChatSendButton.
+    7. ChatToolCalls, dictation (`useSpeechRecognition` behind a pluggable provider,
+       `useChatDictation`, ChatDictationButton), the emoji picker and the reaction bar.
+  - Stage 1 (done): the syntax engine, the new `astryx-syntax` crate. `tools/export/export-code.mjs`
+    exports upstream's grammars (17 built-in grammars under 42 identifiers, and the 9
+    language modules), the 12 syntax presets, and fixtures of upstream's own tokenizer over
+    one sample in every language; codegen translates each JS regex into `fancy-regex`
+    (flags inline, JS's ASCII `\w` and `\d`). The tokenizer scans as upstream's (rules in
+    order at each position, the first non-empty match wins, lines on their own, the default
+    type left out) and matches the fixtures token for token. Custom languages
+    (`create_code_language`), the fence and diff helpers, `define_syntax_theme` and the
+    presets; SyntaxTheme and `use_syntax_theme` in `syntax_theme/`, with upstream's
+    defaults for unset diff slots.
 - **M11 Motion & touch:** springs, decay, rubber-band, gesture recognizers on GPUI pointer and
   touch events, keyboard clearance, dragToSnapPoints.
   - Components: BottomSheet(+Switcher), Swipe, coarse-pointer variants (sheet-backed

@@ -9,6 +9,7 @@ members = [
     "crates/astryx-icons",
     "crates/astryx-components",
     "crates/astryx-themes",
+    "crates/astryx-syntax",
     "apps/gallery",
     "apps/cli",
     "examples/consumer",
@@ -41,6 +42,7 @@ astryx-effects = { path = "crates/astryx-effects" }
 astryx-icons = { path = "crates/astryx-icons" }
 astryx-components = { path = "crates/astryx-components" }
 astryx-themes = { path = "crates/astryx-themes", default-features = false }
+astryx-syntax = { path = "crates/astryx-syntax" }
 
 # The accessibility tree types GPUI uses; keep it at GPUI's version.
 accesskit = "0.24.1"
@@ -67,6 +69,8 @@ unicode-linebreak = "0.1"
 spellbook = "0.4"
 windows = { version = "0.62", features = ["Win32_Globalization", "Win32_System_Com"] }
 serde_json = "1"
+# CodeBlock's grammars need lookaround and backreferences, which `regex` lacks.
+fancy-regex = "0.14"
 wasm-bindgen = "0.2.120"
 
 # Zed's workspace patches two crates that GPUI depends on. Patches only apply

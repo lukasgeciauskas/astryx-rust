@@ -49,6 +49,7 @@ pub mod side_nav;
 pub mod slider;
 pub mod status;
 pub mod stepper;
+pub mod syntax_theme;
 pub mod table;
 pub mod tabs;
 pub mod text;

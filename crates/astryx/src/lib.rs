@@ -18,6 +18,7 @@ pub use astryx_effects as effects;
 pub use astryx_i18n as i18n;
 pub use astryx_icons as icons;
 pub use astryx_primitives as primitives;
+pub use astryx_syntax as syntax;
 pub use astryx_theme as theme;
 #[cfg(any(
     feature = "theme-butter",

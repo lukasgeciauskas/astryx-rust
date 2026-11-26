@@ -1,0 +1,14 @@
+[package]
+name = "astryx-syntax"
+description = "CodeBlock's syntax engine: the grammar tokenizer, its languages and the syntax theme presets"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+fancy-regex.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

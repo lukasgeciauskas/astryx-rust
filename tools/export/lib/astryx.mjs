@@ -29,8 +29,11 @@ export function importFile(root, relative) {
 }
 
 let vite;
-/** Imports a TypeScript source file through Vite, as upstream scripts do. */
-export async function importTs(root, file) {
+/**
+ * Imports a TypeScript source file through Vite, as upstream scripts do. `plugins` are
+ * Vite plugins for this import (an exporter may expose an internal binding with one).
+ */
+export async function importTs(root, file, plugins = []) {
   if (!vite) {
     const pkg = path.join(root, 'node_modules', 'vite', 'package.json');
     const entry = JSON.parse(fs.readFileSync(pkg, 'utf8')).exports['.'];
@@ -41,6 +44,7 @@ export async function importTs(root, file) {
     root,
     configFile: false,
     logLevel: 'error',
+    plugins,
   });
   return module;
 }
