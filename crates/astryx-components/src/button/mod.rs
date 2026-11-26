@@ -605,10 +605,14 @@ impl RenderOnce for Button {
         let ring_color = (variant == ButtonVariant::Destructive).then_some(t.color.error);
         let radius = t.radius.element.to_pixels(rem);
         let el = el.id(self.id.clone()).child(content).children(spinner);
+        let feedback = crate::gestures::use_press_feedback(self.id.clone(), window, cx)
+            .disabled(disabled || busy)
+            .space_activates(&focus);
         let el = apply_press(
             el,
             &focus,
             Press {
+                feedback: Some(&feedback),
                 fill: resting,
                 scale: group.is_none().then_some(0.98),
                 disabled,
@@ -632,13 +636,12 @@ impl RenderOnce for Button {
             .aria_label(self.label)
             .aria_disabled(disabled)
             .aria_busy(busy);
-        // A menu's trigger: its press-down, hover and keys.
+        // A menu's trigger: its presses, hover and keys.
+        let menu_press = disclosure
+            .as_ref()
+            .filter(|_| !disabled)
+            .and_then(|d| d.menu_press.clone());
         if let Some(d) = disclosure.as_ref().filter(|_| !disabled) {
-            if let Some(press) = d.on_press.clone() {
-                el = el.on_mouse_down(gpui::MouseButton::Left, move |_, window, cx| {
-                    press(window, cx)
-                });
-            }
             if let Some(hover) = d.on_hover.clone() {
                 el = el.on_hover(move |hovered, window, cx| hover(*hovered, window, cx));
             }
@@ -670,12 +673,18 @@ impl RenderOnce for Button {
         if let Some(description) = crate::overlay::tooltip_description(cx) {
             el = el.aria_description(description);
         }
+        // The surface the touch press model paints, and a menu's trigger.
+        let el = feedback.surface(el);
+        let el = match menu_press {
+            Some(press) => press.trigger(el).into_any_element(),
+            None => el.into_any_element(),
+        };
         match tooltip {
             Some((id, text)) => crate::overlay::Tooltip::new(id, text)
                 .trigger_acts(true)
                 .child(el)
                 .into_any_element(),
-            None => el.into_any_element(),
+            None => el,
         }
     }
 }

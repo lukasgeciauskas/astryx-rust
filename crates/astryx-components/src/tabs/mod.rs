@@ -540,7 +540,6 @@ impl RenderOnce for TabList {
                 .track_focus(&handle)
                 .cursor_pointer()
                 .hover(move |s| s.bg(hover))
-                .active(move |s| s.bg(pressed))
                 .on_click(move |_, window, cx| {
                     cx.stop_propagation();
                     if let Some(f) = &select {
@@ -557,6 +556,16 @@ impl RenderOnce for TabList {
                         .map(|c| div().flex().flex_none().items_center().child(c)),
                 )
                 .child(indicator);
+            // A finger's press paints as UIKit tracks a control (upstream `usePressFeedback`).
+            el = crate::press::touch_press(
+                el,
+                ElementId::Name(format!("{:?}-{}-press", self.id, tab.value).into()),
+                false,
+                gpui::transparent_black(),
+                pressed,
+                window,
+                cx,
+            );
             if is_focus_visible(&handle, window) {
                 el = el.child(focus_ring(t, radius, rem));
             }

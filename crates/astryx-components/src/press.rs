@@ -46,8 +46,78 @@ impl ActionCell {
     }
 }
 
+/// The touch press model on a surface that paints its own press (upstream
+/// `usePressFeedback` and `interactionOverlayStyles`): under a fine primary pointer GPUI's
+/// active style keeps the mouse's press; under a finger (and every press on a touch-first
+/// device) the window's press controller paints `overlay` over `base` as UIKit tracks a
+/// control, at once outside a scroller and after the content-touch delay inside one, and
+/// fades it on the theme's exit clock. `id` names the surface.
+pub(crate) fn touch_press(
+    el: Stateful<Div>,
+    id: impl Into<gpui::ElementId>,
+    disabled: bool,
+    base: Hsla,
+    overlay: Hsla,
+    window: &mut Window,
+    cx: &mut App,
+) -> Stateful<Div> {
+    let feedback = crate::gestures::use_press_feedback(id, window, cx).disabled(disabled);
+    touch_press_with(el, &feedback, base, overlay, window, cx)
+}
+
+/// [`touch_press`] in a builder chain.
+pub(crate) trait TouchPress: Sized {
+    fn touch_press(
+        self,
+        id: impl Into<gpui::ElementId>,
+        base: Hsla,
+        overlay: Hsla,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self;
+}
+
+impl TouchPress for Stateful<Div> {
+    fn touch_press(
+        self,
+        id: impl Into<gpui::ElementId>,
+        base: Hsla,
+        overlay: Hsla,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self {
+        touch_press(self, id, false, base, overlay, window, cx)
+    }
+}
+
+/// [`touch_press`] with a surface the caller made (a menu row's, a focusable control's).
+pub(crate) fn touch_press_with(
+    el: Stateful<Div>,
+    feedback: &crate::gestures::PressFeedback,
+    base: Hsla,
+    overlay: Hsla,
+    window: &mut Window,
+    cx: &mut App,
+) -> Stateful<Div> {
+    let pressed = composite(base, overlay);
+    let mut el = if feedback.paints_buttons(window, cx) {
+        el
+    } else {
+        el.active(move |s| s.bg(pressed))
+    };
+    if let Some(strength) = feedback.overlay(overlay, window, cx) {
+        el = el.bg(composite(base, strength));
+    }
+    el.child(feedback.probe().absolute().top_0().left_0().size_full())
+}
+
 /// How a control presses.
 pub(crate) struct Press<'a> {
+    /// The touch press model's surface (upstream `usePressFeedback`): under a finger it
+    /// paints the pressed overlay as UIKit tracks a control, and on a touch-first device
+    /// it paints the mouse's and the Space key's press in place of the active style. The
+    /// caller wraps its element in [`crate::gestures::PressFeedback::surface`].
+    pub feedback: Option<&'a crate::gestures::PressFeedback>,
     /// The resting fill the overlays composite over (`None` is clear).
     pub fill: Option<Hsla>,
     /// Pressed scale (0.98 for a standalone Button), or none.
@@ -93,10 +163,21 @@ pub(crate) fn apply_press(
             theme.refine(&mut hover, target, props, Some(RuleState::Hover));
             theme.refine(&mut active, target, props, Some(RuleState::Active));
         }
-        el = el
-            .cursor_pointer()
-            .hover(move |_| hover)
-            .active(move |_| active);
+        el = el.cursor_pointer().hover(move |_| hover);
+        match press.feedback {
+            Some(feedback) => {
+                if !feedback.paints_buttons(window, cx) {
+                    el = el.active(move |_| active);
+                }
+                if let Some(overlay) = feedback.overlay(t.color.overlay_pressed, window, cx) {
+                    el = el.bg(composite(base, overlay));
+                    if let Some(scale) = press.scale.filter(|_| !prefers_reduced_motion(cx)) {
+                        el = el.scale(scale);
+                    }
+                }
+            }
+            None => el = el.active(move |_| active),
+        }
         if let Some(on_click) = on_click {
             if let Some(cell) = astryx_primitives::use_context::<ActionCell>(cx)
                 && cell.0.borrow().is_none()

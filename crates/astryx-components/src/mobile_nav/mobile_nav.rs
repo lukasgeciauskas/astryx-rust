@@ -302,17 +302,29 @@ impl RenderOnce for MobileNav {
             .children(self.header)
             .child(close_button);
         // FR14: the content is the drawer's navigation landmark, named like the dialog.
+        let scroller_handle = crate::gestures::scroller::use_scroll_handle(
+            ElementId::Name(format!("{}-content", self.id).into()),
+            window,
+            cx,
+        );
         let content = div()
             .id(ElementId::Name(format!("{}-content", self.id).into()))
             .flex_1()
             .min_h_0()
             .overflow_y_scroll()
+            .track_scroll(&scroller_handle)
             .overscroll_contain()
             .px(t.spacing.s2)
             .py(t.spacing.s2)
             .role(Role::Navigation)
             .aria_label(label)
-            .children(self.children);
+            .child(crate::gestures::scroller::scroll_begin(
+                ElementId::Name(format!("{}-content", self.id).into()),
+                Some(&scroller_handle),
+                (false, true),
+            ))
+            .children(self.children)
+            .child(crate::gestures::scroller::scroll_end());
         let drawer = drawer
             .children(if inert {
                 Vec::new()

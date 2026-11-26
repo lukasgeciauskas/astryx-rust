@@ -1196,10 +1196,20 @@ impl Calendar {
         let nav = g.nav.clone();
         let date = day.date;
         let pick: ClickFn = Rc::new(move |_, window, cx| nav.pick(date, window, cx));
+        // A finger's press paints as UIKit tracks a control (upstream `usePressFeedback`).
+        let feedback = crate::gestures::use_press_feedback(
+            ElementId::Name(
+                format!("{}-day-{}-{}", g.state.entity_id(), date, day.is_outside).into(),
+            ),
+            window,
+            cx,
+        )
+        .disabled(state.effectively_disabled);
         let mut button = apply_press(
             button,
             &handle,
             Press {
+                feedback: Some(&feedback),
                 fill,
                 scale: None,
                 disabled: state.effectively_disabled,
@@ -1233,6 +1243,6 @@ impl Calendar {
                 }
             });
         }
-        cell.child(button).into_any_element()
+        cell.child(feedback.surface(button)).into_any_element()
     }
 }

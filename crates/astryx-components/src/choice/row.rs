@@ -71,6 +71,9 @@ pub(crate) struct ChoiceRow {
     pub role: Role,
     pub toggled: Toggled,
     pub on_toggle: Option<ToggleFn>,
+    /// The touch press model's surface (upstream `usePressFeedback` on the row): its
+    /// paint is the control's to draw.
+    pub press: Option<crate::gestures::PressFeedback>,
 }
 
 /// The GPUI group of a row, which its control's hover and press follow.
@@ -134,6 +137,11 @@ impl ChoiceRow {
             LabelPosition::End => row.child(control).child(label),
             LabelPosition::Start => row.child(label).child(control),
         };
+        if let Some(press) = &self.press {
+            row = row
+                .relative()
+                .child(press.probe().absolute().top_0().left_0().size_full());
+        }
         match (self.disabled || self.inert, self.on_toggle) {
             (false, Some(toggle)) => {
                 row = row.cursor_pointer().on_click(move |event, window, cx| {

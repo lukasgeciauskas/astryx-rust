@@ -317,6 +317,11 @@ impl RenderOnce for Dialog {
         let eased = t.ease.standard.ease(progress);
 
         let gutter = t.spacing.s4.to_pixels(rem);
+        let scroller_handle = crate::gestures::scroller::use_scroll_handle(
+            ElementId::Name(format!("{}-surface", self.id).into()),
+            window,
+            cx,
+        );
         let mut surface = div()
             .id(ElementId::Name(format!("{}-surface", self.id).into()))
             .track_focus(&surface_focus)
@@ -326,6 +331,7 @@ impl RenderOnce for Dialog {
             .flex()
             .flex_col()
             .overflow_y_scroll()
+            .track_scroll(&scroller_handle)
             .bg(t.color.background_surface)
             .text_color(t.color.text_primary)
             .font_stack(&t.font.family.body)
@@ -370,15 +376,22 @@ impl RenderOnce for Dialog {
         } else {
             crate::layout::ContainerCorners::all(t.radius.container.to_pixels(rem))
         };
-        let surface = surface.child(provide(
-            scope,
-            crate::layout::padding_container(
-                all(padding),
-                Some(crate::layout::LayoutContainerKind::Dialog),
-                crate::layout::host_children(self.children, all(padding), corners),
-                cx,
-            ),
-        ));
+        let surface = surface
+            .child(crate::gestures::scroller::scroll_begin(
+                ElementId::Name(format!("{}-surface", self.id).into()),
+                Some(&scroller_handle),
+                (false, true),
+            ))
+            .child(provide(
+                scope,
+                crate::layout::padding_container(
+                    all(padding),
+                    Some(crate::layout::LayoutContainerKind::Dialog),
+                    crate::layout::host_children(self.children, all(padding), corners),
+                    cx,
+                ),
+            ))
+            .child(crate::gestures::scroller::scroll_end());
 
         // The backdrop: dims the page (not behind a full-screen dialog),
         // takes its presses, and places the surface.

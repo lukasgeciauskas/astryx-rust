@@ -32,10 +32,9 @@ use astryx_primitives::{
 };
 use astryx_theme::{ThemeStyled, current, scope};
 use gpui::{
-    AnyElement, App, Bounds, ClickEvent, DispatchPhase, ElementId, Entity, FocusHandle, HasPopup,
-    IntoElement, KeyDownEvent, Length, MouseButton, MouseMoveEvent, MouseUpEvent, ParentElement,
-    Pixels, RenderOnce, Role, ScrollHandle, SharedString, StyleRefinement, Styled, Task, Window,
-    div, point, prelude::*, px, relative,
+    AnyElement, App, Bounds, ClickEvent, ElementId, Entity, FocusHandle, HasPopup, IntoElement,
+    KeyDownEvent, Length, MouseButton, ParentElement, Pixels, RenderOnce, Role, ScrollHandle,
+    SharedString, StyleRefinement, Styled, Task, Window, div, point, prelude::*, px, relative,
 };
 use web_time::Instant;
 
@@ -49,6 +48,7 @@ use crate::button::{ButtonVariant, IconButton, element_height};
 use crate::choice::action::{ActionFn, ChangeFn, Optimistic};
 use crate::field::{Field, InputStatus, StatusPlacement, StatusType};
 use crate::focus::{focus_ring, focus_ring_inset};
+use crate::gestures::menu_press::{MenuPress, MenuPressOptions, MenuPressRow, use_menu_press};
 use crate::icon::{Icon, IconColor, IconDefaultSize, IconSize};
 use crate::indicator::CheckIndicator;
 use crate::input::control::{Chrome, control_box, described_by, status_indicator};
@@ -115,8 +115,6 @@ pub(crate) struct SelectorState {
     /// The shown options' signature at the last render (FR10).
     list: Signature,
     typeahead: Typeahead,
-    /// A press that began inside the list is held (FR7).
-    press: bool,
     /// Each shown option's bounds, as of the last frame.
     rows: Vec<Option<Bounds<Pixels>>>,
     listbox: Option<Bounds<Pixels>>,
@@ -152,7 +150,6 @@ impl SelectorState {
             query: String::new(),
             list: Vec::new(),
             typeahead: Typeahead::new(),
-            press: false,
             rows: Vec::new(),
             listbox: None,
             overlay: None,
@@ -190,6 +187,8 @@ struct Shared {
     /// The presentation resolves to the sheet now.
     sheet: bool,
     loading: bool,
+    /// FR7: the listbox's press model (upstream `useMenuPress`).
+    press: MenuPress,
 }
 
 impl Shared {
@@ -223,7 +222,6 @@ impl Shared {
             s.pending_focus = search || sheet;
             s.reveal = highlight.is_some();
             s.ring_suppressed = false;
-            s.press = false;
         });
         window.refresh();
     }
@@ -239,7 +237,6 @@ impl Shared {
             s.open = false;
             s.highlight = None;
             s.hovered = None;
-            s.press = false;
             s.query.clear();
             s.typeahead.reset();
             s.overlay = None;
@@ -884,6 +881,12 @@ impl RenderOnce for Selector {
         state.update(cx, |s, _| s.rows.resize(shown.len(), None));
 
         let sheet_now = crate::overlay::presents_as_sheet(self.presentation, window);
+        let press = use_menu_press(
+            ElementId::Name(format!("{}-listbox-press", self.id).into()),
+            MenuPressOptions::default(),
+            window,
+            cx,
+        );
         let shared = Rc::new(Shared {
             state: state.clone(),
             trigger: trigger.clone(),
@@ -897,7 +900,50 @@ impl RenderOnce for Selector {
             inert,
             sheet: sheet_now,
             loading: self.loading,
+            press: press.clone(),
         });
+        // FR7: a press inside the list picks the enabled option under its release, the
+        // highlight following the held pointer (never scrolling the option into view); a
+        // mouse released outside closes the list, a finger leaves it open.
+        {
+            let (highlight, dismiss) = (Rc::downgrade(&shared), Rc::downgrade(&shared));
+            let (rows, scroll) = {
+                let s = state.read(cx);
+                (s.rows.clone(), s.scroll.clone())
+            };
+            let rows: Vec<gpui::Bounds<gpui::Pixels>> = rows.into_iter().flatten().collect();
+            let overflows = match (rows.first(), rows.last()) {
+                (Some(first), Some(last)) => {
+                    last.bottom() - first.top() > scroll.bounds().size.height + px(0.5)
+                }
+                _ => false,
+            };
+            let mut options = MenuPressOptions::default()
+                .on_highlight(move |row, window, cx| {
+                    let Some(shared) = highlight.upgrade() else {
+                        return;
+                    };
+                    match row.and_then(|key| key.parse::<usize>().ok()) {
+                        Some(index) => shared.hover(index, window, cx),
+                        None => {
+                            if shared.state.read(cx).highlight.is_some() {
+                                shared.state.update(cx, |s, _| s.highlight = None);
+                                window.refresh();
+                            }
+                        }
+                    }
+                })
+                .on_dismiss(move |window, cx| {
+                    if let Some(shared) = dismiss.upgrade() {
+                        shared.close(window, cx);
+                    }
+                })
+                .disabled(inert);
+            if overflows {
+                options = options.scroller(scroll);
+            }
+            press.set_options(options);
+        }
 
         if self.default_open && !state.read(cx).default_opened {
             state.update(cx, |s, _| s.default_opened = true);
@@ -1003,10 +1049,17 @@ impl RenderOnce for Selector {
                 .font_weight(t.font.weight.medium);
             if !inert {
                 let hover = astryx_theme::color::composite(fill, t.color.overlay_hover);
-                let pressed = astryx_theme::color::composite(fill, t.color.overlay_pressed);
-                el = el
-                    .hover(move |s| s.bg(hover))
-                    .active(move |s| s.bg(pressed));
+                el = el.hover(move |s| s.bg(hover));
+                // A finger's press paints as UIKit tracks a control (upstream `usePressFeedback`).
+                el = crate::press::touch_press(
+                    el,
+                    ElementId::Name(format!("{control_id:?}-trigger-press").into()),
+                    false,
+                    fill,
+                    t.color.overlay_pressed,
+                    window,
+                    cx,
+                );
                 // The press scale, at once as the list opens.
                 if !open && !prefers_reduced_motion(cx) && !window.last_input_was_touch() {
                     el = el.active(|s| s.scale(0.98));
@@ -1712,13 +1765,6 @@ impl Selector {
             let shared = shared.clone();
             el = el.on_mouse_move(move |_, window, cx| shared.hover(index, window, cx));
         }
-        {
-            let shared = shared.clone();
-            el = el.on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                shared.state.update(cx, |s, _| s.press = true);
-                shared.hover(index, window, cx);
-            });
-        }
         let mut props = vec![("size", ctx.size.as_str())];
         if highlighted {
             props.push(("highlighted", "highlighted"));
@@ -1730,7 +1776,19 @@ impl Selector {
             props.push(("disabled", "disabled"));
         }
         theme.refine(el.style(), "selector-option-row", &props, None);
-        el.into_any_element()
+        if item.disabled {
+            return el.into_any_element();
+        }
+        // An enabled option is one the press model picks.
+        let pick = shared.clone();
+        shared
+            .press
+            .row(
+                MenuPressRow::new(SharedString::from(index.to_string()))
+                    .on_activate(move |_, window, cx| pick.select(index, window, cx)),
+                el,
+            )
+            .into_any_element()
     }
 
     /// The listbox, under a search field when there is one.
@@ -1766,78 +1824,13 @@ impl Selector {
             .and_then(|v| shared.shown.iter().position(|i| &i.value == v))
             .unwrap_or(0);
         let probe = {
-            let (state, shared) = (state.clone(), shared.clone());
+            let state = state.clone();
             gpui::canvas(
                 {
                     let state = state.clone();
                     move |bounds, _, cx| state.update(cx, |s, _| s.listbox = Some(bounds))
                 },
                 move |_, _, window, cx| {
-                    // The press model (FR7): the release picks the enabled
-                    // option under it; a mouse released outside closes the
-                    // list, a finger leaves it open. Registered while the
-                    // list is drawn, since a press and its release can come
-                    // between two frames.
-                    {
-                        let up = shared.clone();
-                        window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
-                            if phase != DispatchPhase::Bubble
-                                || event.button != MouseButton::Left
-                                || !up.state.read(cx).press
-                            {
-                                return;
-                            }
-                            up.state.update(cx, |s, _| s.press = false);
-                            let (row, inside) = {
-                                let s = up.state.read(cx);
-                                let inside = s.listbox.is_some_and(|b| b.contains(&event.position));
-                                let row = inside
-                                    .then(|| {
-                                        s.rows.iter().position(|b| {
-                                            b.is_some_and(|b| b.contains(&event.position))
-                                        })
-                                    })
-                                    .flatten();
-                                (row, inside)
-                            };
-                            match row {
-                                Some(index) if up.shown.get(index).is_some_and(|i| !i.disabled) => {
-                                    up.select(index, window, cx)
-                                }
-                                _ if !inside && !window.last_input_was_touch() => {
-                                    up.close(window, cx)
-                                }
-                                _ => {}
-                            }
-                        });
-                        let held = shared.clone();
-                        window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
-                            if phase != DispatchPhase::Bubble || !held.state.read(cx).press {
-                                return;
-                            }
-                            let row = {
-                                let s = held.state.read(cx);
-                                s.listbox
-                                    .is_some_and(|b| b.contains(&event.position))
-                                    .then(|| {
-                                        s.rows.iter().position(|b| {
-                                            b.is_some_and(|b| b.contains(&event.position))
-                                        })
-                                    })
-                                    .flatten()
-                                    .filter(|&i| held.shown.get(i).is_some_and(|o| !o.disabled))
-                            };
-                            match row {
-                                Some(index) => held.hover(index, window, cx),
-                                // Nothing is highlighted off an enabled row.
-                                None if held.state.read(cx).highlight.is_some() => {
-                                    held.state.update(cx, |s, _| s.highlight = None);
-                                    window.refresh();
-                                }
-                                None => {}
-                            }
-                        });
-                    }
                     let (reveal, unmeasured) = {
                         let s = state.read(cx);
                         (s.reveal, s.overlay.is_none())
@@ -1871,11 +1864,13 @@ impl Selector {
             .px(pad_x)
             .role(Role::ListBox)
             .aria_label(self.label.clone())
-            .on_mouse_down(MouseButton::Left, {
-                let state = state.clone();
-                move |_, _, cx| state.update(cx, |s, _| s.press = true)
-            })
+            .child(crate::gestures::scroller::scroll_begin(
+                ElementId::Name(format!("{}-listbox", self.id).into()),
+                Some(&scroll),
+                (false, true),
+            ))
             .children(rows)
+            .child(crate::gestures::scroller::scroll_end())
             .child(probe);
         // The sheet's list takes focus and the trigger's keys.
         if ctx.sheet && !self.search {
@@ -1889,8 +1884,10 @@ impl Selector {
                 })
                 .child(focus_probe(&state, listbox_focus.clone()));
         }
+        // The press model's surface (upstream `menuProps` on the listbox).
+        let listbox = shared.press.menu(listbox, true).into_any_element();
         let Some(editor) = shared.editor.clone() else {
-            return listbox.into_any_element();
+            return listbox;
         };
 
         // The search row: a magnifier, a borderless field and a clear button.

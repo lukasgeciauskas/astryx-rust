@@ -469,9 +469,15 @@ impl<T: TableRecord> RenderOnce for Table<T> {
             region_el = hook(region_el);
         }
         let mut out: AnyElement = region_el
+            .child(crate::gestures::scroller::scroll_begin(
+                ElementId::Name(format!("{name}-scroll").into()),
+                Some(&scroll),
+                (true, block),
+            ))
             .children(wrapper.before_table)
             .child(table)
             .children(wrapper.after_table)
+            .child(crate::gestures::scroller::scroll_end())
             .into_any_element();
         // Providers: the first plugin wraps outermost (FR11).
         for p in plugins.iter().rev() {

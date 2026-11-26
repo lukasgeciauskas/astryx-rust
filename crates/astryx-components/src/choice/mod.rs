@@ -223,22 +223,37 @@ impl RenderOnce for CheckboxInput {
                     .shade(SpinnerShade::Inherit),
             );
         }
-        // A press paints the overlay over the box (upstream indicator press).
+        // A press paints the overlay over the box (upstream indicator press): a mouse's
+        // through the active style where the pointer is fine, a finger's as UIKit tracks
+        // a control (upstream `usePressFeedback`).
         let group = row_group(&self.id);
         let overlay = t.color.overlay_pressed;
+        let feedback = crate::gestures::use_press_feedback(
+            ElementId::Name(format!("{group}-press").into()),
+            window,
+            cx,
+        )
+        .disabled(self.disabled || busy || self.read_only)
+        .owns_box(true);
+        let mouse_active = !feedback.paints_buttons(window, cx);
+        let touch_overlay = feedback.overlay(overlay, window, cx);
         let control = div().relative().child(indicator).when(
             !self.disabled && !busy && !self.read_only,
             |el| {
-                el.child(
-                    div()
-                        .id("press")
-                        .absolute()
-                        .top_0()
-                        .left_0()
-                        .size_full()
-                        .rounded(t.radius.inner)
-                        .group_active(group, move |s| s.bg(overlay)),
-                )
+                let mut press = div()
+                    .id("press")
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .size_full()
+                    .rounded(t.radius.inner);
+                if mouse_active {
+                    press = press.group_active(group, move |s| s.bg(overlay));
+                }
+                if let Some(o) = touch_overlay {
+                    press = press.bg(o);
+                }
+                el.child(press)
             },
         );
 
@@ -260,6 +275,7 @@ impl RenderOnce for CheckboxInput {
             role: Role::CheckBox,
             toggled: toggled(shown),
             on_toggle: Some(Rc::new(move |window, cx| change(next, window, cx))),
+            press: Some(feedback),
         };
         let mut el = row.render(window, cx);
         theme.refine(
@@ -424,6 +440,16 @@ impl RenderOnce for Switch {
         let overlay = c.overlay_pressed;
         let thumb_pressed = composite(c.background_surface, overlay);
         let inert = self.disabled || busy;
+        // A finger's press paints the thumb and the track as UIKit tracks a control
+        // (upstream `usePressFeedback`); a fine pointer keeps the active style.
+        let feedback = crate::gestures::use_press_feedback(
+            ElementId::Name(format!("{group}-press").into()),
+            window,
+            cx,
+        )
+        .disabled(inert);
+        let mouse_active = !feedback.paints_buttons(window, cx);
+        let touch_overlay = feedback.overlay(overlay, window, cx);
 
         let thumb = div()
             .id("thumb")
@@ -437,8 +463,11 @@ impl RenderOnce for Switch {
             .rounded_full()
             .bg(c.background_surface)
             .text_color(if on { c.accent } else { c.text_secondary })
-            .when(!inert, |el| {
+            .when(!inert && mouse_active, |el| {
                 el.group_active(group.clone(), move |s| s.bg(thumb_pressed))
+            })
+            .when_some(touch_overlay.filter(|_| !inert), |el, o| {
+                el.bg(composite(c.background_surface, o))
             })
             .when(busy, |el| {
                 el.child(
@@ -459,9 +488,13 @@ impl RenderOnce for Switch {
         if self.disabled {
             control = control.opacity(0.5);
         } else if !busy {
-            control = control
-                .group_hover(group.clone(), move |s| s.bg(hover))
-                .group_active(group, move |s| s.bg(composite(track, overlay)));
+            control = control.group_hover(group.clone(), move |s| s.bg(hover));
+            if mouse_active {
+                control = control.group_active(group, move |s| s.bg(composite(track, overlay)));
+            }
+            if let Some(o) = touch_overlay {
+                control = control.bg(composite(track, o));
+            }
         }
         theme.refine(
             control.style(),
@@ -490,6 +523,7 @@ impl RenderOnce for Switch {
             role: Role::Switch,
             toggled: if on { Toggled::True } else { Toggled::False },
             on_toggle: Some(Rc::new(move |window, cx| change(!on, window, cx))),
+            press: Some(feedback),
         };
         let mut el = row.render(window, cx);
         theme.refine(el.style(), "switch", &[("size", self.size.as_str())], None);

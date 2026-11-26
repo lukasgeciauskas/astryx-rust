@@ -244,23 +244,29 @@ impl RenderOnce for Collapsible {
             let on_open_change = self.on_open_change.clone();
             let group_toggle = in_group.map(|(g, v)| (g.toggle.clone(), v));
             let state = state.clone();
-            trigger = trigger
-                .cursor_pointer()
-                .active(move |s| s.bg(pressed))
-                .on_click(move |_, window, cx| {
-                    cx.stop_propagation();
-                    if let Some((toggle, value)) = &group_toggle {
-                        toggle(value, window, cx);
-                        return;
-                    }
-                    if !controlled {
-                        state.update(cx, |s, _| s.0 = Some(!open));
-                    }
-                    if let Some(f) = &on_open_change {
-                        f(!open, window, cx);
-                    }
-                    window.refresh();
-                });
+            trigger = crate::press::touch_press(
+                trigger,
+                ElementId::Name(format!("{:?}-trigger-press", self.id).into()),
+                false,
+                gpui::transparent_black(),
+                pressed,
+                window,
+                cx,
+            );
+            trigger = trigger.cursor_pointer().on_click(move |_, window, cx| {
+                cx.stop_propagation();
+                if let Some((toggle, value)) = &group_toggle {
+                    toggle(value, window, cx);
+                    return;
+                }
+                if !controlled {
+                    state.update(cx, |s, _| s.0 = Some(!open));
+                }
+                if let Some(f) = &on_open_change {
+                    f(!open, window, cx);
+                }
+                window.refresh();
+            });
         }
         if is_focus_visible(&focus, window) {
             trigger = trigger.child(focus_ring(t, px(0.), rem));

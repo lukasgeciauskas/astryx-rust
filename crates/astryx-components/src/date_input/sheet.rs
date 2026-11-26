@@ -198,6 +198,14 @@ pub(crate) fn header_button(
 ) -> gpui::Stateful<gpui::Div> {
     let t = theme.tokens();
     let rem = window.rem_size();
+    // Upstream TouchDateField's `usePressFeedback`: a finger's press paints as UIKit
+    // tracks a control.
+    let feedback = crate::gestures::use_press_feedback(
+        ElementId::Name(format!("{id:?}-press").into()),
+        window,
+        cx,
+    )
+    .space_activates(focus);
     let el = div()
         .id(id)
         .flex()
@@ -210,6 +218,7 @@ pub(crate) fn header_button(
         el,
         focus,
         Press {
+            feedback: Some(&feedback),
             fill: None,
             scale: None,
             disabled: false,
@@ -223,6 +232,7 @@ pub(crate) fn header_button(
         window,
         cx,
     )
+    .child(feedback.probe().absolute().top_0().left_0().size_full())
 }
 
 pub(super) fn render_sheet(mut input: DateInput, window: &mut Window, cx: &mut App) -> AnyElement {

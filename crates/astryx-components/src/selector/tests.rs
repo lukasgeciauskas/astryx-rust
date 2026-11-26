@@ -650,3 +650,64 @@ fn fr3_the_mark_sits_at_the_indicator_edge(cx: &mut TestAppContext) {
     let row = bounds(cx, "s-option-Banana").unwrap();
     assert!(mark.left() - row.left() < px(16.), "the mark leads the row");
 }
+
+fn finger(cx: &mut VisualTestContext, id: u64, phase: gpui::TouchPhase, at: Point<Pixels>) {
+    cx.simulate_event(gpui::TouchEvent {
+        id: gpui::TouchId(id),
+        phase,
+        position: at,
+        predicted_position: None,
+        force: None,
+    });
+    settle(cx);
+}
+
+#[gpui::test]
+fn fr7_a_finger_slides_to_the_option_it_lifts_on(cx: &mut TestAppContext) {
+    let (cx, setup) = host(cx, fruits(), None, |s| s);
+    click_trigger(cx);
+    let (apple, grape) = (center(cx, "s-option-Apple"), center(cx, "s-option-Grape"));
+    finger(cx, 1, gpui::TouchPhase::Started, apple);
+    assert_eq!(highlighted(cx), Some("Apple"));
+    finger(cx, 1, gpui::TouchPhase::Moved, grape);
+    assert_eq!(
+        highlighted(cx),
+        Some("Grape"),
+        "the highlight follows the finger"
+    );
+    finger(cx, 1, gpui::TouchPhase::Ended, grape);
+    assert_eq!(
+        logged(&setup),
+        ["change Grape"],
+        "once, the option under the lift"
+    );
+}
+
+#[gpui::test]
+fn fr7_a_finger_released_outside_leaves_the_list_open_and_picks_nothing(cx: &mut TestAppContext) {
+    let (cx, setup) = host(cx, fruits(), None, |s| s);
+    click_trigger(cx);
+    let apple = center(cx, "s-option-Apple");
+    let outside = point(px(900.), px(600.));
+    finger(cx, 1, gpui::TouchPhase::Started, apple);
+    finger(cx, 1, gpui::TouchPhase::Moved, outside);
+    finger(cx, 1, gpui::TouchPhase::Ended, outside);
+    assert!(logged(&setup).is_empty());
+    assert!(is_open(cx), "a finger leaves the list open");
+    // A tap on an option picks it.
+    let banana = center(cx, "s-option-Banana");
+    finger(cx, 2, gpui::TouchPhase::Started, banana);
+    finger(cx, 2, gpui::TouchPhase::Ended, banana);
+    assert_eq!(logged(&setup), ["change Banana"]);
+}
+
+#[gpui::test]
+fn fr7_a_cancelled_finger_picks_nothing(cx: &mut TestAppContext) {
+    let (cx, setup) = host(cx, fruits(), None, |s| s);
+    click_trigger(cx);
+    let apple = center(cx, "s-option-Apple");
+    finger(cx, 1, gpui::TouchPhase::Started, apple);
+    finger(cx, 1, gpui::TouchPhase::Cancelled, apple);
+    assert!(logged(&setup).is_empty());
+    assert!(is_open(cx));
+}

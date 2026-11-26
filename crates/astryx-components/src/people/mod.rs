@@ -651,14 +651,26 @@ impl RenderOnce for AvatarGroupOverflow {
                 let focus = control_focus(&id, window, cx);
                 let ring = is_focus_visible(&focus, window)
                     .then(|| crate::focus::focus_ring(t, radius.to_pixels(rem), rem));
-                el.id(id)
+                let el = el
+                    .id(id)
                     .track_focus(&focus)
                     .role(Role::Button)
                     .aria_label(label)
-                    .cursor_pointer()
-                    .on_click(on_click)
-                    .children(ring)
-                    .into_any_element()
+                    .cursor_pointer();
+                // A finger's press paints as UIKit tracks a control (upstream
+                // `usePressFeedback`).
+                crate::press::touch_press(
+                    el,
+                    ElementId::Name("avatar-group-overflow-press".into()),
+                    false,
+                    gpui::transparent_black(),
+                    t.color.overlay_pressed,
+                    window,
+                    cx,
+                )
+                .on_click(on_click)
+                .children(ring)
+                .into_any_element()
             }
         }
     }

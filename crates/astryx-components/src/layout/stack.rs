@@ -247,9 +247,18 @@ impl RenderOnce for Stack {
             .clone()
             .unwrap_or(ElementId::CodeLocation(*self.source));
         if self.scrollable {
-            el.id(id)
+            let scroller_handle =
+                crate::gestures::scroller::use_scroll_handle(id.clone(), window, cx);
+            el.id(id.clone())
                 .overflow_scroll()
+                .track_scroll(&scroller_handle)
+                .child(crate::gestures::scroller::scroll_begin(
+                    id,
+                    Some(&scroller_handle),
+                    (true, true),
+                ))
                 .children(children)
+                .child(crate::gestures::scroller::scroll_end())
                 .into_any_element()
         } else if let Some(id) = self.id {
             el.id(id).children(children).into_any_element()

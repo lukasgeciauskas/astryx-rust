@@ -338,6 +338,12 @@
   the content under a clip with transforms alone; here the clip's height follows the
   shared motion (the content keeps its own height and slides under it), so the content
   after it follows by layout, frame by frame, rather than by a transform.
+- **Gestures: what GPUI's input reports.** GPUI has no pen pointer type, so a pen
+  drives gestures as a mouse does (the recognizers' pen rules are tested but never
+  reached). It has no `scrollend`, so a finger's scroll counts as ended after 150 ms
+  without movement. A finger that no gesture takes scrolls the window on UIKit's
+  deceleration, since GPUI's own scroll physics is private. Scrollers inside a cached
+  view are not followed.
 - **Remembered sizes live in a file natively (M9).** `autoSaveId` writes to
   `localStorage` in a browser, as upstream does; a native app keeps the entries in
   `<data dir>/astryx/<executable>.json` (`astryx_primitives::storage`, which an app can

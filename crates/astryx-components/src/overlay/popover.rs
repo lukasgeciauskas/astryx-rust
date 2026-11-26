@@ -478,6 +478,7 @@ impl RenderOnce for Popover {
                 open,
                 self.label.clone().unwrap_or_default(),
             )
+            .escape_dismiss(self.escape_dismiss)
             .on_open_change(move |open, window, cx| request(&sheet_state, open, window, cx));
             if let Some(build) = content {
                 bottom = bottom.child(build(window, cx));
@@ -550,6 +551,11 @@ impl RenderOnce for Popover {
             }
         });
 
+        let scroller_handle = crate::gestures::scroller::use_scroll_handle(
+            ElementId::Name(format!("{}-surface", self.id).into()),
+            window,
+            cx,
+        );
         let mut surface = div()
             .id(ElementId::Name(format!("{}-surface", self.id).into()))
             .track_focus(&surface_focus)
@@ -560,6 +566,7 @@ impl RenderOnce for Popover {
             .max_w(cap.width)
             .max_h(cap.height)
             .overflow_y_scroll()
+            .track_scroll(&scroller_handle)
             .bg(t.color.background_popover)
             .rounded(t.radius.container)
             .shadow_token(&t.shadow.low)
@@ -567,7 +574,13 @@ impl RenderOnce for Popover {
             .font_stack(&t.font.family.body)
             .text_style(&t.text.body)
             .text_color(t.color.text_primary)
+            .child(crate::gestures::scroller::scroll_begin(
+                ElementId::Name(format!("{}-surface", self.id).into()),
+                Some(&scroller_handle),
+                (false, true),
+            ))
             .child(content)
+            .child(crate::gestures::scroller::scroll_end())
             .children(close)
             .when(state.read(cx).pending_focus, |el| {
                 let state = state.clone();

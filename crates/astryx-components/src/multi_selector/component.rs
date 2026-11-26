@@ -1648,10 +1648,17 @@ impl MultiSelector {
                 .font_weight(t.font.weight.medium);
             if !inert {
                 let hover = astryx_theme::color::composite(fill, t.color.overlay_hover);
-                let pressed = astryx_theme::color::composite(fill, t.color.overlay_pressed);
-                el = el
-                    .hover(move |s| s.bg(hover))
-                    .active(move |s| s.bg(pressed));
+                el = el.hover(move |s| s.bg(hover));
+                // A finger's press paints as UIKit tracks a control (upstream `usePressFeedback`).
+                el = crate::press::touch_press(
+                    el,
+                    ElementId::Name(format!("{control_id:?}-trigger-press").into()),
+                    false,
+                    fill,
+                    t.color.overlay_pressed,
+                    window,
+                    cx,
+                );
                 // The press scale, at once as the list opens.
                 if !open && !prefers_reduced_motion(cx) && !window.last_input_was_touch() {
                     el = el.active(|s| s.scale(0.98));
@@ -2345,7 +2352,13 @@ impl MultiSelector {
             .role(if grid { Role::Grid } else { Role::ListBox })
             .aria_label(self.label.clone())
             .aria_multiselectable(true)
+            .child(crate::gestures::scroller::scroll_begin(
+                ElementId::Name(format!("{}-listbox", self.id).into()),
+                Some(&scroll),
+                (false, true),
+            ))
             .children(children)
+            .child(crate::gestures::scroller::scroll_end())
             .child(reveal_probe);
         if a.list_owns_keys {
             let s = shared.clone();

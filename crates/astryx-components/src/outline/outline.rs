@@ -4,6 +4,7 @@
 //! Choosing a link scrolls its heading to the top of the scroll root, below `offset`
 //! (FR4); uncontrolled, the current heading follows the reader's scroll (FR5).
 
+use crate::press::TouchPress as _;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -484,6 +485,15 @@ impl RenderOnce for Outline {
                     .text_color(t.color.text_secondary)
                     .cursor_pointer()
                     .hover(move |s| s.text_color(primary))
+                    // A finger's press paints as UIKit tracks a cell (upstream
+                    // `usePressFeedback`).
+                    .touch_press(
+                        ElementId::Name(format!("{link_id}-press").into()),
+                        gpui::transparent_black(),
+                        t.color.overlay_pressed,
+                        window,
+                        cx,
+                    )
                     .role(Role::Link)
                     .aria_label(item.label.clone())
                     .on_click(move |event, window, cx| {

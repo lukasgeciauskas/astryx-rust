@@ -11,8 +11,11 @@
 //! - The pointer: the row under it takes focus. A submenu opens on hover
 //!   after 150 ms and stays open while the pointer travels the safe triangle
 //!   toward it (FR13); leaving closes it after 200 ms.
-//! - The press model (FR5): a press that opened the menu picks the row it is
-//!   released on, once it settled; a mouse released outside closes the menu.
+//! - The press model (FR5, upstream `useMenuPress`, [`crate::gestures::menu_press`]): the
+//!   row under the release acts and the highlight follows a held pointer; the opening
+//!   press picks once it settled, a finger's once it travelled UIMenu's handoff; a mouse
+//!   released outside closes the menu, a finger leaves it open; a held finger lights the
+//!   row under it; a resting pointer near the edge of a scrolling menu scrolls it.
 //! - Drill-in (FR11) and the touch sheet: a submenu replaces the rows, behind
 //!   a Back row (or the sheet's Back button).
 
@@ -27,14 +30,15 @@ use astryx_primitives::{
 use astryx_theme::{ThemeStyled, current};
 use gpui::{
     AnyElement, App, Bounds, ClickEvent, DispatchPhase, ElementId, Entity, FocusHandle, HasPopup,
-    IntoElement, KeyDownEvent, Length, MouseButton, MouseMoveEvent, MouseUpEvent, ParentElement,
-    Pixels, Point, RenderOnce, Role, ScrollHandle, SharedString, Styled, Task, Window, div, point,
-    prelude::*, px, relative,
+    IntoElement, KeyDownEvent, Length, MouseButton, MouseMoveEvent, ParentElement, Pixels, Point,
+    RenderOnce, Role, ScrollHandle, SharedString, Styled, Task, Window, div, point, prelude::*, px,
+    relative,
 };
 use web_time::Instant;
 
 use crate::button::{ButtonVariant, IconButton};
 use crate::focus::focus_ring_inset;
+use crate::gestures::menu_press::{MenuPress, MenuPressRow, MenuRelease};
 use crate::icon::{Icon, IconColor, IconSize, IconSource};
 use crate::indicator::{CheckboxIndicator, ChoiceSize, RadioIndicator};
 use crate::item::Item;
@@ -53,8 +57,6 @@ const SUBMENU_HIDE_DELAY: Duration = Duration::from_millis(200);
 const SUBMENU_CLICK_GUARD: Duration = Duration::from_millis(500);
 /// Upstream `SAFE_TRIANGLE_PADDING_PX`.
 const SAFE_TRIANGLE_PADDING: f32 = 8.;
-/// Upstream `MENU_PRESS_SETTLE_MS`.
-pub(crate) const MENU_PRESS_SETTLE: Duration = Duration::from_millis(300);
 
 /// What a menu row does.
 pub type MenuAction = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -635,26 +637,14 @@ pub(crate) enum Initial {
     Container,
 }
 
-/// A press that opened the menu and is still held.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct PressGesture {
-    pub at: Instant,
-    /// The pointer moved over the menu.
-    pub entered: bool,
-    /// Left for a menu button, right for a context menu.
-    pub button: MouseButton,
-}
-
 /// One menu's state across its levels.
 pub(crate) struct MenuRoot {
     /// Where focus enters the root level on its next frame.
     pub initial: Option<Initial>,
-    pub press: Option<PressGesture>,
-    /// The trigger's click after a press-down that already acted.
-    pub consume_toggle: bool,
+    /// The menu press model (upstream `useMenuPress`), shared by every level.
+    pub press: MenuPress,
     /// The key that opened the menu: its repeats do nothing (FR12).
     pub opening_key: Option<SharedString>,
-    pub over_trigger: bool,
     /// How many levels are drilled in: Escape steps back, not out.
     pub drilled: usize,
     /// Counts openings, so each opening starts from the root level.
@@ -671,12 +661,10 @@ pub(crate) fn menu_root(id: &ElementId, window: &mut Window, cx: &mut App) -> En
     window.use_keyed_state(
         ElementId::Name(format!("{id}-menu-root").into()),
         cx,
-        |_, _| MenuRoot {
+        |window, cx| MenuRoot {
             initial: None,
-            press: None,
-            consume_toggle: false,
+            press: MenuPress::new(window, cx),
             opening_key: None,
-            over_trigger: false,
             drilled: 0,
             generation: 0,
             was_open: false,
@@ -698,7 +686,7 @@ pub(crate) fn sync_root(root: &Entity<MenuRoot>, open: bool, window: &Window, cx
             r.initial.get_or_insert(Initial::Container);
         }
         if !open {
-            r.press = None;
+            r.press.reset();
             r.opening_key = None;
             r.drilled = 0;
             r.surfaces.clear();
@@ -727,17 +715,6 @@ pub(crate) fn surface_probe(root: &Entity<MenuRoot>, depth: usize, clear: bool) 
     .left_0()
     .size_full()
     .into_any_element()
-}
-
-/// The menu's press-down settled: it entered the menu, or lasted long
-/// enough that its release is a choice.
-fn settled(press: &PressGesture, cx: &App) -> bool {
-    press.entered
-        || cx
-            .background_executor()
-            .now()
-            .saturating_duration_since(press.at)
-            >= MENU_PRESS_SETTLE
 }
 
 /// What every level of one menu shares.
@@ -1092,6 +1069,9 @@ impl RenderOnce for MenuList {
         let tree = self.tree.clone();
         let root = tree.root.clone();
         let is_root = self.depth == 0 && self.back.is_none();
+        // The level drawn first each frame (the root, or what drilled in for it).
+        let first_level = self.depth == 0;
+        let press = root.read(cx).press.clone();
         let state = window.use_keyed_state(
             ElementId::Name(format!("{}-menu", self.id).into()),
             cx,
@@ -1584,6 +1564,7 @@ impl RenderOnce for MenuList {
             };
 
             let row_selector = format!("{}-{}", self.id, row.key());
+            let row_key = SharedString::from(row_selector.clone());
             // TabMenu's rows are roomier, the selected one medium weight.
             let tab_menu_row = matches!(&row, Row::Radio { group, .. } if group.check_marks);
             let (row_pad_y, row_pad_x) = if tab_menu_row && !tree.touch {
@@ -1656,33 +1637,16 @@ impl RenderOnce for MenuList {
             // The pointer focuses the row under it (an enabled one).
             {
                 let handle = handle.clone();
-                let root = root.clone();
                 el = el.on_mouse_move(move |_, window, cx| {
-                    root.update(cx, |r, _| {
-                        if let Some(press) = &mut r.press {
-                            press.entered = true;
-                        }
-                    });
                     if !row_disabled && !handle.is_focused(window) {
                         handle.focus(window, cx);
                         window.refresh();
                     }
                 });
             }
-            // The press model: the release of the opening press picks.
-            for button in [MouseButton::Left, MouseButton::Right] {
-                let root = root.clone();
-                let activate = activate.clone();
-                el = el.on_mouse_up(button, move |_, window, cx| {
-                    let Some(press) = root.read(cx).press.filter(|p| p.button == button) else {
-                        return;
-                    };
-                    root.update(cx, |r, _| r.press = None);
-                    if settled(&press, cx) {
-                        cx.stop_propagation();
-                        activate(false, window, cx);
-                    }
-                });
+            // A held finger lights the row it is over: its pressed paint.
+            if press.lit_row().as_deref() == Some(row_key.as_ref()) {
+                el = el.bg(t.color.overlay_pressed);
             }
             if href.is_some() {
                 let activate = activate.clone();
@@ -1690,10 +1654,17 @@ impl RenderOnce for MenuList {
                     activate(true, window, cx)
                 });
             }
-            let mut el = el.on_click(move |event: &ClickEvent, window, cx| {
-                cx.stop_propagation();
-                let m = event.modifiers();
-                activate(m.platform || m.control || m.shift, window, cx);
+            let mut el = el.on_click({
+                let (press, activate) = (press.clone(), activate.clone());
+                move |event: &ClickEvent, window, cx| {
+                    cx.stop_propagation();
+                    // The press model already answered this release.
+                    if !event.is_keyboard() && press.take_stray_click(cx) {
+                        return;
+                    }
+                    let m = event.modifiers();
+                    activate(m.platform || m.control || m.shift, window, cx);
+                }
             });
             let props = [("size", tree.size.as_str())];
             theme.refine(
@@ -1711,6 +1682,23 @@ impl RenderOnce for MenuList {
                 self.flyout(&state, &row, &handle, el, window, cx)
             } else {
                 el.into_any_element()
+            };
+            // An enabled row is one the press model picks (upstream's item selector).
+            let el: AnyElement = if row_disabled {
+                el
+            } else {
+                let activate = activate.clone();
+                press
+                    .row(
+                        MenuPressRow::new(row_key.clone())
+                            .focus(&handle)
+                            .on_activate(move |release: &MenuRelease, window, cx| {
+                                let m = release.modifiers;
+                                activate(m.platform || m.control || m.shift, window, cx)
+                            }),
+                        el,
+                    )
+                    .into_any_element()
             };
             stack.last_mut().expect("root").1.push(el);
         }
@@ -1889,47 +1877,40 @@ impl RenderOnce for MenuList {
                 .size_0(),
             );
         }
-        // The release of the opening press, anywhere: a settled mouse
-        // release outside every level and the trigger closes the menu.
-        if is_root {
-            let root = root.clone();
+        // The press model: a mouse released outside every level (and the trigger)
+        // closes the menu; the root level's rows scroll under a resting pointer.
+        if first_level {
             let close = tree.close.clone();
-            container = container.child(
-                gpui::canvas(
-                    |_, _, _| {},
-                    move |_, _, window, _| {
-                        let (root, close) = (root.clone(), close.clone());
-                        window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
-                            if phase != DispatchPhase::Bubble {
-                                return;
-                            }
-                            let Some(press) =
-                                root.read(cx).press.filter(|p| p.button == event.button)
-                            else {
-                                return;
-                            };
-                            root.update(cx, |r, _| r.press = None);
-                            // A finger leaves the menu open.
-                            if window.last_input_was_touch() {
-                                return;
-                            }
-                            let r = root.read(cx);
-                            let inside =
-                                r.surfaces.iter().any(|(_, b)| b.contains(&event.position));
-                            if settled(&press, cx) && !inside && !r.over_trigger {
-                                close(window, cx);
-                            }
-                        });
-                    },
-                )
-                .absolute()
-                .size_0(),
+            // The rows overflow the level (as last laid out): it scrolls.
+            let overflows = {
+                let s = state.read(cx);
+                let rows: Vec<Bounds<Pixels>> = s.rows.iter().flatten().copied().collect();
+                let viewport = scroll.bounds();
+                match (rows.first(), rows.last()) {
+                    (Some(first), Some(last)) => {
+                        last.bottom() - first.top() > viewport.size.height + px(0.5)
+                    }
+                    _ => false,
+                }
+            };
+            press.set_menu(
+                move |window, cx| close(window, cx),
+                overflows.then(|| scroll.clone()),
+                Some(container_focus.clone()),
             );
         }
-        let mut container = container.children(children).children(entry_probe);
+        let mut container = container
+            .child(crate::gestures::scroller::scroll_begin(
+                self.id.clone(),
+                Some(&scroll),
+                (false, true),
+            ))
+            .children(children)
+            .child(crate::gestures::scroller::scroll_end())
+            .children(entry_probe);
         let props = [("size", tree.size.as_str())];
         theme.refine(container.style(), "dropdown-menu", &props, None);
-        container.into_any_element()
+        press.menu(container, first_level).into_any_element()
     }
 }
 

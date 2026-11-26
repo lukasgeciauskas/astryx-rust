@@ -1,8 +1,10 @@
 //! Upstream `DropdownMenu` and `MoreMenu`: a menu behind a button.
 //!
 //! - The trigger opens the menu on a mouse press-down (FR8), with the press
-//!   model's settle rule on its release; a click, Enter or Space open it
-//!   too, and ArrowDown or ArrowUp open it on the first or last row (FR12).
+//!   model's settle rule on its release; a finger opens it as it presses (after the
+//!   content-touch delay in a scroller) and picks after UIMenu's handoff; a click, Enter
+//!   or Space open it too, and ArrowDown or ArrowUp open it on the first or last row
+//!   (FR12).
 //!   It reports `aria-expanded` and `aria-haspopup`, and keeps the pressed
 //!   tint while the menu is open.
 //! - The menu opens in a Popover below the trigger, at least as wide as it
@@ -23,8 +25,8 @@ use gpui::{
 
 use super::disclosure::Disclosure;
 use super::menu::{
-    Initial, MenuAction, MenuEntry, MenuList, MenuRoot, MenuSize, MenuTree, PressGesture,
-    menu_block_cap, menu_root, surface_probe, sync_root,
+    Initial, MenuAction, MenuEntry, MenuList, MenuRoot, MenuSize, MenuTree, menu_block_cap,
+    menu_root, surface_probe, sync_root,
 };
 use super::motion::viewport_cap;
 use super::popover::{
@@ -44,14 +46,29 @@ pub(crate) fn menu_disclosure(
     controller: &PopoverController,
     expanded: bool,
     popup: HasPopup,
+    cx: &App,
 ) -> Disclosure {
-    let toggle = {
+    let press = root.read(cx).press.clone();
+    // The trigger's press (upstream `onTriggerPress`): a mouse press, or a finger's
+    // UIMenu open, opens the menu under the held pointer, or closes an open one.
+    {
         let (root, controller) = (root.clone(), controller.clone());
+        press.set_trigger_press(move |_, window, cx| {
+            if controller.is_open(cx) {
+                controller.hide(window, cx);
+                return false;
+            }
+            root.update(cx, |r, _| r.initial = Some(Initial::Container));
+            controller.show(window, cx);
+            true
+        });
+    }
+    let toggle = {
+        let (root, controller, press) = (root.clone(), controller.clone(), press.clone());
         Rc::new(move |window: &mut Window, cx: &mut App| {
             let keyboard = window.last_input_was_keyboard();
-            let consumed = root.update(cx, |r, _| std::mem::take(&mut r.consume_toggle));
-            // The press-down already opened or closed it.
-            if consumed && !keyboard {
+            // The press already opened or closed it.
+            if press.is_trigger_click_from_press() && !keyboard {
                 return;
             }
             if controller.is_open(cx) {
@@ -63,45 +80,10 @@ pub(crate) fn menu_disclosure(
                     } else {
                         Initial::Container
                     });
-                    r.press = None;
                 });
                 controller.show(window, cx);
             }
         }) as Rc<dyn Fn(&mut Window, &mut App)>
-    };
-    let on_press = {
-        let (root, controller) = (root.clone(), controller.clone());
-        Rc::new(move |window: &mut Window, cx: &mut App| {
-            // A finger taps (its click opens the menu).
-            if window.last_input_was_touch() {
-                root.update(cx, |r, _| r.consume_toggle = false);
-                return;
-            }
-            let now = cx.background_executor().now();
-            let open = controller.is_open(cx);
-            root.update(cx, |r, _| {
-                r.consume_toggle = true;
-                if !open {
-                    r.press = Some(PressGesture {
-                        at: now,
-                        entered: false,
-                        button: gpui::MouseButton::Left,
-                    });
-                    r.initial = Some(Initial::Container);
-                }
-            });
-            if open {
-                controller.hide(window, cx);
-            } else {
-                controller.show(window, cx);
-            }
-        }) as Rc<dyn Fn(&mut Window, &mut App)>
-    };
-    let on_hover = {
-        let root = root.clone();
-        Rc::new(move |hovered: bool, _: &mut Window, cx: &mut App| {
-            root.update(cx, |r, _| r.over_trigger = hovered);
-        }) as Rc<dyn Fn(bool, &mut Window, &mut App)>
     };
     let on_key = {
         let (root, controller) = (root.clone(), controller.clone());
@@ -118,7 +100,6 @@ pub(crate) fn menu_disclosure(
                         Initial::First
                     });
                     r.opening_key = Some(key.to_string().into());
-                    r.press = None;
                 });
                 controller.show(window, cx);
                 true
@@ -129,8 +110,8 @@ pub(crate) fn menu_disclosure(
         expanded,
         popup,
         toggle: Some(toggle),
-        on_press: Some(on_press),
-        on_hover: Some(on_hover),
+        menu_press: Some(press),
+        on_hover: None,
         on_key: Some(on_key),
         open_tint: true,
         detached: false,
@@ -465,7 +446,10 @@ impl RenderOnce for DropdownMenu {
         } else {
             HasPopup::Menu
         };
-        let trigger = provide(menu_disclosure(&root, &controller, open, popup), trigger);
+        let trigger = provide(
+            menu_disclosure(&root, &controller, open, popup, cx),
+            trigger,
+        );
 
         let mut popover = Popover::new(self.id, label)
             .controller(controller)
@@ -697,6 +681,9 @@ impl RenderOnce for MenuTrigger {
             Some(focus) => focus,
             None => astryx_primitives::control_focus(&self.id, window, cx),
         };
+        // A finger's press paints as UIKit's controls do (upstream `usePressFeedback`).
+        let feedback = crate::gestures::use_press_feedback(self.id.clone(), window, cx)
+            .space_activates(&focus);
         let mut el = div()
             .id(self.id)
             .relative()
@@ -707,23 +694,23 @@ impl RenderOnce for MenuTrigger {
         el.style().refine(&self.style);
         if self.hover_bg {
             let (hover, pressed) = (t.color.overlay_hover, t.color.overlay_pressed);
-            el = el
-                .hover(move |s| s.bg(hover))
-                .active(move |s| s.bg(pressed));
+            el = el.hover(move |s| s.bg(hover));
+            if !feedback.paints_buttons(window, cx) {
+                el = el.active(move |s| s.bg(pressed));
+            }
+            if let Some(overlay) = feedback.overlay(pressed, window, cx) {
+                el = el.bg(overlay);
+            }
         }
         let disclosure = super::disclosure::disclosure(cx);
         let expanded = disclosure.as_ref().is_some_and(|d| d.expanded);
+        let menu_press = disclosure.as_ref().and_then(|d| d.menu_press.clone());
         if let Some(d) = disclosure {
             el = el.aria_expanded(d.expanded).aria_has_popup(d.popup);
             if let Some(toggle) = d.toggle {
                 el = el.on_click(move |_, window, cx| {
                     cx.stop_propagation();
                     toggle(window, cx)
-                });
-            }
-            if let Some(press) = d.on_press {
-                el = el.on_mouse_down(gpui::MouseButton::Left, move |_, window, cx| {
-                    press(window, cx)
                 });
             }
             if let Some(hover) = d.on_hover {
@@ -752,6 +739,10 @@ impl RenderOnce for MenuTrigger {
         if astryx_primitives::is_focus_visible(&focus, window) {
             el = el.child(crate::focus::focus_ring(t, radius, rem));
         }
-        el.child((self.content)(expanded))
+        let el = feedback.surface(el.child((self.content)(expanded)));
+        match menu_press {
+            Some(press) => press.trigger(el).into_any_element(),
+            None => el.into_any_element(),
+        }
     }
 }

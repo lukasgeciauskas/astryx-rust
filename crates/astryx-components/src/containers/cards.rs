@@ -90,10 +90,23 @@ impl PressableCard {
             overlay = overlay.border_2().border_color(ring);
             card = card.border_color(ring);
         }
+        // A finger's press paints as UIKit tracks a cell (upstream `usePressFeedback`);
+        // a fine pointer keeps the active style.
+        let feedback = crate::gestures::use_press_feedback(
+            ElementId::Name(format!("{group}-press").into()),
+            window,
+            cx,
+        )
+        .disabled(self.disabled)
+        .space_activates(&focus);
         if !self.disabled {
-            overlay = overlay
-                .group_hover(group.clone(), move |s| s.bg(hover))
-                .group_active(group.clone(), move |s| s.bg(pressed));
+            overlay = overlay.group_hover(group.clone(), move |s| s.bg(hover));
+            if !feedback.paints_buttons(window, cx) {
+                overlay = overlay.group_active(group.clone(), move |s| s.bg(pressed));
+            }
+            if let Some(o) = feedback.overlay(pressed, window, cx) {
+                overlay = overlay.bg(o);
+            }
             if self.ring.is_none() {
                 let emphasized = t.color.border_emphasized;
                 card = card.group_hover(group.clone(), move |s| s.border_color(emphasized));
@@ -118,7 +131,12 @@ impl PressableCard {
             &[("variant", variant.as_str())],
             None,
         );
-        let mut el = el.id(self.id).group(group).track_focus(&focus).child(card);
+        let mut el = el
+            .id(self.id)
+            .group(group)
+            .track_focus(&focus)
+            .child(card)
+            .child(feedback.probe().absolute().top_0().left_0().size_full());
         if self.disabled {
             el = el.opacity(0.5).on_click(|_, _, cx| cx.stop_propagation());
         } else if let Some(activate) = activate {

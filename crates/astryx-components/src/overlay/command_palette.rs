@@ -296,6 +296,23 @@ impl RenderOnce for CommandPaletteItem {
         if self.disabled {
             el = el.opacity(0.5);
         } else {
+            // A finger's press paints as UIKit tracks a row (upstream `usePressFeedback`).
+            let base = if self.selected {
+                t.color.accent_muted
+            } else if self.highlighted {
+                t.color.overlay_hover
+            } else {
+                gpui::transparent_black()
+            };
+            el = crate::press::touch_press(
+                el,
+                ElementId::Name(format!("command-palette-item-{}-press", self.value).into()),
+                false,
+                base,
+                t.color.overlay_pressed,
+                window,
+                cx,
+            );
             el = el.cursor_pointer();
             if let Some(f) = self.on_hover {
                 el = el.on_mouse_move(move |_, window, cx| f(window, cx));
@@ -418,8 +435,10 @@ impl RenderOnce for CommandPaletteList {
         let label = self
             .label
             .unwrap_or_else(|| i18n(cx).t("@astryx.commandPalette.list.label"));
+        let scroller_handle =
+            crate::gestures::scroller::use_scroll_handle(self.id.clone(), window, cx);
         let mut el = div()
-            .id(self.id)
+            .id(self.id.clone())
             .flex()
             .flex_col()
             .gap(t.spacing.s0_5)
@@ -427,9 +446,16 @@ impl RenderOnce for CommandPaletteList {
             .min_h_0()
             .p(t.spacing.s1)
             .overflow_y_scroll()
+            .track_scroll(&scroller_handle)
             .role(Role::ListBox)
             .aria_label(label)
-            .children(self.children);
+            .child(crate::gestures::scroller::scroll_begin(
+                self.id.clone(),
+                Some(&scroller_handle),
+                (false, true),
+            ))
+            .children(self.children)
+            .child(crate::gestures::scroller::scroll_end());
         theme.refine(el.style(), "command-palette-list", &[], None);
         el.style().refine(&self.style);
         el

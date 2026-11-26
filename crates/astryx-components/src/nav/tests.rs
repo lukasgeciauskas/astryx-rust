@@ -126,3 +126,60 @@ fn fr8_a_press_slides_across_the_rows_and_a_lift_outside_dismisses(cx: &mut Test
     cx.run_until_parked();
     assert_eq!(*log.borrow(), ["settings", "dismiss"]);
 }
+
+fn finger(
+    cx: &mut VisualTestContext,
+    id: u64,
+    phase: gpui::TouchPhase,
+    at: gpui::Point<gpui::Pixels>,
+) {
+    cx.simulate_event(gpui::TouchEvent {
+        id: gpui::TouchId(id),
+        phase,
+        position: at,
+        predicted_position: None,
+        force: None,
+    });
+    cx.run_until_parked();
+}
+
+#[gpui::test]
+fn fr8_a_finger_slides_across_the_rows_and_lifts_on_the_one_that_acts(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let cx = host(cx, menu(log.clone()));
+    let (dash, set) = (
+        cx.debug_bounds("dash").unwrap().center(),
+        cx.debug_bounds("set").unwrap().center(),
+    );
+    finger(cx, 1, gpui::TouchPhase::Started, dash);
+    finger(cx, 1, gpui::TouchPhase::Moved, set);
+    finger(cx, 1, gpui::TouchPhase::Ended, set);
+    assert_eq!(
+        *log.borrow(),
+        ["settings"],
+        "the row under the lift acts, once"
+    );
+    // A finger released off the rows leaves the menu: nothing acts, nothing dismisses.
+    finger(cx, 2, gpui::TouchPhase::Started, dash);
+    finger(cx, 2, gpui::TouchPhase::Moved, point(px(600.), px(500.)));
+    finger(cx, 2, gpui::TouchPhase::Ended, point(px(600.), px(500.)));
+    assert_eq!(*log.borrow(), ["settings"]);
+    // A second finger ends the press with nothing acting.
+    finger(cx, 3, gpui::TouchPhase::Started, dash);
+    finger(cx, 4, gpui::TouchPhase::Started, set);
+    finger(cx, 3, gpui::TouchPhase::Ended, dash);
+    finger(cx, 4, gpui::TouchPhase::Ended, set);
+    assert_eq!(*log.borrow(), ["settings"]);
+}
+
+#[gpui::test]
+fn fr8_a_press_on_a_disabled_row_acts_on_nothing(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let cx = host(cx, menu(log.clone()));
+    let off = cx.debug_bounds("off").unwrap().center();
+    finger(cx, 1, gpui::TouchPhase::Started, off);
+    finger(cx, 1, gpui::TouchPhase::Ended, off);
+    mouse(cx, true, "off");
+    mouse(cx, false, "off");
+    assert!(log.borrow().is_empty());
+}

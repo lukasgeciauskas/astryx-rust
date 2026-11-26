@@ -16,6 +16,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use astryx_primitives::gestures::VelocityTracker;
+use astryx_primitives::gestures::haptics::{HapticFeedbackKind, can_vibrate, play_haptic};
 use astryx_primitives::motion::uikit::{PAN_HYSTERESIS, picker, springs, timing};
 use astryx_primitives::{is_focus_visible, prefers_reduced_motion};
 use astryx_theme::{ThemeStyled, current};
@@ -35,6 +36,7 @@ use super::physics::{
     PlanKind, WheelCurve, WheelLayout, bounce_curve, drag_offset, finger_offset, nearest_index,
     plan_release, scale_for,
 };
+use super::physics::{reaches_row, tick_times};
 use crate::focus::focus_ring;
 
 /// A row's value committed by a rest, a key or a click.
@@ -185,6 +187,8 @@ struct Motion {
     fade: Option<f64>,
     end: End,
     _timer: Task<()>,
+    /// The haptic ticks the motion plays as rows reach the band.
+    _ticks: Vec<Task<()>>,
 }
 
 #[derive(Clone, Copy)]
@@ -231,6 +235,8 @@ pub(crate) struct WheelState {
     /// A mouse drag on the column: the click it ends with is not a row's.
     dragged: bool,
     bounds: Option<Bounds<Pixels>>,
+    /// The last selection tick, for the picker's minimum interval.
+    last_tick: Option<Instant>,
 }
 
 impl WheelState {
@@ -254,6 +260,7 @@ impl WheelState {
             phased_lift: false,
             dragged: false,
             bounds: None,
+            last_tick: None,
         }
     }
 
@@ -322,6 +329,20 @@ fn stop(state: &Entity<WheelState>, window: &mut Window, cx: &mut App) -> f64 {
     offset
 }
 
+/// A selection tick (upstream `wheelStrip`'s `tick`): UIPickerView's haptic as a row
+/// reaches the band, at most one per the picker's interval.
+fn tick(state: &Entity<WheelState>, cx: &mut App) {
+    let at = now(cx);
+    let due = state.read(cx).last_tick.is_none_or(|last| {
+        at.saturating_duration_since(last).as_secs_f64() * 1000.
+            >= picker::SELECTION_TICK_INTERVAL_MS
+    });
+    if due {
+        state.update(cx, |s, _| s.last_tick = Some(at));
+        play_haptic(HapticFeedbackKind::Selection);
+    }
+}
+
 /// Plays `curve` from where the wheel shows. Under Reduce Motion a
 /// transition cross-fades after a touch or on a coarse pointer and lands at
 /// once otherwise; momentum (a coast, its bounce) always plays.
@@ -357,6 +378,22 @@ fn play(
         timer.await;
         cx.update(|window, cx| finish(&entity, id, window, cx)).ok();
     });
+    // A finger's release ticks through the rows it passes; a cross-fade has no travel.
+    let ticks: Vec<Task<()>> = if touch_release && fade.is_none() && can_vibrate() {
+        tick_times(&curve, ROW_HEIGHT)
+            .into_iter()
+            .map(|t| {
+                let timer = cx.background_executor().timer(Duration::from_secs_f64(t));
+                let entity = state.clone();
+                window.spawn(cx, async move |cx| {
+                    timer.await;
+                    cx.update(|_, cx| tick(&entity, cx)).ok();
+                })
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
     let start = now(cx);
     state.update(cx, |s, _| {
         s.motion = Some(Motion {
@@ -366,6 +403,7 @@ fn play(
             fade,
             end,
             _timer: task,
+            _ticks: ticks,
         });
     });
     window.refresh();
@@ -810,10 +848,17 @@ fn pointer_moved(state: &Entity<WheelState>, y: f64, window: &mut Window, cx: &m
         }
     };
     if let Drag::Pan { start, origin } = drag {
-        state.update(cx, |s, _| {
+        let next = drag_offset(start - (y - origin), &latest.layout);
+        let previous = state.update(cx, |s, _| {
+            let previous = s.drag.is_some().then_some(s.offset);
             s.drag = Some(drag);
-            s.offset = drag_offset(start - (y - origin), &latest.layout);
+            s.offset = next;
+            previous
         });
+        // A drag frame that brings a row onto the band ticks.
+        if previous.is_some_and(|p| reaches_row(p, next, ROW_HEIGHT)) && can_vibrate() {
+            tick(state, cx);
+        }
         window.refresh();
     }
 }

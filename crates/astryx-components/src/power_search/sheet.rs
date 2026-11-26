@@ -926,6 +926,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
             open && adding,
             t18.t("@astryx.powersearch.sheet.addFilter"),
         )
+        .final_focus_named(step_return_target(&p.id))
         .height(SheetHeight::Tall)
         .on_open_change(move |open, window, cx| {
             if open {
@@ -1342,6 +1343,7 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
             open,
             title.clone(),
         )
+        .final_focus_named(step_return_target(&p.id))
         .height(SheetHeight::Tall)
         .on_open_change(move |open, window, cx| {
             if !open {
@@ -1578,10 +1580,32 @@ pub(crate) fn flow(p: SheetProps, window: &mut Window, cx: &mut App) -> AnyEleme
         .into_any_element()
 }
 
+thread_local! {
+    /// The control a step change last named (upstream `stepReturnTargetRef`).
+    static STEP_TARGET: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
 /// FR16: asks the flow's control named `name` to take focus when it next
-/// renders.
+/// renders. It also becomes where the closing step sheets return focus when their
+/// exit ends (upstream `placeFocus` and `stepFinalFocusRef`): a closing sheet that
+/// held focus keeps it until then, and BottomSheet then returns it, so the named
+/// control takes it even when the first move could not land. Once the flow closes,
+/// the name is the trigger's, so the step sheets return focus as the flow does.
 fn focus_next_render(name: String, cx: &mut App) {
+    STEP_TARGET.with(|t| *t.borrow_mut() = Some(name.clone()));
     astryx_primitives::request_focus(&ElementId::Name(name.into()), cx);
+}
+
+/// The step sheets' return target for the flow `flow_id`: the control a step change
+/// of this flow last named.
+fn step_return_target(flow_id: &dyn std::fmt::Display) -> Option<ElementId> {
+    let prefix = format!("{flow_id}-");
+    STEP_TARGET.with(|t| {
+        t.borrow()
+            .as_ref()
+            .filter(|name| name.starts_with(&prefix))
+            .map(|name| ElementId::Name(name.clone().into()))
+    })
 }
 
 /// A filter's whole text, for announcements (AR6).

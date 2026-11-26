@@ -314,92 +314,114 @@ impl RenderOnce for RadioList {
             .or_else(|| disabled.iter().position(|d| !d))
             .or((!values.is_empty()).then_some(0));
 
-        let rows = self.items.into_iter().enumerate().map(|(i, item)| {
-            let checked = selected == Some(i);
-            let item_disabled = disabled[i];
-            let handle = list.item_handle(i, tab_stop);
-            let row_id = ElementId::Name(format!("{:?}-{}", self.id, item.value).into());
-            let group: SharedString = format!("{row_id:?}-row").into();
-            let overlay = t.color.overlay_pressed;
-            let circle = div()
-                .relative()
-                .flex()
-                .flex_none()
-                .child(
-                    RadioIndicator::new(checked)
-                        .size(self.size)
-                        .disabled(item_disabled)
-                        .hover_group(group.clone()),
+        let rows = self
+            .items
+            .into_iter()
+            .enumerate()
+            .map(|(i, item)| {
+                let checked = selected == Some(i);
+                let item_disabled = disabled[i];
+                let handle = list.item_handle(i, tab_stop);
+                let row_id = ElementId::Name(format!("{:?}-{}", self.id, item.value).into());
+                let group: SharedString = format!("{row_id:?}-row").into();
+                let overlay = t.color.overlay_pressed;
+                // Upstream RadioListItem's `usePressFeedback` on a row that owns the radio's
+                // box: a finger's press, and a mouse's on any pointer, paint the box at once.
+                let feedback = crate::gestures::use_press_feedback(
+                    ElementId::Name(format!("{group}-press").into()),
+                    window,
+                    cx,
                 )
-                .when(!item_disabled, |el| {
-                    el.child(
-                        div()
+                .disabled(item_disabled)
+                .owns_box(true);
+                let mouse_active = !feedback.paints_buttons(window, cx);
+                let touch_overlay = feedback.overlay(overlay, window, cx);
+                let circle = div()
+                    .relative()
+                    .flex()
+                    .flex_none()
+                    .child(
+                        RadioIndicator::new(checked)
+                            .size(self.size)
+                            .disabled(item_disabled)
+                            .hover_group(group.clone()),
+                    )
+                    .when(!item_disabled, |el| {
+                        let mut press = div()
                             .id("press")
                             .absolute()
                             .top_0()
                             .left_0()
                             .size_full()
-                            .rounded_full()
-                            .group_active(group.clone(), move |s| s.bg(overlay)),
-                    )
-                })
-                .when(is_focus_visible(&handle, window), |el| {
-                    el.child(focus_ring(t, self.size.box_size() / 2., rem))
-                });
-            let start = div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .gap(t.spacing.s2)
-                .child(circle)
-                .children(item.start_content);
-            let mut row_item = Item::new(row_id.clone(), item.label.clone())
-                .bare(true)
-                .disabled(item_disabled)
-                .align(item.align)
-                .start_content(start)
-                .end_content_opt(item.end_content)
-                .description_opt(item.description.map(|d| d.into_any_element()));
-            theme.refine(
-                row_item.style(),
-                "radio-list-item",
-                &[
-                    ("size", self.size.as_str()),
-                    ("selected", if checked { "selected" } else { "" }),
-                    ("disabled", if item_disabled { "disabled" } else { "" }),
-                ],
-                None,
-            );
-            let select = self.on_change.clone();
-            let value = item.value.clone();
-            let mut row = div()
-                .id(row_id)
-                .group(group)
-                .track_focus(&handle)
-                .min_w_0()
-                .child(row_item);
-            if item_disabled {
-                row = row.on_click(|_, _, cx| cx.stop_propagation());
-            } else {
-                row = row.cursor_pointer().on_click(move |event, window, cx| {
-                    cx.stop_propagation();
-                    if toggles(event)
-                        && !checked
-                        && let Some(f) = &select
-                    {
-                        f(value.clone(), window, cx);
-                    }
-                });
-            }
-            row.role(Role::RadioButton)
-                .aria_disabled(item_disabled)
-                .aria_label(item.aria_label.unwrap_or(item.label))
-                .aria_toggled(if checked {
-                    Toggled::True
+                            .rounded_full();
+                        if mouse_active {
+                            press = press.group_active(group.clone(), move |s| s.bg(overlay));
+                        }
+                        if let Some(o) = touch_overlay {
+                            press = press.bg(o);
+                        }
+                        el.child(press)
+                    })
+                    .when(is_focus_visible(&handle, window), |el| {
+                        el.child(focus_ring(t, self.size.box_size() / 2., rem))
+                    });
+                let start = div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap(t.spacing.s2)
+                    .child(circle)
+                    .children(item.start_content);
+                let mut row_item = Item::new(row_id.clone(), item.label.clone())
+                    .bare(true)
+                    .disabled(item_disabled)
+                    .align(item.align)
+                    .start_content(start)
+                    .end_content_opt(item.end_content)
+                    .description_opt(item.description.map(|d| d.into_any_element()));
+                theme.refine(
+                    row_item.style(),
+                    "radio-list-item",
+                    &[
+                        ("size", self.size.as_str()),
+                        ("selected", if checked { "selected" } else { "" }),
+                        ("disabled", if item_disabled { "disabled" } else { "" }),
+                    ],
+                    None,
+                );
+                let select = self.on_change.clone();
+                let value = item.value.clone();
+                let mut row = div()
+                    .id(row_id)
+                    .group(group)
+                    .track_focus(&handle)
+                    .relative()
+                    .min_w_0()
+                    .child(row_item)
+                    .child(feedback.probe().absolute().top_0().left_0().size_full());
+                if item_disabled {
+                    row = row.on_click(|_, _, cx| cx.stop_propagation());
                 } else {
-                    Toggled::False
-                })
-        });
+                    row = row.cursor_pointer().on_click(move |event, window, cx| {
+                        cx.stop_propagation();
+                        if toggles(event)
+                            && !checked
+                            && let Some(f) = &select
+                        {
+                            f(value.clone(), window, cx);
+                        }
+                    });
+                }
+                row.role(Role::RadioButton)
+                    .aria_disabled(item_disabled)
+                    .aria_label(item.aria_label.unwrap_or(item.label))
+                    .aria_toggled(if checked {
+                        Toggled::True
+                    } else {
+                        Toggled::False
+                    })
+            })
+            .collect::<Vec<_>>();
 
         let mut group = match self.orientation {
             Orientation::Vertical => div().flex().flex_col().gap(t.spacing.s2),
@@ -704,6 +726,7 @@ impl RenderOnce for CheckboxList {
             } else {
                 gpui::transparent_black()
             };
+            let row_press_id = format!("{row_id:?}");
             let mut row = div()
                 .id(row_id)
                 .group(group)
@@ -728,10 +751,18 @@ impl RenderOnce for CheckboxList {
                     (_, _, Some(on_check)) => Rc::new(move |window, cx| on_check(next, window, cx)),
                     _ => Rc::new(|_, _| {}),
                 };
+                row = crate::press::touch_press(
+                    row,
+                    ElementId::Name(format!("{row_press_id}-press").into()),
+                    false,
+                    rest,
+                    pressed,
+                    window,
+                    cx,
+                );
                 row = row
                     .cursor_pointer()
                     .hover(move |s| s.bg(composite(rest, hover)))
-                    .active(move |s| s.bg(composite(rest, pressed)))
                     .on_click(move |event, window, cx| {
                         cx.stop_propagation();
                         if toggles(event) {

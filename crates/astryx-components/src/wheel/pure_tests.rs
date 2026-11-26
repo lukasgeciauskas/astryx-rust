@@ -110,3 +110,34 @@ fn a_drag_past_an_end_is_banded_and_reads_back() {
     assert!((finger_offset(shown, &layout) + 40.).abs() < 1e-9);
     assert_eq!(drag_offset(50., &layout), 50.);
 }
+
+#[test]
+fn a_row_reaches_the_band_as_its_centre_crosses_either_way() {
+    assert!(reaches_row(31., 32., 32.));
+    assert!(!reaches_row(1., 31., 32.));
+    assert!(reaches_row(33., 32., 32.));
+    assert!(!reaches_row(63., 33., 32.));
+    assert!(!reaches_row(40., 40., 32.));
+}
+
+#[test]
+fn a_release_ticks_once_per_row_it_passes_no_faster_than_the_pickers_interval() {
+    let layout = WheelLayout {
+        row_height: 32.,
+        row_count: 60,
+        looping: false,
+    };
+    let plan = plan_release(963.67, 933.4, &layout);
+    let ticks = tick_times(&plan.curve, 32.);
+    let rows = ((plan.curve.to() - plan.curve.value(0.)) / 32.).abs();
+    assert!(
+        !ticks.is_empty() && ticks.len() as f64 <= rows + 1.,
+        "{} ticks over {rows} rows",
+        ticks.len()
+    );
+    let interval = astryx_primitives::motion::uikit::picker::SELECTION_TICK_INTERVAL_MS / 1000.;
+    assert!(ticks.windows(2).all(|w| w[1] - w[0] >= interval - 1e-9));
+    assert!(ticks.iter().all(|t| *t > 0. && *t <= plan.curve.duration()));
+    // A curve that never leaves its row ticks nothing.
+    assert!(tick_times(&WheelCurve::Rest(64.), 32.).is_empty());
+}

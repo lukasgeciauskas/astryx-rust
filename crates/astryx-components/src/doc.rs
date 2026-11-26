@@ -104,6 +104,13 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::animator::CREATE_ANIMATOR_DOC,
     crate::animator::USE_ANIMATOR_DOC,
     crate::animator::USE_ENTRY_ANIMATION_DOC,
+    crate::gestures::CREATE_PAN_GESTURE_DOC,
+    crate::gestures::USE_PAN_GESTURE_DOC,
+    crate::gestures::USE_LONG_PRESS_DOC,
+    crate::gestures::USE_MENU_PRESS_DOC,
+    crate::gestures::USE_PRESS_FEEDBACK_DOC,
+    crate::drag_to_snap_points::CREATE_DRAG_TO_SNAP_POINTS_DOC,
+    crate::drag_to_snap_points::USE_DRAG_TO_SNAP_POINTS_DOC,
     crate::animated_layout::USE_ANIMATED_LAYOUT_DOC,
     crate::top_nav::TOP_NAV_DOC,
     crate::top_nav::TOP_NAV_HEADING_DOC,
@@ -266,7 +273,11 @@ pub const REGISTRY: &[ComponentDoc] = &[
 /// Modules upstream has specified (an accepted contract) but not yet built,
 /// so they have no `.doc.mjs` to check against. One moves to [`REGISTRY`]
 /// once upstream publishes its doc.
-pub const SPEC_ONLY: &[ComponentDoc] = &[crate::table::USE_TABLE_ACTIVATION_DOC];
+pub const SPEC_ONLY: &[ComponentDoc] = &[
+    crate::table::USE_TABLE_ACTIVATION_DOC,
+    crate::overlay::CREATE_CONTEXT_MENU_DOC,
+    crate::overlay::USE_CONTEXT_MENU_DOC,
+];
 
 /// The registered doc for an upstream component name.
 pub fn find(name: &str) -> Option<&'static ComponentDoc> {

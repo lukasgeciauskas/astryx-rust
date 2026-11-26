@@ -536,10 +536,17 @@ impl<V: Clone + 'static> RenderOnce for ComplexSelector<V> {
                         .font_weight(t.font.weight.medium);
                     if !disabled {
                         let hover = astryx_theme::color::composite(fill, t.color.overlay_hover);
-                        let pressed = astryx_theme::color::composite(fill, t.color.overlay_pressed);
-                        el = el
-                            .hover(move |s| s.bg(hover))
-                            .active(move |s| s.bg(pressed));
+                        el = el.hover(move |s| s.bg(hover));
+                        // A finger's press paints as UIKit tracks a control (upstream `usePressFeedback`).
+                        el = crate::press::touch_press(
+                            el,
+                            ElementId::Name(format!("{control_id:?}-trigger-press").into()),
+                            false,
+                            fill,
+                            t.color.overlay_pressed,
+                            window,
+                            cx,
+                        );
                         if !open && !prefers_reduced_motion(cx) && !window.last_input_was_touch() {
                             el = el.active(|s| s.scale(0.98));
                         }
@@ -751,6 +758,8 @@ impl<V: Clone + 'static> RenderOnce for ComplexSelector<V> {
                     )
                 })
                 .unwrap_or_else(|| div().into_any_element());
+            let scroller_handle =
+                crate::gestures::scroller::use_scroll_handle(content_id.clone(), window, cx);
             let mut wrap = div()
                 .id(content_id.clone())
                 .debug_selector({
@@ -760,7 +769,14 @@ impl<V: Clone + 'static> RenderOnce for ComplexSelector<V> {
                 .p(t.spacing.s3)
                 .max_h(px(480.).min(cap.height))
                 .overflow_y_scroll()
-                .child(body);
+                .track_scroll(&scroller_handle)
+                .child(crate::gestures::scroller::scroll_begin(
+                    content_id.clone(),
+                    Some(&scroller_handle),
+                    (false, true),
+                ))
+                .child(body)
+                .child(crate::gestures::scroller::scroll_end());
             wrap.style().refine(&content_style);
             wrap.into_any_element()
         };

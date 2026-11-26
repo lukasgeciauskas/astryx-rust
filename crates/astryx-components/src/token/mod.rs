@@ -1,5 +1,6 @@
 //! Token. Upstream: `Token/`.
 
+use crate::press::TouchPress as _;
 use std::rc::Rc;
 
 use astryx_i18n::{LogicalStyled, current as i18n, use_direction};
@@ -231,6 +232,7 @@ impl RenderOnce for Token {
                     ),
                 };
                 let remove_id = ElementId::Name(format!("{:?}-remove", self.id).into());
+                let remove_press = ElementId::Name(format!("{:?}-remove-press", self.id).into());
                 let focus = control_focus(&remove_id, window, cx);
                 let mut button = div()
                     .id(remove_id)
@@ -245,7 +247,7 @@ impl RenderOnce for Token {
                     .rounded_full()
                     .cursor_pointer()
                     .hover(move |s| s.bg(hover))
-                    .active(move |s| s.bg(pressed))
+                    .touch_press(remove_press, gpui::transparent_black(), pressed, window, cx)
                     .on_click(move |event, window, cx| {
                         cx.stop_propagation();
                         on_remove(event, window, cx);
@@ -302,7 +304,13 @@ impl RenderOnce for Token {
                 .track_focus(&focus)
                 .cursor_pointer()
                 .hover(move |s| s.bg(composite(bg, hover)))
-                .active(move |s| s.bg(composite(bg, pressed)))
+                .touch_press(
+                    ElementId::Name(format!("{:?}-press", self.id).into()),
+                    bg,
+                    pressed,
+                    window,
+                    cx,
+                )
                 .on_click(move |event, window, cx| {
                     cx.stop_propagation();
                     if let Some(f) = &on_click {

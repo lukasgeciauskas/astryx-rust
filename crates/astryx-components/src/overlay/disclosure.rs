@@ -3,12 +3,14 @@
 //! handler. Here the popup provides a [`Disclosure`] around its trigger, and
 //! Button (and everything built on it) reads it: it reports the popup's state
 //! and toggles it after its own click handler. A menu also hears the
-//! trigger's press-down, hover and keys (its press model and arrow keys).
+//! trigger's presses, hover and keys (its press model and arrow keys).
 
 use std::rc::Rc;
 
 use astryx_primitives::use_context;
 use gpui::{App, HasPopup, KeyDownEvent, Window};
+
+use crate::gestures::menu_press::MenuPress;
 
 type ToggleFn = Rc<dyn Fn(&mut Window, &mut App)>;
 type HoverFn = Rc<dyn Fn(bool, &mut Window, &mut App)>;
@@ -24,8 +26,8 @@ pub(crate) struct Disclosure {
     pub popup: HasPopup,
     /// Opens or closes it; `None` while the popup ignores its trigger.
     pub toggle: Option<ToggleFn>,
-    /// A left press-down on an enabled trigger.
-    pub on_press: Option<ToggleFn>,
+    /// A menu's press model: the trigger is its trigger (upstream `triggerProps`).
+    pub menu_press: Option<MenuPress>,
     /// The pointer entered (`true`) or left an enabled trigger.
     pub on_hover: Option<HoverFn>,
     /// A key down on an enabled, focused trigger.
@@ -45,7 +47,7 @@ impl Disclosure {
             expanded,
             popup,
             toggle,
-            on_press: None,
+            menu_press: None,
             on_hover: None,
             on_key: None,
             open_tint: false,

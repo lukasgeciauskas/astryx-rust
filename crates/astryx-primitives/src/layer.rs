@@ -107,7 +107,7 @@ fn window_stack(window: &Window, cx: &mut App) -> Rc<RefCell<WindowStack>> {
 }
 
 /// The least depth of a modal layer, above any non-modal nesting.
-const MODAL_DEPTH: usize = 100;
+pub const MODAL_DEPTH: usize = 100;
 
 /// The nesting depth a layer gives its content.
 #[derive(Clone, Copy)]
@@ -182,6 +182,13 @@ impl Layer {
     /// before it, and layers opened inside it draw above it.
     pub fn modal(mut self) -> Self {
         self.min_depth = MODAL_DEPTH;
+        self
+    }
+
+    /// The least depth the layer takes: a surface with a stacking order of its own
+    /// (a stack of bottom sheets) ranks its layers by it, above their nesting.
+    pub fn min_depth(mut self, depth: usize) -> Self {
+        self.min_depth = self.min_depth.max(depth);
         self
     }
 

@@ -84,6 +84,7 @@ pub(crate) fn with_actions(
     crate::overlay::with_context_menu(
         area,
         crate::overlay::ContextSpec {
+            render: None,
             id,
             entries: Vec::new(),
             entries_fn: Some(Rc::new(move |_: &mut Window, cx: &mut App| {

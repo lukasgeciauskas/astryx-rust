@@ -212,12 +212,20 @@ impl RenderOnce for Thumbnail {
                 let handle = control_focus(&ElementId::Name(group.clone()), window, cx);
                 let ring = is_focus_visible(&handle, window)
                     .then(|| focus_ring(t, radius.to_pixels(rem), rem));
-                el.track_focus(&handle)
-                    .cursor_pointer()
-                    .hover(|s| s.bg(t.color.overlay_hover))
-                    .active(|s| s.bg(t.color.overlay_pressed))
-                    .on_click(move |event, window, cx| on_click(event, window, cx))
-                    .children(ring)
+                crate::press::touch_press(
+                    el,
+                    ElementId::Name(format!("{group}-press").into()),
+                    false,
+                    gpui::transparent_black(),
+                    t.color.overlay_pressed,
+                    window,
+                    cx,
+                )
+                .track_focus(&handle)
+                .cursor_pointer()
+                .hover(|s| s.bg(t.color.overlay_hover))
+                .on_click(move |event, window, cx| on_click(event, window, cx))
+                .children(ring)
             }
             _ => el,
         };

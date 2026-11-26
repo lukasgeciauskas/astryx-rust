@@ -1058,6 +1058,14 @@ impl RenderOnce for DateTimeInput {
             None,
         );
         let toggle_popover = date_popover.clone();
+        // A finger's press paints as UIKit tracks a control (upstream `usePressFeedback`).
+        let toggle_feedback = crate::gestures::use_press_feedback(
+            gpui::ElementId::Name(format!("{toggle_id:?}-press").into()),
+            window,
+            cx,
+        )
+        .disabled(locked)
+        .space_activates(&toggle_focus);
         let toggle = apply_press(
             div()
                 .id(toggle_id)
@@ -1078,6 +1086,7 @@ impl RenderOnce for DateTimeInput {
                 .child(glyph),
             &toggle_focus,
             Press {
+                feedback: Some(&toggle_feedback),
                 fill: None,
                 scale: None,
                 disabled: false,
@@ -1094,6 +1103,14 @@ impl RenderOnce for DateTimeInput {
             &theme,
             window,
             cx,
+        );
+        let toggle = toggle.child(
+            toggle_feedback
+                .probe()
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full(),
         );
         let reduced_motion = prefers_reduced_motion(cx);
         let style = |rejected: bool, placeholder: SharedString| EditorStyle {

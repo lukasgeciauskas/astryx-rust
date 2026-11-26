@@ -44,7 +44,7 @@ _Last updated: 2026-11-26, after M10 (Content)._
 | Backdrop blur (Lightbox, scrims, ChatLayout's frosted dock) | Fork patch R2 |
 | Item and List swipe actions | M11 stage 5 (with fork patch R3) |
 | Transient copies: SideNav's two rail layers (FR6), AppShell's held content (FR17, AST-105 FR8), a List exit's and a dragged row's start and end content | M11 stage 5 (fork patch R3 snapshots) |
-| SegmentedControl's finger drag, label hysteresis and lift (FR11-FR14) | M11 stage 3 (gestures) |
+| A tall BottomSheet riding the virtual keyboard | M11 stage 6 (keyboard) |
 | ChatLayout's virtual-keyboard lift (`useChatKeyboard`) | Touch layer (M11) |
 | ChatTypingIndicator, ChatUnreadDivider, ChatVirtualizer, ChatEmojiPicker, ChatReactionBar (lab components) | Lab (M13) |
 | ChatPastedTextToken's touch tap-stop | Touch layer (M11) |

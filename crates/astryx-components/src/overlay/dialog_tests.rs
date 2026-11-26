@@ -299,17 +299,6 @@ fn overlay_shows_on_hover_and_always(cx: &mut TestAppContext) {
 // ----------------------------------------------------------------------------
 // Drawer and BottomSheet
 
-#[test]
-fn a_released_sheet_rests_at_the_nearest_stop_or_dismisses() {
-    use super::sheet::settle;
-    let stops = [px(300.)];
-    assert_eq!(settle(px(600.), &stops, px(100.), true), Some(px(600.)));
-    assert_eq!(settle(px(600.), &stops, px(250.), true), Some(px(300.)));
-    // 150px showing is well under 300px less 40%.
-    assert_eq!(settle(px(600.), &stops, px(450.), true), None);
-    assert_eq!(settle(px(600.), &stops, px(450.), false), Some(px(300.)));
-}
-
 fn drawer(scrim: bool, clicks: Rc<Cell<usize>>) -> impl Fn(Rc<Cell<bool>>) -> AnyElement + 'static {
     move |open| {
         let close = open.clone();
@@ -576,8 +565,11 @@ fn bottom_sheet_fr5_fr7_fr9_a_stack_dismisses_from_the_top(cx: &mut TestAppConte
     press(cx, "escape");
     assert!(!inner.get(), "the top sheet closed");
     assert!(open.get(), "the sheet beneath stays");
-    // Focus came back to its opener inside the revealed sheet: Enter
-    // opens the second sheet again.
+    // Focus comes back, once its exit ends, to its opener inside the revealed
+    // sheet (FR9): Enter opens the second sheet again.
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(1));
+    settle(cx);
     press(cx, "enter");
     assert!(inner.get());
 }

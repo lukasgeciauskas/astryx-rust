@@ -1290,7 +1290,15 @@ fn listbox<T: Searchable>(
         .size_0()
     };
     let _ = order;
-    list.children(children).child(probe).into_any_element()
+    list.child(crate::gestures::scroller::scroll_begin(
+        ElementId::Name(format!("{id}-listbox").into()),
+        Some(&scroll),
+        (false, true),
+    ))
+    .children(children)
+    .child(crate::gestures::scroller::scroll_end())
+    .child(probe)
+    .into_any_element()
 }
 
 impl<T: Searchable> RenderOnce for BaseTypeahead<T> {

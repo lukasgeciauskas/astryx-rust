@@ -10,6 +10,7 @@
 //! closes it (FR5). In AppShell's drawer it is a disclosure group (FR9); in the phone's
 //! bar, nothing (FR10).
 
+use crate::press::TouchPress as _;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
@@ -536,7 +537,13 @@ impl TopNavMegaMenu {
         .justify_between()
         .cursor_pointer()
         .hover(move |s| s.bg(hover))
-        .active(move |s| s.bg(pressed))
+        .touch_press(
+            ElementId::Name(format!("{}-press", self.id).into()),
+            gpui::transparent_black(),
+            pressed,
+            window,
+            cx,
+        )
         .role(Role::Button)
         .aria_label(self.label.clone())
         .aria_expanded(is_expanded)
@@ -759,7 +766,13 @@ impl RenderOnce for TopNavMegaMenuItem {
             el = el
                 .cursor_pointer()
                 .hover(move |s| s.bg(hover))
-                .active(move |s| s.bg(pressed))
+                .touch_press(
+                    ElementId::Name(format!("{}-press", self.id).into()),
+                    gpui::transparent_black(),
+                    pressed,
+                    window,
+                    cx,
+                )
                 .role(if href.is_some() {
                     Role::Link
                 } else {

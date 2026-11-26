@@ -11,11 +11,12 @@ use astryx_primitives::typeahead::Typeahead;
 use astryx_primitives::{is_focus_visible, provide, use_context, use_link_handler};
 use astryx_theme::{ThemeStyled, current};
 use gpui::{
-    AnyElement, App, Bounds, ElementId, FocusHandle, IntoElement, KeyDownEvent, Length,
-    MouseButton, MouseUpEvent, ParentElement, Pixels, RenderOnce, Role, SharedString,
-    StyleRefinement, Styled, Window, canvas, div, prelude::*, px,
+    AnyElement, App, ElementId, FocusHandle, IntoElement, KeyDownEvent, Length, MouseButton,
+    ParentElement, Pixels, RenderOnce, Role, SharedString, StyleRefinement, Styled, Window, div,
+    prelude::*, px,
 };
 
+use crate::gestures::menu_press::{MenuPress, MenuPressOptions, MenuPressRow, use_menu_press};
 use crate::icon::{Icon, IconColor, IconSize};
 use crate::text::{Text, TextType};
 
@@ -77,10 +78,6 @@ struct MenuState {
     rows: Vec<Row>,
     fresh: bool,
     typeahead: Typeahead,
-    /// A press on an enabled row is held.
-    pressing: bool,
-    /// The rows' places this frame, for a lift's hit test.
-    bounds: Vec<Bounds<Pixels>>,
     /// The row that holds the menu's one tab stop (the roving tab index).
     active: usize,
 }
@@ -91,6 +88,8 @@ struct MenuScope {
     state: Rc<RefCell<MenuState>>,
     size: NavHeadingMenuSize,
     close: Option<Action>,
+    /// FR8: the menu press model (upstream `useMenuPress`).
+    press: MenuPress,
 }
 
 impl MenuScope {
@@ -172,18 +171,28 @@ impl RenderOnce for NavHeadingMenu {
             )
             .read(cx)
             .clone();
-        {
-            let mut s = state.borrow_mut();
-            s.fresh = true;
-            s.bounds.clear();
-        }
+        state.borrow_mut().fresh = true;
         let close = use_context::<NavHeadingClose>(cx).map(|c| c.0);
         let dismiss = use_context::<NavHeadingDismiss>(cx).map(|d| d.0);
         let hosted = use_context::<NavHeadingMenuHost>(cx).is_some();
+        // FR8: a press that slides across the rows acts on the row it lifts on, the
+        // highlight following the pointer; a mouse released outside dismisses. A press on
+        // caller content beside the rows stays that content's.
+        let mut options = MenuPressOptions::default().press_on_items_only(true);
+        if let Some(dismiss) = dismiss.or(close.clone()) {
+            options = options.on_dismiss(move |window, cx| dismiss(window, cx));
+        }
+        let press = use_menu_press(
+            ElementId::Name(format!("{:?}-nav-menu-press", self.id).into()),
+            options,
+            window,
+            cx,
+        );
         let scope = MenuScope {
             state: state.clone(),
             size: self.size,
             close: close.clone(),
+            press: press.clone(),
         };
         let mut menu = div()
             .id(self.id.clone())
@@ -270,50 +279,17 @@ impl RenderOnce for NavHeadingMenu {
                 }
             }
         });
-        // FR8: a mouse released off the rows, after a press on one, dismisses.
-        if state.borrow().pressing {
-            let (state, dismiss) = (state.clone(), dismiss.or(close));
-            menu = menu.child(
-                canvas(
-                    |_, _, _| {},
-                    move |_, _, window, _| {
-                        let (state, dismiss) = (state.clone(), dismiss.clone());
-                        window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
-                            if phase != gpui::DispatchPhase::Capture
-                                || event.button != MouseButton::Left
-                            {
-                                return;
-                            }
-                            // A lift over a row is that row's (its own handler, in the
-                            // bubble phase); a lift anywhere else ends the press and
-                            // dismisses.
-                            let hit = state
-                                .borrow()
-                                .bounds
-                                .iter()
-                                .any(|b| b.contains(&event.position));
-                            if !hit {
-                                state.borrow_mut().pressing = false;
-                                if let Some(dismiss) = &dismiss {
-                                    dismiss(window, cx);
-                                }
-                                window.refresh();
-                            }
-                        });
-                    },
-                )
-                .absolute()
-                .size_0(),
-            );
-        }
-        menu.child(provide(
-            scope,
-            div()
-                .flex()
-                .flex_col()
-                .gap(t.spacing.s0_5)
-                .children(self.children),
-        ))
+        press.menu(
+            menu.child(provide(
+                scope,
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(t.spacing.s0_5)
+                    .children(self.children),
+            )),
+            true,
+        )
     }
 }
 
@@ -476,6 +452,7 @@ impl RenderOnce for NavHeadingMenuItem {
         };
         let focused = focus.is_focused(window);
         let hover = t.color.overlay_hover;
+        let row_key = SharedString::from(format!("{}", self.id));
         let mut row = div()
             .id(self.id.clone())
             .debug_selector({
@@ -512,56 +489,28 @@ impl RenderOnce for NavHeadingMenuItem {
             None,
         );
         row.style().refine(&self.style);
-        // FR8: a press on an enabled row begins the slide; the row under the lift acts.
+        // FR8: the press model picks the row under the release; a press on a row
+        // focuses it, as a browser focuses a tabindex=-1 row it is pressed on, and a
+        // disabled row keeps focus where it is.
         if let Some(scope) = &scope {
-            let (press_state, lift_state, disabled) =
-                (scope.state.clone(), scope.state.clone(), self.disabled);
-            let lift = activate.clone();
-            let press_focus = focus.clone();
-            row = row
-                .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                    if disabled {
-                        // A disabled row keeps focus where it is.
-                        window.prevent_default();
-                        cx.stop_propagation();
-                        return;
-                    }
-                    // As a browser focuses a tabindex=-1 row it is pressed on.
-                    window.focus(&press_focus, cx);
-                    let mut s = press_state.borrow_mut();
-                    s.pressing = true;
-                    if let Some(index) = index {
-                        s.active = index;
-                    }
-                    drop(s);
-                    window.refresh();
-                })
-                .on_mouse_up(MouseButton::Left, move |_, window, cx| {
-                    // Only a press that began on a row acts (not the one that
-                    // opened the menu).
-                    let pressing = std::mem::replace(&mut lift_state.borrow_mut().pressing, false);
-                    if pressing && !disabled {
-                        cx.stop_propagation();
-                        lift(window, cx);
-                    }
-                });
+            let (disabled, press_focus) = (self.disabled, focus.clone());
+            row = row.on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                if disabled {
+                    window.prevent_default();
+                    cx.stop_propagation();
+                    return;
+                }
+                window.focus(&press_focus, cx);
+                window.refresh();
+            });
+            // A held finger lights the row it is over.
+            if scope.press.lit_row().as_deref() == Some(row_key.as_ref()) {
+                row = row.bg(t.color.overlay_pressed);
+            }
+            let _ = index;
         } else if !self.disabled {
             let lift = activate.clone();
             row = row.on_click(move |_, window, cx| lift(window, cx));
-        }
-        // The row's place, for a lift's hit test.
-        if let Some(scope) = &scope {
-            let state = scope.state.clone();
-            row = row.child(
-                canvas(
-                    move |bounds, _, _| state.borrow_mut().bounds.push(bounds),
-                    |_, _, _, _| {},
-                )
-                .absolute()
-                .top_0()
-                .left_0()
-                .size_full(),
-            );
         }
         let label = match self.custom_label {
             Some(custom) => custom,
@@ -615,6 +564,20 @@ impl RenderOnce for NavHeadingMenuItem {
                 .debug_selector(move || ring),
             );
         }
-        row
+        match scope.filter(|_| !self.disabled) {
+            Some(scope) => {
+                let lift = activate.clone();
+                scope
+                    .press
+                    .row(
+                        MenuPressRow::new(row_key)
+                            .focus(&focus)
+                            .on_activate(move |_, window, cx| lift(window, cx)),
+                        row,
+                    )
+                    .into_any_element()
+            }
+            None => row.into_any_element(),
+        }
     }
 }

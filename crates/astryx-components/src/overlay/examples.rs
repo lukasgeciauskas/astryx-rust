@@ -255,7 +255,12 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                         ),
                 ),
         )
-        .child(
+        .child({
+            // Drag the grab bar, or pull the content at its top: the sheet rests at
+            // 30% or fully open, and a flick down closes it. "More" stacks a second
+            // sheet over it.
+            let more_open = window.use_keyed_state("sheet-more-open", cx, |_, _| false);
+            let (open_more, close_more) = (toggle(&more_open, true), toggle(&more_open, false));
             BottomSheet::new("share-sheet", *sheet_open.read(cx), "Share")
                 .height(SheetHeight::Capped)
                 .snap_points([SnapPoint::Fraction(0.3)])
@@ -269,9 +274,33 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                         .gap(SpacingStep::S2)
                         .child(Text::new("Share").text_type(TextType::Label))
                         .child(Button::new("share-copy", "Copy link").variant(ButtonVariant::Ghost))
-                        .child(Button::new("share-mail", "Email").variant(ButtonVariant::Ghost)),
-                ),
-        )
+                        .child(Button::new("share-mail", "Email").variant(ButtonVariant::Ghost))
+                        .child(
+                            Button::new("share-more", "More options")
+                                .variant(ButtonVariant::Secondary)
+                                .on_click(move |_, window, cx| open_more(window, cx)),
+                        )
+                        .children((0..12).map(|i| {
+                            Text::new(format!("Recent contact {}", i + 1)).text_type(TextType::Body)
+                        })),
+                )
+                .child(
+                    BottomSheet::new("share-more-sheet", *more_open.read(cx), "More options")
+                        .height(SheetHeight::Hug)
+                        .on_open_change(move |open, window, cx| {
+                            if !open {
+                                close_more(window, cx)
+                            }
+                        })
+                        .child(
+                            Stack::vertical()
+                                .gap(SpacingStep::S2)
+                                .child(Text::new("More options").text_type(TextType::Label))
+                                .child(Button::new("share-print", "Print").variant(ButtonVariant::Ghost))
+                                .child(Button::new("share-save", "Save to files").variant(ButtonVariant::Ghost)),
+                        ),
+                )
+        })
         .child(label("DropdownMenu, MoreMenu and ContextMenu"))
         .child(menus(window, cx))
         .child(label("Lightbox"))

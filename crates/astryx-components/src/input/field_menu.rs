@@ -49,6 +49,7 @@ pub(crate) fn with_field_menu(
     with_context_menu(
         control,
         ContextSpec {
+            render: None,
             id: ElementId::Name(format!("{id}-menu").into()),
             entries: Vec::new(),
             entries_fn: Some(entries),

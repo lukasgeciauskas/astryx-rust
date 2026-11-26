@@ -166,9 +166,16 @@ impl RenderOnce for TopNavItem {
         // FR2: the selected fill stays under hover and press, with no overlay.
         if !self.selected && !self.disabled {
             let (hover, pressed) = (t.color.overlay_hover, t.color.overlay_pressed);
-            el = el
-                .hover(move |s| s.bg(hover))
-                .active(move |s| s.bg(pressed));
+            el = el.hover(move |s| s.bg(hover));
+            el = crate::press::touch_press(
+                el,
+                ElementId::Name(format!("{:?}-press", self.id).into()),
+                false,
+                gpui::transparent_black(),
+                pressed,
+                window,
+                cx,
+            );
         }
         theme.refine(
             el.style(),

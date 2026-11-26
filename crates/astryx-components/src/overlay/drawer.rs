@@ -205,12 +205,18 @@ impl RenderOnce for Drawer {
         surface = surface.translate(offset, px(0.));
         theme.refine(surface.style(), "drawer", &[], None);
         surface.style().refine(&self.style);
+        let scroller_handle = crate::gestures::scroller::use_scroll_handle(
+            ElementId::Name(format!("{}-content", self.id).into()),
+            window,
+            cx,
+        );
         let content = div()
             .id(ElementId::Name(format!("{}-content", self.id).into()))
             .flex_grow(1.)
             .min_h_0()
             .w_full()
             .overflow_y_scroll()
+            .track_scroll(&scroller_handle)
             .p(padding)
             .child(provide(
                 state.read(cx).focus.clone(),
@@ -235,7 +241,15 @@ impl RenderOnce for Drawer {
                     cx,
                 ),
             ));
-        let surface = surface.children(probes(&state, cx)).child(content);
+        let surface = surface
+            .children(probes(&state, cx))
+            .child(crate::gestures::scroller::scroll_begin(
+                ElementId::Name(format!("{}-content", self.id).into()),
+                Some(&scroller_handle),
+                (false, true),
+            ))
+            .child(content)
+            .child(crate::gestures::scroller::scroll_end());
 
         let info = self.purpose == DialogPurpose::Info;
         let press: super::modal::CloseFn = Rc::new(close.clone());

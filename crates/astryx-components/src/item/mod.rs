@@ -3,7 +3,7 @@
 //!
 //! This is Item's core: start content, a label over a description, end
 //! content, alignment, density, line clamps, and the interactive states.
-//! Swipe actions land with the touch layer.
+//! Swipe actions land with Swipe (M11 stage 5, with fork patch R3).
 
 use std::rc::Rc;
 
@@ -11,9 +11,8 @@ use astryx_i18n::{LogicalStyled, use_direction};
 use astryx_primitives::{control_focus, is_focus_visible, use_link_handler};
 use astryx_theme::current;
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, FocusHandle, IntoElement, MouseButton, ParentElement,
-    Pixels, RenderOnce, Role, SharedString, StyleRefinement, Styled, Window, div, prelude::*, px,
-    relative,
+    AnyElement, App, ClickEvent, ElementId, FocusHandle, IntoElement, ParentElement, Pixels,
+    RenderOnce, Role, SharedString, StyleRefinement, Styled, Window, div, prelude::*, px, relative,
 };
 
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
@@ -402,54 +401,25 @@ impl RenderOnce for Item {
                 el = el.hover(move |s| s.bg(hover));
             }
             if !self.bare {
-                if touch {
-                    // FR11: under a finger the press paints at once and its
-                    // release fades on the exit motion.
-                    let state = window.use_keyed_state(
-                        ElementId::Name(format!("{:?}-pressed", self.id).into()),
-                        cx,
-                        |_, _| false,
-                    );
-                    let held = *state.read(cx);
-                    let fade = crate::motion::transition(
-                        format!("{:?}-press", self.id),
-                        held,
-                        t.duration.exit,
-                        t.ease.exit,
-                        window,
-                        cx,
-                    );
-                    let strength = if held { 1. } else { fade };
-                    if strength > 0. {
-                        // Above the row's own fill, below its content.
-                        let mut tint = pressed;
-                        tint.a *= strength;
-                        let base = if self.selected {
-                            t.color.accent_muted
-                        } else if self.highlighted {
-                            t.color.overlay_hover
-                        } else {
-                            gpui::transparent_black()
-                        };
-                        el = el.bg(astryx_theme::color::composite(base, tint));
-                    }
-                    let (down, up, out) = (state.clone(), state.clone(), state);
-                    el = el
-                        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                            down.update(cx, |p, _| *p = true);
-                            window.refresh();
-                        })
-                        .on_mouse_up(MouseButton::Left, move |_, window, cx| {
-                            up.update(cx, |p, _| *p = false);
-                            window.refresh();
-                        })
-                        .on_mouse_up_out(MouseButton::Left, move |_, window, cx| {
-                            out.update(cx, |p, _| *p = false);
-                            window.refresh();
-                        });
+                // FR11: under a finger the press paints as UIKit tracks a row (at once
+                // outside a scroller, after the content-touch delay inside one) and its
+                // release fades on the exit motion (upstream `usePressFeedback`).
+                let base = if self.selected {
+                    t.color.accent_muted
+                } else if self.highlighted {
+                    t.color.overlay_hover
                 } else {
-                    el = el.active(move |s| s.bg(pressed));
-                }
+                    gpui::transparent_black()
+                };
+                el = crate::press::touch_press(
+                    el,
+                    ElementId::Name(format!("{:?}-pressed", self.id).into()),
+                    false,
+                    base,
+                    pressed,
+                    window,
+                    cx,
+                );
             }
             el = el.cursor_pointer().on_click({
                 let activate = activate.clone();
@@ -519,7 +489,7 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
 
-const SWIPE: &str = "not yet: swipe actions land with the touch layer (M11)";
+const SWIPE: &str = "swipe actions land with Swipe (M11 stage 5, fork patch R3)";
 
 pub const ITEM_DOC: ComponentDoc = ComponentDoc {
     name: "Item",

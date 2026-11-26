@@ -13,6 +13,8 @@ use astryx_primitives::motion::AnimatorValues;
 pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let label = |text: &'static str| Text::new(text).text_type(TextType::Supporting);
     let animated_layout = crate::animated_layout::examples::examples(window, cx);
+    let gestures = crate::gestures::examples::examples(window, cx);
+    let snap_points = crate::drag_to_snap_points::examples::examples(window, cx);
     Stack::vertical()
         .gap(SpacingStep::S3)
         .child(label("useAnimator: springs a card on the state-change role; press again mid-flight and it carries its velocity"))
@@ -20,6 +22,8 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
         .child(label("useEntryAnimation: each added row slides in; the rows drawn on first paint did not"))
         .child(EntryDemo { id: "entry-demo".into() })
         .child(animated_layout)
+        .child(snap_points)
+        .child(gestures)
         .into_any_element()
 }
 

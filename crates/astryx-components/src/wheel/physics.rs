@@ -320,3 +320,40 @@ pub(crate) fn plan_release(offset: f64, velocity: f64, layout: &WheelLayout) -> 
         curve,
     }
 }
+
+/// Upstream `reachesRow`: whether moving from offset `from` to `to` brings a row's centre onto
+/// the band.
+pub(crate) fn reaches_row(from: f64, to: f64, row_height: f64) -> bool {
+    if to > from {
+        (to / row_height).floor() > (from / row_height).floor()
+    } else if to < from {
+        (to / row_height).ceil() < (from / row_height).ceil()
+    } else {
+        false
+    }
+}
+
+/// Upstream `tickTimes`: when, in seconds, a motion on `curve` brings a row onto the band,
+/// at most one tick per picker selection-tick interval.
+pub(crate) fn tick_times(curve: &WheelCurve, row_height: f64) -> Vec<f64> {
+    let interval = astryx_primitives::motion::uikit::picker::SELECTION_TICK_INTERVAL_MS / 1000.;
+    let (step, until) = (1. / 240., curve.duration());
+    let mut times = Vec::new();
+    let mut previous = curve.value(0.);
+    let mut last = f64::NEG_INFINITY;
+    let mut t = step;
+    while t < until + step {
+        let time = t.min(until);
+        let value = curve.value(time);
+        if reaches_row(previous, value, row_height) && time - last >= interval {
+            times.push(time);
+            last = time;
+        }
+        previous = value;
+        if time == until {
+            break;
+        }
+        t += step;
+    }
+    times
+}

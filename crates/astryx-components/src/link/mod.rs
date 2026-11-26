@@ -426,10 +426,23 @@ impl RenderOnce for Link {
             theme.refine(&mut hover, "link", &props, Some(RuleState::Hover));
             theme.refine(&mut active, "link", &props, Some(RuleState::Active));
             let activate = activate.expect("an enabled link activates");
+            el = el.cursor_pointer().hover(move |_| hover);
+            // Under a finger the press paints as UIKit tracks a control (upstream
+            // `usePressFeedback`); a fine pointer keeps the active rule.
+            let feedback = crate::gestures::use_press_feedback(
+                ElementId::Name(format!("{:?}-press", self.id).into()),
+                window,
+                cx,
+            )
+            .space_activates(&focus);
+            if !feedback.paints_buttons(window, cx) {
+                el = el.active(move |_| active);
+            }
+            if let Some(overlay) = feedback.overlay(t.color.overlay_pressed, window, cx) {
+                el = el.bg(overlay);
+            }
             el = el
-                .cursor_pointer()
-                .hover(move |_| hover)
-                .active(move |_| active)
+                .child(feedback.probe().absolute().top_0().left_0().size_full())
                 .on_click(move |event, window, cx| activate(event, window, cx));
         }
         if is_focus_visible(&focus, window) {

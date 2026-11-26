@@ -40,7 +40,10 @@ pub use command_palette::{
     CommandPalette, CommandPaletteEmpty, CommandPaletteFooter, CommandPaletteGroup,
     CommandPaletteInput, CommandPaletteItem, CommandPaletteList,
 };
-pub use context_menu::ContextMenu;
+pub use context_menu::{
+    CREATE_CONTEXT_MENU_DOC, ContextMenu, ContextMenuHandle, ContextMenuOptions,
+    USE_CONTEXT_MENU_DOC, create_context_menu, use_context_menu,
+};
 pub(crate) use context_menu::{ContextSpec, InvokeFn, with_context_menu};
 pub(crate) use context_menu::{context_menu_button, with_row_menu};
 pub(crate) use dialog::focus_scope;
@@ -361,10 +364,7 @@ pub const BOTTOM_SHEET_DOC: ComponentDoc = ComponentDoc {
     props: &[
         p("isOpen", RustApi::Argument("open")),
         p("onOpenChange", RustApi::Method("on_open_change")),
-        p(
-            "finalFocusRef",
-            RustApi::Waived("GPUI has no refs: focus returns to what had it when the sheet opened"),
-        ),
+        p("finalFocusRef", RustApi::Method("final_focus")),
         p("purpose", RustApi::Method("purpose")),
         p("sheetId", RustApi::Method("sheet_id")),
         p("label", RustApi::Argument("label")),
@@ -382,10 +382,7 @@ pub const BOTTOM_SHEET_SWITCHER_DOC: ComponentDoc = ComponentDoc {
     rust_type: "astryx::components::overlay::BottomSheetSwitcher",
     props: &[
         p("ref", RustApi::Waived("GPUI elements have no refs")),
-        p(
-            "onCancel",
-            RustApi::Waived("Escape reaches the active sheet, which asks to close per its purpose"),
-        ),
+        p("onCancel", RustApi::Method("on_cancel")),
         p("activeSheet", RustApi::Argument("active_sheet")),
         p(
             "onActiveSheetChange",

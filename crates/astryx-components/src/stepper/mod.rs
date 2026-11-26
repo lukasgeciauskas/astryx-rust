@@ -829,13 +829,21 @@ impl RenderOnce for Stepper {
                 el = if disabled {
                     el.aria_disabled(true)
                 } else {
-                    el.cursor_pointer()
-                        .hover(move |s| s.bg(hover))
-                        .active(move |s| s.bg(pressed))
-                        .on_click(move |_, window, cx| {
-                            cx.stop_propagation();
-                            on_click(i, window, cx);
-                        })
+                    crate::press::touch_press(
+                        el,
+                        ElementId::Name(format!("{button_id:?}-press").into()),
+                        false,
+                        gpui::transparent_black(),
+                        pressed,
+                        window,
+                        cx,
+                    )
+                    .cursor_pointer()
+                    .hover(move |s| s.bg(hover))
+                    .on_click(move |_, window, cx| {
+                        cx.stop_propagation();
+                        on_click(i, window, cx);
+                    })
                 };
                 if is_focus_visible(&focus, window) {
                     el = el.child(focus_ring(t, t.radius.element.to_pixels(rem), rem));

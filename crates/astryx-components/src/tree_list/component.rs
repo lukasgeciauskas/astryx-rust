@@ -957,8 +957,16 @@ impl RenderOnce for TreeList {
                 };
                 content = content
                     .cursor_pointer()
-                    .hover(move |s| s.bg(astryx_theme::color::composite(base, hover)))
-                    .active(move |s| s.bg(astryx_theme::color::composite(base, pressed)));
+                    .hover(move |s| s.bg(astryx_theme::color::composite(base, hover)));
+                content = crate::press::touch_press(
+                    content,
+                    ElementId::Name(format!("tree-row-{}-press", item.id).into()),
+                    false,
+                    base,
+                    pressed,
+                    window,
+                    cx,
+                );
                 // A press that a control inside the row took (it focused,
                 // preventing the default) is the control's, not the row's.
                 {

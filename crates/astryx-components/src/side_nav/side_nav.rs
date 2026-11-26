@@ -509,6 +509,11 @@ impl RenderOnce for SideNav {
                     .children(self.top_content.map(|c| div().child(c))),
             );
         }
+        let scroller_handle = crate::gestures::scroller::use_scroll_handle(
+            ElementId::Name(format!("{:?}-list", self.id).into()),
+            window,
+            cx,
+        );
         let list = div()
             .id(ElementId::Name(format!("{:?}-list", self.id).into()))
             .flex()
@@ -516,6 +521,7 @@ impl RenderOnce for SideNav {
             .flex_1()
             .min_h_0()
             .overflow_y_scroll()
+            .track_scroll(&scroller_handle)
             .px(t.spacing.s2)
             .pt(if has_top { t.spacing.s1 } else { t.spacing.s2 })
             .pb(if has_bottom {
@@ -524,7 +530,13 @@ impl RenderOnce for SideNav {
                 t.spacing.s2
             })
             .when(collapsed, |d| d.items_center())
-            .children(self.children);
+            .child(crate::gestures::scroller::scroll_begin(
+                ElementId::Name(format!("{:?}-list", self.id).into()),
+                Some(&scroller_handle),
+                (false, true),
+            ))
+            .children(self.children)
+            .child(crate::gestures::scroller::scroll_end());
         parts = parts.child(list);
         if has_bottom || show_button {
             parts = parts.child(

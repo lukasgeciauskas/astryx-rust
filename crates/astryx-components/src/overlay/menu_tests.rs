@@ -762,3 +762,298 @@ fn a_drill_in_submenu_replaces_the_rows_behind_a_back_row(cx: &mut TestAppContex
         "a keyboard drill lands on the first row after Back"
     );
 }
+
+// --- The press model under a finger (upstream useMenuPress.test.tsx) ---------
+
+fn finger(cx: &mut VisualTestContext, id: u64, phase: gpui::TouchPhase, p: Point<Pixels>) {
+    cx.simulate_event(gpui::TouchEvent {
+        id: gpui::TouchId(id),
+        phase,
+        position: p,
+        predicted_position: None,
+        force: None,
+    });
+    settle(cx);
+}
+
+#[gpui::test]
+fn menu_press_a_finger_on_the_trigger_opens_the_menu_as_it_presses_and_its_lift_picks_nothing(
+    cx: &mut TestAppContext,
+) {
+    let log = Log::default();
+    let cx = host(cx, &log, menu(&log));
+    finger(cx, 1, gpui::TouchPhase::Started, at(TRIGGER.0, TRIGGER.1));
+    assert!(
+        open(cx),
+        "a trigger in a fixed bar opens as the finger presses (UIMenu)"
+    );
+    // The lift, however long the finger rested, picks nothing: it never travelled.
+    wait(cx, 600);
+    finger(cx, 1, gpui::TouchPhase::Ended, at(TRIGGER.0, TRIGGER.1));
+    assert!(open(cx), "the menu stays open");
+    assert!(logged(&log).is_empty());
+}
+
+#[gpui::test]
+fn menu_press_the_opening_finger_picks_after_the_handoff_travel(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let cx = host(cx, &log, menu(&log));
+    finger(cx, 1, gpui::TouchPhase::Started, at(TRIGGER.0, TRIGGER.1));
+    let oldest = row(cx, "m-list-oldest").expect("the press opened the menu");
+    // The first sample is where the handoff counts from.
+    finger(
+        cx,
+        1,
+        gpui::TouchPhase::Moved,
+        at(TRIGGER.0, TRIGGER.1 + 2.),
+    );
+    finger(cx, 1, gpui::TouchPhase::Moved, oldest);
+    finger(cx, 1, gpui::TouchPhase::Ended, oldest);
+    assert_eq!(logged(&log), ["oldest"]);
+    assert!(!open(cx), "picking closes the menu");
+}
+
+#[gpui::test]
+fn menu_press_a_finger_that_moves_under_the_handoff_picks_nothing(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let cx = host(cx, &log, menu(&log));
+    finger(cx, 1, gpui::TouchPhase::Started, at(TRIGGER.0, TRIGGER.1));
+    assert!(open(cx));
+    finger(
+        cx,
+        1,
+        gpui::TouchPhase::Moved,
+        at(TRIGGER.0, TRIGGER.1 + 2.),
+    );
+    finger(
+        cx,
+        1,
+        gpui::TouchPhase::Moved,
+        at(TRIGGER.0, TRIGGER.1 + 8.),
+    );
+    finger(
+        cx,
+        1,
+        gpui::TouchPhase::Ended,
+        at(TRIGGER.0, TRIGGER.1 + 8.),
+    );
+    assert!(logged(&log).is_empty());
+    assert!(open(cx));
+}
+
+#[gpui::test]
+fn menu_press_a_finger_tap_on_a_row_acts_on_it_once(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let cx = host(cx, &log, menu(&log));
+    keyboard_open(cx);
+    let newest = row(cx, "m-list-newest").expect("open");
+    finger(cx, 1, gpui::TouchPhase::Started, newest);
+    finger(cx, 1, gpui::TouchPhase::Ended, newest);
+    wait(cx, 50);
+    assert_eq!(logged(&log), ["newest"]);
+}
+
+#[gpui::test]
+fn menu_press_a_held_finger_picks_the_row_it_lifts_on_not_the_one_it_pressed(
+    cx: &mut TestAppContext,
+) {
+    let log = Log::default();
+    let cx = host(cx, &log, menu(&log));
+    keyboard_open(cx);
+    let (newest, delete) = (
+        row(cx, "m-list-newest").expect("open"),
+        row(cx, "m-list-delete").expect("open"),
+    );
+    finger(cx, 1, gpui::TouchPhase::Started, newest);
+    finger(cx, 1, gpui::TouchPhase::Moved, delete);
+    finger(cx, 1, gpui::TouchPhase::Ended, delete);
+    wait(cx, 50);
+    assert_eq!(logged(&log), ["delete"]);
+}
+
+#[gpui::test]
+fn menu_press_a_finger_released_outside_leaves_the_menu_open_and_a_cancel_acts_on_nothing(
+    cx: &mut TestAppContext,
+) {
+    let log = Log::default();
+    let cx = host(cx, &log, menu(&log));
+    keyboard_open(cx);
+    let newest = row(cx, "m-list-newest").expect("open");
+    finger(cx, 1, gpui::TouchPhase::Started, newest);
+    finger(cx, 1, gpui::TouchPhase::Moved, at(900., 700.));
+    finger(cx, 1, gpui::TouchPhase::Ended, at(900., 700.));
+    assert!(open(cx), "a finger released outside leaves it open");
+    finger(cx, 2, gpui::TouchPhase::Started, newest);
+    finger(cx, 2, gpui::TouchPhase::Cancelled, newest);
+    wait(cx, 50);
+    assert!(logged(&log).is_empty());
+    assert!(open(cx));
+}
+
+#[gpui::test]
+fn menu_press_a_second_finger_ends_the_gesture_with_nothing_acting(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let cx = host(cx, &log, menu(&log));
+    keyboard_open(cx);
+    let (newest, delete) = (
+        row(cx, "m-list-newest").expect("open"),
+        row(cx, "m-list-delete").expect("open"),
+    );
+    finger(cx, 1, gpui::TouchPhase::Started, newest);
+    finger(cx, 2, gpui::TouchPhase::Started, delete);
+    finger(cx, 1, gpui::TouchPhase::Ended, newest);
+    finger(cx, 2, gpui::TouchPhase::Ended, delete);
+    wait(cx, 50);
+    assert!(
+        logged(&log).is_empty(),
+        "a pinch or a two-finger scroll is never a pick"
+    );
+}
+
+#[gpui::test]
+fn context_a_long_press_opens_under_the_finger_which_picks_after_the_handoff(
+    cx: &mut TestAppContext,
+) {
+    let log = Log::default();
+    let cx = host(cx, &log, context(&log, false));
+    finger(cx, 1, gpui::TouchPhase::Started, at(300., 200.));
+    wait(cx, 100);
+    assert!(!context_open(cx), "nothing opens before the hold");
+    wait(cx, 450);
+    assert!(context_open(cx), "the long press opened it");
+    let delete = row(cx, "c-list-delete").expect("open");
+    finger(cx, 1, gpui::TouchPhase::Moved, at(300., 202.));
+    finger(cx, 1, gpui::TouchPhase::Moved, delete);
+    finger(cx, 1, gpui::TouchPhase::Ended, delete);
+    wait(cx, 50);
+    assert_eq!(logged(&log), ["delete"]);
+}
+
+#[gpui::test]
+fn context_a_quick_tap_opens_nothing(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let cx = host(cx, &log, context(&log, false));
+    finger(cx, 1, gpui::TouchPhase::Started, at(300., 200.));
+    wait(cx, 100);
+    finger(cx, 1, gpui::TouchPhase::Ended, at(300., 200.));
+    wait(cx, 600);
+    assert!(!context_open(cx));
+}
+
+// --- The headless context menu (spec:AST-107 FR8) -----------------------------
+
+#[derive(IntoElement)]
+struct Headless {
+    log: Log,
+    custom: bool,
+    disabled: bool,
+    handle: Rc<RefCell<Option<ContextMenuHandle>>>,
+}
+
+impl gpui::RenderOnce for Headless {
+    fn render(self, window: &mut Window, cx: &mut gpui::App) -> impl IntoElement {
+        use gpui::InteractiveElement as _;
+        let mut options = ContextMenuOptions::default()
+            .items(entries(&self.log))
+            .disabled(self.disabled);
+        if self.custom {
+            options = options.render(|_, _| {
+                div()
+                    .debug_selector(|| "custom-content".into())
+                    .w(px(120.))
+                    .h(px(40.))
+                    .into_any_element()
+            });
+        }
+        let menu = use_context_menu("h", options, window, cx);
+        *self.handle.borrow_mut() = Some(menu.clone());
+        menu.attach(
+            div().id("h-area").relative().w(px(240.)).h(px(120.)),
+            window,
+            cx,
+        )
+    }
+}
+
+fn headless<'a>(
+    cx: &'a mut TestAppContext,
+    log: &Log,
+    custom: bool,
+    disabled: bool,
+) -> (
+    &'a mut VisualTestContext,
+    Rc<RefCell<Option<ContextMenuHandle>>>,
+) {
+    let handle: Rc<RefCell<Option<ContextMenuHandle>>> = Rc::default();
+    let (l, h) = (log.clone(), handle.clone());
+    let cx = host(cx, log, move || {
+        Headless {
+            log: l.clone(),
+            custom,
+            disabled,
+            handle: h.clone(),
+        }
+        .into_any_element()
+    });
+    (cx, handle)
+}
+
+#[gpui::test]
+fn fr8_the_headless_menu_opens_at_a_point_and_closes(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let (cx, handle) = headless(cx, &log, false, false);
+    let menu = handle.borrow().clone().unwrap();
+    cx.update(|window, cx| menu.open(Some(at(200., 180.)), window, cx));
+    settle(cx);
+    let list = cx.debug_bounds("h-list").expect("open(at) opened it");
+    assert!((f32::from(list.left()) - 200.).abs() <= 8.);
+    cx.update(|window, cx| menu.close(window, cx));
+    settle(cx);
+    assert!(!shown(cx, "h-list"));
+}
+
+#[gpui::test]
+fn fr8_open_without_a_point_opens_at_the_elements_corner_on_its_first_row(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let (cx, handle) = headless(cx, &log, false, false);
+    let menu = handle.borrow().clone().unwrap();
+    cx.update(|window, cx| menu.open(None, window, cx));
+    settle(cx);
+    assert!(shown(cx, "h-list"));
+    press(cx, "enter");
+    settle(cx);
+    assert_eq!(
+        logged(&log),
+        ["newest"],
+        "focus started on the first enabled row"
+    );
+}
+
+#[gpui::test]
+fn fr8_a_context_request_on_the_element_opens_it(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let (cx, _) = headless(cx, &log, false, false);
+    right_click(cx, at(200., 180.));
+    assert!(shown(cx, "h-list"), "a right press opens it");
+}
+
+#[gpui::test]
+fn fr8_is_disabled_keeps_it_from_opening(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let (cx, handle) = headless(cx, &log, false, true);
+    right_click(cx, at(200., 180.));
+    assert!(!shown(cx, "h-list"));
+    let menu = handle.borrow().clone().unwrap();
+    cx.update(|window, cx| menu.open(Some(at(200., 180.)), window, cx));
+    settle(cx);
+    assert!(!shown(cx, "h-list"));
+}
+
+#[gpui::test]
+fn fr8_render_fills_the_menu_with_custom_content(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let (cx, _) = headless(cx, &log, true, false);
+    right_click(cx, at(200., 180.));
+    assert!(shown(cx, "custom-content"));
+    assert!(!shown(cx, "h-list"), "the content replaces the rows");
+}

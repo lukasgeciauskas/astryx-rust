@@ -261,6 +261,18 @@ impl RenderOnce for ChatLayout {
             scroll,
             messages: registry,
         };
-        provide(context, root.child(area).child(dock).child(observer))
+        // A self-scrolling layout is its messages' scroller.
+        let root = if self_scrolling {
+            root.child(crate::gestures::scroller::scroll_begin(
+                self.id.clone(),
+                Some(&handle),
+                (false, true),
+            ))
+            .child(area)
+            .child(crate::gestures::scroller::scroll_end())
+        } else {
+            root.child(area)
+        };
+        provide(context, root.child(dock).child(observer))
     }
 }

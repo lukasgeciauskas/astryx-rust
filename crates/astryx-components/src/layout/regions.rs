@@ -9,6 +9,7 @@
 //! container's, else step 4), collapsing beside a header or footer without a divider.
 //! Regions publish the padding they apply as `ContainerPadding`.
 
+use crate::gestures::scroller::{scroll_begin, scroll_end};
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -658,7 +659,8 @@ impl Region {
             if let Some(label) = &self.label {
                 el = el.aria_label(label.clone());
             }
-            return el;
+            // No scroller here; the caller's `scroll_end` after the content balances it.
+            return el.child(scroll_begin(self.id.clone(), None, (false, false)));
         }
         let area = use_scrollable_area(
             &self.id,
@@ -672,7 +674,10 @@ impl Region {
             window,
             cx,
         );
-        let mut el = area.viewport(el);
+        // The region scrolls its content: a press inside waits out a scroll (the caller
+        // closes it with `scroll_end` after the content).
+        let begin = scroll_begin(self.id.clone(), Some(area.scroll_handle()), (false, true));
+        let mut el = area.viewport(el).child(begin);
         // A caller's role takes only the caller's label (AR1).
         if let Some(role) = self.role {
             el = el.role(role);
@@ -879,11 +884,13 @@ impl RenderOnce for LayoutContent {
             ),
         );
         let selector = format!("{}", self.0.id);
-        let el = el
-            .debug_selector(move || selector)
-            .child(probe)
-            .child(children);
-        self.0.viewport(el, window, cx).flex_1().min_h_0()
+        let el = el.debug_selector(move || selector).child(probe);
+        self.0
+            .viewport(el, window, cx)
+            .child(children)
+            .child(scroll_end())
+            .flex_1()
+            .min_h_0()
     }
 }
 
@@ -1006,7 +1013,9 @@ impl RenderOnce for LayoutPanel {
         );
         let panel = self
             .region
-            .viewport(el.child(children), window, cx)
+            .viewport(el, window, cx)
+            .child(children)
+            .child(scroll_end())
             .track_focus(&panel_focus);
         // The slide: a still clip at the extent shown, the panel anchored at its outer
         // edge inside it, so its content stays put and enters and leaves at the edge

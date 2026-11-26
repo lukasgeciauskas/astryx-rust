@@ -39,20 +39,55 @@ struct LastPointer(HashMap<WindowId, bool>);
 
 impl Global for LastPointer {}
 
-/// Whether the primary pointer is coarse, upstream `(pointer: coarse)`: the
-/// last pointer input was a finger. A key press is no pointer, so typing or
-/// tabbing keeps the answer (a tablet with a keyboard stays coarse).
+/// Whether the primary pointer is coarse, upstream `(pointer: coarse)` and
+/// its input tracking: the pointer the window's gesture host saw last is a
+/// finger (the host records every contact it hears: a finger's touch, a
+/// real mouse's press or move, never GPUI's taps synthesized from a touch);
+/// without a host's reading, the last pointer input was a finger. Before any
+/// pointer input the answer is the platform's: on the web the browser's own
+/// `(pointer: coarse)` media query, natively fine. A key press is no
+/// pointer, so typing or tabbing keeps the answer (a tablet with a keyboard
+/// stays coarse).
 pub fn coarse_primary_pointer(window: &Window, cx: &mut App) -> bool {
+    use crate::gestures::PointerKind;
+
     let id = window.window_handle().window_id();
+    let stored = cx
+        .try_global::<LastPointer>()
+        .and_then(|last| last.0.get(&id).copied());
     if window.last_input_was_keyboard() {
-        return cx
-            .try_global::<LastPointer>()
-            .and_then(|last| last.0.get(&id).copied())
-            .unwrap_or(false);
+        if let Some(kind) = crate::gestures::host::last_pointer_kind(id, cx) {
+            return kind == PointerKind::Touch;
+        }
+        return stored.unwrap_or_else(platform_coarse_pointer);
     }
-    let touch = window.last_input_was_touch();
-    cx.default_global::<LastPointer>().0.insert(id, touch);
-    touch
+    let coarse = if window.last_input_was_touch() {
+        true
+    } else if let Some(kind) = crate::gestures::host::last_pointer_kind(id, cx) {
+        kind == PointerKind::Touch
+    } else if stored.is_none() {
+        // No pointer input the window could tell from its first state.
+        return platform_coarse_pointer();
+    } else {
+        false
+    };
+    cx.default_global::<LastPointer>().0.insert(id, coarse);
+    coarse
+}
+
+/// The platform's primary pointer before any input: the browser's
+/// `(pointer: coarse)` on the web; fine natively.
+fn platform_coarse_pointer() -> bool {
+    #[cfg(target_family = "wasm")]
+    {
+        web_sys::window()
+            .and_then(|window| window.match_media("(pointer: coarse)").ok().flatten())
+            .is_some_and(|list| list.matches())
+    }
+    #[cfg(not(target_family = "wasm"))]
+    {
+        false
+    }
 }
 
 /// Whether `handle` has focus that should show a ring: CSS `:focus-visible`.

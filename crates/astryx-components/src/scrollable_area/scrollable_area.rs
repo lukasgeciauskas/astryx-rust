@@ -188,7 +188,16 @@ impl RenderOnce for ScrollableArea {
                 }),
             );
         }
-        let viewport = viewport.child(content).child(overlay);
+        // A press inside waits out a scroll (upstream `isInsideScrollView`).
+        let viewport = viewport
+            .child(crate::gestures::scroller::scroll_begin(
+                self.id.clone(),
+                Some(area.scroll_handle()),
+                (self.axis.inline(), self.axis.block()),
+            ))
+            .child(content)
+            .child(crate::gestures::scroller::scroll_end())
+            .child(overlay);
         viewport.debug_selector({
             let id = format!("{}", self.id);
             move || id.clone()

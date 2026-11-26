@@ -499,7 +499,13 @@ impl RenderOnce for AppShell {
             let root = astryx_primitives::anchor::ScrollRoot(area.scroll_handle().clone());
             let el = area
                 .viewport(div().relative().size_full().p(padding))
-                .child(provide(root, children));
+                .child(crate::gestures::scroller::scroll_begin(
+                    "app-shell-main",
+                    Some(area.scroll_handle()),
+                    (false, true),
+                ))
+                .child(provide(root, children))
+                .child(crate::gestures::scroller::scroll_end());
             (el, focus)
         };
         // A ring for Tab focus on a scroll region, never for the skip link's move.

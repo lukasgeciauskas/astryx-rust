@@ -1202,10 +1202,18 @@ impl RenderOnce for NumberInput {
                 if !blocked {
                     let (down, up, out) = (ctx.clone(), ctx.clone(), ctx.clone());
                     let focus = focus.clone();
+                    button = crate::press::touch_press(
+                        button,
+                        ElementId::Name(format!("{:?}-step-{direction}", self.id).into()),
+                        false,
+                        gpui::transparent_black(),
+                        pressed,
+                        window,
+                        cx,
+                    );
                     button = button
                         .cursor_pointer()
                         .hover(move |s| s.bg(hover))
-                        .active(move |s| s.bg(pressed))
                         .on_mouse_down(MouseButton::Left, move |_, window, cx| {
                             // The field keeps focus while its steppers work.
                             cx.stop_propagation();

@@ -186,6 +186,22 @@ impl RenderOnce for SideNavItem {
         };
         let focus = control_focus(&self.id, window, cx);
         let hover = t.color.overlay_hover;
+        // A finger's press paints as UIKit tracks a cell (upstream `usePressFeedback`); a
+        // fine pointer keeps the active style.
+        let feedback = crate::gestures::use_press_feedback(
+            ElementId::Name(format!("{:?}-press", self.id).into()),
+            window,
+            cx,
+        )
+        .disabled(self.disabled);
+        let pressed = t.color.overlay_pressed;
+        let mouse_active = !feedback.paints_buttons(window, cx);
+        let touch_overlay = feedback.overlay(pressed, window, cx);
+        let rest = if self.selected {
+            t.color.neutral
+        } else {
+            gpui::transparent_black()
+        };
         // The row's look (upstream navItemStyles).
         let selector = format!("{}", self.id);
         let style_row = |el: gpui::Stateful<gpui::Div>| {
@@ -214,6 +230,13 @@ impl RenderOnce for SideNavItem {
             }
             if !self.disabled {
                 el = el.cursor_pointer();
+                if mouse_active {
+                    el = el.active(move |s| s.bg(astryx_theme::color::composite(rest, pressed)));
+                }
+                if let Some(o) = touch_overlay {
+                    el = el.bg(astryx_theme::color::composite(rest, o));
+                }
+                el = el.child(feedback.probe().absolute().top_0().left_0().size_full());
             }
             el
         };

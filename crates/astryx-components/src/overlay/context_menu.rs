@@ -3,8 +3,11 @@
 //!
 //! - A right press opens it at the pointer (and, held, picks the row it is
 //!   released on, as the press model says); Shift+F10 or the Menu key opens
-//!   it at the area's bottom-start corner on its first row; a long press on
-//!   a touch screen opens it under the finger.
+//!   it at the area's bottom-start corner on its first row; a long press
+//!   (upstream `useLongPress`) opens it under the finger, which then picks the row it
+//!   lifts on after the handoff travel.
+//! - It is built on the headless layer, [`create_context_menu`] / [`use_context_menu`]
+//!   (spec:AST-107 FR8), which gives any element a context menu.
 //! - A press outside closes it at the press; Escape closes the top-most
 //!   level only (FR9); Tab leaves the menu (FR11). Focus returns to what had
 //!   it.
@@ -14,33 +17,31 @@
 //! the right press and the keys itself.
 
 use std::rc::Rc;
-use std::time::Duration;
 
 use astryx_i18n::{current as i18n, use_direction};
 use astryx_primitives::{EscapeBehavior, layer};
 use astryx_theme::{ThemeStyled, current};
 use gpui::{
     AnyElement, App, Bounds, Div, ElementId, Entity, FocusHandle, IntoElement, KeyDownEvent,
-    Length, MouseButton, MouseDownEvent, MouseMoveEvent, ParentElement, Pixels, Point, RenderOnce,
-    SharedString, Stateful, StyleRefinement, Styled, Task, Window, div, point, prelude::*, px,
+    Length, MouseButton, MouseDownEvent, ParentElement, Pixels, Point, RenderOnce, SharedString,
+    Stateful, StyleRefinement, Styled, Window, div, point, prelude::*, px,
 };
 use smallvec::SmallVec;
 
 use super::menu::{
-    Initial, MenuAction, MenuEntry, MenuList, MenuRoot, MenuSize, MenuTree, PressGesture,
-    menu_block_cap, menu_root, surface_probe, sync_root,
+    Initial, MenuAction, MenuEntry, MenuList, MenuRoot, MenuSize, MenuTree, menu_block_cap,
+    menu_root, surface_probe, sync_root,
 };
 use super::motion::viewport_cap;
 use super::popover::{PopoverPresentation, presents_as_sheet};
+use crate::gestures::long_press::{LongPressOptions, use_long_press};
+use crate::gestures::menu_press::MenuPressPointerType;
 use crate::text::{Heading, HeadingLevel};
 
 type OpenFn = Rc<dyn Fn(bool, &mut Window, &mut App)>;
 type EntriesFn = Rc<dyn Fn(&mut Window, &mut App) -> Vec<MenuEntry>>;
-
-/// Upstream `LONG_PRESS_DURATION_MS`.
-const LONG_PRESS: Duration = Duration::from_millis(500);
-/// How far a finger may drift before a long press is a pan.
-const LONG_PRESS_TOLERANCE: f32 = 10.;
+/// Custom menu content.
+pub(crate) type ContentFn = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 
 /// A context menu's state between frames.
 pub(crate) struct ContextState {
@@ -51,7 +52,6 @@ pub(crate) struct ContextState {
     surface: FocusHandle,
     /// The area's bounds as of last frame.
     bounds: Option<Bounds<Pixels>>,
-    long_press: Option<(Task<()>, Point<Pixels>)>,
     on_open_change: Option<OpenFn>,
 }
 
@@ -65,46 +65,57 @@ fn context_state(id: &ElementId, window: &mut Window, cx: &mut App) -> Entity<Co
             return_to: None,
             surface: cx.focus_handle().tab_stop(false),
             bounds: None,
-            long_press: None,
             on_open_change: None,
         },
     )
 }
 
+/// What opened a context menu and is still held, for the press model.
+#[derive(Clone, Copy)]
+enum MenuOpener {
+    Mouse(MouseButton),
+    Finger,
+}
+
 /// Opens the menu at `at`: `keyboard` lands on the first row; `press` is the
-/// button still held, for the press model.
+/// pointer still held, for the press model.
 fn open_at(
     state: &Entity<ContextState>,
     root: &Entity<MenuRoot>,
     at: Point<Pixels>,
     keyboard: bool,
-    press: Option<MouseButton>,
+    press: Option<MenuOpener>,
     window: &mut Window,
     cx: &mut App,
 ) {
     let focused = window.focused(cx);
-    let now = cx.background_executor().now();
     let (was_open, report) = state.update(cx, |s, _| {
         let was_open = s.open;
         s.open = true;
         s.at = at;
-        s.long_press = None;
         if !was_open {
             s.return_to = focused;
         }
         (was_open, s.on_open_change.clone())
     });
-    root.update(cx, |r, _| {
+    root.update(cx, |r, cx| {
         r.initial = Some(if keyboard {
             Initial::First
         } else {
             Initial::Container
         });
-        r.press = press.map(|button| PressGesture {
-            at: now,
-            entered: false,
-            button,
-        });
+        // The pointer that opened it is still held: its press picks on release.
+        match press {
+            Some(MenuOpener::Mouse(button)) => {
+                r.press
+                    .opened_under(MenuPressPointerType::Mouse, button, cx)
+            }
+            Some(MenuOpener::Finger) => {
+                r.press
+                    .opened_under(MenuPressPointerType::Touch, MouseButton::Left, cx)
+            }
+            None => r.press.reset(),
+        }
         // A new invocation starts from the root level.
         if was_open {
             r.generation += 1;
@@ -245,19 +256,26 @@ impl RenderOnce for ContextMenu {
             area = area.flex_none().self_start();
         }
         area.style().refine(&self.style);
-        let spec = ContextSpec {
-            id: self.id,
-            entries: self.entries,
-            entries_fn: self.entries_fn,
-            menu_width: self.menu_width,
-            size: self.size,
-            label: self.label,
-            on_open_change: self.on_open_change,
-            on_invoke: None,
-            presentation: self.presentation,
-            disabled: self.disabled,
-        };
-        with_context_menu(area, spec, window, cx).children(self.children)
+        // ContextMenu is built on the headless factory (spec:AST-107 FR8).
+        let menu = create_context_menu(
+            self.id,
+            ContextMenuOptions {
+                items: self.entries,
+                render: None,
+                label: self.label,
+                disabled: self.disabled,
+                on_open_change: self.on_open_change,
+                presentation: self.presentation,
+                extras: ContextExtras {
+                    entries_fn: self.entries_fn,
+                    menu_width: self.menu_width,
+                    size: self.size,
+                },
+            },
+            window,
+            cx,
+        );
+        menu.attach(area, window, cx).children(self.children)
     }
 }
 
@@ -269,6 +287,8 @@ pub(crate) type InvokeFn = Rc<dyn Fn(Option<Point<Pixels>>, &mut Window, &mut Ap
 pub(crate) struct ContextSpec {
     pub id: ElementId,
     pub entries: Vec<MenuEntry>,
+    /// Custom content in place of the rows (upstream `createContextMenu`'s `render`).
+    pub render: Option<ContentFn>,
     pub entries_fn: Option<EntriesFn>,
     pub menu_width: Option<Length>,
     pub size: MenuSize,
@@ -334,58 +354,29 @@ pub(crate) fn with_context_menu(
                     &r,
                     event.position,
                     false,
-                    Some(MouseButton::Right),
+                    Some(MenuOpener::Mouse(MouseButton::Right)),
                     window,
                     cx,
                 );
             },
         );
-        // A long press under a finger.
+        // A long press under a finger (upstream `useLongPress`) opens it under the finger,
+        // which then picks the row it lifts on after the handoff travel.
         let invoke = spec.on_invoke.clone();
         let (s, r) = (state.clone(), root.clone());
-        area = area.on_mouse_down(
-            MouseButton::Left,
-            move |event: &MouseDownEvent, window, cx| {
-                if !window.last_input_was_touch() {
-                    return;
+        let hold = use_long_press(
+            ElementId::Name(format!("{}-hold", spec.id).into()),
+            LongPressOptions::new(move |at, window, cx| {
+                let at = point(px(at.x as f32), px(at.y as f32));
+                if let Some(invoke) = &invoke {
+                    invoke(Some(at), window, cx);
                 }
-                let at = event.position;
-                let timer = cx.background_executor().timer(LONG_PRESS);
-                let (weak, root, invoke) = (s.downgrade(), r.clone(), invoke.clone());
-                let task = window.spawn(cx, async move |cx| {
-                    timer.await;
-                    cx.update(|window, cx| {
-                        if let Some(state) = weak.upgrade() {
-                            if let Some(invoke) = &invoke {
-                                invoke(Some(at), window, cx);
-                            }
-                            open_at(&state, &root, at, false, None, window, cx);
-                        }
-                    })
-                    .ok();
-                });
-                s.update(cx, |s, _| s.long_press = Some((task, at)));
-            },
+                open_at(&s, &r, at, false, Some(MenuOpener::Finger), window, cx);
+            }),
+            window,
+            cx,
         );
-        let s = state.clone();
-        area = area.on_mouse_move(move |event: &MouseMoveEvent, _, cx| {
-            let drifted = s.read(cx).long_press.as_ref().is_some_and(|(_, from)| {
-                let (dx, dy) = (
-                    f32::from(event.position.x - from.x),
-                    f32::from(event.position.y - from.y),
-                );
-                (dx * dx + dy * dy).sqrt() > LONG_PRESS_TOLERANCE
-            });
-            if drifted {
-                s.update(cx, |s, _| s.long_press = None);
-            }
-        });
-        let s = state.clone();
-        area = area.on_mouse_up(MouseButton::Left, move |_, _, cx| {
-            if s.read(cx).long_press.is_some() {
-                s.update(cx, |s, _| s.long_press = None);
-            }
-        });
+        area = area.child(hold.probe().absolute().top_0().left_0().size_full());
         let invoke = spec.on_invoke.clone();
         let (s, r) = (state.clone(), root.clone());
         area = area.on_key_down(move |event: &KeyDownEvent, window, cx| {
@@ -430,12 +421,16 @@ pub(crate) fn with_context_menu(
         Some(f) => f(window, cx),
         None => spec.entries,
     };
-    let list = MenuList::new(
-        ElementId::Name(format!("{}-list", spec.id).into()),
-        entries,
-        label.clone(),
-        tree,
-    );
+    let list: AnyElement = match &spec.render {
+        Some(render) => render(window, cx),
+        None => MenuList::new(
+            ElementId::Name(format!("{}-list", spec.id).into()),
+            entries,
+            label.clone(),
+            tree,
+        )
+        .into_any_element(),
+    };
     let drilled = root.read(cx).drilled > 0;
     if sheet {
         let s = state.clone();
@@ -524,6 +519,7 @@ pub(crate) fn with_row_menu(
         ContextSpec {
             id,
             entries,
+            render: None,
             entries_fn: None,
             menu_width: None,
             size: MenuSize::Md,
@@ -569,3 +565,202 @@ pub(crate) fn context_menu_button(
         })
         .into_any_element()
 }
+
+// --- The headless layer (spec:AST-107 FR8) -----------------------------------
+
+/// Upstream `createContextMenu`'s options (spec:AST-107 FR8): the shared options mean what
+/// ContextMenu's props of the same names mean.
+#[derive(Clone, Default)]
+pub struct ContextMenuOptions {
+    /// The rows.
+    pub items: Vec<MenuEntry>,
+    /// Custom content in place of the rows.
+    pub render: Option<ContentFn>,
+    /// The menu's name ("Context menu").
+    pub label: Option<SharedString>,
+    /// Nothing opens it.
+    pub disabled: bool,
+    pub on_open_change: Option<OpenFn>,
+    pub presentation: PopoverPresentation,
+    /// ContextMenu's own props beyond the shared ones.
+    pub(crate) extras: ContextExtras,
+}
+
+/// What ContextMenu adds on the factory: entries built at the invocation, the menu's
+/// width and the rows' size.
+#[derive(Clone, Default)]
+pub(crate) struct ContextExtras {
+    entries_fn: Option<EntriesFn>,
+    menu_width: Option<Length>,
+    size: MenuSize,
+}
+
+impl ContextMenuOptions {
+    pub fn items(mut self, items: impl IntoIterator<Item = MenuEntry>) -> Self {
+        self.items.extend(items);
+        self
+    }
+
+    pub fn render(mut self, f: impl Fn(&mut Window, &mut App) -> AnyElement + 'static) -> Self {
+        self.render = Some(Rc::new(f));
+        self
+    }
+
+    pub fn label(mut self, label: impl Into<SharedString>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    pub fn disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+
+    pub fn on_open_change(mut self, f: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
+        self.on_open_change = Some(Rc::new(f));
+        self
+    }
+
+    pub fn presentation(mut self, presentation: PopoverPresentation) -> Self {
+        self.presentation = presentation;
+        self
+    }
+}
+
+/// Upstream `createContextMenu`'s result: `open(at?)`, `close()`, and the element it attaches
+/// to ([`ContextMenuHandle::attach`]). Cheap to clone.
+#[derive(Clone)]
+pub struct ContextMenuHandle {
+    id: ElementId,
+    state: Entity<ContextState>,
+    root: Entity<MenuRoot>,
+    options: ContextMenuOptions,
+    rtl: bool,
+}
+
+impl ContextMenuHandle {
+    /// Gives `area` its context menu: it opens on the element's context request (a long
+    /// press, a right press, or Shift+F10 and the Menu key), and its menu draws there. The
+    /// element should be `relative`. Render it each frame in the scope the hook ran in.
+    pub fn attach(&self, area: Stateful<Div>, window: &mut Window, cx: &mut App) -> Stateful<Div> {
+        let o = self.options.clone();
+        with_context_menu(
+            area,
+            ContextSpec {
+                id: self.id.clone(),
+                entries: o.items,
+                render: o.render,
+                entries_fn: o.extras.entries_fn,
+                menu_width: o.extras.menu_width,
+                size: o.extras.size,
+                label: o.label,
+                on_open_change: o.on_open_change,
+                on_invoke: None,
+                presentation: o.presentation,
+                disabled: o.disabled,
+            },
+            window,
+            cx,
+        )
+    }
+
+    /// Upstream `open(at?)`: opens the menu at `at`, or at the element's bottom-start corner
+    /// on its first row.
+    pub fn open(&self, at: Option<Point<Pixels>>, window: &mut Window, cx: &mut App) {
+        if self.options.disabled {
+            return;
+        }
+        let at = at.map(|p| (p, false)).or_else(|| {
+            self.state.read(cx).bounds.map(|b| {
+                let x = if self.rtl { b.right() } else { b.left() };
+                (point(x, b.bottom() - px(1.)), true)
+            })
+        });
+        if let Some((at, keyboard)) = at {
+            open_at(&self.state, &self.root, at, keyboard, None, window, cx);
+        }
+    }
+
+    /// Upstream `close()`.
+    pub fn close(&self, window: &mut Window, cx: &mut App) {
+        close(&self.state, window, cx);
+    }
+
+    /// Whether the menu is open.
+    pub fn is_open(&self, cx: &App) -> bool {
+        self.state.read(cx).open
+    }
+}
+
+/// Upstream `createContextMenu` (spec:AST-107 FR8): a headless context menu for the element
+/// `id` names, which ContextMenu is built on. GPUI gives no element handles, so the factory
+/// and its hook are one call made where the element renders.
+pub fn create_context_menu(
+    id: impl Into<ElementId>,
+    options: ContextMenuOptions,
+    window: &mut Window,
+    cx: &mut App,
+) -> ContextMenuHandle {
+    let id = id.into();
+    ContextMenuHandle {
+        state: context_state(&id, window, cx),
+        root: menu_root(&id, window, cx),
+        rtl: use_direction(cx).is_rtl(),
+        id,
+        options,
+    }
+}
+
+/// Upstream `useContextMenu(ref, options)`: the thin hook over [`create_context_menu`].
+pub fn use_context_menu(
+    id: impl Into<ElementId>,
+    options: ContextMenuOptions,
+    window: &mut Window,
+    cx: &mut App,
+) -> ContextMenuHandle {
+    create_context_menu(id, options, window, cx)
+}
+
+const fn doc_prop(prop: &'static str, rust: crate::doc::RustApi) -> crate::doc::PropMapping {
+    crate::doc::PropMapping { prop, rust }
+}
+
+const CONTEXT_MENU_FACTORY_PROPS: &[crate::doc::PropMapping] = {
+    use crate::doc::RustApi::{Argument, Method};
+    &[
+        doc_prop(
+            "element",
+            Argument("id (the element's id; ContextMenuHandle::attach gives it the menu)"),
+        ),
+        doc_prop("options.items", Method("ContextMenuOptions::items")),
+        doc_prop("options.render", Method("ContextMenuOptions::render")),
+        doc_prop("options.label", Method("ContextMenuOptions::label")),
+        doc_prop("options.isDisabled", Method("ContextMenuOptions::disabled")),
+        doc_prop(
+            "options.onOpenChange",
+            Method("ContextMenuOptions::on_open_change"),
+        ),
+        doc_prop(
+            "options.presentation",
+            Method("ContextMenuOptions::presentation"),
+        ),
+        doc_prop("open(at)", Method("ContextMenuHandle::open")),
+        doc_prop("close()", Method("ContextMenuHandle::close")),
+    ]
+};
+
+/// Spec-only (spec:AST-107 FR8; no upstream doc yet).
+pub const CREATE_CONTEXT_MENU_DOC: crate::doc::ComponentDoc = crate::doc::ComponentDoc {
+    name: "createContextMenu",
+    rust_type: "astryx::components::overlay::create_context_menu -> ContextMenuHandle",
+    props: CONTEXT_MENU_FACTORY_PROPS,
+    example: include_str!("../gestures/examples.rs"),
+};
+
+/// Spec-only (spec:AST-107 FR8; no upstream doc yet).
+pub const USE_CONTEXT_MENU_DOC: crate::doc::ComponentDoc = crate::doc::ComponentDoc {
+    name: "useContextMenu",
+    rust_type: "astryx::components::overlay::use_context_menu -> ContextMenuHandle",
+    props: CONTEXT_MENU_FACTORY_PROPS,
+    example: include_str!("../gestures/examples.rs"),
+};

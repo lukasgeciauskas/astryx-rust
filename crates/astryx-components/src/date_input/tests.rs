@@ -701,3 +701,58 @@ fn fr12_a_disabled_native_field_never_opens_its_picker(cx: &mut TestAppContext) 
     cx.run_until_parked();
     assert!(cx.native_picker_request().is_none());
 }
+
+#[gpui::test]
+fn a_finger_dragging_a_wheel_plays_a_selection_tick_per_row(cx: &mut TestAppContext) {
+    use astryx_primitives::gestures::haptics::{HapticFeedbackKind, set_haptic_player};
+    let played: Rc<RefCell<Vec<HapticFeedbackKind>>> = Rc::default();
+    let record = played.clone();
+    set_haptic_player(Some(Rc::new(move |kind| {
+        record.borrow_mut().push(kind);
+        true
+    })));
+    let (cx, _log) = sheet(cx, Some(d(2026, 1, 31)), |f| f);
+    touch_somewhere(cx);
+    open_sheet(cx);
+    tap(cx, "di-month-year".into());
+    wait(cx, 500);
+    let month = bounds_of(cx, "di-wheels-month".into())
+        .expect("the wheels")
+        .center();
+    let at = |dy: f32| point(month.x, month.y + px(dy));
+    cx.simulate_event(TouchEvent {
+        id: TouchId(1),
+        phase: TouchPhase::Started,
+        position: at(0.),
+        ..Default::default()
+    });
+    for step in 1..=12 {
+        cx.executor().advance_clock(Duration::from_millis(50));
+        cx.simulate_event(TouchEvent {
+            id: TouchId(1),
+            phase: TouchPhase::Moved,
+            position: at(-8. * step as f32),
+            ..Default::default()
+        });
+        settle(cx);
+    }
+    let during = played.borrow().len();
+    assert!(
+        during >= 2,
+        "a tick per row the drag brings onto the band: {during}"
+    );
+    assert!(
+        played
+            .borrow()
+            .iter()
+            .all(|k| *k == HapticFeedbackKind::Selection)
+    );
+    cx.simulate_event(TouchEvent {
+        id: TouchId(1),
+        phase: TouchPhase::Ended,
+        position: at(-96.),
+        ..Default::default()
+    });
+    wait(cx, 1500);
+    set_haptic_player(None);
+}

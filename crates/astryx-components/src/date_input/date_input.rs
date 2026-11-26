@@ -605,10 +605,19 @@ impl RenderOnce for DateInput {
             .aria_has_popup(gpui::HasPopup::Dialog)
             .aria_disabled(locked)
             .child(glyph);
+        // A finger's press paints as UIKit tracks a control (upstream `usePressFeedback`).
+        let toggle_feedback = crate::gestures::use_press_feedback(
+            gpui::ElementId::Name(format!("{toggle_id:?}-press").into()),
+            window,
+            cx,
+        )
+        .disabled(locked)
+        .space_activates(&toggle_focus);
         let toggle = apply_press(
             toggle,
             &toggle_focus,
             Press {
+                feedback: Some(&toggle_feedback),
                 fill: None,
                 scale: None,
                 disabled: false,
@@ -625,6 +634,14 @@ impl RenderOnce for DateInput {
             &part,
             window,
             cx,
+        );
+        let toggle = toggle.child(
+            toggle_feedback
+                .probe()
+                .absolute()
+                .top_0()
+                .left_0()
+                .size_full(),
         );
         control = control.child(toggle);
 

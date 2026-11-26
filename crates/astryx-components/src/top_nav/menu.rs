@@ -8,6 +8,7 @@
 //! open (FR4). In AppShell's drawer it is a disclosure group (FR7, FR8); in the phone's
 //! bar, nothing (FR9).
 
+use crate::press::TouchPress as _;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -360,7 +361,13 @@ impl TopNavMenu {
         .justify_between()
         .cursor_pointer()
         .hover(move |s| s.bg(hover))
-        .active(move |s| s.bg(pressed))
+        .touch_press(
+            ElementId::Name(format!("{}-press", self.id).into()),
+            gpui::transparent_black(),
+            pressed,
+            window,
+            cx,
+        )
         .role(Role::Button)
         .aria_label(self.label.clone())
         .aria_expanded(is_expanded)
@@ -393,6 +400,7 @@ impl TopNavMenu {
                         links.clone(),
                     );
                     let selector = format!("{id}");
+                    let press_id = ElementId::Name(format!("{id}-press").into());
                     nav_item_row(
                         div()
                             .id(id)
@@ -407,7 +415,7 @@ impl TopNavMenu {
                     .pl(t.spacing.s6)
                     .cursor_pointer()
                     .hover(move |s| s.bg(hover))
-                    .active(move |s| s.bg(pressed))
+                    .touch_press(press_id, gpui::transparent_black(), pressed, window, cx)
                     .role(if href.is_some() {
                         Role::Link
                     } else {

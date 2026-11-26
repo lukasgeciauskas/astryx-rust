@@ -965,6 +965,31 @@ The remaining primitives:
     - Carried to stage 5 (fork patch R3's snapshots): the transient copies (SideNav's two
       rail layers, AppShell's held content, AST-105 FR8's swap copy, a List exit's and a
       dragged row's slot content). Carried to stage 3: SegmentedControl FR11-FR14.
+  - Stage 3 (done): gestures.
+    - Fork patches R21 (`8239090`, Windows touchscreens deliver `TouchEvent`s), R22
+      (`05754b3`, the browser's own context menu opens on the web when the app takes no
+      right press) and R23 (`5115fb5`, raw touch listeners: `Window::on_touch_event` sees
+      every finger and may claim it from GPUI's recognizer).
+    - `astryx_primitives::gestures`: upstream's arena, Tap, LongPress, Pan, Pinch, Swipe and
+      ScreenEdgePan recognizers, PressTracker, the velocity tracker, wheel segmenter,
+      finger scroll, page hold, selection lock, touch-action rules, context requests and
+      haptics (`navigator.vibrate` on the web), checked against upstream's gesture tests;
+      the GPUI `GestureHost` binds them to mouse, wheel, trackpad pinch and every finger.
+      `coarse_primary_pointer` follows the pointer the host sees.
+    - The public hooks: `create_pan_gesture`/`use_pan_gesture`, `use_long_press`,
+      `use_press_feedback`, `use_menu_press`, `create_context_menu`/`use_context_menu`
+      (AST-107 FR1, FR4, FR6, FR8), with a playing-cards example (FR5). Core uses them as
+      upstream does (FR7): every menu and its triggers, Selector's listbox and
+      NavHeadingMenu on the menu press model; ContextMenu's long press; press feedback on
+      Button, controls, rows, cards, tabs, nav items and the date inputs; real scrollers
+      register with the host. SegmentedControl's finger drag, hysteresis and lift
+      (FR11-FR14).
+  - Stage 4 (done): `create_drag_to_snap_points`/`use_drag_to_snap_points` (AST-107 FR2)
+    and BottomSheet's full gestures (detents, rubber band, UIKit projection and flick
+    rules, release on the sheet springs, swipe to dismiss, the body's scroll handoff
+    through nested scrollers, resize during a settle), stack (one scrim, recede, Escape on
+    the top sheet, replace handoff), panel, switcher and edge tint.
+    - Carried to stage 6: a tall sheet riding the virtual keyboard.
 - **M12 Theme authoring parity:** a Rust `defineTheme` builder with type/radius/motion scale
   expansion (with the motion tempo the animator plays at, carried from M11), OKLCH palette engine (`palette/`), HCT generator (`theme/hct.ts`), status-role
   derivation, contrast, `onDark`/`onLight`, adaptations, per-theme icons.
