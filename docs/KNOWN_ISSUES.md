@@ -264,6 +264,13 @@
   never arise. Each line renders left to right; upstream gives every line `dir="auto"`, so
   a line that starts with a right-to-left letter reads right to left (FR16). The highlight
   modes look alike: GPUI paints every token as a span of styled text.
+- **Markdown's inline code and images are atomic boxes (M10).** A paragraph lays text out
+  around them, but a code span never breaks across lines (upstream breaks a long one
+  outside table cells), and an image keeps its intrinsic size up to the column's width.
+  Remote images need the app's HTTP client, as any GPUI image does.
+- **Markdown's `content_width` takes a `Length` (M10).** Upstream accepts any CSS width
+  (`60ch`, `min(...)`); here pixels, rems or a fraction, and `Length::Auto` or zero drops the
+  cap as upstream's `0` does.
 - **Grammar word boundaries are Unicode (M10).** CodeBlock's grammars use JS's ASCII `\b`;
   `fancy-regex` has no ASCII boundary, so a keyword directly beside a non-ASCII letter
   (`éfor`) can paint differently. `\w` and `\d` keep JS's ASCII meaning.

@@ -762,8 +762,8 @@ The remaining primitives:
     steps about a view onto a stop.
 - **M9 done.** Every M9 component is ported; its carried items are in HANDOFF's table.
 - **M10 Content:**
-  - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
-    URL safety.
+  - Markdown: upstream's own parser ported (`astryx-markdown`) onto its canonical AST;
+    upstream plugins; streaming parse; URL safety.
   - CodeBlock: port of the in-house grammar tokenizer with `fancy-regex`, 30 languages, 12
     syntax presets.
   - Chat suite: layout, message list with stream scroll, composer with tokens and trigger
@@ -808,6 +808,29 @@ The remaining primitives:
     both axes with a tab stop only while it overflows (FR8). Long code tokenizes in the
     background and shows plain until then.
     - Carried to M11: the collapse's height animation.
+  - Stage 3 (done): Markdown's core. The parser is upstream's own, ported rather than a
+    CommonMark library, because upstream's dialect is its own (FR23) and its plugins hook into
+    its scanner: the new `astryx-markdown` crate (`parser.ts`, `ast.ts`,
+    `characterReferences.ts`, `url.ts`), onto the canonical mdast-aligned tree with UTF-8
+    offsets. `tools/export/export-markdown.mjs` exports the HTML character references
+    (codegen'd into a sorted table) and fixtures of upstream's own parser: every string its
+    parser tests feed it plus a corpus of samples, under the default options, math, GFM
+    autolinks and citations; the port matches all 775. The component (`markdown/`): block
+    and inline display (FR1), headings (Heading, with root headings' unique slugs as their
+    anchor ids, so Outline finds them), paragraphs, lists with the nested marker cycle and
+    task items, task lists as read-only CheckboxLists (FR23), fenced code through CodeBlock
+    with the fence's diff layer (FR29), blockquotes, tables through Table with grid
+    dividers, wrapping headers and each column's content-derived floor in the body font's
+    `ch` (FR26-FR28), rules and images; each part with its theme target and `density`
+    (FR2, FR4, FR5); upstream's collapsed block margins per density; `heading_level_start`;
+    `content_width` and `content_align`; per-block direction from the first strong character;
+    unsafe destinations as text, `on_link_click` (`false` keeps a link from opening),
+    external links in a new tab; `autolink`; and the `components` renderers for code, inline
+    code, links, headings, paragraphs, images, quotes and rules (FR3). Math reads as
+    written until `components.math` arrives with stage 4 (FR6). Along the way: CodeBlock now
+    sizes to its content as upstream's `fit-content` (it had stretched across its column),
+    CheckboxListItem takes a rich label (`new_element`, upstream's `ReactNode`), and
+    `astryx_i18n::first_strong_direction` ports upstream's classifier.
 - **M11 Motion & touch:** springs, decay, rubber-band, gesture recognizers on GPUI pointer and
   touch events, keyboard clearance, dragToSnapPoints.
   - Components: BottomSheet(+Switcher), Swipe, coarse-pointer variants (sheet-backed

@@ -12,6 +12,7 @@
 mod catalog;
 pub mod date;
 pub mod datetime;
+mod first_strong;
 mod local;
 pub(crate) mod locale;
 mod logical;
@@ -26,6 +27,7 @@ use astryx_primitives::{Provider, provide, use_context};
 use gpui::{App, Global, IntoElement, SharedString};
 
 pub use datetime::{InstantFormat, TimeZoneChoice};
+pub use first_strong::first_strong_direction;
 pub use locale::{Direction, DurationUnit, LocaleInfo, locale_chain, locale_direction};
 pub use logical::LogicalStyled;
 pub use message::{Arg, Message};

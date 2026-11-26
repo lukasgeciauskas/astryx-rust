@@ -11,7 +11,7 @@ mod typography;
 mod tests;
 
 pub use heading::{DisplayType, Heading, HeadingLevel};
-pub(crate) use inline::{InlineBuilder, InlineGroup, InlineGroupState, InlineRing};
+pub(crate) use inline::{InlineBuilder, InlineGroup, InlineGroupState, InlineRing, InlineSpan};
 pub use text::{Text, TextDisplay, TextElement, TruncateTooltip, WordBreak};
 pub use typography::{Justify, TextColor, TextSize, TextType, TextWeight, TextWrap};
 

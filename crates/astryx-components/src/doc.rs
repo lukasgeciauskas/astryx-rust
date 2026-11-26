@@ -80,6 +80,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::carousel::USE_SNAP_PAGING_DOC,
     crate::syntax_theme::SYNTAX_THEME_DOC,
     crate::code_block::CODE_BLOCK_DOC,
+    crate::markdown::MARKDOWN_DOC,
     crate::top_nav::TOP_NAV_DOC,
     crate::top_nav::TOP_NAV_HEADING_DOC,
     crate::top_nav::TOP_NAV_ITEM_DOC,

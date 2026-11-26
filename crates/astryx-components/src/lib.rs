@@ -27,6 +27,7 @@ pub mod keyboard_hint;
 pub mod layout;
 pub mod link;
 pub mod list;
+pub mod markdown;
 pub mod media;
 pub mod metadata;
 pub mod mobile_nav;

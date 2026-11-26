@@ -7,6 +7,7 @@
 //! - `crates/astryx-i18n/src/generated/catalogs.rs`: message catalogs.
 //! - `crates/astryx-i18n/src/generated/cldr.rs`: CLDR tables for dates.
 //! - `crates/astryx-syntax/src/generated/`: CodeBlock's grammars and the syntax presets.
+//! - `crates/astryx-markdown/src/generated/`: Markdown's named character references.
 //! - `docs/theme-overrides-todo.md`: overrides that need a hand port.
 //!
 //! `--check` writes nothing and fails when any file differs from what it
@@ -16,6 +17,7 @@ mod cldr;
 mod code;
 mod literal;
 mod locales;
+mod markdown;
 mod themes;
 mod tokens;
 
@@ -165,6 +167,14 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
     files.push((
         PathBuf::from("crates/astryx-syntax/src/generated/presets.rs"),
         rustfmt(&format!("{HEADER}{}", code::render_presets(&presets)?))?,
+    ));
+    let references = read_json(&spec.join("markdown/character-references.json"))?;
+    files.push((
+        PathBuf::from("crates/astryx-markdown/src/generated/character_references.rs"),
+        rustfmt(&format!(
+            "{HEADER}{}",
+            markdown::render_references(&references)?
+        ))?,
     ));
     files.push((
         PathBuf::from("docs/theme-overrides-todo.md"),

@@ -1,0 +1,13 @@
+[package]
+name = "astryx-markdown"
+description = "Markdown's parser: upstream Astryx's own, ported, onto its canonical mdast-aligned AST"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+regex.workspace = true

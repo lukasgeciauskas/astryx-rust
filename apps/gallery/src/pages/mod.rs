@@ -109,6 +109,7 @@ impl Page {
                 .child(astryx::components::code_block::examples::examples(
                     window, cx,
                 ))
+                .child(astryx::components::markdown::examples::examples(window, cx))
                 .into_any_element(),
             Page::People => astryx::components::people::examples::examples(window, cx),
             Page::Containers => astryx::components::containers::examples::examples(window, cx),

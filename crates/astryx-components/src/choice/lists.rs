@@ -446,6 +446,8 @@ type CheckFn = Rc<dyn Fn(bool, &mut Window, &mut App)>;
 pub struct CheckboxListItem {
     value: Option<SharedString>,
     label: SharedString,
+    /// Upstream's `ReactNode` label, when it is more than text.
+    label_element: Option<AnyElement>,
     aria_label: Option<SharedString>,
     description: Option<SharedString>,
     end_content: Option<AnyElement>,
@@ -462,6 +464,7 @@ impl CheckboxListItem {
         CheckboxListItem {
             value: None,
             label: label.into(),
+            label_element: None,
             aria_label: None,
             description: None,
             end_content: None,
@@ -471,6 +474,14 @@ impl CheckboxListItem {
             checked: IndicatorState::Unchecked,
             on_check: None,
         }
+    }
+
+    /// Upstream `label` as any element, such as rich text. It wraps rather than
+    /// truncating; name the box with [`aria_label`](Self::aria_label).
+    pub fn new_element(label: impl IntoElement) -> Self {
+        let mut item = Self::new("");
+        item.label_element = Some(label.into_any_element());
+        item
     }
 
     astryx_primitives::setters! {
@@ -668,11 +679,15 @@ impl RenderOnce for CheckboxList {
                 .when(is_focus_visible(&focus, window), |el| {
                     el.child(focus_ring(t, t.radius.inner.to_pixels(rem), rem))
                 });
-            let row_item = Item::new(row_id.clone(), item.label.clone())
+            let rich = item.label_element.is_some();
+            let row_item = match item.label_element {
+                Some(label) => Item::new(row_id.clone(), label),
+                None => Item::new(row_id.clone(), item.label.clone()).label_lines(1usize),
+            };
+            let row_item = row_item
                 .bare(true)
                 .disabled(disabled)
-                .align(item.align)
-                .label_lines(1usize)
+                .align(if rich { ItemAlign::Start } else { item.align })
                 .description_lines(1usize)
                 .start_content(indicator)
                 .end_content_opt(item.end_content)

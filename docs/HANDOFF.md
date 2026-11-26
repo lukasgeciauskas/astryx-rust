@@ -5,15 +5,17 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M10 (Content): stages 1 and 2 done (the syntax engine and SyntaxTheme, CodeBlock)._
+_Last updated: 2026-11-26, during M10 (Content): stages 1 to 3 done (the syntax engine and SyntaxTheme, CodeBlock, Markdown's core)._
 
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8 and M9; M10 is under way (stage 1:
-  the syntax engine, `astryx-syntax`, and SyntaxTheme; stage 2: CodeBlock). Details and dates are in
+  the syntax engine, `astryx-syntax`, and SyntaxTheme; stage 2: CodeBlock; stage 3: Markdown's
+  core, on `astryx-markdown`, upstream's own parser ported). Stage 4 (Markdown's extensions) is
+  next. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 101 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 102 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** M9's eleven stages, from `a08759f` (fork patch R17,
   scroll chaining and scrollbars) through ScrollableArea, Resizable, Layout, the navs,
@@ -27,10 +29,10 @@ _Last updated: 2026-11-26, during M10 (Content): stages 1 and 2 done (the syntax
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (20)
+### Not yet ported (19)
 
 - **M10:** Chat,
-  ChatDictationButton, ChatToolCalls, Markdown.
+  ChatDictationButton, ChatToolCalls.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
   LinkProvider, MediaTheme, Theme. All five already exist as Rust APIs
   (`astryx_i18n::provider`, `astryx_primitives::layer`, `link_provider`,
@@ -67,8 +69,8 @@ _Last updated: 2026-11-26, during M10 (Content): stages 1 and 2 done (the syntax
   Don't capture other apps' windows; only the gallery.
 - **Privacy.** The owner's email never goes to an outside service.
 - **Commits.** Each stage: run the gate, then commit and push to `main` with the
-  global git identity. Messages end with the two attribution lines the session
-  supplies (`Co-Authored-By: ...` and `Claude-Session: ...`). Never commit a
+  global git identity. Messages end with the attribution lines the session
+  supplies (`Co-Authored-By: ...`). Never commit a
   `gpui-local` `[patch]` block.
 
 ## Workflow per stage
@@ -205,8 +207,8 @@ menu and heading, on one hover recognizer (`top_nav/hover.rs`); MobileNav; AppSh
 `useSnapPaging`. Its carried items are in the table below: motion to M11, and
 `useOutlineFromMarkdown` to M10.
 
-M10 ports Markdown (pulldown-cmark/GFM mapped to Astryx nodes, upstream plugins, streaming
-parse, URL safety), CodeBlock (the in-house grammar tokenizer on `fancy-regex`, 30
+M10 ports Markdown (upstream's own parser, ported as `astryx-markdown` and checked against
+fixtures of upstream's output; upstream plugins, streaming parse, URL safety), CodeBlock (the in-house grammar tokenizer on `fancy-regex`, 30
 languages, 12 syntax presets) and the Chat suite (see `PLAN.md`), and carries
 `useOutlineFromMarkdown` (it shares Markdown's parser and heading slugs). Start with
 `cargo run -q -p astryx-cli -- component <Name> --dense` for each and the upstream specs

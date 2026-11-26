@@ -185,3 +185,21 @@ fn fr4_a_wrapped_block_wraps_its_long_lines(cx: &mut TestAppContext) {
     );
     assert!(line.size.height > px(30.), "and takes several rows");
 }
+
+#[gpui::test]
+fn fit_content_by_default_at_least_400px(cx: &mut TestAppContext) {
+    {
+        let cx = page(cx, || CodeBlock::new("cb", "x").language("rust"));
+        assert_eq!(cx.debug_bounds("cb").unwrap().size.width, px(400.));
+    }
+    let cx = page(cx, || {
+        CodeBlock::new("cb2", "x")
+            .language("rust")
+            .width(gpui::relative(1.))
+    });
+    assert_eq!(
+        cx.debug_bounds("cb2").unwrap().size.width,
+        px(700.),
+        "an explicit width"
+    );
+}

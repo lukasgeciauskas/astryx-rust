@@ -106,6 +106,8 @@ pub struct CodeBlock {
     tokenizer: Option<astryx_syntax::TokenizeFn>,
     highlight_mode: HighlightMode,
     syntax_theme: Option<SyntaxThemeDefinition>,
+    /// The fit-content floor, `min(floor, 100%)`: 400px, or a host's measure.
+    min_width_floor: Pixels,
     style: StyleRefinement,
 }
 
@@ -135,8 +137,16 @@ impl CodeBlock {
             tokenizer: None,
             highlight_mode: HighlightMode::Auto,
             syntax_theme: None,
+            min_width_floor: px(400.),
             style: StyleRefinement::default(),
         }
+    }
+
+    /// The floor of the fit-content width, `min-width: min(floor, 100%)`; Markdown
+    /// raises it to its content width.
+    pub(crate) fn min_width_floor(mut self, floor: Pixels) -> Self {
+        self.min_width_floor = floor;
+        self
     }
 
     /// Upstream `language`: a built-in identifier, a language module, or a custom
@@ -878,8 +888,16 @@ impl RenderOnce for CodeBlock {
         root = match self.width {
             Some(width) => root.w(width),
             None => {
-                let available = state.read(cx).available.unwrap_or(px(400.));
-                root.max_w_full().min_w(px(400.).min(available))
+                // Fit-content: its own width at the start of the line, not stretched
+                // across the column, between min(floor, 100%) and 100%.
+                let floor = self.min_width_floor;
+                let available = state.read(cx).available.unwrap_or(floor);
+                let root = root.max_w_full().min_w(floor.min(available));
+                if astryx_i18n::use_direction(cx).is_rtl() {
+                    root.self_end()
+                } else {
+                    root.self_start()
+                }
             }
         };
         theme.refine(

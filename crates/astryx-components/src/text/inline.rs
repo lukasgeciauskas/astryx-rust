@@ -28,9 +28,9 @@ use gpui::{
     AnyElement, App, AvailableSpace, BorderStyle, Bounds, ClickEvent, CursorStyle, DispatchPhase,
     Element, ElementId, Entity, FocusHandle, GlobalElementId, Hitbox, HitboxBehavior, Hsla,
     InspectorElementId, IntoElement, LayoutId, MouseButton, MouseClickEvent, MouseDownEvent,
-    MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, ShapedLine, SharedString, Size, Style,
-    TextAlign, TextOverflow, TextStyle, TextStyleRefinement, ViewElement, WhiteSpace, Window, div,
-    point, px, quad, size, transparent_black,
+    MouseMoveEvent, MouseUpEvent, ParentElement, Pixels, RenderOnce, ShapedLine, SharedString,
+    Size, Style, Styled as _, TextAlign, TextOverflow, TextStyle, TextStyleRefinement, ViewElement,
+    WhiteSpace, Window, div, point, px, quad, size, transparent_black,
 };
 use smallvec::SmallVec;
 use unicode_linebreak::{BreakOpportunity, linebreaks};
@@ -195,6 +195,16 @@ impl InlineBuilder {
             link.inline(self, window, cx);
             return;
         }
+        if let Some(view) = element.downcast_mut::<ViewElement<InlineSpan>>()
+            && let Some(span) = view.take_view()
+        {
+            self.styled(&span.refinement, |flow| {
+                for child in span.children {
+                    flow.child(child, window, cx);
+                }
+            });
+            return;
+        }
         self.inline_box(element, block, window, cx);
     }
 
@@ -225,6 +235,38 @@ impl InlineBuilder {
         if block {
             self.items.push(Item::Break { hard: false });
         }
+    }
+}
+
+/// Inline content in a text style of its own and otherwise its paragraph's, as an
+/// HTML `<strong>`, `<em>` or `<span>` inherits everything it does not set:
+/// Markdown's phrasing parents. Outside a paragraph it is a paragraph of its own.
+#[derive(IntoElement)]
+pub(crate) struct InlineSpan {
+    refinement: TextStyleRefinement,
+    children: SmallVec<[AnyElement; 2]>,
+}
+
+impl InlineSpan {
+    pub fn new(refinement: TextStyleRefinement) -> Self {
+        InlineSpan {
+            refinement,
+            children: SmallVec::new(),
+        }
+    }
+}
+
+impl ParentElement for InlineSpan {
+    fn extend(&mut self, elements: impl IntoIterator<Item = AnyElement>) {
+        self.children.extend(elements);
+    }
+}
+
+impl RenderOnce for InlineSpan {
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        let mut el = div();
+        el.style().text = self.refinement;
+        el.child(InlineFlow::new(self.children))
     }
 }
 
