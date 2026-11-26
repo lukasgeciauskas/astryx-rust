@@ -1,8 +1,7 @@
-//! Outline and its source of items. Upstream: `Outline/` (component spec `Outline`).
-//! `useOutlineFromMarkdown` needs Markdown's parser and heading slugs, and lands with
-//! Markdown (M10).
+//! Outline and its sources of items. Upstream: `Outline/` (component spec `Outline`).
 
 pub mod examples;
+mod markdown;
 #[allow(clippy::module_inception)]
 mod outline;
 mod source;
@@ -10,6 +9,9 @@ mod source;
 #[cfg(test)]
 mod tests;
 
+pub use markdown::{
+    ParseOutlineFromMarkdownOptions, parse_outline_from_markdown, use_outline_from_markdown,
+};
 pub use outline::{Outline, OutlineDensity, OutlineItem};
 pub(crate) use source::OutlineCollect;
 pub use source::{OutlineSource, use_outline_from_container};
@@ -50,5 +52,23 @@ pub const USE_OUTLINE_FROM_DOM_DOC: ComponentDoc = ComponentDoc {
         "containerRef",
         RustApi::Method("OutlineSource::container (wraps the element holding the headings)"),
     )],
+    example: include_str!("examples.rs"),
+};
+
+pub const USE_OUTLINE_FROM_MARKDOWN_DOC: ComponentDoc = ComponentDoc {
+    name: "useOutlineFromMarkdown",
+    rust_type: "astryx::components::outline::use_outline_from_markdown -> Vec<OutlineItem>",
+    props: &[
+        p("markdown", RustApi::Argument("markdown")),
+        p("options", RustApi::Argument("options")),
+        p(
+            "options.plugins",
+            RustApi::Method("ParseOutlineFromMarkdownOptions::plugins"),
+        ),
+        p(
+            "options.isFinal",
+            RustApi::Method("ParseOutlineFromMarkdownOptions::is_final"),
+        ),
+    ],
     example: include_str!("examples.rs"),
 };

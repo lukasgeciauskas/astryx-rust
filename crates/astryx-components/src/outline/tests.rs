@@ -206,3 +206,25 @@ impl gpui::RenderOnce for HostOutline {
             )
     }
 }
+
+#[test]
+fn outline_from_markdown_matches_markdowns_heading_ids() {
+    use super::{ParseOutlineFromMarkdownOptions, parse_outline_from_markdown};
+    let items = parse_outline_from_markdown(
+        "# Setup\n\n## Setup\n\n> # Quoted\n\n```\n# not a heading\n```\n\n### **Bold** step",
+        &ParseOutlineFromMarkdownOptions::default(),
+    );
+    let got: Vec<_> = items
+        .iter()
+        .map(|i| (i.id.to_string(), i.label.to_string(), i.level))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            ("setup".to_string(), "Setup".to_string(), 1),
+            ("setup-1".to_string(), "Setup".to_string(), 2),
+            ("bold-step".to_string(), "Bold step".to_string(), 3),
+        ],
+        "root headings only, code fences skipped"
+    );
+}

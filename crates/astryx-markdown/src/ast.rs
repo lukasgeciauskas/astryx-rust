@@ -1,4 +1,5 @@
-//! Markdown's canonical AST, upstream `Markdown/ast.ts`: mdast-aligned nodes. Serialized
+//! Markdown's canonical AST, upstream `Markdown/ast.ts`: mdast-aligned nodes, with
+//! `visitMarkdownNodes` and `markdownAstText`. Serialized
 //! with serde, a tree reads as upstream's JSON: the same `type` tags and field names, absent
 //! optional fields left out. Offsets are UTF-8 bytes (upstream's are UTF-16 units).
 
@@ -54,8 +55,15 @@ pub struct ExtensionNode {
     pub position: Option<Position>,
 }
 
+impl ExtensionNode {
+    /// Upstream `isMarkdownExtensionNode`: whether this is `plugin`'s node named `name`.
+    pub fn is(&self, plugin: &str, name: &str) -> bool {
+        self.plugin == plugin && self.name == name
+    }
+}
+
 /// Whether an extension node is phrasing or flow content.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ExtensionDisplay {
     Inline,
@@ -68,6 +76,9 @@ pub struct Literal {
     pub value: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// A phrasing parent: `strong`, `emphasis` and `delete`.
@@ -76,6 +87,9 @@ pub struct Parent {
     pub children: Vec<Phrasing>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// Upstream `MarkdownAstLink`. An unsafe destination is the empty string.
@@ -85,6 +99,9 @@ pub struct Link {
     pub children: Vec<Phrasing>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// Upstream `MarkdownAstImage`, inline or as a block of its own.
@@ -94,6 +111,9 @@ pub struct Image {
     pub alt: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// Upstream `MarkdownAstCitation`: `[id]` or `【id】` naming a known source.
@@ -103,6 +123,9 @@ pub struct Citation {
     pub source_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// A node with no content: `break` and `thematicBreak`.
@@ -110,6 +133,9 @@ pub struct Citation {
 pub struct Void {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// Upstream `MarkdownAstPhrasingContent`.
@@ -138,6 +164,52 @@ pub struct Heading {
     pub children: Vec<Phrasing>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
+    /// Upstream's hidden source-heading marker: which parsed heading this is, so a
+    /// plugin-authored transform cannot re-level, forge or duplicate it. A new heading has
+    /// none; a clone keeps its original's, as a JavaScript spread copy does.
+    #[serde(skip)]
+    pub identity: HeadingIdentity,
+}
+
+/// The identity a parsed heading carries through the transform pipeline (upstream's
+/// `sourceHeadingMarker`). Only the pipeline can give one; it never serializes, and it
+/// takes no part in equality, since it is provenance rather than content.
+#[derive(Clone, Copy, Default)]
+pub struct HeadingIdentity(pub(crate) Option<SourceHeading>);
+
+/// One run's mark on one parsed heading: the run, the heading's index in it, and the
+/// depth it was parsed with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct SourceHeading {
+    pub(crate) run: u64,
+    pub(crate) index: usize,
+    pub(crate) depth: u8,
+}
+
+impl HeadingIdentity {
+    /// Whether the transform pipeline marked this heading as parsed from source.
+    pub fn is_source(&self) -> bool {
+        self.0.is_some()
+    }
+}
+
+impl PartialEq for HeadingIdentity {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl std::fmt::Debug for HeadingIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(if self.0.is_some() {
+            "HeadingIdentity(source)"
+        } else {
+            "HeadingIdentity(none)"
+        })
+    }
 }
 
 /// Upstream `MarkdownAstParagraph` (and the content of a table cell).
@@ -146,10 +218,13 @@ pub struct Paragraph {
     pub children: Vec<Phrasing>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// Upstream `MarkdownAstCode`: a fenced code block.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct Code {
     /// The info string's first word; `null` in JSON when the fence names none.
     pub lang: Option<String>,
@@ -158,9 +233,35 @@ pub struct Code {
     pub value: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
+    /// Upstream's hidden `markdownFenceProposal`: the block extension node a semantic-fence
+    /// transform (`create_markdown_fence_transform`) proposes to render in this fence's
+    /// place. It never serializes.
+    #[serde(skip)]
+    pub proposal: FenceProposal,
+}
+
+/// A semantic-fence transform's proposal for a code node (upstream
+/// `MarkdownFenceProposal`). Only that helper can make one.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FenceProposal(pub(crate) Option<Box<ExtensionNode>>);
+
+impl FenceProposal {
+    /// The proposed block extension node, if a fence transform claimed this fence.
+    pub fn node(&self) -> Option<&ExtensionNode> {
+        self.0.as_deref()
+    }
 }
 
 impl Code {
+    /// Upstream `getMarkdownFenceProposal`: the extension node a semantic-fence transform
+    /// proposed for this fence.
+    pub fn fence_proposal(&self) -> Option<&ExtensionNode> {
+        self.proposal.node()
+    }
+
     /// Upstream `getMarkdownAstLegacyCodeLanguage`: the info string's leading ASCII
     /// word characters (`info.match(/^(\w*)/)?.[1] || null`), the language the
     /// released `code` renderer receives.
@@ -180,6 +281,9 @@ pub struct Blockquote {
     pub children: Vec<Block>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// Upstream `MarkdownAstListItem`. `checked` is set on a task item.
@@ -191,6 +295,9 @@ pub struct ListItem {
     pub children: Vec<Block>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// Upstream `MarkdownAstList`.
@@ -207,6 +314,43 @@ pub struct List {
     pub children: Vec<ListItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
+    /// Upstream's hidden `listMarkerShapes` entry: the markers a list the block parser
+    /// built opened its items with. The incremental parser joins a streamed list with the
+    /// one before it only when their shapes agree, as the full parse does. It never
+    /// serializes and takes no part in equality.
+    #[serde(skip)]
+    pub marker_shape: ListMarkerShape,
+}
+
+/// The indentation and the bullet (or ordered delimiter) of a parsed list's markers
+/// (upstream `${baseIndent}:${ordered ? delim : bullet}`). A list a transform or the
+/// Remark adapter made has none.
+#[derive(Clone, Copy, Default)]
+pub struct ListMarkerShape(pub(crate) Option<(usize, char)>);
+
+impl ListMarkerShape {
+    /// Whether the block parser recorded this list's markers.
+    pub fn is_known(&self) -> bool {
+        self.0.is_some()
+    }
+}
+
+impl PartialEq for ListMarkerShape {
+    fn eq(&self, _: &Self) -> bool {
+        true
+    }
+}
+
+impl std::fmt::Debug for ListMarkerShape {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            Some((indent, marker)) => write!(f, "ListMarkerShape({indent}:{marker})"),
+            None => f.write_str("ListMarkerShape(none)"),
+        }
+    }
 }
 
 /// Upstream `MarkdownAstTableAlignment`; `None` (JSON `null`) when a column sets none.
@@ -225,6 +369,9 @@ pub struct TableCell {
     pub children: Vec<Phrasing>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// Upstream `MarkdownAstTableRow`.
@@ -234,6 +381,9 @@ pub struct TableRow {
     pub children: Vec<TableCell>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// Upstream `MarkdownAstTable`: the first row is the header.
@@ -243,6 +393,9 @@ pub struct Table {
     pub children: Vec<TableRow>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// Upstream `MarkdownAstBlockContent`.
@@ -269,31 +422,271 @@ pub struct Root {
     pub children: Vec<Block>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub position: Option<Position>,
+    /// Upstream `MarkdownAstNodeBase.data`: finite JSON-like data a transform attached.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<DataValue>,
 }
 
 /// Upstream `markdownAstText`: the plain text of phrasing content. Images give their alt
 /// text, citations and breaks nothing, extension nodes their `source`.
 pub fn markdown_ast_text(nodes: &[Phrasing]) -> String {
+    markdown_ast_text_with(nodes, &|node| node.source.clone().unwrap_or_default())
+}
+
+/// Upstream `markdownAstText` with its `extensionText` argument: the plain text of phrasing
+/// content, each extension node given by `extension_text` (Markdown passes
+/// `PreparedMarkdownPlugins::extension_text`, the owning renderer's `toText`).
+pub fn markdown_ast_text_with(
+    nodes: &[Phrasing],
+    extension_text: &dyn Fn(&ExtensionNode) -> String,
+) -> String {
     let mut text = String::new();
-    push_text(nodes, &mut text);
+    push_text(nodes, &mut text, extension_text);
     text
 }
 
-fn push_text(nodes: &[Phrasing], text: &mut String) {
+fn push_text(
+    nodes: &[Phrasing],
+    text: &mut String,
+    extension_text: &dyn Fn(&ExtensionNode) -> String,
+) {
     for node in nodes {
         match node {
             Phrasing::Text(n) | Phrasing::InlineCode(n) | Phrasing::InlineMath(n) => {
                 text.push_str(&n.value)
             }
             Phrasing::Strong(n) | Phrasing::Emphasis(n) | Phrasing::Delete(n) => {
-                push_text(&n.children, text)
+                push_text(&n.children, text, extension_text)
             }
-            Phrasing::Link(n) => push_text(&n.children, text),
+            Phrasing::Link(n) => push_text(&n.children, text, extension_text),
             Phrasing::Image(n) => text.push_str(&n.alt),
             Phrasing::Citation(_) | Phrasing::Break(_) => {}
-            Phrasing::Extension(n) => text.push_str(n.source.as_deref().unwrap_or("")),
+            Phrasing::Extension(n) => text.push_str(&extension_text(n)),
         }
     }
+}
+
+/// Upstream `MarkdownAstNodeMap`'s keys: every node `type` of the canonical tree.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NodeType {
+    Root,
+    Text,
+    Strong,
+    Emphasis,
+    Delete,
+    InlineCode,
+    InlineMath,
+    Break,
+    Link,
+    Image,
+    Citation,
+    Heading,
+    Paragraph,
+    Code,
+    Math,
+    Blockquote,
+    List,
+    ListItem,
+    Table,
+    TableRow,
+    TableCell,
+    ThematicBreak,
+    Extension,
+}
+
+impl NodeType {
+    /// The node's `type` string, as upstream's JSON spells it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            NodeType::Root => "root",
+            NodeType::Text => "text",
+            NodeType::Strong => "strong",
+            NodeType::Emphasis => "emphasis",
+            NodeType::Delete => "delete",
+            NodeType::InlineCode => "inlineCode",
+            NodeType::InlineMath => "inlineMath",
+            NodeType::Break => "break",
+            NodeType::Link => "link",
+            NodeType::Image => "image",
+            NodeType::Citation => "citation",
+            NodeType::Heading => "heading",
+            NodeType::Paragraph => "paragraph",
+            NodeType::Code => "code",
+            NodeType::Math => "math",
+            NodeType::Blockquote => "blockquote",
+            NodeType::List => "list",
+            NodeType::ListItem => "listItem",
+            NodeType::Table => "table",
+            NodeType::TableRow => "tableRow",
+            NodeType::TableCell => "tableCell",
+            NodeType::ThematicBreak => "thematicBreak",
+            NodeType::Extension => "extension",
+        }
+    }
+}
+
+/// A borrowed node of any type: what [`visit_markdown_nodes`] hands its visitor, the
+/// variant narrowing it by kind as upstream's `MarkdownAstNodeMap` does.
+#[derive(Clone, Copy, Debug)]
+pub enum NodeRef<'a> {
+    Root(&'a Root),
+    Text(&'a Literal),
+    Strong(&'a Parent),
+    Emphasis(&'a Parent),
+    Delete(&'a Parent),
+    InlineCode(&'a Literal),
+    InlineMath(&'a Literal),
+    Break(&'a Void),
+    Link(&'a Link),
+    Image(&'a Image),
+    Citation(&'a Citation),
+    Heading(&'a Heading),
+    Paragraph(&'a Paragraph),
+    Code(&'a Code),
+    Math(&'a Literal),
+    Blockquote(&'a Blockquote),
+    List(&'a List),
+    ListItem(&'a ListItem),
+    Table(&'a Table),
+    TableRow(&'a TableRow),
+    TableCell(&'a TableCell),
+    ThematicBreak(&'a Void),
+    Extension(&'a ExtensionNode),
+}
+
+impl<'a> NodeRef<'a> {
+    /// The node's type.
+    pub fn node_type(self) -> NodeType {
+        match self {
+            NodeRef::Root(_) => NodeType::Root,
+            NodeRef::Text(_) => NodeType::Text,
+            NodeRef::Strong(_) => NodeType::Strong,
+            NodeRef::Emphasis(_) => NodeType::Emphasis,
+            NodeRef::Delete(_) => NodeType::Delete,
+            NodeRef::InlineCode(_) => NodeType::InlineCode,
+            NodeRef::InlineMath(_) => NodeType::InlineMath,
+            NodeRef::Break(_) => NodeType::Break,
+            NodeRef::Link(_) => NodeType::Link,
+            NodeRef::Image(_) => NodeType::Image,
+            NodeRef::Citation(_) => NodeType::Citation,
+            NodeRef::Heading(_) => NodeType::Heading,
+            NodeRef::Paragraph(_) => NodeType::Paragraph,
+            NodeRef::Code(_) => NodeType::Code,
+            NodeRef::Math(_) => NodeType::Math,
+            NodeRef::Blockquote(_) => NodeType::Blockquote,
+            NodeRef::List(_) => NodeType::List,
+            NodeRef::ListItem(_) => NodeType::ListItem,
+            NodeRef::Table(_) => NodeType::Table,
+            NodeRef::TableRow(_) => NodeType::TableRow,
+            NodeRef::TableCell(_) => NodeType::TableCell,
+            NodeRef::ThematicBreak(_) => NodeType::ThematicBreak,
+            NodeRef::Extension(_) => NodeType::Extension,
+        }
+    }
+
+    /// The node's `data`: an extension node's own, or what a transform attached to any
+    /// other node.
+    pub fn data(self) -> Option<&'a DataValue> {
+        match self {
+            NodeRef::Root(n) => n.data.as_ref(),
+            NodeRef::Text(n)
+            | NodeRef::InlineCode(n)
+            | NodeRef::InlineMath(n)
+            | NodeRef::Math(n) => n.data.as_ref(),
+            NodeRef::Strong(n) | NodeRef::Emphasis(n) | NodeRef::Delete(n) => n.data.as_ref(),
+            NodeRef::Break(n) | NodeRef::ThematicBreak(n) => n.data.as_ref(),
+            NodeRef::Link(n) => n.data.as_ref(),
+            NodeRef::Image(n) => n.data.as_ref(),
+            NodeRef::Citation(n) => n.data.as_ref(),
+            NodeRef::Heading(n) => n.data.as_ref(),
+            NodeRef::Paragraph(n) => n.data.as_ref(),
+            NodeRef::Code(n) => n.data.as_ref(),
+            NodeRef::Blockquote(n) => n.data.as_ref(),
+            NodeRef::List(n) => n.data.as_ref(),
+            NodeRef::ListItem(n) => n.data.as_ref(),
+            NodeRef::Table(n) => n.data.as_ref(),
+            NodeRef::TableRow(n) => n.data.as_ref(),
+            NodeRef::TableCell(n) => n.data.as_ref(),
+            NodeRef::Extension(n) => Some(&n.data),
+        }
+    }
+
+    /// The node's children, in order (none for a leaf).
+    pub fn children(self) -> Vec<NodeRef<'a>> {
+        fn phrasing(nodes: &[Phrasing]) -> Vec<NodeRef<'_>> {
+            nodes.iter().map(NodeRef::from).collect()
+        }
+        fn blocks(nodes: &[Block]) -> Vec<NodeRef<'_>> {
+            nodes.iter().map(NodeRef::from).collect()
+        }
+        match self {
+            NodeRef::Root(n) => blocks(&n.children),
+            NodeRef::Strong(n) | NodeRef::Emphasis(n) | NodeRef::Delete(n) => phrasing(&n.children),
+            NodeRef::Link(n) => phrasing(&n.children),
+            NodeRef::Heading(n) => phrasing(&n.children),
+            NodeRef::Paragraph(n) => phrasing(&n.children),
+            NodeRef::Blockquote(n) => blocks(&n.children),
+            NodeRef::List(n) => n.children.iter().map(NodeRef::ListItem).collect(),
+            NodeRef::ListItem(n) => blocks(&n.children),
+            NodeRef::Table(n) => n.children.iter().map(NodeRef::TableRow).collect(),
+            NodeRef::TableRow(n) => n.children.iter().map(NodeRef::TableCell).collect(),
+            NodeRef::TableCell(n) => phrasing(&n.children),
+            _ => Vec::new(),
+        }
+    }
+}
+
+impl<'a> From<&'a Phrasing> for NodeRef<'a> {
+    fn from(node: &'a Phrasing) -> Self {
+        match node {
+            Phrasing::Text(n) => NodeRef::Text(n),
+            Phrasing::Strong(n) => NodeRef::Strong(n),
+            Phrasing::Emphasis(n) => NodeRef::Emphasis(n),
+            Phrasing::Delete(n) => NodeRef::Delete(n),
+            Phrasing::InlineCode(n) => NodeRef::InlineCode(n),
+            Phrasing::InlineMath(n) => NodeRef::InlineMath(n),
+            Phrasing::Link(n) => NodeRef::Link(n),
+            Phrasing::Image(n) => NodeRef::Image(n),
+            Phrasing::Citation(n) => NodeRef::Citation(n),
+            Phrasing::Break(n) => NodeRef::Break(n),
+            Phrasing::Extension(n) => NodeRef::Extension(n),
+        }
+    }
+}
+
+impl<'a> From<&'a Block> for NodeRef<'a> {
+    fn from(node: &'a Block) -> Self {
+        match node {
+            Block::Heading(n) => NodeRef::Heading(n),
+            Block::Paragraph(n) => NodeRef::Paragraph(n),
+            Block::Code(n) => NodeRef::Code(n),
+            Block::Math(n) => NodeRef::Math(n),
+            Block::Blockquote(n) => NodeRef::Blockquote(n),
+            Block::List(n) => NodeRef::List(n),
+            Block::Table(n) => NodeRef::Table(n),
+            Block::ThematicBreak(n) => NodeRef::ThematicBreak(n),
+            Block::Image(n) => NodeRef::Image(n),
+            Block::Extension(n) => NodeRef::Extension(n),
+        }
+    }
+}
+
+/// Upstream `visitMarkdownNodes`: calls `visitor` with every node of `node_type` in
+/// `root`, depth first in document order.
+pub fn visit_markdown_nodes<'a>(
+    root: &'a Root,
+    node_type: NodeType,
+    visitor: &mut dyn FnMut(NodeRef<'a>),
+) {
+    fn visit<'a>(node: NodeRef<'a>, node_type: NodeType, visitor: &mut dyn FnMut(NodeRef<'a>)) {
+        if node.node_type() == node_type {
+            visitor(node);
+        }
+        for child in node.children() {
+            visit(child, node_type, visitor);
+        }
+    }
+    visit(NodeRef::Root(root), node_type, visitor);
 }
 
 #[cfg(test)]
@@ -315,17 +708,18 @@ mod tests {
                         children: vec![TableCell {
                             children: vec![Phrasing::InlineCode(Literal {
                                 value: "a".into(),
-                                position: None,
+                                ..Literal::default()
                             })],
-                            position: None,
+                            ..TableCell::default()
                         }],
-                        position: None,
+                        ..TableRow::default()
                     }],
                     position: Some(Position::offsets(0, 3)),
+                    ..Table::default()
                 }),
                 Block::ThematicBreak(Void::default()),
             ],
-            position: None,
+            ..Root::default()
         };
         assert_eq!(
             serde_json::to_string(&root).unwrap(),

@@ -11,3 +11,7 @@ publish.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 regex.workspace = true
+# NFKC for heading-links slugs (upstream `normalize('NFKC')`).
+icu_normalizer.workspace = true
+# Upstream's `new URL(base, …)` check of a heading-links permalink base.
+url = "2.5"

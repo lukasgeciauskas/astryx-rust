@@ -43,6 +43,7 @@ impl DelimiterRun {
         Phrasing::Text(Literal {
             value: char::from(self.character).to_string().repeat(self.length),
             position: None,
+            data: None,
         })
     }
 }
@@ -266,6 +267,7 @@ pub(super) fn resolve_emphasis(items: Vec<Item>, mut runs: Vec<DelimiterRun>) ->
             Phrasing::Strong(Parent {
                 children,
                 position: None,
+                data: None,
             })
         } else if keeps_strong_outside {
             let strong_children = match children.into_iter().next() {
@@ -275,15 +277,18 @@ pub(super) fn resolve_emphasis(items: Vec<Item>, mut runs: Vec<DelimiterRun>) ->
             let emphasis = Phrasing::Emphasis(Parent {
                 children: strong_children,
                 position: None,
+                data: None,
             });
             Phrasing::Strong(Parent {
                 children: vec![emphasis],
                 position: None,
+                data: None,
             })
         } else {
             Phrasing::Emphasis(Parent {
                 children,
                 position: None,
+                data: None,
             })
         };
         entries.push(Entry {

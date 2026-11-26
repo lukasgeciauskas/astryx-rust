@@ -209,6 +209,7 @@ fn text_node(value: &str) -> Phrasing {
     Phrasing::Text(Literal {
         value: value.to_string(),
         position: None,
+        data: None,
     })
 }
 
@@ -228,6 +229,7 @@ fn split_text_on_autolinks(content: &str) -> Vec<Phrasing> {
             url: normalized_markdown_destination(&m.href),
             children: vec![text_node(&m.display)],
             position: None,
+            data: None,
         }));
         cursor = m.end;
     }

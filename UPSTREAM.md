@@ -23,7 +23,8 @@ snapshots in `spec/` and never runs Node.
    tables directly), so use a current Node.
 3. Run `cargo xtask codegen` to regenerate the Rust sources from `spec/`.
 4. Run `cargo test --workspace`, and review the diff of `spec/` to see what
-   changed upstream. `spec/code/fixtures.json` and `spec/markdown/parser-fixtures.json`
-   hold upstream's own tokenizer and Markdown parser output; when they change, the
+   changed upstream. `spec/code/fixtures.json` and the `spec/markdown/*-fixtures.json` files
+   hold upstream's own tokenizer and Markdown parser output (core, plugins, streaming,
+   legacy shapes); when they change, the
    fixture tests in `astryx-syntax` and `astryx-markdown` fail until the port follows.
 5. Update the commit hash in the table above.

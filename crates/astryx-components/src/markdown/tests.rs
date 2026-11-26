@@ -10,8 +10,10 @@ use gpui::{
     point, px,
 };
 
-use super::markdown::{code_fence, heading_ids, table_column_floors};
+use super::markdown::{code_fence, fence_language, table_column_floors};
+use super::streaming::*;
 use super::*;
+use crate::content::{CitationSource, CitationVariant};
 use crate::segmented::tests::host;
 use crate::text::TextDisplay;
 
@@ -73,12 +75,23 @@ fn gap(cx: &mut VisualTestContext, above: &'static str, below: &'static str) -> 
 
 #[test]
 fn root_headings_take_unique_slugs_and_quoted_ones_none() {
-    let ids = heading_ids(&blocks(
+    let root = parse_markdown_ast(
         "# Setup\n\n## Setup\n\n> # Quoted\n\n# Hello, World!\n\n# !!!\n\n# !!!",
-    ));
+        &ParseOptions::default(),
+    );
+    let projection = astryx_markdown::project_markdown_headings(&root, None);
+    let ids: Vec<_> = projection
+        .outline
+        .iter()
+        .map(|item| item.id.as_str())
+        .collect();
     assert_eq!(
         ids,
         ["setup", "setup-1", "hello-world", "section", "section-1"]
+    );
+    assert!(
+        projection.heading(2).is_none(),
+        "the quoted heading has no id"
     );
 }
 
@@ -389,4 +402,328 @@ fn code_blocks_fit_their_content_at_least_the_measure_wide(cx: &mut TestAppConte
         px(680.),
         "min(680px, 100%), not the whole column"
     );
+}
+
+/// Runs a Markdown whose renderers write to a log, and returns the log.
+fn rendered(cx: &mut TestAppContext, build: impl Fn(Log) -> Markdown + 'static) -> Vec<String> {
+    let seen: Log = Rc::default();
+    let log = seen.clone();
+    let _cx = page(cx, Log::default(), move || build(log.clone()));
+    let mut seen = seen.borrow().clone();
+    // Every render logs again; keep the first pass.
+    if let Some(repeat) = (1..=seen.len())
+        .find(|&n| seen.len().is_multiple_of(n) && seen.chunks(n).all(|c| c == &seen[..n]))
+    {
+        seen.truncate(repeat);
+    }
+    seen
+}
+
+#[gpui::test]
+fn fr7_a_math_renderer_receives_inline_and_display_math(cx: &mut TestAppContext) {
+    let seen = rendered(cx, |log| {
+        Markdown::new(
+            "md",
+            "Energy $E=mc^2$ here.\n\n$$\na + b\n$$\n\nPrice $5 and $10.",
+        )
+        .components(MarkdownComponents::new().math(move |props, _, _| {
+            log.borrow_mut()
+                .push(format!("{:?}:{}", props.display, props.value));
+            div().into_any_element()
+        }))
+    });
+    assert_eq!(
+        seen,
+        ["Inline:E=mc^2", "Block:a + b"],
+        "currency stays text (FR8)"
+    );
+}
+
+#[gpui::test]
+fn citations_number_their_sources_by_first_appearance(cx: &mut TestAppContext) {
+    let seen = rendered(cx, |log| {
+        Markdown::new("md", "See [b] then [a], again [b], and [c].")
+            .sources([
+                (
+                    "a",
+                    CitationSource {
+                        title: Some("Alpha".into()),
+                        ..Default::default()
+                    },
+                ),
+                (
+                    "b",
+                    CitationSource {
+                        title: Some("Beta".into()),
+                        ..Default::default()
+                    },
+                ),
+            ])
+            .citation_style(CitationVariant::Number)
+            .components(MarkdownComponents::new().citation(move |props, _, _| {
+                log.borrow_mut().push(format!(
+                    "{} {} {:?}",
+                    props.number,
+                    props.source.title.unwrap_or_default(),
+                    props.variant
+                ));
+                div().into_any_element()
+            }))
+    });
+    assert_eq!(
+        seen,
+        ["1 Beta Number", "2 Alpha Number", "1 Beta Number"],
+        "[c] is no source"
+    );
+}
+
+#[gpui::test]
+fn inline_plugins_match_prose_only_and_the_first_plugin_wins(cx: &mut TestAppContext) {
+    let seen = rendered(cx, |log| {
+        let tickets = log.clone();
+        let words = log.clone();
+        Markdown::new(
+            "md",
+            "Fixes #12 and #34, not `#56`.\n\n```\n#78\n```\n\n**see #90**",
+        )
+        .inline_plugins([
+            MarkdownInlinePlugin::new(
+                fancy_regex::Regex::new(r"#(\d+)").unwrap(),
+                move |m, _, _| {
+                    tickets.borrow_mut().push(format!("ticket {}", &m[1]));
+                    div().into_any_element()
+                },
+            )
+            .end_index(|_, m| {
+                let whole = m.get(0).unwrap();
+                (whole.as_str() != "#34").then_some(whole.end())
+            }),
+            MarkdownInlinePlugin::new(fancy_regex::Regex::new(r"#\d").unwrap(), move |m, _, _| {
+                words.borrow_mut().push(format!("second {}", &m[0]));
+                div().into_any_element()
+            }),
+        ])
+    });
+    assert_eq!(
+        seen,
+        ["ticket 12", "second #3", "ticket 90"],
+        "#34 skipped by end_index and left to the next plugin; code is never matched"
+    );
+}
+
+#[test]
+fn fr30_listed_languages_claim_their_identifiers() {
+    let code = |source: &str| match blocks(source).remove(0) {
+        astryx_markdown::ast::Block::Code(code) => code,
+        other => panic!("not code: {other:?}"),
+    };
+    let listed = [astryx_syntax::languages::graphql()];
+    let name =
+        |input: &astryx_syntax::CodeLanguageInput| astryx_syntax::language_key(input).to_string();
+    let (language, diff) = fence_language(&code("```graphql\nquery { a }\n```"), &listed);
+    assert!(matches!(language, astryx_syntax::CodeLanguageInput::Language(_)) && !diff);
+    let (language, _) = fence_language(&code("```graphql\nquery { a }\n```"), &[]);
+    assert!(
+        matches!(language, astryx_syntax::CodeLanguageInput::Name(_)),
+        "unlisted: the plain name"
+    );
+    let (language, diff) = fence_language(&code("```diff-graphql\n-a\n```"), &listed);
+    assert!(diff && matches!(language, astryx_syntax::CodeLanguageInput::Language(_)));
+    assert_eq!(name(&language), "graphql");
+}
+
+/// Renders `use_streaming_text` and logs what it shows.
+#[derive(IntoElement)]
+struct RevealProbe {
+    target: &'static str,
+    streaming: bool,
+    log: Log,
+}
+
+impl gpui::RenderOnce for RevealProbe {
+    fn render(self, window: &mut gpui::Window, cx: &mut gpui::App) -> impl IntoElement {
+        let shown = use_streaming_text(
+            "probe",
+            self.target,
+            self.streaming,
+            Default::default(),
+            window,
+            cx,
+        );
+        self.log.borrow_mut().push(shown.to_string());
+        div().child(shown)
+    }
+}
+
+#[gpui::test]
+fn streaming_text_reveals_steadily_and_snaps_when_streaming_stops(cx: &mut TestAppContext) {
+    const TARGET: &str = "The quick brown fox jumps over the lazy dog, again and again and again.";
+    let log: Log = Rc::default();
+    let streaming = Rc::new(std::cell::Cell::new(true));
+    let cx = {
+        let (log, streaming) = (log.clone(), streaming.clone());
+        host(cx, move || {
+            RevealProbe {
+                target: TARGET,
+                streaming: streaming.get(),
+                log: log.clone(),
+            }
+            .into_any_element()
+        })
+    };
+    let first = log.borrow().last().unwrap().clone();
+    assert!(first.len() < TARGET.len(), "starts partway: {first:?}");
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(30));
+    settle(cx);
+    let later = log.borrow().last().unwrap().clone();
+    assert!(
+        later.len() > first.len() && TARGET.starts_with(&later),
+        "grows toward the target"
+    );
+    streaming.set(false);
+    settle(cx);
+    assert_eq!(
+        log.borrow().last().unwrap(),
+        TARGET,
+        "the whole text once streaming stops"
+    );
+}
+
+#[gpui::test]
+fn streamed_markdown_renders_its_revealed_text(cx: &mut TestAppContext) {
+    let seen = rendered(cx, |log| {
+        Markdown::new("md", "**Bold** words, then `code`.")
+            .streaming(true)
+            .components(MarkdownComponents::new().inline_code(move |value, _, _| {
+                log.borrow_mut().push(value.to_string());
+                div().into_any_element()
+            }))
+    });
+    // The first ticks reveal the start; the code span arrives later or not yet.
+    assert!(seen.len() <= 1);
+}
+
+/// An inline `@{name}` mention plugin whose UI renderer logs, or fails for "bad".
+fn mentions(log: Log) -> astryx_markdown::plugins::MarkdownPlugin {
+    use astryx_markdown::ast::{ExtensionDisplay, ExtensionNode};
+    use astryx_markdown::plugins::{
+        ExtensionRenderer, PluginDefinition, SyntaxCapability, SyntaxContribution, TokenizeResult,
+        create_markdown_plugin,
+    };
+    create_markdown_plugin(PluginDefinition {
+        parse_key: Some("v1".into()),
+        syntax: Some(SyntaxCapability {
+            inline: vec![SyntaxContribution::new(["@{"], 80, |input| {
+                let Some(close) = input.source[input.offset + 2..].find('}') else {
+                    return Ok(TokenizeResult::NoMatch);
+                };
+                let close = input.offset + 2 + close;
+                Ok(TokenizeResult::Match {
+                    end: close + 1,
+                    node: ExtensionNode {
+                        plugin: "mentions".into(),
+                        name: "mention".into(),
+                        data: serde_json::json!({"label": &input.source[input.offset + 2..close]}),
+                        display: ExtensionDisplay::Inline,
+                        source: None,
+                        position: None,
+                    },
+                })
+            })],
+            block: vec![],
+        }),
+        renderers: [(
+            "mention".to_string(),
+            ExtensionRenderer::new(|node| {
+                Ok(format!("@{}", node.data["label"].as_str().unwrap_or("")))
+            })
+            .with_render(markdown_extension_render(move |node, _, _| {
+                let label = node.data["label"].as_str().unwrap_or("").to_string();
+                if label == "bad" {
+                    return Err("no".into());
+                }
+                log.borrow_mut().push(format!("mention {label}"));
+                Ok(div().into_any_element())
+            })),
+        )]
+        .into(),
+        ..PluginDefinition::new("mentions")
+    })
+    .expect("a valid plugin")
+}
+
+#[gpui::test]
+fn fr13_plugin_syntax_renders_through_its_renderer_and_falls_back_on_failure(
+    cx: &mut TestAppContext,
+) {
+    let seen = rendered(cx, |log| {
+        let diagnostics = log.clone();
+        Markdown::new("md", "Hi @{Ada} and @{bad}.")
+            .plugins([mentions(log.clone())])
+            .on_plugin_diagnostic(move |d| diagnostics.borrow_mut().push(d.to_string()))
+    });
+    assert_eq!(seen[0], "mention Ada");
+    assert!(
+        seen.iter()
+            .any(|s| s.contains("\"mentions\" failed in render (render-failed)")),
+        "a failing renderer reports and shows its text: {seen:?}"
+    );
+}
+
+#[gpui::test]
+fn heading_links_give_every_heading_an_id_and_copy_its_permalink(cx: &mut TestAppContext) {
+    use astryx_markdown::plugins::{HeadingLinksOptions, create_markdown_heading_links};
+    let links = create_markdown_heading_links(HeadingLinksOptions {
+        permalink_base_url: Some("https://docs.example/page".into()),
+        ..Default::default()
+    })
+    .unwrap();
+    let seen = rendered(cx, {
+        let links = links.clone();
+        move |log| {
+            Markdown::new("md", "# Intro\n\n> ## Quoted")
+                .plugins([links.clone()])
+                .components(MarkdownComponents::new().heading(move |props, _, _| {
+                    log.borrow_mut()
+                        .push(format!("{:?}", props.id.map(|id| id.to_string())));
+                    div().into_any_element()
+                }))
+        }
+    });
+    assert_eq!(
+        seen,
+        ["Some(\"intro\")", "Some(\"quoted\")"],
+        "nested headings too"
+    );
+
+    let cx = page(cx, Log::default(), move || {
+        Markdown::new("md", "# Intro").plugins([links.clone()])
+    });
+    // Rest the pointer on the control (it shows once the row is hovered), then press it.
+    let copy = cx.debug_bounds("md-block-0-heading-links-copy").unwrap();
+    cx.simulate_mouse_move(copy.center(), None, Modifiers::none());
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(400));
+    settle(cx);
+    cx.simulate_click(copy.center(), Modifiers::none());
+    settle(cx);
+    let copied = cx.update(|_, cx| cx.read_from_clipboard().and_then(|c| c.text()));
+    assert_eq!(copied.as_deref(), Some("https://docs.example/page#intro"));
+}
+
+#[gpui::test]
+fn source_lines_reach_custom_renderers(cx: &mut TestAppContext) {
+    let seen = rendered(cx, |log| {
+        Markdown::new("md", "One\n\nTwo\nlines")
+            .plugins([astryx_markdown::plugins::markdown_source_lines_plugin()])
+            .components(MarkdownComponents::new().paragraph(move |props, _, _| {
+                log.borrow_mut().push(format!(
+                    "{:?}",
+                    props.source_lines.map(|l| (l.start, l.end))
+                ));
+                div().into_any_element()
+            }))
+    });
+    assert_eq!(seen, ["Some((1, 1))", "Some((3, 4))"]);
 }

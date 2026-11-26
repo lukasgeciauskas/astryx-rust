@@ -198,7 +198,14 @@ impl InlineBuilder {
         if let Some(view) = element.downcast_mut::<ViewElement<InlineSpan>>()
             && let Some(span) = view.take_view()
         {
-            self.styled(&span.refinement, |flow| {
+            let mut refinement = span.refinement;
+            if span.opacity < 1. {
+                // The color it would draw in, faded.
+                let mut style = self.style.clone();
+                gpui::Refineable::refine(&mut style, &refinement);
+                refinement.color = Some(style.color.opacity(style.color.a * span.opacity));
+            }
+            self.styled(&refinement, |flow| {
                 for child in span.children {
                     flow.child(child, window, cx);
                 }
@@ -244,6 +251,8 @@ impl InlineBuilder {
 #[derive(IntoElement)]
 pub(crate) struct InlineSpan {
     refinement: TextStyleRefinement,
+    /// Multiplies the alpha of the color it draws in, for a fade.
+    opacity: f32,
     children: SmallVec<[AnyElement; 2]>,
 }
 
@@ -251,8 +260,15 @@ impl InlineSpan {
     pub fn new(refinement: TextStyleRefinement) -> Self {
         InlineSpan {
             refinement,
+            opacity: 1.,
             children: SmallVec::new(),
         }
+    }
+
+    /// Draws its text at `opacity` (0 to 1) of the color it would have.
+    pub fn opacity(mut self, opacity: f32) -> Self {
+        self.opacity = opacity.clamp(0., 1.);
+        self
     }
 }
 
@@ -266,7 +282,8 @@ impl RenderOnce for InlineSpan {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
         let mut el = div();
         el.style().text = self.refinement;
-        el.child(InlineFlow::new(self.children))
+        el.opacity(self.opacity)
+            .child(InlineFlow::new(self.children))
     }
 }
 

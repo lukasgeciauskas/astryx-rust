@@ -5,9 +5,9 @@
 use std::collections::BTreeSet;
 
 use super::ResolvedOptions;
-use super::block::{parse_markdown_impl, source_ends_in_paragraph};
+use super::block::{LineResolver, parse_markdown_impl, source_ends_in_paragraph};
 use super::lines::{can_continue_paragraph_lazily, is_horizontal_rule};
-use crate::ast::{Block, List, ListItem};
+use crate::ast::{Block, List, ListItem, ListMarkerShape, Point, Position};
 use crate::js::{self, get_indent};
 
 /// Upstream `listItemSource`: an item's content as one text: its first line, then its
@@ -79,12 +79,16 @@ impl ItemMarker {
 }
 
 /// Upstream `parseList`: the list that opens at `lines[start]`, and the line after it.
-/// Blank lines between items or inside one make it loose (`spread`).
+/// Blank lines between items or inside one make it loose (`spread`). A line where a
+/// plugin's block syntax starts (`interrupts_lazy_continuation`) is no lazy continuation;
+/// with `document_line_of`, items record their source lines.
 pub(super) fn parse_list(
     lines: &[&str],
     start: usize,
     ordered: bool,
     opts: &ResolvedOptions,
+    interrupts_lazy_continuation: &dyn Fn(usize) -> bool,
+    document_line_of: Option<&LineResolver>,
 ) -> (Block, usize) {
     let first = lines[start];
     let indent = get_indent(first);
@@ -111,6 +115,7 @@ pub(super) fn parse_list(
     let mut loose = false;
     let mut index = start;
     while index < lines.len() && marker.starts_item(lines[index]) {
+        let item_start = index;
         let line = lines[index];
         let marker_end = marker.content_start(line).unwrap_or(line.len());
         let content = &line[marker_end..];
@@ -155,8 +160,9 @@ pub(super) fn parse_list(
                 index += 1;
                 continue;
             }
-            // Upstream also ends the item where a plugin's block syntax starts.
-            if !can_continue_paragraph_lazily(lines, index, true) {
+            if interrupts_lazy_continuation(index)
+                || !can_continue_paragraph_lazily(lines, index, true)
+            {
                 break;
             }
             let open = *lazy_paragraph_open.get_or_insert_with(|| {
@@ -197,11 +203,34 @@ pub(super) fn parse_list(
         }
 
         let source = list_item_source(item_text, &sub_lines, &lazy_lines);
-        items.push(ListItem {
-            checked,
-            children: parse_markdown_impl(&source, &opts.nested()),
-            position: None,
-        });
+        match document_line_of {
+            None => items.push(ListItem {
+                checked,
+                children: parse_markdown_impl(&source, &opts.nested()),
+                ..ListItem::default()
+            }),
+            Some(document_line_of) => {
+                // The item's source holds one line per line it consumed, from its marker
+                // line to its last content line, so its lines map back one to one.
+                let origin: Vec<usize> = (item_start..index)
+                    .map(|line| document_line_of.resolve(line))
+                    .collect();
+                let line = |line: usize| Point {
+                    line: Some(line + 1),
+                    ..Point::default()
+                };
+                let position = Position {
+                    start: line(origin[0]),
+                    end: line(origin[origin.len() - 1]),
+                };
+                items.push(ListItem {
+                    checked,
+                    children: parse_markdown_impl(&source, &opts.nested_at(Some(origin))),
+                    position: Some(position),
+                    data: None,
+                });
+            }
+        }
 
         // Blank lines between items of the same marker and indentation still make one
         // (loose) list.
@@ -222,6 +251,11 @@ pub(super) fn parse_list(
         delimiter: marker.delimiter.map(char::from),
         children: items,
         position: None,
+        data: None,
+        marker_shape: ListMarkerShape(Some((
+            marker.indent,
+            char::from(marker.delimiter.unwrap_or(marker.bullet)),
+        ))),
     };
     (Block::List(list), index)
 }

@@ -5,14 +5,15 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M10 (Content): stages 1 to 3 done (the syntax engine and SyntaxTheme, CodeBlock, Markdown's core)._
+_Last updated: 2026-11-26, during M10 (Content): stages 1 to 4 done (the syntax engine and SyntaxTheme, CodeBlock, Markdown's core and extensions)._
 
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8 and M9; M10 is under way (stage 1:
   the syntax engine, `astryx-syntax`, and SyntaxTheme; stage 2: CodeBlock; stage 3: Markdown's
-  core, on `astryx-markdown`, upstream's own parser ported). Stage 4 (Markdown's extensions) is
-  next. Details and dates are in
+  core, on `astryx-markdown`, upstream's own parser ported; stage 4: its plugins, streaming,
+  citations, math, heading links, `useOutlineFromMarkdown` and `useContainerReveal`). Stage 5
+  (Chat's layout and messages) is next. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
 - **Parity:** 102 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
@@ -50,7 +51,6 @@ _Last updated: 2026-11-26, during M10 (Content): stages 1 to 3 done (the syntax 
 | Table row expansion's `animatedLayout` glide (FR15) | Motion layer (M11) |
 | TreeList's `animatedLayout` and expand glide (FR8, FR9) | Motion layer (M11) |
 | Resizable's pane slide and rubber-band overshoot (FR8, AST-105 FR9); SideNav's rail reveal (FR6); TopNav's drawer groups' height (TopNavMenu FR7, TopNavMegaMenu FR9); AppShell's content swap (FR17); CodeBlock's collapse (FR5) | Motion layer (M11) |
-| `useOutlineFromMarkdown` (Outline's items from a Markdown string, with Markdown's parser and heading slugs) | Markdown (M10) |
 | Native date and time pickers on macOS and Linux (`Native` shows the Astryx surface there) | Fork patch R16 built and checked on those platforms |
 
 ## The owner's standing instructions
@@ -204,13 +204,13 @@ and sheets compose one); NavIcon and NavHeadingMenu; SideNav; TopNav with its me
 menu and heading, on one hover recognizer (`top_nav/hover.rs`); MobileNav; AppShell and
 `useAppShellMobile` (the theme now carries `widthBreakpoints`); Outline and
 `useOutlineFromDOM` on in-page anchors (`astryx_primitives::anchor`); Carousel and
-`useSnapPaging`. Its carried items are in the table below: motion to M11, and
-`useOutlineFromMarkdown` to M10.
+`useSnapPaging`. Its carried items are in the table below: motion to M11; `useOutlineFromMarkdown`, carried
+to M10, landed in M10 stage 4.
 
 M10 ports Markdown (upstream's own parser, ported as `astryx-markdown` and checked against
 fixtures of upstream's output; upstream plugins, streaming parse, URL safety), CodeBlock (the in-house grammar tokenizer on `fancy-regex`, 30
-languages, 12 syntax presets) and the Chat suite (see `PLAN.md`), and carries
-`useOutlineFromMarkdown` (it shares Markdown's parser and heading slugs). Start with
+languages, 12 syntax presets) and the Chat suite (see `PLAN.md`). Stages 1 to 4 are done; stage 5 (Chat's layout and
+messages) is next. Start with
 `cargo run -q -p astryx-cli -- component <Name> --dense` for each and the upstream specs
 in `../Astryx/docs/specs/components/`.
 

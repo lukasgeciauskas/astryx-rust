@@ -303,6 +303,7 @@ dependencies = [
  "astryx-syntax",
  "astryx-theme",
  "astryx-themes",
+ "fancy-regex",
  "gpui",
  "gpui_web",
  "image",
@@ -378,9 +379,11 @@ dependencies = [
 name = "astryx-markdown"
 version = "0.1.0"
 dependencies = [
+ "icu_normalizer",
  "regex",
  "serde",
  "serde_json",
+ "url",
 ]
 
 [[package]]

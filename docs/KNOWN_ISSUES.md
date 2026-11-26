@@ -271,6 +271,18 @@
 - **Markdown's `content_width` takes a `Length` (M10).** Upstream accepts any CSS width
   (`60ch`, `min(...)`); here pixels, rems or a fraction, and `Length::Auto` or zero drops the
   cap as upstream's `0` does.
+- **Markdown plugin renderers have no error boundary (M10).** A render closure that
+  returns `Err` shows the node's readable text and reports `render-failed`, as upstream's
+  boundary does; a panic is not caught, and there is no Suspense fallback (GPUI renders
+  synchronously). Source lines reach supplied renderers only: GPUI elements have no
+  `data-source-line` attributes.
+- **Markdown's plugin protocol where upstream's code and spec part (M10).** FR17's content
+  categories are not in upstream's code (extension nodes have no children), so not here
+  either; a transform may not remove another plugin's nodes, as upstream's code and tests
+  require though FR18 allows it. The diagnostic codes and `depends_on` exist only in the
+  spec, so their names are the port's; diagnostics are deduplicated per parse rather than
+  per process. The Remark adapter runs a Rust function over the mdast subset as
+  `serde_json` values. Offsets, spans and decoration ranges are UTF-8 bytes.
 - **Grammar word boundaries are Unicode (M10).** CodeBlock's grammars use JS's ASCII `\b`;
   `fancy-regex` has no ASCII boundary, so a keyword directly beside a non-ASCII letter
   (`éfor`) can paint differently. `\w` and `\d` keep JS's ASCII meaning.

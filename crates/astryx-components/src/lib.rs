@@ -10,6 +10,7 @@ pub mod choice;
 pub mod code_block;
 pub mod collapsible;
 pub mod complex_selector;
+pub mod container_reveal;
 pub mod containers;
 pub mod content;
 pub mod date_input;

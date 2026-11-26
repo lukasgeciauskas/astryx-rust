@@ -827,10 +827,29 @@ The remaining primitives:
     unsafe destinations as text, `on_link_click` (`false` keeps a link from opening),
     external links in a new tab; `autolink`; and the `components` renderers for code, inline
     code, links, headings, paragraphs, images, quotes and rules (FR3). Math reads as
-    written until `components.math` arrives with stage 4 (FR6). Along the way: CodeBlock now
+    written without a math renderer (FR6). Along the way: CodeBlock now
     sizes to its content as upstream's `fit-content` (it had stretched across its column),
     CheckboxListItem takes a rich label (`new_element`, upstream's `ReactNode`), and
     `astryx_i18n::first_strong_direction` ports upstream's classifier.
+  - Stage 4 (done): Markdown's extensions. The parser crate gained upstream's whole plugin
+    system (`astryx_markdown::plugins`: `create_markdown_plugin`, syntax contributions in the
+    block and inline scanners, ordered transforms with their validation, extension text, the
+    diagnostic channel), the first-party plugins (text transforms, semantic fences, source
+    decorations, frontmatter, soft breaks, source lines, heading links), the heading
+    projection, `parse_outline_from_markdown`, the Remark adapter's meaning over
+    `serde_json`, incremental parsing with `trim_streaming_artifacts`, and the released
+    `parse_markdown`/`parse_inline` shapes. Each is checked against exported fixtures of
+    upstream's own output (plugin sets, every streamed prefix, the legacy shapes) and the
+    parser-side cases of upstream's tests. The component: `plugins` and
+    `on_plugin_diagnostic`, extension nodes and semantic-fence proposals through a plugin's
+    render closure (`markdown_extension_render`; an `Err` shows the node's text and reports
+    `render-failed`), `MarkdownPluginNodeRenderer`, heading ids from the projection with the
+    heading-links copy control, source lines for supplied renderers, citations and sources,
+    `components.math` and `components.citation`, `code_languages` (FR30), inline plugins,
+    and streaming: `use_streaming_text` reveals the source, the incremental parse reuses
+    settled blocks and never shows partial syntax, and each new span fades in over the
+    medium duration. Also `useContainerReveal` (`container_reveal/`, which heading links
+    use) and `useOutlineFromMarkdown` (carried from M9) in `outline/`.
 - **M11 Motion & touch:** springs, decay, rubber-band, gesture recognizers on GPUI pointer and
   touch events, keyboard clearance, dragToSnapPoints.
   - Components: BottomSheet(+Switcher), Swipe, coarse-pointer variants (sheet-backed

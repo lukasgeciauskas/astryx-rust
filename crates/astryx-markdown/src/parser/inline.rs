@@ -1,7 +1,7 @@
 //! The inline parser, upstream `Markdown/parser.ts` ("Inline parser" and its helpers): one
 //! pass over a block's text that builds code spans, math, citations, images, links,
-//! reference links and images, escapes, character references and breaks, leaving runs
-//! of `*` and `_` for [`resolve_emphasis`].
+//! reference links and images, plugins' inline extension syntax, escapes, character
+//! references and breaks, leaving runs of `*` and `_` for [`resolve_emphasis`].
 
 use std::borrow::Cow;
 use std::sync::LazyLock;
@@ -10,10 +10,13 @@ use regex::Regex;
 
 use super::autolink::transform_autolinks;
 use super::emphasis::{DelimiterRun, delimiter_run, resolve_emphasis};
+use super::extension::{ExtensionMatch, match_extension_syntax};
 use super::inline_index::InlineIndex;
 use super::link_definitions::normalize_link_label;
 use super::{LinkDefinitions, ResolvedOptions};
-use crate::ast::{Citation, Image, Link, Literal, Parent, Phrasing, Void, markdown_ast_text};
+use crate::ast::{
+    Citation, ExtensionDisplay, Image, Link, Literal, Parent, Phrasing, Void, markdown_ast_text,
+};
 use crate::character_references::{
     decode_literal_text, is_ascii_punctuation, match_character_reference,
 };
@@ -55,6 +58,7 @@ fn text_node(value: &str) -> Phrasing {
     Phrasing::Text(Literal {
         value: value.to_string(),
         position: None,
+        data: None,
     })
 }
 
@@ -79,7 +83,7 @@ fn line_ending_length_at(bytes: &[u8], index: usize) -> usize {
 }
 
 /// Upstream `isEscaped`: whether an odd run of backslashes precedes `index`.
-fn is_escaped(bytes: &[u8], index: usize) -> bool {
+pub(super) fn is_escaped(bytes: &[u8], index: usize) -> bool {
     bytes[..index]
         .iter()
         .rev()
@@ -91,7 +95,7 @@ fn is_escaped(bytes: &[u8], index: usize) -> bool {
 
 /// Upstream `isInlineMathStart`: whitespace cannot hug the delimiters, a digit cannot sit
 /// just before the opener, and `$$` is display math's.
-fn is_inline_math_start(text: &str, index: usize) -> bool {
+pub(super) fn is_inline_math_start(text: &str, index: usize) -> bool {
     let bytes = text.as_bytes();
     let before = index.checked_sub(1).map(|i| bytes[i]);
     bytes[index] == b'$'
@@ -105,7 +109,7 @@ fn is_inline_math_start(text: &str, index: usize) -> bool {
 /// Upstream `findInlineMathEnd`: the `$` that closes `$…$` math opened at `start`, on
 /// the same line. The first unescaped `$` ends the candidate: it closes it, or the span is
 /// text, so "$20 and $30" stays prose. No digit may follow the closer.
-fn find_inline_math_end(text: &str, start: usize) -> Option<usize> {
+pub(super) fn find_inline_math_end(text: &str, start: usize) -> Option<usize> {
     if !is_inline_math_start(text, start) {
         return None;
     }
@@ -223,7 +227,7 @@ pub(super) fn image_alt(
     }
     let deeper = ResolvedOptions {
         image_alt_depth: opts.image_alt_depth + 1,
-        ..opts.clone()
+        ..opts.protected()
     };
     markdown_ast_text(&breaks_as_line_endings(parse_inline_impl(
         description,
@@ -251,15 +255,15 @@ fn match_reference_link(
 ) -> Option<(Phrasing, usize)> {
     let text_close = index.opener_close(start)?;
     let link_text = &text[start + 1..text_close];
-    // Plugins aside (upstream strips them from link text), link text reads as the
-    // enclosing text does.
+    // Link text reads as the enclosing text does, without extension syntax.
     let link = |url: &String, end: usize| {
-        let children = parse_inline_impl(link_text, opts, context);
+        let children = parse_inline_impl(link_text, &opts.protected(), context);
         (
             Phrasing::Link(Link {
                 url: url.clone(),
                 children,
                 position: None,
+                data: None,
             }),
             end,
         )
@@ -304,6 +308,7 @@ fn match_reference_image(
             url: url.clone(),
             alt: image_alt(alt, opts, context),
             position: None,
+            data: None,
         };
         (Phrasing::Image(node), end)
     };
@@ -356,6 +361,8 @@ fn parse_inline_impl(text: &str, opts: &ResolvedOptions, context: InlineContext)
     // Runs of `*` and `_`, in order; each is also an item until resolve_emphasis pairs it.
     let mut runs: Vec<DelimiterRun> = Vec::new();
     let mut index = InlineIndex::new(text, opts.link_defs.as_deref());
+    // Only a plugin that contributes inline syntax costs anything per position.
+    let extension_starts = opts.inline_extension_starts();
     let mut i = 0;
 
     while i < bytes.len() {
@@ -395,6 +402,7 @@ fn parse_inline_impl(text: &str, opts: &ResolvedOptions, context: InlineContext)
             items.push(Item::Node(Phrasing::InlineCode(Literal {
                 value,
                 position: None,
+                data: None,
             })));
             i = close + ticks;
             continue;
@@ -408,6 +416,7 @@ fn parse_inline_impl(text: &str, opts: &ResolvedOptions, context: InlineContext)
             items.push(Item::Node(Phrasing::InlineMath(Literal {
                 value: text[i + 1..close].to_string(),
                 position: None,
+                data: None,
             })));
             i = close + 1;
             continue;
@@ -418,6 +427,7 @@ fn parse_inline_impl(text: &str, opts: &ResolvedOptions, context: InlineContext)
             items.push(Item::Node(Phrasing::Citation(Citation {
                 source_id: source_id.to_string(),
                 position: None,
+                data: None,
             })));
             i = end;
             continue;
@@ -437,6 +447,7 @@ fn parse_inline_impl(text: &str, opts: &ResolvedOptions, context: InlineContext)
                     url: src,
                     alt,
                     position: None,
+                    data: None,
                 })));
             } else {
                 // An unsafe scheme is text.
@@ -463,6 +474,7 @@ fn parse_inline_impl(text: &str, opts: &ResolvedOptions, context: InlineContext)
             items.push(Item::Node(Phrasing::Citation(Citation {
                 source_id: source_id.to_string(),
                 position: None,
+                data: None,
             })));
             i = end;
             continue;
@@ -476,13 +488,14 @@ fn parse_inline_impl(text: &str, opts: &ResolvedOptions, context: InlineContext)
         {
             let href = destination_url(&text[text_close + 2..url_close]);
             if is_safe_markdown_parser_url(&href) {
-                // Plugins aside (upstream strips them from link text), link text reads as
-                // the enclosing text does.
-                let children = parse_inline_impl(&text[i + 1..text_close], opts, context);
+                // Link text reads as the enclosing text does, without extension syntax.
+                let children =
+                    parse_inline_impl(&text[i + 1..text_close], &opts.protected(), context);
                 items.push(Item::Node(Phrasing::Link(Link {
                     url: href,
                     children,
                     position: None,
+                    data: None,
                 })));
             } else {
                 // An unsafe scheme is text.
@@ -511,13 +524,16 @@ fn parse_inline_impl(text: &str, opts: &ResolvedOptions, context: InlineContext)
             if run.can_open || run.can_close {
                 items.push(Item::Run(runs.len()));
                 runs.push(run);
-            } else {
-                // A run that can neither open nor close is text (upstream lets a plugin
-                // that starts with it read it first).
-                append_inline_text(&mut items, &text[i..run_end]);
+                i = run_end;
+                continue;
             }
-            i = run_end;
-            continue;
+            // A run that can neither open nor close is text; a plugin that starts with it
+            // may still read it below.
+            if !extension_starts.is_some_and(|starts| starts.contains_key(&char::from(byte))) {
+                append_inline_text(&mut items, &text[i..run_end]);
+                i = run_end;
+                continue;
+            }
         }
 
         // Strikethrough: ~~.
@@ -529,12 +545,24 @@ fn parse_inline_impl(text: &str, opts: &ResolvedOptions, context: InlineContext)
             items.push(Item::Node(Phrasing::Delete(Parent {
                 children,
                 position: None,
+                data: None,
             })));
             i = close + 2;
             continue;
         }
 
-        // Upstream tries plugins' inline extension syntax here; built-ins win.
+        // Extension syntax: built-ins and protected contexts win.
+        if extension_starts.is_some() {
+            match match_extension_syntax(text, i, ExtensionDisplay::Inline, opts) {
+                ExtensionMatch::Match { node, end } => {
+                    items.push(Item::Node(Phrasing::Extension(*node)));
+                    i = end;
+                    continue;
+                }
+                ExtensionMatch::Defer => break,
+                ExtensionMatch::None => {}
+            }
+        }
 
         // Character reference: the characters it names, as text.
         if byte == b'&'
@@ -547,7 +575,13 @@ fn parse_inline_impl(text: &str, opts: &ResolvedOptions, context: InlineContext)
 
         // Plain text, up to the next character something else may start with.
         let mut end = i + js::char_at(text, i).map_or(1, char::len_utf8);
-        while end < bytes.len() && !ends_plain_text(bytes, end, opts.math) {
+        while end < bytes.len()
+            && !ends_plain_text(bytes, end, opts.math)
+            && !extension_starts.is_some_and(|starts| {
+                text.is_char_boundary(end)
+                    && js::char_at(text, end).is_some_and(|c| starts.contains_key(&c))
+            })
+        {
             end += 1;
         }
         let content = &text[i..end];

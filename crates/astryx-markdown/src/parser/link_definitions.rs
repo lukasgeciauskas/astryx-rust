@@ -132,7 +132,7 @@ fn list_item_scope_of(line: &str) -> Option<ListItemScope> {
 
 /// What a line does to the top-level code fence.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum FenceEvent {
+pub(super) enum FenceEvent {
     Open,
     Close,
     Inside,
@@ -142,7 +142,7 @@ enum FenceEvent {
 /// document, a line at a time, as the block parser reads them. A fence indented into an
 /// open list item belongs to that item: it neither opens nor closes a top-level fence.
 #[derive(Default)]
-struct TopLevelFences<'a> {
+pub(super) struct TopLevelFences<'a> {
     /// The open top-level fence.
     fence: Option<&'a str>,
     /// The outermost open list item, and what it last read. After a blank line inside the
@@ -161,7 +161,7 @@ fn is_heading_or_break(text: &str) -> bool {
 }
 
 impl<'a> TopLevelFences<'a> {
-    fn is_open(&self) -> bool {
+    pub(super) fn is_open(&self) -> bool {
         self.fence.is_some()
     }
 
@@ -182,7 +182,7 @@ impl<'a> TopLevelFences<'a> {
         self.item_ends_in_paragraph = !js::is_blank(text) && !is_heading_or_break(text);
     }
 
-    fn read(&mut self, lines: &[&'a str], index: usize) -> Option<FenceEvent> {
+    pub(super) fn read(&mut self, lines: &[&'a str], index: usize) -> Option<FenceEvent> {
         let line = lines[index];
         if let Some(fence) = self.fence {
             if closes_fence(line, fence) {
