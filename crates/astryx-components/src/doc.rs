@@ -64,6 +64,8 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::scrollable_area::USE_SCROLLABLE_AREA_DOC,
     crate::resizable::RESIZABLE_DOC,
     crate::resizable::USE_RESIZABLE_DOC,
+    crate::nav::NAV_ICON_DOC,
+    crate::nav::NAV_HEADING_MENU_DOC,
     crate::icon::ICON_DOC,
     crate::status::SPINNER_DOC,
     crate::status::SKELETON_DOC,

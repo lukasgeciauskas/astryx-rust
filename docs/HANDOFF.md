@@ -5,15 +5,15 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 4 done (R17, ScrollableArea, Resizable, Layout)._
+_Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 5 done (R17, ScrollableArea, Resizable, Layout, NavIcon and NavHeadingMenu)._
 
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7 and M8; M9 is under way (stage 1:
-  scroll chaining and scrollbars, fork patch R17; stage 2: ScrollableArea and its hook; stage 3: Resizable; stage 4: Layout). Details and dates are in
+  scroll chaining and scrollbars, fork patch R17; stage 2: ScrollableArea and its hook; stage 3: Resizable; stage 4: Layout; stage 5: NavIcon and NavHeadingMenu). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 91 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 93 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** M8's stages, from `90581cb` (calendar systems and
   Calendar) through the pointer fields, DateRangeInput, the wheels and the three bottom
@@ -30,7 +30,7 @@ _Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 4 done (R
 ### Not yet ported (26)
 
 - **M9:** AppShell, Carousel,
-  MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
+  MobileNav, Outline, SideNav, TopNav. **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
   LinkProvider, MediaTheme, SyntaxTheme, Theme. The first five already exist as

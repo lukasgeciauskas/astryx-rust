@@ -671,6 +671,15 @@ The remaining primitives:
     footer reflect the container (`card`, `dialog`, `bottom-sheet`).
     - Carried in: Dialog, Drawer and BottomSheet are padding containers, and
       DialogHeader is a LayoutHeader, so a dialog composes a Layout as upstream's does.
+  - Stage 5 (done): NavIcon and NavHeadingMenu (`nav/`). NavIcon is the accent circle at
+    a control's size, with no role, name or stop. NavHeadingMenu is one `menu` (none
+    inside a heading's own menu) whose NavHeadingMenuItem rows register with it each
+    frame: the arrows wrap through every row, disabled ones included, Home, End and
+    typeahead move, Enter and Space choose, Escape closes the heading's popover; an
+    enabled choice runs `on_click`, follows its `href` through the link provider, then
+    closes; a press that lands on a row slides across the rows and acts on the one it
+    lifts on, and a mouse released elsewhere dismisses (FR1-FR8). The heading contexts
+    (close, dismiss, host) wait for SideNavHeading and TopNavHeading.
 - **M10 Content:**
   - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
     URL safety.

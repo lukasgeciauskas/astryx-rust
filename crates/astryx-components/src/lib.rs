@@ -28,6 +28,7 @@ pub mod media;
 pub mod metadata;
 mod motion;
 pub mod multi_selector;
+pub mod nav;
 pub mod overflow;
 pub mod overlay;
 pub mod pagination;
