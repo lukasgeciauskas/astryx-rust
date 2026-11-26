@@ -330,3 +330,230 @@ fn a_delegate_row_hands_surface_presses_to_its_control(cx: &mut TestAppContext) 
         "the control keeps its own press"
     );
 }
+
+// ---- FR12: row updates with an animatedLayout handle ----------------------------
+
+mod updates {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::time::Duration;
+
+    use gpui::{
+        IntoElement, Modifiers, ParentElement, Pixels, Styled, TestAppContext, VisualTestContext,
+        div, px,
+    };
+
+    use super::{host, settle};
+    use crate::animated_layout::use_animated_layout;
+    use crate::list::{List, ListItem};
+
+    #[derive(Clone)]
+    struct Setup {
+        rows: Rc<RefCell<Vec<&'static str>>>,
+        handle: bool,
+        keyed: bool,
+        removed: Rc<RefCell<Vec<String>>>,
+        /// The list shows through a viewport this tall.
+        clip: Option<Pixels>,
+    }
+
+    #[derive(IntoElement)]
+    struct Page(Setup);
+
+    impl gpui::RenderOnce for Page {
+        fn render(self, window: &mut gpui::Window, cx: &mut gpui::App) -> impl IntoElement {
+            use gpui::InteractiveElement as _;
+            let layout = use_animated_layout("rows", window, cx);
+            let mut list = List::new("l");
+            if self.0.handle {
+                list = list.animated_layout(layout.clone());
+            }
+            let names: Vec<&'static str> = self.0.rows.borrow().clone();
+            for name in names {
+                let removed = self.0.removed.clone();
+                let mut row = ListItem::new(name, name)
+                    .on_click(move |_, _, _| removed.borrow_mut().push(name.to_string()));
+                if self.0.keyed {
+                    row = row.item_key(name);
+                }
+                list = list.child(row);
+            }
+            let list = match self.0.clip {
+                Some(h) => div().h(h).overflow_hidden().child(list).into_any_element(),
+                None => list.into_any_element(),
+            };
+            let area = div()
+                .w(px(300.))
+                .flex()
+                .flex_col()
+                .child(list)
+                .child(div().debug_selector(|| "after".into()).h(px(10.)));
+            layout.container(area, window, cx)
+        }
+    }
+
+    fn page(cx: &mut TestAppContext, setup: Setup) -> &mut VisualTestContext {
+        let cx = host(cx, move || Page(setup.clone()).into_any_element());
+        settle(cx);
+        cx
+    }
+
+    fn setup(handle: bool, keyed: bool) -> Setup {
+        Setup {
+            rows: Rc::new(RefCell::new(vec!["a", "b", "c"])),
+            handle,
+            keyed,
+            removed: Rc::default(),
+            clip: None,
+        }
+    }
+
+    const LEAVING_B: &str = "l-leaving-Text(\"b\")";
+    const LEAVING_C: &str = "l-leaving-Text(\"c\")";
+
+    #[gpui::test]
+    fn fr12_a_collapsing_row_is_out_of_the_tab_order(cx: &mut TestAppContext) {
+        let s = setup(true, true);
+        let (rows, clicks) = (s.rows.clone(), s.removed.clone());
+        let cx = page(cx, s);
+        crate::segmented::tests::press(cx, "tab");
+        rows.borrow_mut().retain(|r| *r != "b");
+        settle(cx);
+        frames(cx, 32);
+        assert!(cx.debug_bounds(LEAVING_B).is_some(), "b collapses in place");
+        // From a, Tab skips the collapsing row to c.
+        crate::segmented::tests::press(cx, "tab");
+        crate::segmented::tests::press(cx, "enter");
+        settle(cx);
+        assert_eq!(*clicks.borrow(), ["c"]);
+    }
+
+    #[gpui::test]
+    fn fr12_a_row_removed_outside_the_visible_part_goes_at_once(cx: &mut TestAppContext) {
+        let mut s = setup(true, true);
+        s.clip = Some(px(40.));
+        let rows = s.rows.clone();
+        let cx = page(cx, s);
+        // c lies below the viewport's edge.
+        rows.borrow_mut().retain(|r| *r != "c");
+        settle(cx);
+        frames(cx, 32);
+        assert!(cx.debug_bounds(LEAVING_C).is_none(), "no exit out of view");
+        // In view, a removal plays its exit.
+        rows.borrow_mut().retain(|r| *r != "a");
+        settle(cx);
+        frames(cx, 32);
+        assert!(
+            cx.debug_bounds("l-leaving-Text(\"a\")").is_some(),
+            "an exit in view"
+        );
+    }
+
+    fn frames(cx: &mut VisualTestContext, ms: u64) {
+        for _ in 0..(ms / 16) {
+            cx.executor().advance_clock(Duration::from_millis(16));
+            settle(cx);
+        }
+    }
+
+    fn top(cx: &mut VisualTestContext, selector: &'static str) -> Pixels {
+        cx.debug_bounds(selector)
+            .unwrap_or_else(|| panic!("{selector} is not drawn"))
+            .top()
+    }
+
+    #[gpui::test]
+    fn fr12_an_inserted_row_enters_and_the_rows_after_it_glide(cx: &mut TestAppContext) {
+        let s = setup(true, true);
+        let rows = s.rows.clone();
+        let cx = page(cx, s);
+        let (c, after) = (top(cx, "c"), top(cx, "after"));
+        rows.borrow_mut().insert(1, "new");
+        settle(cx);
+        frames(cx, 96);
+        let mid = top(cx, "c") - c;
+        frames(cx, 600);
+        let end = top(cx, "c") - c;
+        assert!(end > px(20.), "a row's height: {end:?}");
+        assert!(
+            mid > px(0.5) && mid < end,
+            "the rows after it glide: {mid:?}"
+        );
+        assert_eq!(top(cx, "after") - after, end, "and what follows the list");
+    }
+
+    #[gpui::test]
+    fn fr12_a_removed_row_collapses_in_place_inert_until_it_is_gone(cx: &mut TestAppContext) {
+        let s = setup(true, true);
+        let (rows, clicks) = (s.rows.clone(), s.removed.clone());
+        let cx = page(cx, s);
+        let (b, c) = (top(cx, "b"), top(cx, "c"));
+        rows.borrow_mut().retain(|r| *r != "b");
+        settle(cx);
+        frames(cx, 64);
+        let mid = top(cx, "c");
+        assert!(mid > b && mid < c, "c glides up as b collapses: {mid:?}");
+        // The collapsing row takes no presses.
+        let at = gpui::point(px(100.), b + px(4.));
+        cx.simulate_click(at, Modifiers::none());
+        settle(cx);
+        assert!(clicks.borrow().is_empty(), "inert: {:?}", clicks.borrow());
+        frames(cx, 600);
+        assert_eq!(top(cx, "c"), b, "c in b's place");
+        assert!(
+            cx.debug_bounds("l-leaving-Text(\"b\")").is_none(),
+            "gone at rest"
+        );
+    }
+
+    #[gpui::test]
+    fn fr12_moved_rows_glide_to_their_new_places(cx: &mut TestAppContext) {
+        let s = setup(true, true);
+        let rows = s.rows.clone();
+        let cx = page(cx, s);
+        let (a, c) = (top(cx, "a"), top(cx, "c"));
+        *rows.borrow_mut() = vec!["c", "b", "a"];
+        settle(cx);
+        frames(cx, 96);
+        let mid = top(cx, "c");
+        assert!(mid > a && mid < c, "c glides up: {mid:?}");
+        frames(cx, 600);
+        assert_eq!(top(cx, "c"), a);
+    }
+
+    #[gpui::test]
+    fn fr12_without_a_handle_the_list_changes_at_once(cx: &mut TestAppContext) {
+        let s = setup(false, true);
+        let rows = s.rows.clone();
+        let cx = page(cx, s);
+        let b = top(cx, "b");
+        rows.borrow_mut().retain(|r| *r != "b");
+        settle(cx);
+        assert_eq!(top(cx, "c"), b);
+    }
+
+    #[gpui::test]
+    fn fr12_a_row_without_an_item_key_changes_at_once(cx: &mut TestAppContext) {
+        let s = setup(true, false);
+        let rows = s.rows.clone();
+        let cx = page(cx, s);
+        let b = top(cx, "b");
+        rows.borrow_mut().retain(|r| *r != "b");
+        settle(cx);
+        frames(cx, 32);
+        assert!(cx.debug_bounds("b").is_none(), "no exit without a key");
+        let _ = b;
+    }
+
+    #[gpui::test]
+    fn fr12_under_reduced_motion_with_a_mouse_rows_change_at_once(cx: &mut TestAppContext) {
+        cx.update(|cx| astryx_primitives::set_reduced_motion(true, cx));
+        let s = setup(true, true);
+        let rows = s.rows.clone();
+        let cx = page(cx, s);
+        let b = top(cx, "b");
+        rows.borrow_mut().retain(|r| *r != "b");
+        settle(cx);
+        assert_eq!(top(cx, "c"), b);
+    }
+}

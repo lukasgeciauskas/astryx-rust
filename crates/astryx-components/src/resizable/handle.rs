@@ -266,6 +266,19 @@ impl RenderOnce for ResizeHandle {
                 handle = handle.aria_value(i18n.t("@astryx.resizable.collapsed"));
             }
         }
+        // A pull past a limit draws the handle past it on the rubber band, over the
+        // content, and springs it back after the lift (Resizable FR8).
+        let band = props.as_ref().map_or(0., |p| p.handle_offset(window, cx));
+        if band != 0. {
+            let sign = if self.reversed { -1. } else { 1. };
+            let flip = if horizontal && rtl { -1. } else { 1. };
+            let shift = px(band * sign * flip);
+            handle = if horizontal {
+                handle.left(shift)
+            } else {
+                handle.top(shift)
+            };
+        }
         let hit = px(16.).min(t.spacing.s4.to_pixels(rem));
         if overlay {
             handle = handle.absolute();
@@ -341,7 +354,7 @@ impl RenderOnce for ResizeHandle {
                             f64::from(f32::from(event.position.y)),
                             0.,
                         );
-                        props.start(window, cx);
+                        props.start_pointer(window, cx);
                         state_down.borrow_mut().drag = Some(Drag {
                             start: pos,
                             rtl: if horizontal && rtl { -1. } else { 1. },

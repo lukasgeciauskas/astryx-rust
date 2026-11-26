@@ -180,13 +180,53 @@ fn fr2_pointer_enter_and_space_each_toggle_once(cx: &mut TestAppContext) {
     activate(cx);
     click(cx, "d-toggle");
     assert_eq!(*log.borrow(), ["true"]);
+    rest(cx);
     assert!(cx.debug_bounds("chip").is_none(), "collapsed");
     key(cx, "enter");
     assert_eq!(*log.borrow(), ["true", "false"]);
+    rest(cx);
     assert!(cx.debug_bounds("chip").is_some(), "expanded");
     key(cx, "space");
     assert_eq!(*log.borrow(), ["true", "false", "true"]);
+    rest(cx);
     assert!(cx.debug_bounds("chip").is_none());
+}
+
+/// Lets the drawer's collapse motion end.
+fn rest(cx: &mut VisualTestContext) {
+    for _ in 0..40 {
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(16));
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+}
+
+#[gpui::test]
+fn the_drawer_s_height_eases_and_its_items_fade_as_it_collapses(cx: &mut TestAppContext) {
+    let cx = drawer_page(cx, || {
+        ChatComposerDrawer::new("d")
+            .count(2usize)
+            .child(div().debug_selector(|| "tall".into()).h(px(120.)))
+    });
+    activate(cx);
+    let open = cx.debug_bounds("d").unwrap().size.height;
+    click(cx, "d-toggle");
+    for _ in 0..6 {
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(16));
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+    let mid = cx.debug_bounds("d").unwrap().size.height;
+    assert!(mid < open, "easing closed: {mid:?} of {open:?}");
+    assert!(
+        cx.debug_bounds("tall").is_some(),
+        "the items stay while it collapses"
+    );
+    rest(cx);
+    assert!(cx.debug_bounds("tall").is_none(), "gone once collapsed");
+    assert!(cx.debug_bounds("d").unwrap().size.height < mid);
 }
 
 #[gpui::test]
@@ -409,6 +449,7 @@ fn fr8_the_default_summary_is_the_count_badge_and_label(cx: &mut TestAppContext)
         "collapsed: no handle"
     );
     click(cx, "d-toggle");
+    rest(cx);
     assert!(
         cx.debug_bounds("d-summary").is_none(),
         "expanded: summary hidden"
@@ -437,6 +478,7 @@ fn fr8_fr9_a_custom_summary_replaces_only_the_visuals(cx: &mut TestAppContext) {
     );
     click(cx, "d-toggle");
     assert_eq!(*log.borrow(), ["false"], "the toggle still works the same");
+    rest(cx);
     assert!(cx.debug_bounds("custom").is_none());
     assert!(cx.debug_bounds("chip").is_some());
 }
@@ -1097,3 +1139,42 @@ fn fr4_the_theme_target_styles_the_root_and_the_caller_wins(cx: &mut TestAppCont
 
 // FR5 (render-only) is read from source, as upstream's verification map does: the
 // component holds its text, tokens and style, and keeps no keyed state.
+
+#[gpui::test]
+fn fr4_collapsing_items_are_inert(cx: &mut TestAppContext) {
+    let log: Log = Rc::default();
+    let cx = drawer_page(cx, {
+        let log = log.clone();
+        move || {
+            let log = log.clone();
+            ChatComposerDrawer::new("d").count(1usize).child(
+                div().debug_selector(|| "item".into()).child(
+                    Button::new("item-button", "Item")
+                        .on_click(move |_, _, _| log.borrow_mut().push("item".into())),
+                ),
+            )
+        }
+    });
+    activate(cx);
+    // The toggle takes focus from the press and collapses the drawer.
+    click(cx, "d-toggle");
+    for _ in 0..3 {
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(16));
+        settle(cx);
+    }
+    let item = cx.debug_bounds("item").expect("held while it collapses");
+    cx.simulate_click(item.center(), Modifiers::none());
+    settle(cx);
+    assert!(
+        log.borrow().is_empty(),
+        "a press reaches nothing: {:?}",
+        log.borrow()
+    );
+    // Tab skips the items: it comes back to the toggle, which Enter expands again.
+    key(cx, "tab");
+    key(cx, "enter");
+    rest(cx);
+    assert!(log.borrow().is_empty());
+    assert!(cx.debug_bounds("item").is_some(), "expanded again");
+}

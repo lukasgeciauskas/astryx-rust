@@ -11,12 +11,14 @@
 //! elements.
 //!
 //! The drag's look follows upstream: the other items stay still until the
-//! drop (or, with shift feedback, slide aside to open the gap); the source
-//! dims in place, and the item itself, dimmed, follows the pointer as the
-//! preview (GPUI draws an element once a frame, so the place keeps a copy of
-//! the row's text); an accent line marks the candidate; and the scroller the
-//! collection sits in autoscrolls near its edges. With a mouse the items
-//! jump to their new places at the drop, as upstream's do.
+//! drop (or, with shift feedback, slide aside on `springs.settle` to open the
+//! gap, [`super::slide`]); the source dims in place, and the item itself,
+//! dimmed, follows the pointer as the preview (GPUI draws an element once a
+//! frame, so the place keeps a copy of the row's text); an accent line marks
+//! the candidate; and the scroller the collection sits in autoscrolls near its
+//! edges. Under shift feedback or a finger, a drop, a cancel and a reorder-mode
+//! move glide the rows into their new places; a mouse's drop behind the
+//! insertion line lands at once, as upstream's does.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -42,6 +44,7 @@ use super::model::{
     bounds_of, clamp_top, drop_position, layout_of, line_center, mode_line_center, movable_range,
     nearest_slot, row_and_column, shift_candidate, shift_offset, slot_centers,
 };
+use super::slide::{SlideMotion, Slides};
 use super::{FeedbackBehavior, ItemKey, ReorderMove, Reorderable, ReorderableLabels};
 use crate::content::Kbd;
 
@@ -83,6 +86,12 @@ pub(crate) struct Drag {
     given: bool,
     /// Shift feedback (FR9) rather than the insertion line.
     shift: bool,
+    /// Under Reduce Motion with a coarse pointer the shift cross-fades in place.
+    fade: bool,
+    /// The pointer's speed, for the drop's glide from the release velocity.
+    tracker: astryx_primitives::gestures::VelocityTracker,
+    /// When the drag began, the tracker's time origin.
+    began: web_time::Instant,
     /// The dragged item's size plus the gap, along the axis.
     pitch: f32,
     /// The pointer's offset into the item at pickup.
@@ -128,6 +137,8 @@ pub(crate) struct Session {
     scroll_into_view: Option<ItemKey>,
     handles: HashMap<ItemKey, FocusHandle>,
     autoscroll: Option<Task<()>>,
+    /// The rows' slides (FR9).
+    pub(crate) slides: Slides,
 }
 
 /// What a collection gives its items: the session, the object, and a slot
@@ -261,6 +272,12 @@ pub(crate) fn finalize(
             }
         }
         s.rows = rows;
+        // A landing ends once its frame is laid out.
+        s.slides.landed();
+        let keys: Vec<ItemKey> = s.rows.iter().filter_map(|r| r.key.clone()).collect();
+        if s.drag.is_none() {
+            s.slides.retain(&keys);
+        }
         if let Some(p) = s.pending.take() {
             match index_of(&s.rows, &p.key) {
                 Some(at) if at == p.to => {
@@ -642,7 +659,12 @@ fn step(session: &Entity<Session>, arrow: Arrow, window: &mut Window, cx: &mut A
         return;
     }
     let kept = kept_message(session.read(cx), &m, index, false);
+    let glides = lands_gliding(session, window, cx);
     session.update(cx, |s, _| {
+        // The moved row and the rows it passes slide into their new places.
+        if glides {
+            s.slides.land();
+        }
         s.last_step = if to < index { -1 } else { 1 };
         s.pending = Some(Pending {
             key: key.clone(),
@@ -820,10 +842,16 @@ fn begin_drag(
     let given_positions = options
         .as_ref()
         .and_then(|o| o.positions.as_ref().map(|f| f()));
+    // Under Reduce Motion the neighbours do not travel: with a coarse pointer the gap
+    // opens as an in-place cross-fade, and otherwise the drag shows the insertion line.
+    let reduced = prefers_reduced_motion(cx);
+    let coarse = astryx_primitives::coarse_primary_pointer(window, cx);
     let shift = options
         .as_ref()
         .is_some_and(|o| o.feedback == FeedbackBehavior::Shift)
-        && !prefers_reduced_motion(cx);
+        && (!reduced || coarse);
+    let fade = reduced;
+    let began_at = cx.background_executor().now();
     let began = session.update(cx, |s, _| {
         s.armed = None;
         let list = s.list?;
@@ -883,6 +911,13 @@ fn begin_drag(
             centers,
             given,
             shift,
+            fade,
+            tracker: {
+                let mut tracker = astryx_primitives::gestures::VelocityTracker::default();
+                tracker.add(f64::from(pointer.x), f64::from(pointer.y), 0.);
+                tracker
+            },
+            began: began_at,
             pitch,
             pointer,
             position: dragged,
@@ -898,6 +933,18 @@ fn begin_drag(
     window.refresh();
 }
 
+/// Whether a landing glides the rows it moves: under shift feedback, whose drop settles
+/// into the open gap, or under the touch presentation (upstream's `uikit` presentation).
+/// A mouse's drop behind the insertion line lands at once, as upstream's does.
+fn lands_gliding(session: &Entity<Session>, window: &Window, cx: &mut App) -> bool {
+    let shift = session
+        .read(cx)
+        .reorderable
+        .as_ref()
+        .is_some_and(|r| r.0.options.feedback == FeedbackBehavior::Shift);
+    shift || astryx_primitives::coarse_primary_pointer(window, cx)
+}
+
 /// The drop: the move is reported once, and announced once it lands.
 fn drop_drag(session: &Entity<Session>, window: &mut Window, cx: &mut App) {
     let Some(d) = session.update(cx, |s, _| {
@@ -906,6 +953,28 @@ fn drop_drag(session: &Entity<Session>, window: &mut Window, cx: &mut App) {
     }) else {
         return;
     };
+    // The dragged row lands from where its preview was let go.
+    let at = {
+        let s = session.read(cx);
+        let (x, y) = dragged_at(s, &d, window);
+        let (ox, oy) = origin(s);
+        point(px(x + ox), px(y + oy))
+    };
+    // It glides from the drag's release velocity (upstream's `pending.velocity`).
+    let released = cx
+        .background_executor()
+        .now()
+        .saturating_duration_since(d.began)
+        .as_secs_f64()
+        * 1000.;
+    let v = d.tracker.velocity(Some(released));
+    let glides = lands_gliding(session, window, cx);
+    session.update(cx, |s, _| {
+        s.slides.let_go_at(&d.key, at, (v.x, v.y));
+        if glides {
+            s.slides.land();
+        }
+    });
     let labels = labels_of(session, cx);
     let m = Messages::new(&labels, cx);
     let total = d.rects.len();
@@ -942,6 +1011,20 @@ fn cancel_drag(session: &Entity<Session>, window: &mut Window, cx: &mut App) {
     }) else {
         return;
     };
+    // The rows go home: the dragged one from where it was shown.
+    let at = {
+        let s = session.read(cx);
+        let (x, y) = dragged_at(s, &d, window);
+        let (ox, oy) = origin(s);
+        point(px(x + ox), px(y + oy))
+    };
+    let glides = lands_gliding(session, window, cx);
+    session.update(cx, |s, _| {
+        s.slides.let_go_at(&d.key, at, (0., 0.));
+        if glides {
+            s.slides.land();
+        }
+    });
     let labels = labels_of(session, cx);
     let m = Messages::new(&labels, cx);
     say(m.cancelled(d.dragged + 1, d.rects.len()), window, cx);
@@ -1027,9 +1110,13 @@ fn pointer_moved(
         return;
     }
     if session.read(cx).drag.is_some() {
+        let now = cx.background_executor().now();
         session.update(cx, |s, _| {
             if let Some(d) = &mut s.drag {
                 d.pointer = position;
+                let ms = now.saturating_duration_since(d.began).as_secs_f64() * 1000.;
+                d.tracker
+                    .add(f64::from(position.x), f64::from(position.y), ms);
             }
         });
         update_autoscroll(session, window, cx);
@@ -1558,13 +1645,13 @@ pub(crate) fn place_item(
             _ => place.into_any_element(),
         };
     }
-    match shift_of(rc, index, cx) {
-        Some((dx, dy)) => div()
-            .relative()
-            .left(px(dx))
-            .top(px(dy))
-            .child(element)
-            .into_any_element(),
-        None => element,
-    }
+    let target = shift_of(rc, index, cx).unwrap_or((0., 0.));
+    let s = rc.session.read(cx);
+    let motion = match &s.drag {
+        Some(d) if d.fade => SlideMotion::Fade,
+        Some(_) => SlideMotion::Glide,
+        None if prefers_reduced_motion(cx) => SlideMotion::Jump,
+        None => SlideMotion::Glide,
+    };
+    s.slides.clone().place(key, target, motion, element, cx)
 }

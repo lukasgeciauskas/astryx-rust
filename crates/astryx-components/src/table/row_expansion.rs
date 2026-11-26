@@ -2,9 +2,13 @@
 //! opens a full-width detail panel below its row, with the same toggle in
 //! the row's right-click menu. The caller owns the expanded keys.
 //!
-//! The panel takes its row's divider while open (FR5). Opening and closing
-//! glide the rows below with an `animatedLayout` handle upstream (FR15);
-//! that waits for M11's motion layer.
+//! The panel takes its row's divider while open (FR5). With an `animated_layout`
+//! handle (FR15, AST-105) an opening panel reveals from its block-end edge while the
+//! rows after it glide down with that edge, and a closing panel hides at once while
+//! its space is held and shrinks, so the rows after it glide up into it; the chevron
+//! turns on the same motion. A table with column lines changes at once. Without a
+//! handle the panel shows and hides at once and the chevron turns on the theme's
+//! `--duration-fast`.
 
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -23,6 +27,8 @@ use super::plugin::{
     BodyCellProps, BodyRowProps, HeaderCellProps, RowModel, TableContextAction,
     TableContextActions, TablePlugin, TableRowContext, WholeRowOwner,
 };
+use crate::animated_layout::adopt::{indicator_turn, reveal_content};
+use crate::animated_layout::{AnimatedLayout, use_edge_reveal};
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
 use crate::icon::{Icon, IconSize, TABLE_ROW_EXPAND, component_icon};
 
@@ -55,6 +61,7 @@ pub struct TableRowExpansion<T> {
     is_expandable: Option<Predicate<T>>,
     panel_variant: PanelVariant,
     row_click_expansion: bool,
+    animated_layout: Option<AnimatedLayout>,
 }
 
 impl<T> Clone for TableRowExpansion<T> {
@@ -68,6 +75,7 @@ impl<T> Clone for TableRowExpansion<T> {
             is_expandable: self.is_expandable.clone(),
             panel_variant: self.panel_variant,
             row_click_expansion: self.row_click_expansion,
+            animated_layout: self.animated_layout.clone(),
         }
     }
 }
@@ -90,6 +98,7 @@ impl<T: 'static> TableRowExpansion<T> {
             is_expandable: None,
             panel_variant: PanelVariant::Transparent,
             row_click_expansion: false,
+            animated_layout: None,
         }
     }
 
@@ -120,6 +129,18 @@ impl<T: 'static> TableRowExpansion<T> {
         self
     }
 
+    /// Upstream `animatedLayout`: the handle from [`use_animated_layout`]. With it, a
+    /// panel that opens reveals while the rows after it glide to their new places, and
+    /// one that closes hides at once while the rows after it glide up into its space;
+    /// the chevron turns on the same motion (FR15). A table with column lines
+    /// (`TableDividers::Grid` or `Columns`) changes at once, as without it.
+    ///
+    /// [`use_animated_layout`]: crate::animated_layout::use_animated_layout
+    pub fn animated_layout(mut self, layout: AnimatedLayout) -> Self {
+        self.animated_layout = Some(layout);
+        self
+    }
+
     fn expandable(&self, item: &T) -> bool {
         self.is_expandable.as_ref().is_none_or(|f| f(item))
     }
@@ -142,6 +163,12 @@ struct ExpansionChevron {
     label: SharedString,
     expanded: bool,
     on_toggle: PressFn,
+    layout: Option<AnimatedLayout>,
+}
+
+/// Whether the table being drawn has column lines: it does not glide (FR15).
+fn column_lines(cx: &App) -> bool {
+    use_context::<CellDensity>(cx).is_some_and(|d| d.1.columns())
 }
 
 impl RenderOnce for ExpansionChevron {
@@ -156,6 +183,7 @@ impl RenderOnce for ExpansionChevron {
         let size = t.spacing.s6.to_pixels(rem).min(px(EXPANSION_COLUMN_WIDTH));
         let (hover_bg, hover_fg) = (t.color.overlay_hover, t.color.icon_primary);
         let selector = format!("{}", self.id);
+        let turn_key = format!("{}-turn", self.id);
         let toggle = self.on_toggle;
         let mut el = div()
             .id(self.id)
@@ -186,14 +214,29 @@ impl RenderOnce for ExpansionChevron {
         } else {
             "collapsed"
         };
+        // The glyph points into the row (mirrored under RTL) and turns a quarter to
+        // point down: on the handle's motion, or the theme's own turn with column lines
+        // or without a handle.
+        let layout = self.layout.filter(|_| !column_lines(cx));
+        let turn = indicator_turn(
+            turn_key,
+            self.expanded,
+            layout.as_ref(),
+            (t.duration.fast, t.ease.standard),
+            window,
+            cx,
+        );
         if let Some(icon) = component_icon(TABLE_ROW_EXPAND, state, "chevronRight".into(), cx) {
-            let quarter = std::f32::consts::FRAC_PI_2;
-            let turn = match (self.expanded, rtl) {
-                (false, false) => 0.,
-                (false, true) => std::f32::consts::PI,
-                (true, _) => quarter,
+            let (base, quarter) = if rtl {
+                (std::f32::consts::PI, -std::f32::consts::FRAC_PI_2)
+            } else {
+                (0., std::f32::consts::FRAC_PI_2)
             };
-            el = el.child(Icon::new(icon).size(IconSize::Xsm).rotation(turn));
+            el = el.child(
+                Icon::new(icon)
+                    .size(IconSize::Xsm)
+                    .rotation(base + quarter * turn),
+            );
         }
         el
     }
@@ -243,6 +286,60 @@ impl RenderOnce for Panel {
             .w_full()
             .role(Role::Row)
             .child(cell.child(self.content))
+    }
+}
+
+/// A row's panel under an `animated_layout` handle, open or not: it plays its reveal,
+/// and holds its space while it closes (FR15).
+#[derive(IntoElement)]
+struct ExpansionPanel {
+    id: ElementId,
+    open: bool,
+    layout: AnimatedLayout,
+    /// The panel, while open.
+    panel: Option<AnyElement>,
+}
+
+/// The panel's height when last open.
+struct HeldHeight(gpui::Pixels);
+
+impl RenderOnce for ExpansionPanel {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let layout = (!column_lines(cx)).then_some(&self.layout);
+        let reveal = use_edge_reveal(
+            ElementId::Name(format!("{}-reveal", self.id).into()),
+            self.open,
+            layout,
+            window,
+            cx,
+        );
+        let held = window.use_keyed_state(
+            ElementId::Name(format!("{}-held", self.id).into()),
+            cx,
+            |_, _| HeldHeight(px(0.)),
+        );
+        match self.panel {
+            Some(panel) => {
+                let measure = held.clone();
+                let panel = div()
+                    .child(panel)
+                    .on_children_prepainted(move |bounds, _, cx| {
+                        if let Some(b) = bounds.first() {
+                            let h = b.size.height;
+                            if measure.read(cx).0 != h {
+                                measure.update(cx, |m, _| m.0 = h);
+                            }
+                        }
+                    });
+                reveal_content(reveal, panel, false, window, cx)
+                    .unwrap_or_else(|| div().into_any_element())
+            }
+            // Closing: the panel is gone at once; its space shrinks on the motion.
+            None if reveal.is_moving() => {
+                div().h(held.read(cx).0 * reveal.shown()).into_any_element()
+            }
+            None => div().into_any_element(),
+        }
     }
 }
 
@@ -299,6 +396,7 @@ impl<T: 'static> TablePlugin<T> for TableRowExpansion<T> {
                     };
                     let toggle = this.on_toggle.clone();
                     let toggle_key = key.clone();
+                    let layout = this.animated_layout.clone();
                     div()
                         .flex()
                         .items_center()
@@ -311,6 +409,7 @@ impl<T: 'static> TablePlugin<T> for TableRowExpansion<T> {
                             on_toggle: Rc::new(move |window, cx| {
                                 toggle(toggle_key.clone(), window, cx)
                             }),
+                            layout,
                         })
                         .into_any_element()
                 }),
@@ -399,17 +498,30 @@ impl<T: 'static> TablePlugin<T> for TableRowExpansion<T> {
                 })
             }));
         }
-        if self.expanded.contains(&key) {
+        let open = self.expanded.contains(&key);
+        let panel_id = ElementId::Name(format!("{}-panel-{key}", context.render.table).into());
+        let panel = open.then(|| {
             let last = context.logical_index + 1 == context.logical_row_count;
-            props.after_row.push(
-                Panel {
-                    id: ElementId::Name(format!("{}-panel-{key}", context.render.table).into()),
-                    content: (self.render_expanded)(item, window, cx),
-                    muted: self.panel_variant == PanelVariant::Muted,
-                    last,
+            Panel {
+                id: panel_id.clone(),
+                content: (self.render_expanded)(item, window, cx),
+                muted: self.panel_variant == PanelVariant::Muted,
+                last,
+            }
+            .into_any_element()
+        });
+        match &self.animated_layout {
+            // FR15: every expandable row keeps its panel's place, so a change plays.
+            Some(layout) => props.after_row.push(
+                ExpansionPanel {
+                    id: ElementId::Name(format!("{panel_id}-motion").into()),
+                    open,
+                    layout: layout.clone(),
+                    panel,
                 }
                 .into_any_element(),
-            );
+            ),
+            None => props.after_row.extend(panel),
         }
         props
     }
@@ -434,10 +546,7 @@ pub const USE_TABLE_ROW_EXPANSION_DOC: ComponentDoc = ComponentDoc {
             "hasRowClickExpansion",
             RustApi::Method("row_click_expansion"),
         ),
-        p(
-            "animatedLayout",
-            RustApi::Pending("animatedLayout", "M11: the motion layer's row glide (FR15)"),
-        ),
+        p("animatedLayout", RustApi::Method("animated_layout")),
     ],
     example: include_str!("examples.rs"),
 };

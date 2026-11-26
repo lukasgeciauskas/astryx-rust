@@ -17,16 +17,54 @@ use crate::status::{Badge, BadgeVariant};
 
 type CollapsedFn = Rc<dyn Fn(bool, &mut Window, &mut App)>;
 
+/// The items' fade: from what it showed when the last change began.
+struct ItemsFade {
+    shown: bool,
+    from: f32,
+    since: Option<web_time::Instant>,
+}
+
+/// The items' opacity now: in over `medium` after a `fast` delay, out over `fast`.
+fn items_fade_value(
+    fade: &ItemsFade,
+    now: web_time::Instant,
+    t: &astryx_theme::Tokens,
+    reduced: bool,
+) -> (f32, bool) {
+    let target = if fade.shown { 1. } else { 0. };
+    let Some(since) = fade.since.filter(|_| !reduced) else {
+        return (target, false);
+    };
+    let (delay, duration) = if fade.shown {
+        (t.duration.fast, t.duration.medium)
+    } else {
+        (std::time::Duration::ZERO, t.duration.fast)
+    };
+    let elapsed = now.saturating_duration_since(since);
+    if elapsed < delay {
+        return (fade.from, true);
+    }
+    if duration.is_zero() {
+        return (target, false);
+    }
+    let p = ((elapsed - delay).as_secs_f32() / duration.as_secs_f32()).min(1.);
+    let value = fade.from + (target - fade.from) * t.ease.standard.ease(p);
+    (value, p < 1.)
+}
+
 /// Upstream `ChatComposerDrawer`.
 ///
 /// Elements it draws carry debug selectors after its id: `<id>` (the root),
 /// `<id>-toggle`, `<id>-summary`, `<id>-label` (the default summary's label),
 /// `<id>-handle` and `<id>-content`.
 ///
-/// Upstream animates the collapse (a grid-row height transition and a fade) and keeps the
-/// collapsed content mounted but `inert`. GPUI has no `inert`, so collapsed content is
-/// not drawn at all: it takes no height and no focus and is absent from the
-/// accessibility tree (FR4). The transition comes with the motion milestone (M11).
+/// The collapse eases the content's height over `--duration-medium` on `--ease-standard`
+/// (upstream's grid row) while the items fade: out over `--duration-fast` as it collapses,
+/// in over `--duration-medium` after a `--duration-fast` delay as it expands; the summary
+/// and the handle cross-fade over `--duration-fast`. Reduce Motion changes it at once.
+/// Collapsing content is inert (fork patch R20), as upstream's: out of the tab order, the
+/// pointer's targets and the accessibility tree (FR4); once the collapse ends it is not
+/// drawn at all.
 ///
 /// ```ignore
 /// ChatComposerDrawer::new("attachments")
@@ -134,6 +172,47 @@ impl RenderOnce for ChatComposerDrawer {
         let controlled = self.collapsed.is_some();
         let collapsed = self.collapsed.unwrap_or(*internal.read(cx));
         let can_collapse = self.count.is_some();
+        let shown = !(can_collapse && collapsed);
+        // The motion: the content's height, the items' fade and the summary's cross-fade.
+        let height = crate::animated_layout::adopt::use_height_transition(
+            format!("{key}-content"),
+            shown,
+            t.duration.medium,
+            t.ease.standard,
+            window,
+            cx,
+        );
+        let reduced = astryx_primitives::prefers_reduced_motion(cx);
+        let now = cx.background_executor().now();
+        let fade = window.use_keyed_state(
+            ElementId::Name(format!("{key}-items-fade").into()),
+            cx,
+            |_, _| ItemsFade {
+                shown,
+                from: if shown { 1. } else { 0. },
+                since: None,
+            },
+        );
+        if fade.read(cx).shown != shown {
+            let (value, _) = items_fade_value(fade.read(cx), now, t, reduced);
+            fade.update(cx, |f, _| {
+                f.from = value;
+                f.shown = shown;
+                f.since = Some(now);
+            });
+        }
+        let (items_opacity, fading) = items_fade_value(fade.read(cx), now, t, reduced);
+        if fading {
+            window.request_animation_frame();
+        }
+        let summary_shown = crate::motion::transition(
+            format!("{key}-summary-fade"),
+            collapsed,
+            t.duration.fast,
+            t.ease.standard,
+            window,
+            cx,
+        );
 
         // Upstream reads the composer's copy of --radius-chat; a theme that changes the
         // composer's corner changes the token the drawer reads here too.
@@ -174,7 +253,7 @@ impl RenderOnce for ChatComposerDrawer {
             let focus = control_focus(&toggle_id, window, cx);
             let group = SharedString::from(toggle_key.clone());
             let (primary, icon_primary) = (t.color.text_primary, t.color.icon_primary);
-            let summary = collapsed.then(|| {
+            let summary = (summary_shown > 0.).then(|| {
                 let summary_key = format!("{key}-summary");
                 let content = match self.collapsed_summary {
                     Some(custom) => custom,
@@ -208,24 +287,36 @@ impl RenderOnce for ChatComposerDrawer {
                         .h(t.spacing.s5)
                         .gap(t.spacing.s2)
                         .rounded(t.radius.full)
+                        .when(summary_shown < 1., |el| el.opacity(summary_shown))
                         .child(content),
                 )
             });
-            let handle = (!collapsed).then(|| {
+            let handle = (summary_shown < 1.).then(|| {
                 let handle_key = format!("{key}-handle");
+                // Centred at the top of the row, in the summary's cell.
                 div()
-                    .debug_selector(move || handle_key)
-                    .w(t.spacing.s5)
-                    .h(t.spacing.s0_5)
-                    .rounded(t.radius.full)
-                    .bg(t.color.icon_secondary)
-                    .group_hover(group.clone(), move |s| s.bg(icon_primary))
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .right_0()
+                    .flex()
+                    .justify_center()
+                    .when(summary_shown > 0., |el| el.opacity(1. - summary_shown))
+                    .child(
+                        div()
+                            .debug_selector(move || handle_key)
+                            .w(t.spacing.s5)
+                            .h(t.spacing.s0_5)
+                            .rounded(t.radius.full)
+                            .bg(t.color.icon_secondary)
+                            .group_hover(group.clone(), move |s| s.bg(icon_primary)),
+                    )
             });
             let ring = is_focus_visible(&focus, window)
                 .then(|| focus_ring_inset(t, t.radius.element.to_pixels(rem), rem));
             let (on_change, state) = (self.on_collapsed_change.clone(), internal.clone());
             let s4 = t.spacing.s4.to_pixels(rem);
-            let mut toggle = div()
+            let toggle = div()
                 .id(toggle_id)
                 .debug_selector(move || toggle_key)
                 .group(group.clone())
@@ -240,13 +331,8 @@ impl RenderOnce for ChatComposerDrawer {
                 .flex_none()
                 .h(t.spacing.s5)
                 .px(s4)
-                .mx(-s4);
-            toggle = if collapsed {
-                toggle.items_center()
-            } else {
-                // The handle sits centred at the top of the row.
-                toggle.justify_center().items_start()
-            };
+                .mx(-s4)
+                .items_center();
             // A pointer click, and Enter or Space as a keyboard click (FR2).
             let toggle = toggle
                 .on_click(move |_, window, cx| {
@@ -266,7 +352,7 @@ impl RenderOnce for ChatComposerDrawer {
         }
 
         let content_key = format!("{key}-content");
-        let shown = !(can_collapse && collapsed);
+        let mounted = height.mounted();
         let content = div()
             .id(ElementId::Name(content_name.clone()))
             .debug_selector(move || content_key)
@@ -277,7 +363,10 @@ impl RenderOnce for ChatComposerDrawer {
             .flex_wrap()
             .items_start()
             .gap(t.spacing.s1)
-            .when(shown, |el| el.children(self.children));
-        root.child(content)
+            .when(items_opacity < 1., |el| el.opacity(items_opacity))
+            .when(mounted, |el| el.children(self.children))
+            // Collapsing, the items are inert.
+            .inert(mounted && !shown);
+        root.child(height.wrap_kept(content))
     }
 }

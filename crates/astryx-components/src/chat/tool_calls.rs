@@ -326,14 +326,14 @@ fn row_parts(
     parts
 }
 
-/// The chevron of a disclosure, turned while open.
-fn chevron(open: bool) -> AnyElement {
-    let icon = Icon::new(IconSource::Named("chevronDown".into())).size(IconSize::Xsm);
-    let icon = if open {
-        icon.rotation(std::f32::consts::PI)
-    } else {
-        icon
-    };
+/// The chevron of a disclosure, turned half over while open; it turns on
+/// `--duration-fast` and `--ease-standard`, at once under Reduce Motion.
+fn chevron(key: String, open: bool, window: &mut Window, cx: &mut App) -> AnyElement {
+    let t = current(window, cx).tokens().clone();
+    let turn = crate::motion::transition(key, open, t.duration.fast, t.ease.standard, window, cx);
+    let icon = Icon::new(IconSource::Named("chevronDown".into()))
+        .size(IconSize::Xsm)
+        .rotation(std::f32::consts::PI * turn);
     div()
         .flex()
         .flex_none()
@@ -373,7 +373,11 @@ fn call_row(
     });
     let is_open = *open.read(cx);
     let focus = control_focus(&id, window, cx);
-    row = row.child(div().ml_auto().child(chevron(is_open)));
+    row = row.child(
+        div()
+            .ml_auto()
+            .child(chevron(format!("{key}-chevron"), is_open, window, cx)),
+    );
     let toggle = open.clone();
     let hover = t.color.overlay_hover;
     let ring = is_focus_visible(&focus, window).then(|| {
@@ -495,8 +499,9 @@ impl RenderOnce for ChatToolCalls {
         }
         let (on_change, controlled) = (self.on_expanded_change.clone(), self.expanded.is_some());
         let toggle_state = internal.clone();
+        let chevron = chevron(format!("{}-chevron", self.id), expanded, window, cx);
         header = header
-            .child(chevron(expanded))
+            .child(chevron)
             .on_click(move |_, window, cx| {
                 let next = !expanded;
                 if !controlled {
@@ -511,15 +516,27 @@ impl RenderOnce for ChatToolCalls {
                 is_focus_visible(&focus, window)
                     .then(|| crate::focus::focus_ring(t, t.radius.element.to_pixels(rem), rem)),
             );
-        // FR3: collapsed, the calls are not rendered, so none takes focus.
-        let list = expanded.then(|| {
+        // FR3: collapsed, the calls are not rendered, so none takes focus. The group's
+        // height eases over --duration-medium on --ease-standard (upstream's grid row),
+        // at once under Reduce Motion; a collapsing group takes no presses.
+        let t = t.clone();
+        let height = crate::animated_layout::adopt::use_height_transition(
+            format!("{}-group", self.id),
+            expanded,
+            t.duration.medium,
+            t.ease.standard,
+            window,
+            cx,
+        );
+        let list = height.wrap(|| {
             let mut list = div().flex().flex_col();
             for call in &self.calls {
                 let id = ElementId::Name(format!("{}-call-{}", self.id, call.row_key()).into());
                 list = list.child(call_row(id, call, true, window, cx));
             }
-            list
+            // Collapsing, the calls are inert.
+            list.inert(!expanded).into_any_element()
         });
-        root.child(header).children(list).into_any_element()
+        root.child(header).child(list).into_any_element()
     }
 }

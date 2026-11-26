@@ -86,17 +86,59 @@ fn fr5_collapse_needs_the_threshold_and_toggles_the_body(cx: &mut TestAppContext
     let open = cx.debug_bounds("cb-region").unwrap().size.height;
     assert!(open > px(0.));
     click(cx, "cb-header");
+    frames(cx, 800);
     assert_eq!(
         cx.debug_bounds("cb-region").unwrap().size.height,
         px(0.),
         "collapsed"
     );
     click(cx, "cb-header");
+    frames(cx, 800);
     assert_eq!(
         cx.debug_bounds("cb-region").unwrap().size.height,
         open,
         "expanded again"
     );
+}
+
+fn frames(cx: &mut VisualTestContext, ms: u64) {
+    for _ in 0..(ms / 16) {
+        cx.executor().advance_clock(Duration::from_millis(16));
+        settle(cx);
+    }
+}
+
+#[gpui::test]
+fn fr5_collapsing_eases_the_body_height_and_expanding_eases_it_back(cx: &mut TestAppContext) {
+    let cx = page(cx, || {
+        CodeBlock::new("cb", TEN).language("rust").collapsible(true)
+    });
+    let open = cx.debug_bounds("cb-region").unwrap().size.height;
+    click(cx, "cb-header");
+    frames(cx, 112);
+    let mid = cx.debug_bounds("cb-region").unwrap().size.height;
+    assert!(
+        mid > px(1.) && mid < open - px(1.),
+        "easing closed: {mid:?}"
+    );
+    frames(cx, 800);
+    assert_eq!(cx.debug_bounds("cb-region").unwrap().size.height, px(0.));
+    click(cx, "cb-header");
+    frames(cx, 112);
+    let mid = cx.debug_bounds("cb-region").unwrap().size.height;
+    assert!(mid > px(1.) && mid < open - px(1.), "easing open: {mid:?}");
+    frames(cx, 800);
+    assert_eq!(cx.debug_bounds("cb-region").unwrap().size.height, open);
+}
+
+#[gpui::test]
+fn fr5_under_reduced_motion_the_body_collapses_at_once(cx: &mut TestAppContext) {
+    cx.update(|cx| astryx_primitives::set_reduced_motion(true, cx));
+    let cx = page(cx, || {
+        CodeBlock::new("cb", TEN).language("rust").collapsible(true)
+    });
+    click(cx, "cb-header");
+    assert_eq!(cx.debug_bounds("cb-region").unwrap().size.height, px(0.));
 }
 
 #[gpui::test]
@@ -202,4 +244,43 @@ fn fit_content_by_default_at_least_400px(cx: &mut TestAppContext) {
         px(700.),
         "an explicit width"
     );
+}
+
+#[gpui::test]
+fn fr5_the_collapsing_body_is_inert_and_tab_skips_it(cx: &mut TestAppContext) {
+    let after = Rc::new(RefCell::new(0));
+    let cx = host(cx, {
+        let after = after.clone();
+        move || {
+            let after = after.clone();
+            // Past its max height the viewport is a tab stop (FR8), while the body is open.
+            div()
+                .w(px(700.))
+                .child(
+                    CodeBlock::new("cb", TEN)
+                        .language("rust")
+                        .collapsible(true)
+                        .copy_button(false)
+                        .max_height(px(40.)),
+                )
+                .child(
+                    crate::button::Button::new("after", "After")
+                        .on_click(move |_, _, _| *after.borrow_mut() += 1),
+                )
+                .into_any_element()
+        }
+    });
+    settle(cx);
+    // The header takes focus from the press and collapses the body.
+    click(cx, "cb-header");
+    frames(cx, 48);
+    assert!(
+        cx.debug_bounds("cb-region").unwrap().size.height > px(1.),
+        "still collapsing"
+    );
+    // Tab finds no stop in the body: it goes on to the button after the block.
+    crate::segmented::tests::press(cx, "tab");
+    crate::segmented::tests::press(cx, "enter");
+    settle(cx);
+    assert_eq!(*after.borrow(), 1);
 }

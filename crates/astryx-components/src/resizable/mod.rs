@@ -11,6 +11,7 @@ mod model;
 mod tests;
 
 pub use handle::{PillPlacement, ResizeHandle, ResizeHandlePosition};
+pub(crate) use hook::SlideCurve;
 pub use hook::{
     ResizableBasis, ResizableProps, ResizableRegion, ResizableRegions, UseResizable,
     UseResizableRegions, use_resizable, use_resizable_basis, use_resizable_regions,

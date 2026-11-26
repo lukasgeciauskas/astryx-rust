@@ -71,6 +71,7 @@ impl RenderOnce for SideNavCollapseButton {
                 let collapsed = config.is_collapsed.unwrap_or(false);
                 let report = config.on_collapsed_change.clone();
                 SideNavCollapse {
+                    labels: 1.,
                     collapsed,
                     collapsible: true,
                     toggle: Rc::new(move |window, cx| {

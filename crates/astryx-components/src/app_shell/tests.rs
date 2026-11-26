@@ -262,3 +262,89 @@ fn fr6_in_auto_the_header_sticks_while_the_page_scrolls(cx: &mut TestAppContext)
         "the header stays at the top of the page"
     );
 }
+
+// ---- FR17: the content column moves with the side nav's collapse and expand -------
+
+fn frames(cx: &mut VisualTestContext, ms: u64) {
+    for _ in 0..(ms / 16) {
+        wait(cx, 16);
+    }
+}
+
+fn collapsible_shell(cx: &mut TestAppContext) -> &mut VisualTestContext {
+    let cx = host(cx, move || {
+        div()
+            .size_full()
+            .child(
+                AppShell::new("shell")
+                    .mobile_nav(wide())
+                    .side_nav(|| {
+                        SideNav::new("nav")
+                            .collapsible(true)
+                            .child(SideNavItem::new("home", "Home").icon("info"))
+                    })
+                    .child(div().debug_selector(|| "content".into()).child("Content")),
+            )
+            .into_any_element()
+    });
+    settle(cx);
+    cx
+}
+
+#[gpui::test]
+fn fr17_the_content_column_glides_beside_the_rails_edge(cx: &mut TestAppContext) {
+    let cx = collapsible_shell(cx);
+    let open = cx.debug_bounds("shell-main").unwrap().left();
+    click(cx, "side-nav-collapse");
+    let start = cx.debug_bounds("shell-main").unwrap().left();
+    assert!(
+        (start - open).abs() < px(2.),
+        "it starts where it was: {start:?}"
+    );
+    frames(cx, 96);
+    let main = cx.debug_bounds("shell-main").unwrap();
+    let nav = cx.debug_bounds("nav").unwrap();
+    assert!(main.left() < open - px(1.), "gliding: {:?}", main.left());
+    assert!(
+        (nav.right() - main.left()).abs() < px(2.),
+        "the rail's edge rides the column: {:?} vs {:?}",
+        nav.right(),
+        main.left()
+    );
+    frames(cx, 700);
+    let rest = cx.debug_bounds("shell-main").unwrap();
+    assert_eq!(
+        main.size.width, rest.size.width,
+        "the column never animates its width: it has its final width at once"
+    );
+    assert_eq!(rest.left(), cx.debug_bounds("nav").unwrap().right());
+    assert!(rest.left() < open - px(100.), "the rail collapsed");
+}
+
+#[gpui::test]
+fn fr17_an_expand_covers_the_gap_at_the_columns_trailing_edge(cx: &mut TestAppContext) {
+    let cx = collapsible_shell(cx);
+    click(cx, "side-nav-collapse");
+    frames(cx, 700);
+    click(cx, "side-nav-collapse");
+    frames(cx, 96);
+    let cover = cx.debug_bounds("app-shell-content-cover").unwrap();
+    assert!(
+        cover.size.width > px(1.),
+        "the surface reaches over the gap"
+    );
+    frames(cx, 700);
+    let cover = cx.debug_bounds("app-shell-content-cover").unwrap();
+    assert_eq!(cover.size.width, px(0.));
+}
+
+#[gpui::test]
+fn fr17_under_reduce_motion_with_a_mouse_it_lands_at_once(cx: &mut TestAppContext) {
+    cx.update(|cx| astryx_primitives::set_reduced_motion(true, cx));
+    let cx = collapsible_shell(cx);
+    let open = cx.debug_bounds("shell-main").unwrap().left();
+    click(cx, "side-nav-collapse");
+    let main = cx.debug_bounds("shell-main").unwrap().left();
+    assert!(main < open - px(100.), "no glide: {main:?}");
+    assert_eq!(main, cx.debug_bounds("nav").unwrap().right());
+}

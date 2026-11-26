@@ -392,6 +392,8 @@ impl RenderOnce for SideNavItem {
                     .overflow_hidden()
                     .whitespace_nowrap()
                     .text_ellipsis()
+                    // The rail's labels fade as it collapses or expands (SideNav FR6).
+                    .opacity(collapse.labels)
                     .child(self.label.clone()),
             )
             .children(

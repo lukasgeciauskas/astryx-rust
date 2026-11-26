@@ -71,9 +71,13 @@ impl RenderOnce for SideNavSection {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
         let t = theme.tokens().clone();
-        let collapsed = use_context::<SideNavCollapse>(cx).is_some_and(|c| c.collapsed);
+        let rail = use_context::<SideNavCollapse>(cx);
+        let collapsed = rail.as_ref().is_some_and(|c| c.collapsed);
+        // The rail's labels fade as it collapses or expands (SideNav FR6).
+        let labels = rail.as_ref().map_or(1., |c| c.labels);
         let line = |text: SharedString, weight: FontWeight| {
             div()
+                .opacity(labels)
                 .overflow_hidden()
                 .whitespace_nowrap()
                 .text_ellipsis()

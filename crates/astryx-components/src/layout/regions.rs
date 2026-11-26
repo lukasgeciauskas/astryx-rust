@@ -87,6 +87,8 @@ pub(crate) struct LayoutFrame {
     header_divider: Rc<Cell<bool>>,
     footer_divider: Rc<Cell<bool>>,
     area: LayoutArea,
+    /// The glide area of the row the panels slide in (FR7).
+    panes: Option<super::pane_glide::PaneGlide>,
 }
 
 /// The layer contexts a Layout reads, each unset at a layout root (Layout FR8).
@@ -188,6 +190,8 @@ pub struct Layout {
     content_width: Option<Pixels>,
     padding: Option<SpacingStep>,
     default_has_dividers: Option<bool>,
+    /// Whether the row of panels and content is a glide area of its own (FR7).
+    pane_glide: bool,
     style: StyleRefinement,
 }
 
@@ -210,8 +214,16 @@ impl Layout {
             content_width: None,
             padding: None,
             default_has_dividers: None,
+            pane_glide: true,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// The row glides inside an area the caller owns (AppShell's, FR17), so its panels'
+    /// slides do not make an area of their own.
+    pub(crate) fn without_pane_glide(mut self) -> Self {
+        self.pane_glide = false;
+        self
     }
 
     /// Upstream `header`.
@@ -301,6 +313,9 @@ impl RenderOnce for Layout {
         };
         let (header_divider, footer_divider) =
             (Rc::new(Cell::new(false)), Rc::new(Cell::new(false)));
+        let panes = self
+            .pane_glide
+            .then(|| super::pane_glide::use_pane_glide(window, cx));
         let frame = |area| {
             FrameSlot(Some(LayoutFrame {
                 edge,
@@ -310,6 +325,7 @@ impl RenderOnce for Layout {
                 header_divider: header_divider.clone(),
                 footer_divider: footer_divider.clone(),
                 area,
+                panes: panes.clone(),
             }))
         };
         let content = self.content.or_else(|| {
@@ -322,6 +338,9 @@ impl RenderOnce for Layout {
             middle = middle.max_w(width).mx_auto();
         }
         let _ = both;
+        if let Some(panes) = &panes {
+            middle = middle.layout_glide(panes.glide(window, cx));
+        }
         let middle = middle
             .children(
                 self.start
@@ -818,7 +837,19 @@ impl RenderOnce for LayoutContent {
             shown.inline_start = shown.inline_start.max(gutter);
             shown.inline_end = shown.inline_end.max(gutter);
         }
-        let mut el = pad(div().size_full().relative(), shown, dir);
+        // AST-105 FR9: beside an opening panel the content keeps its final width while its
+        // trailing edge reaches over the gap until the panel's edge arrives: its box
+        // extends by the inline-end margin, the padding keeps its children in place.
+        let reach = frame
+            .as_ref()
+            .and_then(|f| f.panes.as_ref())
+            .map_or(px(0.), |p| p.trailing_reach(window, cx));
+        let mut el = if reach > px(0.) {
+            shown.inline_end += reach;
+            pad(div().h_full().relative(), shown, dir).margin_end(dir, -reach)
+        } else {
+            pad(div().size_full().relative(), shown, dir)
+        };
         theme.refine(
             el.style(),
             "layout-content",
@@ -847,7 +878,11 @@ impl RenderOnce for LayoutContent {
                 div().children(std::mem::take(&mut self.0.children)),
             ),
         );
-        let el = el.child(probe).child(children);
+        let selector = format!("{}", self.0.id);
+        let el = el
+            .debug_selector(move || selector)
+            .child(probe)
+            .child(children);
         self.0.viewport(el, window, cx).flex_1().min_h_0()
     }
 }
@@ -892,6 +927,15 @@ impl RenderOnce for LayoutPanel {
             applied = all(step_px(step, window, cx));
         }
         let collapsed = self.resizable.as_ref().is_some_and(|r| r.is_collapsed);
+        // FR7: the panel lends itself to its region's controller, and slides closed and
+        // open by its content-facing edge (Resizable FR8, AST-105 FR9).
+        let slide = match &self.resizable {
+            Some(r) => {
+                r.lend_pane(cx);
+                r.pane_frame(window, cx)
+            }
+            None => None,
+        };
         // AR2: focus inside a collapsing panel moves to its handle.
         let panel_focus = window
             .use_keyed_state(
@@ -916,8 +960,11 @@ impl RenderOnce for LayoutPanel {
             }
         }
         let mut el = pad(div().h_full().flex_none().relative(), applied, dir);
-        // ORD1: the region's size, then width.
-        if let Some(region) = &self.resizable {
+        // ORD1: the region's size, then width. While it slides, its content stays laid
+        // out at the open size and the clip around it takes the extent shown.
+        if let Some(frame) = &slide {
+            el = el.w(px(frame.held));
+        } else if let Some(region) = &self.resizable {
             el = el.w(px(region.size));
         } else if let Some(width) = self.width {
             el = el.w(width);
@@ -925,6 +972,11 @@ impl RenderOnce for LayoutPanel {
         // FR4: the divider on the content-facing edge; without one and with the
         // automatic inset, the panel overlaps the content by the inner inset.
         let one: AbsoluteLength = px(1.).into();
+        let overlap = (!self.divider && automatic).then_some(if at_end {
+            inner.inline_start
+        } else {
+            inner.inline_end
+        });
         if self.divider {
             el = el.border_color(t.color.border);
             el = if at_end {
@@ -932,16 +984,16 @@ impl RenderOnce for LayoutPanel {
             } else {
                 el.border_end(dir, one)
             };
-        } else if automatic {
+        } else if let Some(overlap) = overlap.filter(|_| slide.is_none()) {
             el = if at_end {
-                el.margin_start(dir, -inner.inline_start)
+                el.margin_start(dir, -overlap)
             } else {
-                el.margin_end(dir, -inner.inline_end)
+                el.margin_end(dir, -overlap)
             };
         }
         theme.refine(el.style(), "layout-panel", &[], None);
         el.style().refine(&self.region.style);
-        if collapsed {
+        if collapsed && slide.is_none() {
             // Inert while collapsed (AR2).
             el = el.invisible();
         }
@@ -952,8 +1004,67 @@ impl RenderOnce for LayoutPanel {
                 div().children(std::mem::take(&mut self.region.children)),
             ),
         );
-        self.region
+        let panel = self
+            .region
             .viewport(el.child(children), window, cx)
-            .track_focus(&panel_focus)
+            .track_focus(&panel_focus);
+        // The slide: a still clip at the extent shown, the panel anchored at its outer
+        // edge inside it, so its content stays put and enters and leaves at the edge
+        // facing its handle; the content beside follows that edge. Collapsed at rest, the
+        // clip takes no room at all (the panel's padding and divider go with it).
+        let panes = frame.as_ref().and_then(|f| f.panes.clone());
+        if let (Some(panes), Some(r)) = (&panes, &self.resizable) {
+            panes.lend(at_end, r);
+            let catches = r.catches(cx);
+            let (start, curve) = slide
+                .as_ref()
+                .map_or((None, None), |f| (f.start, f.curve.as_ref()));
+            panes.follow(start, curve, catches, window, cx);
+        }
+        let (shown, to, held, opacity, rides) = match &slide {
+            // In a Layout the panel's layout snaps to its new size and what sits beside it
+            // glides there at its final width, on the edge's curve; a pointer holding the
+            // edge, or Reduce Motion's fade, lays out at what shows.
+            Some(f) => (
+                f.shown,
+                f.to,
+                f.held,
+                f.opacity,
+                panes.is_some() && !f.by_pointer && f.opacity.is_none(),
+            ),
+            None if collapsed => (0., 0., 0., None, false),
+            None => return panel.into_any_element(),
+        };
+        let mut clip = div()
+            .relative()
+            .h_full()
+            .flex_none()
+            .overflow_hidden()
+            .w(px(shown));
+        let overlap = overlap.filter(|_| slide.is_some()).unwrap_or(px(0.));
+        // The flow takes the new size: the inline-end margin frees (or claims) the
+        // difference, so the moving edge is the clip's and the rest rides the glide. A
+        // start panel's content-facing edge is that end; an end panel's start edge moves
+        // with its slot's glide while its outer end stays put.
+        let free = if rides { px(to - shown) } else { px(0.) };
+        clip = if at_end {
+            clip.margin_start(dir, -overlap).margin_end(dir, free)
+        } else {
+            clip.margin_end(dir, free - overlap)
+        };
+        if let Some(opacity) = opacity {
+            clip = clip.opacity(opacity);
+        }
+        let outer_at_left = at_end == dir.is_rtl();
+        let held = div().absolute().top_0().bottom_0().w(px(held));
+        let held = if outer_at_left {
+            held.left_0()
+        } else {
+            held.right_0()
+        };
+        let clip = clip.child(held.child(panel));
+        // AR2: a closing or collapsed panel is inert (fork patch R20): out of the tab order,
+        // the pointer's targets and the accessibility tree until it opens.
+        clip.inert(collapsed).into_any_element()
     }
 }

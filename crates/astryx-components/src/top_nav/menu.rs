@@ -88,14 +88,17 @@ pub(crate) fn pick_closes(window: &Window) -> bool {
     interaction_modality(window) != InteractionModality::Pointer
 }
 
-/// The chevron that turns when open.
-pub(crate) fn chevron(open: bool) -> impl IntoElement {
-    let el = div().flex().items_center().child(
+/// The chevron that turns half over when open, on `--duration-fast` and
+/// `--ease-standard` (at once under Reduce Motion); `key` names its turn.
+pub(crate) fn chevron(key: String, open: bool, window: &mut Window, cx: &mut App) -> gpui::Div {
+    let t = current(window, cx).tokens().clone();
+    let turn = crate::motion::transition(key, open, t.duration.fast, t.ease.standard, window, cx);
+    div().flex().items_center().child(
         Icon::new("chevronDown")
             .size(IconSize::Sm)
-            .color(IconColor::Inherit),
-    );
-    if open { el.scale_xy(1., -1.) } else { el }
+            .color(IconColor::Inherit)
+            .rotation(std::f32::consts::PI * turn),
+    )
 }
 
 /// The popover alignment for a slot (FR3).
@@ -197,6 +200,7 @@ impl TopNavMenu {
         let hover_color = t.color.overlay_hover;
         let (on_hover, on_click) = (hover.clone(), hover.clone());
         let selector = format!("{}", self.id);
+        let chevron_el = chevron(format!("{:?}-chevron", self.id), open, window, cx);
         let mut trigger =
             div()
                 .id(self.id.clone())
@@ -225,7 +229,7 @@ impl TopNavMenu {
                 .aria_expanded(open)
                 .aria_has_popup(gpui::HasPopup::Menu)
                 .child(self.label.clone())
-                .child(chevron(open))
+                .child(chevron_el)
                 .on_hover(move |over, window, cx| {
                     if *over {
                         on_hover.trigger_enter(window, cx)
@@ -323,6 +327,22 @@ impl TopNavMenu {
             |_, _| false,
         );
         let is_expanded = *expanded.read(cx);
+        let chevron_el = chevron(
+            format!("{:?}-drawer-chevron", self.id),
+            is_expanded,
+            window,
+            cx,
+        );
+        // FR7: the group's height eases open and closed over --duration-medium on
+        // --ease-standard, clipped until it is fully open; at once under Reduce Motion.
+        let height = crate::animated_layout::adopt::use_height_transition(
+            format!("{:?}-drawer-items", self.id),
+            is_expanded,
+            t.duration.medium,
+            t.ease.standard,
+            window,
+            cx,
+        );
         let focus = control_focus(&self.id, window, cx);
         let (hover, pressed) = (t.color.overlay_hover, t.color.overlay_pressed);
         let selector = format!("{}", self.id);
@@ -345,7 +365,7 @@ impl TopNavMenu {
         .aria_label(self.label.clone())
         .aria_expanded(is_expanded)
         .child(self.label.clone())
-        .child(chevron(is_expanded))
+        .child(chevron_el)
         .on_click(move |_, _, cx| {
             expanded.update(cx, |e, cx| {
                 *e = !*e;
@@ -358,8 +378,8 @@ impl TopNavMenu {
         );
         let links = use_link_handler(cx);
         let close = drawer_close(cx);
-        // Collapsed rows are out of the tree: inert and hidden (FR7).
-        let rows = is_expanded.then(|| {
+        // Collapsed rows are out of the tree (FR7); collapsing, they are inert.
+        let rows = height.wrap(|| {
             div()
                 .flex()
                 .flex_col()
@@ -430,8 +450,11 @@ impl TopNavMenu {
                         crate::focus::focus_ring_inset(&t, t.radius.element.to_pixels(rem), rem)
                     }))
                 }))
+                // Collapsing, the group is inert (fork patch R20).
+                .inert(!is_expanded)
+                .into_any_element()
         });
-        let mut section = div().flex().flex_col().child(header).children(rows);
+        let mut section = div().flex().flex_col().child(header).child(rows);
         theme.refine(section.style(), "top-nav-menu", &[("mode", "drawer")], None);
         section.into_any_element()
     }

@@ -1,7 +1,11 @@
 //! Collapsible and CollapsibleGroup. Upstream: `Collapsible/`.
 //!
-//! The chevron flips at once: GPUI's element transforms scale and translate
-//! but do not rotate, so a quarter turn is a glyph swap.
+//! With an `animated_layout` handle (FR10, AST-105) opening and closing reveal or conceal
+//! the content from its block-end edge, the content after the Collapsible glides inside
+//! the handle's container, and the chevron turns on that motion. A closing content stays
+//! drawn, inert, until its exit ends. Without one the chevron turns on the theme's own
+//! `--duration-fast` and the content shows or hides at once. Focus inside content that
+//! closes moves to the trigger (AR4).
 
 #[cfg(test)]
 mod tests;
@@ -17,6 +21,8 @@ use gpui::{
 };
 use smallvec::SmallVec;
 
+use crate::animated_layout::adopt::{indicator_turn, reveal_content};
+use crate::animated_layout::{AnimatedLayout, use_edge_reveal};
 use crate::button::{SelectionMode, toggled};
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
 use crate::focus::focus_ring;
@@ -49,6 +55,9 @@ struct GroupPart {
 #[derive(Default)]
 struct OpenState(Option<bool>);
 
+/// What the Collapsible showed last frame, for AR4.
+struct Shown(bool);
+
 /// Content behind a trigger that shows and hides it, upstream `Collapsible`.
 ///
 /// ```ignore
@@ -65,6 +74,7 @@ pub struct Collapsible {
     chevron_position: Option<ChevronPosition>,
     value: Option<SharedString>,
     group: Option<GroupPart>,
+    animated_layout: Option<AnimatedLayout>,
     style: StyleRefinement,
     children: SmallVec<[AnyElement; 2]>,
 }
@@ -82,6 +92,7 @@ impl Collapsible {
             chevron_position: None,
             value: None,
             group: None,
+            animated_layout: None,
             style: StyleRefinement::default(),
             children: SmallVec::new(),
         }
@@ -103,6 +114,17 @@ impl Collapsible {
     /// Upstream `onOpenChange`.
     pub fn on_open_change(mut self, f: impl Fn(bool, &mut Window, &mut App) + 'static) -> Self {
         self.on_open_change = Some(Rc::new(f));
+        self
+    }
+
+    /// Upstream `animatedLayout`: the handle from [`use_animated_layout`]. With it,
+    /// opening and closing glide the content after this Collapsible, up to the handle's
+    /// container, instead of jumping; the content reveals from its edge and the chevron
+    /// turns on the same motion (FR10).
+    ///
+    /// [`use_animated_layout`]: crate::animated_layout::use_animated_layout
+    pub fn animated_layout(mut self, layout: AnimatedLayout) -> Self {
+        self.animated_layout = Some(layout);
         self
     }
 }
@@ -142,19 +164,28 @@ impl RenderOnce for Collapsible {
             .or(self.group.as_ref().map(|g| g.chevron))
             .unwrap_or_default();
 
+        let layout = self.animated_layout.clone();
         let chevron = {
-            let (icon, flip) = match position {
-                ChevronPosition::End => ("chevronDown", open),
-                ChevronPosition::Start if open => ("chevronDown", false),
-                ChevronPosition::Start if dir.is_rtl() => ("chevronLeft", false),
-                ChevronPosition::Start => ("chevronRight", false),
+            // A trailing chevron points down and turns half over; a leading one points
+            // into the row (mirrored under RTL) and turns a quarter to point down.
+            let turn = indicator_turn(
+                format!("{:?}-chevron", self.id),
+                open,
+                layout.as_ref(),
+                (t.duration.fast, t.ease.standard),
+                window,
+                cx,
+            );
+            use std::f32::consts::{FRAC_PI_2, PI};
+            let (icon, rotation) = match position {
+                ChevronPosition::End => ("chevronDown", PI * turn),
+                ChevronPosition::Start if dir.is_rtl() => ("chevronLeft", -FRAC_PI_2 * turn),
+                ChevronPosition::Start => ("chevronRight", FRAC_PI_2 * turn),
             };
-            let mut icon = Icon::new(icon)
+            let icon = Icon::new(icon)
                 .size(IconSize::Sm)
-                .color(IconColor::Secondary);
-            if flip {
-                icon = icon.scale_xy(1., -1.);
-            }
+                .color(IconColor::Secondary)
+                .rotation(rotation);
             let size = t.text.large.size;
             div()
                 .flex()
@@ -239,8 +270,42 @@ impl RenderOnce for Collapsible {
             .aria_expanded(open)
             .aria_disabled(self.disabled);
 
-        let content = open.then(|| {
+        // FR10: the content reveals and conceals from its block-end edge on the handle's
+        // motion, and a closing content is held, inert, until it is gone.
+        let reveal = use_edge_reveal(
+            ElementId::Name(format!("{:?}-content", self.id).into()),
+            open,
+            layout.as_ref(),
+            window,
+            cx,
+        );
+        let content_focus = window
+            .use_keyed_state(
+                ElementId::Name(format!("{:?}-content-focus", self.id).into()),
+                cx,
+                |_, cx| cx.focus_handle(),
+            )
+            .read(cx)
+            .clone();
+        // AR4: focus inside content that closes, or that its exit holds, goes to the
+        // trigger, however it closed; focus anywhere else stays.
+        let shown = window.use_keyed_state(
+            ElementId::Name(format!("{:?}-shown", self.id).into()),
+            cx,
+            |_, _| Shown(open),
+        );
+        let was_open = shown.update(cx, |s, _| std::mem::replace(&mut s.0, open));
+        if !open && (was_open || reveal.mounted) && content_focus.contains_focused(window, cx) {
+            let trigger_focus = focus.clone();
+            window.defer(cx, move |window, cx| trigger_focus.focus(window, cx));
+        }
+        let content = reveal.mounted.then(|| {
             let mut content = div()
+                .track_focus(&content_focus)
+                // A press on the content's own surface leaves focus where it is.
+                .on_mouse_down(gpui::MouseButton::Left, |_, window, _| {
+                    window.prevent_default()
+                })
                 .pt(t.spacing.s1)
                 .text_size(t.text.body.size)
                 .line_height(relative(t.text.body.leading))
@@ -255,12 +320,13 @@ impl RenderOnce for Collapsible {
                 "collapsible-content",
                 &[
                     ("density", density.map_or("", |d| d.as_str())),
-                    ("open", "open"),
+                    ("open", if open { "open" } else { "" }),
                 ],
                 None,
             );
             content
         });
+        let content = content.and_then(|c| reveal_content(reveal, c, !open, window, cx));
 
         let divided = self.group.as_ref().is_some_and(|g| g.divided);
         let first = self.group.as_ref().is_none_or(|g| g.first);
@@ -446,10 +512,7 @@ pub const COLLAPSIBLE_DOC: ComponentDoc = ComponentDoc {
         p("onOpenChange", RustApi::Method("on_open_change")),
         p("chevronPosition", RustApi::Method("chevron_position")),
         p("value", RustApi::Method("value")),
-        p(
-            "animatedLayout",
-            RustApi::Waived("not yet: animated layout lands with the motion layer (M11)"),
-        ),
+        p("animatedLayout", RustApi::Method("animated_layout")),
         p("ref", RustApi::Waived(NO_REFS)),
         p("xstyle", RustApi::Trait("Styled")),
         p("className", RustApi::Trait("Styled")),

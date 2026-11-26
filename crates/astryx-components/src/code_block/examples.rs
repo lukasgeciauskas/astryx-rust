@@ -22,6 +22,16 @@ pub fn examples(_window: &mut Window, _cx: &mut App) -> AnyElement {
                 .line_numbers(true)
                 .highlight_lines([5]),
         )
+        .child(label(
+            "Collapsible: its header folds the body, which eases closed and open (FR5)",
+        ))
+        .child(
+            CodeBlock::new("cb-collapsible", TS)
+                .language("tsx")
+                .title("Counter.tsx")
+                .collapsible(true)
+                .collapsible_threshold(5),
+        )
         .child(label("A diff over TypeScript, with line numbers"))
         .child(CodeBlock::new("cb-diff", DIFF).language("ts").diff(true).line_numbers(true))
         .child(label("Headerless: the copy button sits beside the first line"))

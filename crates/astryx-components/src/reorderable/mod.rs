@@ -14,6 +14,7 @@
 pub mod examples;
 pub(crate) mod model;
 pub(crate) mod session;
+mod slide;
 
 #[cfg(test)]
 mod tests;

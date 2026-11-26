@@ -10,6 +10,13 @@
 //! - The WAI-ARIA tree keys (`astryx_primitives::tree_focus`) with one tab
 //!   stop, typeahead on labels, and focus kept when a branch collapses
 //!   around it (AR1, AR2).
+//! - Motion (FR8, FR9, AST-105): with an `animated_layout` handle a branch's
+//!   children reveal and conceal from their block-end edge while the rows and
+//!   content after it glide, and the chevron turns on that motion; a collapsing
+//!   group stays drawn, inert and out of the keys, until it is gone. Without a
+//!   handle a tree under a coarse pointer plays the same motion inside itself
+//!   (content after it takes its place at once), and under a mouse a group
+//!   appears and leaves at once.
 
 mod component;
 pub mod examples;
@@ -32,12 +39,7 @@ pub const TREE_LIST_DOC: ComponentDoc = ComponentDoc {
         p("items", RustApi::Argument("items (TreeListItemData)")),
         p("density", RustApi::Method("density")),
         p("variant", RustApi::Method("variant")),
-        p(
-            "animatedLayout",
-            RustApi::Waived(
-                "MOTION: the expand glide and animatedLayout handles come with the motion layer (M11), as List's do",
-            ),
-        ),
+        p("animatedLayout", RustApi::Method("animated_layout")),
         p("header", RustApi::Method("header")),
         p("xstyle", RustApi::Trait("Styled")),
     ],

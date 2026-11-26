@@ -15,10 +15,11 @@ use gpui::{
     Window, div, prelude::*, px, relative,
 };
 
+use crate::animated_layout::adopt::{indicator_turn, reveal_content};
+use crate::animated_layout::{AnimatedLayout, EdgeReveal, use_animated_layout, use_edge_reveal};
 use crate::focus::focus_ring;
 use crate::icon::{Icon, IconColor, IconSize};
 use crate::indicator::{IndicatorRequest, TREE_DISCLOSURE, theme_indicator};
-use crate::motion::transition;
 
 type SlotFn = Rc<dyn Fn(&mut Window, &mut App) -> AnyElement>;
 type ClickFn = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
@@ -202,17 +203,78 @@ struct TreeState {
     focus: HashMap<SharedString, FocusHandle>,
     /// The last press began on a control inside a row (FR7).
     press_in_control: bool,
+    /// Each drawn child group's own height, for a tree that animates inside itself.
+    group_heights: HashMap<SharedString, Pixels>,
 }
 
-/// One visible row.
+/// One drawn row.
+#[derive(Clone)]
 struct Visible {
     item: TreeListItemData,
     level: usize,
     expanded: bool,
+    /// Its children are drawn: expanded, or held while their group collapses.
+    shows_children: bool,
+    /// Inside a group that is collapsing: drawn, but out of reach (FR9).
+    inert: bool,
     is_last: bool,
     ancestors_last: Vec<bool>,
     pos: usize,
     set: usize,
+}
+
+/// A branch's child group while its rows are laid out.
+struct Group {
+    owner: Option<SharedString>,
+    level: usize,
+    rows: Vec<AnyElement>,
+    expanded: bool,
+}
+
+/// Ends the innermost group: its rows, inside the reveal of its branch (FR8, FR9), go
+/// to the group around it. A collapsing group is inert while it conceals.
+fn close_group(
+    tree: &ElementId,
+    groups: &mut Vec<Group>,
+    reveals: &mut HashMap<SharedString, EdgeReveal>,
+    state: &Entity<TreeState>,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    let Some(group) = groups.pop() else {
+        return;
+    };
+    let Some(owner) = group.owner else {
+        return;
+    };
+    let (measure, id) = (state.clone(), owner.clone());
+    let content = div()
+        .child(
+            div()
+                .id(ElementId::Name(format!("{tree}-rows-{owner}").into()))
+                .flex()
+                .flex_col()
+                .role(Role::Group)
+                .children(group.rows),
+        )
+        .on_children_prepainted(move |bounds, _, cx| {
+            if let Some(b) = bounds.first() {
+                let h = b.size.height;
+                if measure.read(cx).group_heights.get(&id) != Some(&h) {
+                    measure.update(cx, |s, _| {
+                        s.group_heights.insert(id.clone(), h);
+                    });
+                }
+            }
+        });
+    let Some(reveal) = reveals.remove(&owner) else {
+        return;
+    };
+    if let Some(el) = reveal_content(reveal, content, !group.expanded, window, cx)
+        && let Some(parent) = groups.last_mut()
+    {
+        parent.rows.push(el);
+    }
 }
 
 /// Upstream `findInitialTabbableId`: the first selected enabled row (in
@@ -254,6 +316,7 @@ pub struct TreeList {
     header: Option<AnyElement>,
     aria_label: Option<SharedString>,
     on_key_down: Option<KeyFn>,
+    animated_layout: Option<AnimatedLayout>,
     style: StyleRefinement,
 }
 
@@ -271,8 +334,19 @@ impl TreeList {
             header: None,
             aria_label: None,
             on_key_down: None,
+            animated_layout: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Upstream `animatedLayout`: the handle from [`use_animated_layout`]. With it,
+    /// expanding or collapsing a row reveals or conceals its children from their
+    /// block-end edge and glides the rows and content after it, up to the handle's
+    /// container, instead of jumping; the chevron turns on the same motion (FR9).
+    /// Without one, a tree under a coarse pointer animates inside itself (FR8).
+    pub fn animated_layout(mut self, layout: AnimatedLayout) -> Self {
+        self.animated_layout = Some(layout);
+        self
     }
 
     astryx_primitives::setters! {
@@ -327,44 +401,107 @@ impl RenderOnce for TreeList {
                 typeahead: tree_typeahead(),
                 focus: HashMap::new(),
                 press_in_control: false,
+                group_heights: HashMap::new(),
             },
         );
+        // The motion (FR8, FR9): the app's handle; else, under a coarse pointer, the
+        // tree's own, whose area is the tree, so content after it takes its place at once.
+        let own_layout = use_animated_layout(
+            ElementId::Name(format!("{}-own", self.id).into()),
+            window,
+            cx,
+        );
+        let self_animating =
+            self.animated_layout.is_none() && astryx_primitives::coarse_primary_pointer(window, cx);
+        let layout = self
+            .animated_layout
+            .clone()
+            .or_else(|| self_animating.then(|| own_layout.clone()));
         // The visible rows, in order.
         let overrides = state.read(cx).overrides.clone();
         let is_expanded = |item: &TreeListItemData| {
             item.has_children() && overrides.get(&item.id).copied().unwrap_or(item.expanded)
         };
-        let mut visible: Vec<Visible> = Vec::new();
+        // Each branch's child group reveals and conceals from its block-end edge; one that
+        // is collapsing stays drawn, inert, until it is gone.
+        let mut reveals: HashMap<SharedString, EdgeReveal> = HashMap::new();
+        {
+            fn branches<'a>(items: &'a [TreeListItemData], out: &mut Vec<&'a TreeListItemData>) {
+                for item in items {
+                    if item.has_children() {
+                        out.push(item);
+                        branches(&item.children, out);
+                    }
+                }
+            }
+            let mut all = Vec::new();
+            branches(&self.items, &mut all);
+            for item in all {
+                let reveal = use_edge_reveal(
+                    ElementId::Name(format!("{}-group-{}", self.id, item.id).into()),
+                    is_expanded(item),
+                    layout.as_ref(),
+                    window,
+                    cx,
+                );
+                reveals.insert(item.id.clone(), reveal);
+            }
+        }
+        let shows_children = |item: &TreeListItemData| {
+            is_expanded(item) || reveals.get(&item.id).is_some_and(|r| r.mounted)
+        };
+        let mut drawn: Vec<Visible> = Vec::new();
+        #[allow(clippy::too_many_arguments)]
         fn walk(
             items: &[TreeListItemData],
             level: usize,
             ancestors_last: &[bool],
-            ancestors: &[SharedString],
+            inert: bool,
             is_expanded: &dyn Fn(&TreeListItemData) -> bool,
+            shows_children: &dyn Fn(&TreeListItemData) -> bool,
             out: &mut Vec<Visible>,
         ) {
             for (index, item) in items.iter().enumerate() {
                 let is_last = index + 1 == items.len();
                 let expanded = is_expanded(item);
+                let shows = shows_children(item);
                 out.push(Visible {
                     item: item.clone(),
                     level,
                     expanded,
+                    shows_children: shows,
+                    inert,
                     is_last,
                     ancestors_last: ancestors_last.to_vec(),
                     pos: index + 1,
                     set: items.len(),
                 });
-                if expanded {
+                if shows {
                     let mut last = ancestors_last.to_vec();
                     last.push(is_last);
-                    let mut up = ancestors.to_vec();
-                    up.push(item.id.clone());
-                    walk(&item.children, level + 1, &last, &up, is_expanded, out);
+                    walk(
+                        &item.children,
+                        level + 1,
+                        &last,
+                        inert || !expanded,
+                        is_expanded,
+                        shows_children,
+                        out,
+                    );
                 }
             }
         }
-        walk(&self.items, 0, &[], &[], &is_expanded, &mut visible);
+        walk(
+            &self.items,
+            0,
+            &[],
+            false,
+            &is_expanded,
+            &shows_children,
+            &mut drawn,
+        );
+        // The rows in reach: a collapsing group's rows leave the keys at once.
+        let visible: Vec<Visible> = drawn.iter().filter(|v| !v.inert).cloned().collect();
         let has_expandable = self.items.iter().any(TreeListItemData::has_children);
 
         // One focus handle per row; one tab stop.
@@ -585,13 +722,45 @@ impl RenderOnce for TreeList {
         };
         let radius = t.radius.element.to_pixels(rem);
         let disclosure = theme_indicator(TREE_DISCLOSURE, cx);
-        let mut rows: Vec<AnyElement> = Vec::new();
-        for (index, v) in visible.iter().enumerate() {
+        // FR8: a tree that animates inside itself takes its final height at once; this is
+        // how far its rows still are from it.
+        let pending: Pixels = if self_animating {
+            let heights = &state.read(cx).group_heights;
+            drawn
+                .iter()
+                .filter_map(|v| {
+                    let reveal = reveals.get(&v.item.id)?;
+                    let h = heights.get(&v.item.id).copied()?;
+                    let target = if v.expanded { 1. } else { 0. };
+                    reveal.is_moving().then(|| h * (target - reveal.shown()))
+                })
+                .fold(px(0.), |a, b| a + b)
+        } else {
+            px(0.)
+        };
+        // Rows nest in their branches' groups: the groups open so far, each with the
+        // level of its rows, its rows, and whether its branch is expanded.
+        let mut groups: Vec<Group> = vec![Group {
+            owner: None,
+            level: 0,
+            rows: Vec::new(),
+            expanded: true,
+        }];
+        let mut in_reach = 0usize;
+        for v in drawn.iter() {
+            while groups.last().is_some_and(|g| g.level > v.level) {
+                close_group(&self.id, &mut groups, &mut reveals, &state, window, cx);
+            }
+            let inert = v.inert;
+            let index = in_reach;
+            if !inert {
+                in_reach += 1;
+            }
             let item = &v.item;
-            let handle = handles[index].clone();
+            let handle = (!inert).then(|| handles[index].clone());
             let branch = item.has_children();
-            let interactive = item.on_click.is_some() || item.href.is_some() || branch;
-            let keyboard_focus = is_focus_visible(&handle, window);
+            let interactive = !inert && (item.on_click.is_some() || item.href.is_some() || branch);
+            let keyboard_focus = handle.as_ref().is_some_and(|h| is_focus_visible(h, window));
             let selector = format!("{}-row-{}", self.id, item.id);
             // Guides (FR1): one line per open ancestor column, and the row's own.
             let guide_x = |level: usize| {
@@ -639,11 +808,13 @@ impl RenderOnce for TreeList {
                         cx,
                     ),
                     None => {
-                        let turn = transition(
+                        // FR8, FR9: on the shared motion with a handle (or the tree's own
+                        // under a finger), else the theme's own turn.
+                        let turn = indicator_turn(
                             format!("{}-chevron-{}", self.id, item.id),
                             v.expanded,
-                            t.duration.fast,
-                            t.ease.standard,
+                            layout.as_ref(),
+                            (t.duration.fast, t.ease.standard),
                             window,
                             cx,
                         );
@@ -675,7 +846,7 @@ impl RenderOnce for TreeList {
                     .aria_expanded(v.expanded)
                     .aria_disabled(disabled)
                     .child(mark);
-                if !disabled {
+                if !disabled && !inert {
                     c = c.cursor_pointer().on_click(move |_, window, cx| {
                         cx.stop_propagation();
                         toggle(id.clone(), window, cx);
@@ -825,7 +996,7 @@ impl RenderOnce for TreeList {
                 .relative()
                 .w_full()
                 .py(row_gap / 2.)
-                .track_focus(&handle)
+                .when_some(handle.clone(), |el, h| el.track_focus(&h))
                 .role(Role::TreeItem)
                 .aria_label(item.label.clone())
                 .aria_level(v.level + 1)
@@ -838,15 +1009,29 @@ impl RenderOnce for TreeList {
                 .on_mouse_down(MouseButton::Left, {
                     let (state, id, disabled) = (state.clone(), item.id.clone(), item.disabled);
                     move |_, _, cx| {
-                        if !disabled {
+                        if !disabled && !inert {
                             state.update(cx, |s, _| s.tab_stop = Some(id.clone()));
                         }
                     }
                 })
                 .children(guides)
                 .child(content);
-            rows.push(row.into_any_element());
+            if let Some(group) = groups.last_mut() {
+                group.rows.push(row.into_any_element());
+            }
+            if v.shows_children {
+                groups.push(Group {
+                    owner: Some(item.id.clone()),
+                    level: v.level + 1,
+                    rows: Vec::new(),
+                    expanded: v.expanded,
+                });
+            }
         }
+        while groups.len() > 1 {
+            close_group(&self.id, &mut groups, &mut reveals, &state, window, cx);
+        }
+        let rows = groups.pop().map(|g| g.rows).unwrap_or_default();
 
         let mut root = div()
             .id(self.id.clone())
@@ -877,6 +1062,25 @@ impl RenderOnce for TreeList {
         if let Some(label) = self.aria_label.clone() {
             tree = tree.aria_label(label);
         }
+        if !self_animating {
+            return root.children(header).child(tree);
+        }
+        // FR8: the tree is its own area; it takes its final height at once and clips
+        // what moves inside it, so the content after it never moves with it.
+        let tree = own_layout.container(tree, window, cx);
+        let moving = pending != px(0.);
+        // Only the block-end edge clips, as upstream's: the clip box reaches far above the
+        // tree (a margin and an equal padding that leave the layout as it is), so nothing
+        // at the block-start edge, such as a row's focus ring, is cut.
+        let reach = px(10_000.);
+        let tree = div()
+            .flex()
+            .flex_col()
+            .when(moving, |el| el.overflow_y_hidden().mt(-reach).pt(reach))
+            .child(tree.when(pending < px(0.), |t| t.mb(pending)))
+            .when(pending > px(0.), |el| {
+                el.child(div().flex_none().h(pending))
+            });
         root.children(header).child(tree)
     }
 }

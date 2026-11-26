@@ -4,6 +4,7 @@
 pub mod examples;
 mod grid;
 mod misc;
+mod pane_glide;
 mod regions;
 mod spacing;
 mod stack;

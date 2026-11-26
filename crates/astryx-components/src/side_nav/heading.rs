@@ -107,10 +107,14 @@ impl RenderOnce for SideNavHeading {
         let t = theme.tokens().clone();
         let i18n = i18n(cx);
         let links = use_link_handler(cx);
-        let collapsed = use_context::<SideNavCollapse>(cx).is_some_and(|c| c.collapsed);
+        let rail = use_context::<SideNavCollapse>(cx);
+        let collapsed = rail.as_ref().is_some_and(|c| c.collapsed);
+        // The rail's labels fade as it collapses or expands (SideNav FR6).
+        let labels = rail.as_ref().map_or(1., |c| c.labels);
         let text = |text: SharedString, href: Option<SharedString>, heading: bool, id: &str| {
             let mut el = div()
                 .id(ElementId::Name(format!("{:?}-{id}", self.id).into()))
+                .opacity(labels)
                 .overflow_hidden()
                 .whitespace_nowrap()
                 .text_ellipsis()

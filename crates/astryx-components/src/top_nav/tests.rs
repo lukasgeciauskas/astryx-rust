@@ -488,3 +488,154 @@ fn card_fr3_the_link_needs_a_label_and_an_href(cx: &mut TestAppContext) {
     assert!(!shown(cx, "a-link"));
     assert!(shown(cx, "b-link"));
 }
+
+fn drawer_group_eases(cx: &mut TestAppContext, mega: bool) {
+    use gpui::InteractiveElement as _;
+    let cx = host(
+        cx,
+        page(move || {
+            let group: gpui::AnyElement = if mega {
+                TopNavMegaMenu::new("group", "Products")
+                    .item(TopNavMegaMenuItem::new("g-1", "One").href("https://example.com/1"))
+                    .item(TopNavMegaMenuItem::new("g-2", "Two").href("https://example.com/2"))
+                    .into_any_element()
+            } else {
+                TopNavMenu::new("group", "Docs", menu_items()).into_any_element()
+            };
+            provide(
+                AppShellMobile::new(true, |_, _, _| {}),
+                provide(
+                    TopNavRenderMode::Drawer,
+                    TopNav::new("nav").start_content(
+                        div()
+                            .child(group)
+                            .child(div().debug_selector(|| "below".into()).h(px(10.))),
+                    ),
+                ),
+            )
+            .into_any_element()
+        }),
+    );
+    settle(cx);
+    wait(cx, 600);
+    let base = cx.debug_bounds("below").unwrap().top();
+    click(cx, "group");
+    for _ in 0..6 {
+        wait(cx, 16);
+    }
+    let mid = cx.debug_bounds("below").unwrap().top() - base;
+    wait(cx, 600);
+    let open = cx.debug_bounds("below").unwrap().top() - base;
+    assert!(open > px(20.), "open: {open:?}");
+    assert!(
+        mid > px(0.5) && mid < open,
+        "the group's height eases open: {mid:?}"
+    );
+    click(cx, "group");
+    for _ in 0..6 {
+        wait(cx, 16);
+    }
+    let closing = cx.debug_bounds("below").unwrap().top() - base;
+    assert!(
+        closing > px(0.5) && closing < open,
+        "and closed: {closing:?}"
+    );
+    wait(cx, 600);
+    assert_eq!(cx.debug_bounds("below").unwrap().top(), base);
+}
+
+#[gpui::test]
+fn menu_fr7_the_drawer_group_s_height_eases(cx: &mut TestAppContext) {
+    drawer_group_eases(cx, false);
+}
+
+#[gpui::test]
+fn mega_fr9_the_drawer_group_s_height_eases(cx: &mut TestAppContext) {
+    drawer_group_eases(cx, true);
+}
+
+#[gpui::test]
+fn the_drawer_group_changes_at_once_under_reduced_motion(cx: &mut TestAppContext) {
+    cx.update(|cx| astryx_primitives::set_reduced_motion(true, cx));
+    let cx = host(
+        cx,
+        page(|| {
+            provide(
+                AppShellMobile::new(true, |_, _, _| {}),
+                provide(
+                    TopNavRenderMode::Drawer,
+                    TopNav::new("nav").start_content(TopNavMenu::new(
+                        "group",
+                        "Docs",
+                        menu_items(),
+                    )),
+                ),
+            )
+            .into_any_element()
+        }),
+    );
+    settle(cx);
+    wait(cx, 600);
+    click(cx, "group");
+    let rows = cx.debug_bounds("group").unwrap().bottom();
+    click(cx, "group");
+    assert!(cx.debug_bounds("group").unwrap().bottom() == rows);
+}
+
+fn drawer_group_is_inert_while_it_collapses(cx: &mut TestAppContext, mega: bool) {
+    let log = Log::default();
+    logging_links(cx, &log);
+    let cx = host(
+        cx,
+        page(move || {
+            let group: gpui::AnyElement = if mega {
+                TopNavMegaMenu::new("group", "Products")
+                    .item(TopNavMegaMenuItem::new("g-1", "One").href("https://example.com/1"))
+                    .into_any_element()
+            } else {
+                TopNavMenu::new(
+                    "group",
+                    "Docs",
+                    [TopNavMenuItemData::new("One").href("https://example.com/1")],
+                )
+                .into_any_element()
+            };
+            provide(
+                AppShellMobile::new(true, |_, _, _| {}),
+                provide(
+                    TopNavRenderMode::Drawer,
+                    TopNav::new("nav").start_content(group),
+                ),
+            )
+            .into_any_element()
+        }),
+    );
+    settle(cx);
+    wait(cx, 600);
+    let row: &'static str = if mega { "g-1" } else { "group-drawer-item-0" };
+    click(cx, "group");
+    wait(cx, 600);
+    assert!(shown(cx, row));
+    // Collapse from the header, which keeps focus.
+    click(cx, "group");
+    wait(cx, 48);
+    assert!(shown(cx, row), "held while it collapses");
+    // A press on its row reaches nothing.
+    click(cx, row);
+    assert!(log.borrow().is_empty(), "{:?}", log.borrow());
+    // Tab skips its rows, so Enter opens none of them.
+    crate::segmented::tests::press(cx, "tab");
+    crate::segmented::tests::press(cx, "enter");
+    settle(cx);
+    assert!(log.borrow().is_empty(), "{:?}", log.borrow());
+}
+
+#[gpui::test]
+fn menu_fr7_a_collapsing_drawer_group_is_inert(cx: &mut TestAppContext) {
+    drawer_group_is_inert_while_it_collapses(cx, false);
+}
+
+#[gpui::test]
+fn mega_fr9_a_collapsing_drawer_group_is_inert(cx: &mut TestAppContext) {
+    drawer_group_is_inert_while_it_collapses(cx, true);
+}

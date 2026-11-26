@@ -27,6 +27,14 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use astryx_i18n::{Arg, current as i18n, use_direction};
+use astryx_primitives::motion::paging::{
+    paging_settle_velocity, solve_animated_page_scroll, solve_paging,
+};
+use astryx_primitives::motion::uikit::springs::role::SETTLE as SETTLE_SPRING;
+use astryx_primitives::motion::uikit::zoom_media::role::{
+    DISMISS_POSITION_SPRING, DISMISS_SIZE_SPRING,
+};
+use astryx_primitives::motion::{FnCurve, MotionSpring, SharedCurve, resolve_spring, solve_spring};
 use astryx_primitives::{
     ElementSize, Politeness, announce, is_focus_visible, prefers_reduced_motion, use_link_handler,
 };
@@ -57,8 +65,9 @@ use crate::text::{Text, TextType};
 type OpenFn = Rc<dyn Fn(bool, &mut Window, &mut App)>;
 type IndexFn = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 type Action = Rc<dyn Fn(&mut Window, &mut App)>;
-/// Pages to an item, the row starting `offset` px from it.
-type PageFn = Rc<dyn Fn(usize, f64, &mut Window, &mut App)>;
+/// Pages to an item, the row starting `offset` px from it; a drag's release gives its
+/// velocity (px/s).
+type PageFn = Rc<dyn Fn(usize, f64, Option<f64>, &mut Window, &mut App)>;
 /// A photo's natural size and the device pixel ratio.
 type Natural = Option<((f64, f64), f64)>;
 
@@ -66,8 +75,8 @@ type Natural = Option<((f64, f64), f64)>;
 const KEYBOARD_PAN_STEP: f64 = 50.;
 /// How far a press moves before it is a drag.
 const DRAG_SLOP: f64 = 4.;
-/// How long a settle (zoom, page, return) takes.
-const SETTLE: Duration = Duration::from_millis(280);
+/// A touch close's exit: the viewer shrinks a little and fades.
+const TOUCH_EXIT: Duration = Duration::from_millis(280);
 /// A wheel pinch ends when the wheel has been still this long.
 const WHEEL_PINCH_END: Duration = Duration::from_millis(160);
 
@@ -140,19 +149,94 @@ struct Snapshot {
     page: f64,
     /// A drag to dismiss: the photo's offset.
     dismiss: (f64, f64),
+    /// A dismissal's fade of the backdrop and the controls: 0 shown, 1 gone.
+    leave: f64,
 }
 
 const REST: Snapshot = Snapshot {
     zoom: IDENTITY,
     page: 0.,
     dismiss: (0., 0.),
+    leave: 0.,
 };
 
-/// A settle between two snapshots.
-struct Motion {
-    from: Snapshot,
-    to: Snapshot,
+/// The snapshot's channels, each settling on its own curve: the zoom's x, y and scale,
+/// the row, the dismissal's x and y, and its fade.
+const CHANNELS: usize = 7;
+const ZOOM_X: usize = 0;
+const ZOOM_Y: usize = 1;
+const ZOOM_SCALE: usize = 2;
+const PAGE: usize = 3;
+const DISMISS_X: usize = 4;
+const DISMISS_Y: usize = 5;
+const LEAVE: usize = 6;
+
+impl Snapshot {
+    fn channels(&self) -> [f64; CHANNELS] {
+        [
+            self.zoom.x,
+            self.zoom.y,
+            self.zoom.scale,
+            self.page,
+            self.dismiss.0,
+            self.dismiss.1,
+            self.leave,
+        ]
+    }
+
+    fn from_channels(v: [f64; CHANNELS]) -> Self {
+        Snapshot {
+            zoom: ZoomTransform {
+                x: v[ZOOM_X],
+                y: v[ZOOM_Y],
+                scale: v[ZOOM_SCALE],
+            },
+            page: v[PAGE],
+            dismiss: (v[DISMISS_X], v[DISMISS_Y]),
+            leave: v[LEAVE],
+        }
+    }
+}
+
+/// Within this of its target a channel is at rest (upstream `SETTLE_THRESHOLD`: px, scale,
+/// opacity).
+fn settle_threshold(channel: usize) -> f64 {
+    match channel {
+        ZOOM_SCALE => 0.0001,
+        LEAVE => 0.001,
+        _ => 0.05,
+    }
+}
+
+/// `spring` (a motion role, at the theme's tempo) from `from` to `to`, starting at
+/// `velocity` (units/s), as a curve that ends exactly on `to` once it settles.
+fn spring_curve(
+    spring: MotionSpring,
+    from: f64,
+    to: f64,
+    velocity: f64,
+    epsilon: f64,
+) -> SharedCurve {
+    let curve = solve_spring(resolve_spring(spring, 1.).to_spring(), from, to, velocity);
+    let duration = curve.settle_time(epsilon);
+    FnCurve::new(
+        duration,
+        move |t| if t >= duration { to } else { curve.value(t) },
+        move |t| if t >= duration { 0. } else { curve.velocity(t) },
+    )
+    .shared()
+}
+
+/// One channel settling: its curve, from when it started.
+struct Channel {
+    curve: SharedCurve,
     start: Instant,
+}
+
+/// The channels settling toward `to`.
+struct Motion {
+    channels: [Option<Channel>; CHANNELS],
+    to: Snapshot,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -190,54 +274,161 @@ struct LightboxState {
     photo: FocusHandle,
     /// A Ctrl+wheel pinch: its centroid and when it last moved.
     wheel: Option<(StagePoint, Instant)>,
+    /// A released drag to dismiss: the backdrop's and the controls' opacity at the lift,
+    /// and the photo's travel then. The viewer closes once the photo has left.
+    dismissing: Option<Dismissal>,
     _wheel_end: Option<gpui::Task<()>>,
 }
 
-fn lerp(a: f64, b: f64, t: f64) -> f64 {
-    a + (b - a) * t
+/// A released drag to dismiss, flying out.
+#[derive(Clone, Copy, Debug)]
+struct Dismissal {
+    backdrop: f64,
+    chrome: f64,
+    /// The photo has left and the viewer asked to close.
+    closed: bool,
+    /// The travel at the lift, which sets the photo's size while it leaves.
+    travel: f64,
 }
 
 impl LightboxState {
-    /// The snapshot now, finishing a settle that has ended.
-    fn current(&mut self, now: Instant, ease: impl Fn(f32) -> f32) -> (Snapshot, bool) {
-        let Some(m) = &self.motion else {
+    /// The snapshot now, finishing the channels that have settled.
+    fn current(&mut self, now: Instant) -> (Snapshot, bool) {
+        let Some(m) = &mut self.motion else {
             return (self.shown, false);
         };
-        let t = now.saturating_duration_since(m.start).as_secs_f32() / SETTLE.as_secs_f32();
-        if t >= 1. {
+        let mut values = self.shown.channels();
+        let targets = m.to.channels();
+        let mut moving = false;
+        for (i, slot) in m.channels.iter_mut().enumerate() {
+            let Some(channel) = slot else { continue };
+            let t = now.saturating_duration_since(channel.start).as_secs_f64();
+            if t >= channel.curve.duration() {
+                values[i] = targets[i];
+                *slot = None;
+            } else {
+                values[i] = channel.curve.at(t);
+                moving = true;
+            }
+        }
+        if moving {
+            self.shown = Snapshot::from_channels(values);
+        } else {
             self.shown = m.to;
             self.motion = None;
-            return (self.shown, false);
         }
-        let k = ease(t) as f64;
-        let (a, b) = (m.from, m.to);
-        self.shown = Snapshot {
-            zoom: ZoomTransform {
-                x: lerp(a.zoom.x, b.zoom.x, k),
-                y: lerp(a.zoom.y, b.zoom.y, k),
-                scale: lerp(a.zoom.scale, b.zoom.scale, k),
-            },
-            page: lerp(a.page, b.page, k),
-            dismiss: (
-                lerp(a.dismiss.0, b.dismiss.0, k),
-                lerp(a.dismiss.1, b.dismiss.1, k),
-            ),
-        };
-        (self.shown, true)
+        (self.shown, moving)
     }
 
-    /// Settles to `to` (at once under reduced motion).
-    fn settle(&mut self, to: Snapshot, now: Instant, reduced: bool) {
+    /// A channel's velocity on screen now, units/s.
+    fn velocity(&self, channel: usize, now: Instant) -> f64 {
+        self.motion
+            .as_ref()
+            .and_then(|m| m.channels[channel].as_ref())
+            .map_or(0., |c| {
+                c.curve
+                    .velocity(now.saturating_duration_since(c.start).as_secs_f64())
+            })
+    }
+
+    /// Settles every channel to `to` from what it shows, each on the curve `curve` gives
+    /// for (channel, from, to, velocity on screen); at once under reduced motion.
+    fn settle_with(
+        &mut self,
+        to: Snapshot,
+        now: Instant,
+        reduced: bool,
+        curve: impl Fn(usize, f64, f64, f64) -> SharedCurve,
+    ) {
+        self.current(now);
         if reduced {
             self.shown = to;
             self.motion = None;
-        } else {
-            self.motion = Some(Motion {
-                from: self.shown,
-                to,
-                start: now,
-            });
+            return;
         }
+        let from = self.shown.channels();
+        let targets = to.channels();
+        let channels = std::array::from_fn(|i| {
+            let velocity = self.velocity(i, now);
+            ((from[i] - targets[i]).abs() > 1e-9 || velocity != 0.).then(|| Channel {
+                curve: curve(i, from[i], targets[i], velocity),
+                start: now,
+            })
+        });
+        self.motion = Some(Motion { channels, to });
+    }
+
+    /// Settles to `to` on `springs.settle`, every zoom's spring (upstream
+    /// `useZoomCore.settleTo`): from what shows, at the speed it has, or with a release's
+    /// velocity where `velocity` gives one.
+    fn settle_from(
+        &mut self,
+        to: Snapshot,
+        now: Instant,
+        reduced: bool,
+        velocity: [Option<f64>; CHANNELS],
+    ) {
+        self.settle_with(to, now, reduced, |i, from, to, v| {
+            spring_curve(
+                SETTLE_SPRING,
+                from,
+                to,
+                velocity[i].unwrap_or(v),
+                settle_threshold(i),
+            )
+        });
+    }
+
+    /// Settles to `to` on `springs.settle` from what shows.
+    fn settle(&mut self, to: Snapshot, now: Instant, reduced: bool) {
+        self.settle_from(to, now, reduced, [None; CHANNELS]);
+    }
+
+    /// Turns the row to rest: a drag's release on UIKit's paging settle from its velocity,
+    /// a button's or a key's on `setContentOffset(_:animated:)` (upstream `usePager`).
+    fn settle_page(&mut self, now: Instant, reduced: bool, release: Option<f64>) {
+        let to = Snapshot {
+            page: 0.,
+            ..self.target()
+        };
+        self.settle_with(to, now, reduced, |i, from, to, v| {
+            if i != PAGE {
+                return spring_curve(SETTLE_SPRING, from, to, v, settle_threshold(i));
+            }
+            match release {
+                Some(velocity) => {
+                    Rc::new(solve_paging(from, paging_settle_velocity(velocity), to, 1.))
+                        as SharedCurve
+                }
+                None => solve_animated_page_scroll(from, to, None, None, (v != 0.).then_some(v))
+                    .shared(),
+            }
+        });
+    }
+
+    /// A released drag to dismiss that commits: the photo goes on down on the dismissal's
+    /// measured position spring from the release velocity until it has left, while the
+    /// backdrop and the controls fade on its size spring (upstream `useZoomStage`).
+    fn dismiss(&mut self, exit: f64, velocity: (f64, f64), now: Instant, reduced: bool) {
+        self.current(now);
+        let travel = self.shown.dismiss.1.max(0.);
+        self.dismissing = Some(Dismissal {
+            backdrop: dismiss_backdrop_alpha(travel),
+            chrome: dismiss_chrome_alpha(travel),
+            closed: false,
+            travel,
+        });
+        let to = Snapshot {
+            dismiss: (self.shown.dismiss.0, exit.max(travel)),
+            leave: 1.,
+            ..self.shown
+        };
+        self.settle_with(to, now, reduced, |i, from, to, v| match i {
+            DISMISS_X => spring_curve(DISMISS_POSITION_SPRING, from, to, velocity.0, 0.05),
+            DISMISS_Y => spring_curve(DISMISS_POSITION_SPRING, from, to, velocity.1, 0.05),
+            LEAVE => spring_curve(DISMISS_SIZE_SPRING, from, to, v, 0.001),
+            _ => spring_curve(SETTLE_SPRING, from, to, v, settle_threshold(i)),
+        });
     }
 
     /// Where the motion ends: the keyboard works from there (UIKit's model
@@ -382,7 +573,7 @@ impl RenderOnce for Lightbox {
         let modal = modal_state(&self.id, window, cx);
         sync_open(&modal, self.open && count > 0, window, cx);
         let exit = if window.last_input_was_touch() && !prefers_reduced_motion(cx) {
-            SETTLE
+            TOUCH_EXIT
         } else {
             Duration::ZERO
         };
@@ -409,6 +600,7 @@ impl RenderOnce for Lightbox {
                     was_zoomed: false,
                     photo: cx.focus_handle().tab_stop(true),
                     wheel: None,
+                    dismissing: None,
                     _wheel_end: None,
                 }
             },
@@ -419,6 +611,7 @@ impl RenderOnce for Lightbox {
                 s.shown = REST;
                 s.motion = None;
                 s.drag = None;
+                s.dismissing = None;
                 s.caption_open = false;
                 s.controls_hidden = false;
             });
@@ -459,8 +652,7 @@ impl RenderOnce for Lightbox {
             });
         }
 
-        let ease = t.ease.r#move;
-        let (snap, moving) = state.update(cx, |s, _| s.current(now, |x| ease.ease(x)));
+        let (snap, moving) = state.update(cx, |s, _| s.current(now));
         if moving {
             window.request_animation_frame();
         }
@@ -519,7 +711,7 @@ impl RenderOnce for Lightbox {
         // Paging resets the zoom; the row settles from where it was.
         let page_to: PageFn = {
             let (state, set_index) = (state.clone(), set_index.clone());
-            Rc::new(move |to, from_offset, window, cx| {
+            Rc::new(move |to, from_offset, release, window, cx| {
                 let now = cx.background_executor().now();
                 state.update(cx, |s, _| {
                     s.shown = Snapshot {
@@ -527,20 +719,39 @@ impl RenderOnce for Lightbox {
                         ..REST
                     };
                     s.motion = None;
-                    s.settle(REST, now, reduced);
+                    s.settle_page(now, reduced, release);
                 });
                 set_index(to, window, cx);
             })
         };
 
+        // A released dismissal closes the viewer once the photo has left.
+        let dismissing = state.read(cx).dismissing;
+        if !moving && let Some(d) = dismissing.filter(|d| !d.closed) {
+            state.update(cx, |s, _| {
+                if let Some(d) = &mut s.dismissing {
+                    d.closed = true;
+                }
+            });
+            let _ = d;
+            let close = close.clone();
+            window.defer(cx, move |window, cx| close(window, cx));
+        }
+        // The backdrop and the controls follow the drag's travel; once released to
+        // dismiss they fade from what they showed on the dismissal's spring.
+        let travel = snap.dismiss.1.max(0.);
+        let (backdrop_alpha, controls_alpha) = match dismissing {
+            Some(d) => (d.backdrop * (1. - snap.leave), d.chrome * (1. - snap.leave)),
+            None => (dismiss_backdrop_alpha(travel), dismiss_chrome_alpha(travel)),
+        };
         let dim = faded(
             t.color.overlay,
-            dismiss_backdrop_alpha(snap.dismiss.1.max(0.)) as f32 * (1. - leaving),
+            backdrop_alpha.clamp(0., 1.) as f32 * (1. - leaving),
         );
         let chrome_alpha = if state.read(cx).controls_hidden {
             0.
         } else {
-            dismiss_chrome_alpha(snap.dismiss.1.max(0.)) as f32
+            controls_alpha.clamp(0., 1.) as f32
         };
 
         // ------------------------------------------------------------------
@@ -577,8 +788,10 @@ impl RenderOnce for Lightbox {
                     cx,
                 )
             });
+            let page_selector = format!("{}-page-{i}", self.id);
             pages.push(
                 div()
+                    .debug_selector(move || page_selector.clone())
                     .absolute()
                     .top_0()
                     .left(px(offset as f32))
@@ -697,7 +910,7 @@ impl RenderOnce for Lightbox {
                 let page_to = page_to.clone();
                 Rc::new(move |window: &mut Window, cx: &mut App| {
                     if can_prev {
-                        page_to(index - 1, 0., window, cx);
+                        page_to(index - 1, -stride, None, window, cx);
                     }
                 }) as Action
             };
@@ -705,7 +918,7 @@ impl RenderOnce for Lightbox {
                 let page_to = page_to.clone();
                 Rc::new(move |window: &mut Window, cx: &mut App| {
                     if can_next {
-                        page_to(index + 1, 0., window, cx);
+                        page_to(index + 1, stride, None, window, cx);
                     }
                 }) as Action
             };
@@ -809,9 +1022,9 @@ impl RenderOnce for Lightbox {
                 cx.stop_propagation();
                 let toward_end = (key == "right") != rtl;
                 if toward_end && can_next {
-                    key_page(index + 1, 0., window, cx);
+                    key_page(index + 1, stride, None, window, cx);
                 } else if !toward_end && can_prev {
-                    key_page(index - 1, 0., window, cx);
+                    key_page(index - 1, -stride, None, window, cx);
                 }
             }
         };
@@ -1044,16 +1257,21 @@ fn drag_end(
             }
         }
         DragKind::Pan => {
+            // The pan's release settles on `springs.settle` from the release velocity.
             if let Some(g) = geo {
                 state.update(cx, |s, _| {
                     let to = resting_transform(&g, s.shown.zoom);
-                    s.settle(
+                    let mut velocity = [None; CHANNELS];
+                    velocity[ZOOM_X] = Some(drag.velocity.0);
+                    velocity[ZOOM_Y] = Some(drag.velocity.1);
+                    s.settle_from(
                         Snapshot {
                             zoom: to,
                             ..s.shown
                         },
                         now,
                         reduced,
+                        velocity,
                     )
                 });
             }
@@ -1067,6 +1285,7 @@ fn drag_end(
                 page_to(
                     index + 1,
                     dx + stride * if rtl { -1. } else { 1. },
+                    Some(drag.velocity.0),
                     window,
                     cx,
                 );
@@ -1074,34 +1293,42 @@ fn drag_end(
                 page_to(
                     index - 1,
                     dx - stride * if rtl { -1. } else { 1. },
+                    Some(drag.velocity.0),
                     window,
                     cx,
                 );
             } else {
+                // Back to the page, on the paging settle from the release velocity.
                 state.update(cx, |s, _| {
-                    s.settle(
-                        Snapshot {
-                            page: 0.,
-                            ..s.shown
-                        },
-                        now,
-                        reduced,
-                    )
+                    s.settle_page(now, reduced, Some(drag.velocity.0))
                 });
             }
         }
         DragKind::Dismiss => {
             if dismiss_commits(dy.max(0.), drag.velocity.1) {
-                close(window, cx);
+                match (geo, reduced) {
+                    // Straight on down until the photo has left the stage.
+                    (Some(g), false) => {
+                        let exit = (g.height - g.fit.y).max(dy) + 1.;
+                        state.update(cx, |s, _| s.dismiss(exit, drag.velocity, now, reduced));
+                    }
+                    _ => close(window, cx),
+                }
             } else {
+                // A cancelled drag's return is no exit: `springs.settle` from the release
+                // velocity.
                 state.update(cx, |s, _| {
-                    s.settle(
+                    let mut velocity = [None; CHANNELS];
+                    velocity[DISMISS_X] = Some(drag.velocity.0);
+                    velocity[DISMISS_Y] = Some(drag.velocity.1);
+                    s.settle_from(
                         Snapshot {
                             dismiss: (0., 0.),
                             ..s.shown
                         },
                         now,
                         reduced,
+                        velocity,
                     )
                 });
             }
@@ -1176,12 +1403,21 @@ impl Lightbox {
         }
         let image = match (is_current.then_some(geo).flatten(), snap) {
             (Some(g), snap) => {
-                let z = if snap.dismiss != (0., 0.) {
-                    dismiss_transform(&g, snap.dismiss.0, snap.dismiss.1)
-                } else {
-                    snap.zoom
+                let z = match state.read(cx).dismissing {
+                    // Released to dismiss: the photo keeps the size it had at the lift.
+                    Some(d) => {
+                        let mut z = dismiss_transform(&g, snap.dismiss.0, d.travel);
+                        z.y += snap.dismiss.1 - d.travel;
+                        z
+                    }
+                    None if snap.dismiss != (0., 0.) => {
+                        dismiss_transform(&g, snap.dismiss.0, snap.dismiss.1)
+                    }
+                    None => snap.zoom,
                 };
+                let photo = format!("{}-photo", self.id);
                 img(media.source.clone())
+                    .debug_selector(move || photo.clone())
                     .absolute()
                     .left(px((g.fit.x + z.x) as f32))
                     .top(px((g.fit.y + z.y) as f32))

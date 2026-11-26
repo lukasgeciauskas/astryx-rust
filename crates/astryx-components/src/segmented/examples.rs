@@ -30,7 +30,9 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
 
     Stack::vertical()
         .gap(SpacingStep::S4)
-        .child(label("SegmentedControl"))
+        .child(label(
+            "SegmentedControl: the selected surface slides to the new segment (a finger settles it on the selection spring)",
+        ))
         .child(
             SegmentedControl::new("view", "View", view.read(cx).clone())
                 .on_change(store(view.clone()))

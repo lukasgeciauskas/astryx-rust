@@ -432,7 +432,10 @@ fn expansion(window: &mut Window, cx: &mut App) -> AnyElement {
         std::collections::HashSet::from([gpui::SharedString::from("2")])
     });
     let current = open.read(cx).clone();
-    Table::new("people-expandable")
+    // An animatedLayout handle: a panel plays in and the rows after it glide (FR15).
+    let layout =
+        crate::animated_layout::use_animated_layout("people-expandable-layout", window, cx);
+    let table = Table::new("people-expandable")
         .label("People, expandable")
         .data(people())
         .columns(vec![
@@ -467,8 +470,11 @@ fn expansion(window: &mut Window, cx: &mut App) -> AnyElement {
                 },
             )
             .row_label(|p: &Person| p.name.into())
-            .panel_variant(PanelVariant::Muted),
-        )
+            .panel_variant(PanelVariant::Muted)
+            .animated_layout(layout.clone()),
+        );
+    layout
+        .container(gpui::div().w_full().child(table), window, cx)
         .into_any_element()
 }
 

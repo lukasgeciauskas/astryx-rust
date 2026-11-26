@@ -1,9 +1,11 @@
-//! List and ListItem (M6). Upstream: `List/`.
+//! List and ListItem (M6). Upstream: `List/`. With an `animated_layout` handle its row
+//! updates animate (FR12, [`motion`]).
 
 pub mod examples;
 mod item;
 #[allow(clippy::module_inception)]
 mod list;
+mod motion;
 
 #[cfg(test)]
 mod tests;
@@ -19,7 +21,6 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
 
-const MOTION: &str = "not yet: animated row changes land with the motion layer (M11)";
 const SWIPE: &str = "not yet: swipe actions land with the touch layer (M11)";
 
 pub const LIST_DOC: ComponentDoc = ComponentDoc {
@@ -29,7 +30,7 @@ pub const LIST_DOC: ComponentDoc = ComponentDoc {
         p("children", RustApi::Trait("ParentElement")),
         p("density", RustApi::Method("density")),
         p("hasDividers", RustApi::Method("dividers")),
-        p("animatedLayout", RustApi::Waived(MOTION)),
+        p("animatedLayout", RustApi::Method("animated_layout")),
         p("reorderable", RustApi::Method("reorderable")),
         p("edge", RustApi::Method("edge")),
         p(

@@ -23,6 +23,9 @@ use gpui::{
 };
 use smallvec::SmallVec;
 
+use super::motion::{self, Slot, row_id};
+use crate::animated_layout::AnimatedLayout;
+use crate::animated_layout::adopt::reveal_content;
 use crate::item::ItemDensity;
 use crate::layout::{ContainerChild, ContainerCorners, ContainerPadding};
 
@@ -173,6 +176,7 @@ pub struct List {
     list_style: ListStyle,
     start: i64,
     reorderable: Option<crate::reorderable::Reorderable>,
+    animated_layout: Option<AnimatedLayout>,
     style: StyleRefinement,
 }
 
@@ -190,8 +194,22 @@ impl List {
             list_style: ListStyle::None,
             start: 1,
             reorderable: None,
+            animated_layout: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Upstream `animatedLayout`: the handle from [`use_animated_layout`]. With it, each
+    /// row inserted, removed or moved between renders animates (FR12): an inserted row
+    /// enters, a removed row collapses in place, inert, until it is gone, a row crossing
+    /// rows that move the other way rides above them, and the rows after a change glide
+    /// to their new places, all on the handle's one motion. A row's identity is its
+    /// ListItem's `item_key`; a row without one changes at once.
+    ///
+    /// [`use_animated_layout`]: crate::animated_layout::use_animated_layout
+    pub fn animated_layout(mut self, layout: AnimatedLayout) -> Self {
+        self.animated_layout = Some(layout);
+        self
     }
 
     /// Upstream `reorderable`: the object [`create_reorderable`] made. Its
@@ -349,7 +367,7 @@ pub(crate) fn counter_text(number: i64, marker: ListMarker) -> String {
 }
 
 impl RenderOnce for List {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
         let t = theme.tokens();
         let rem = window.rem_size();
@@ -395,21 +413,102 @@ impl RenderOnce for List {
         let has_header = self.header.is_some();
         let at_first = bleed && !has_header && place.is_some_and(|p| p.first);
         let at_last = bleed && place.is_some_and(|p| p.last);
-        let rows = self.children.into_iter().enumerate().map(|(i, child)| {
-            let (first, last) = (i == 0, i + 1 == count);
-            let row_corners = bleed_corners(corners, host, first && at_first, last && at_last);
-            provide(
-                ListRow {
-                    first,
-                    last,
-                    number: self.start + i as i64,
-                    corners: row_corners,
-                    index: i,
-                },
-                child,
-            )
-            .into_any_element()
-        });
+        // FR12: with a handle, this frame's inserts, removals and moves.
+        let mut motion = self
+            .animated_layout
+            .as_ref()
+            .map(|layout| motion::begin(&self.id, &mut self.children, layout, gap, window, cx));
+        let mut rows: Vec<Option<AnyElement>> = std::mem::take(&mut self.children)
+            .into_iter()
+            .enumerate()
+            .map(|(i, child)| {
+                let (first, last) = (i == 0, i + 1 == count);
+                let row_corners = bleed_corners(corners, host, first && at_first, last && at_last);
+                Some(
+                    provide(
+                        ListRow {
+                            first,
+                            last,
+                            number: self.start + i as i64,
+                            corners: row_corners,
+                            index: i,
+                        },
+                        child,
+                    )
+                    .into_any_element(),
+                )
+            })
+            .collect();
+        let rows: Vec<AnyElement> = match motion.as_mut() {
+            None => rows.into_iter().flatten().collect(),
+            Some(m) => {
+                let surface = t.color.background_surface;
+                let mut out = Vec::with_capacity(m.slots.len());
+                for slot in m.slots.clone() {
+                    match slot {
+                        Slot::Row(i) => {
+                            let Some(row) = rows[i].take() else { continue };
+                            let Some(key) = m.keys[i].clone() else {
+                                out.push(row);
+                                continue;
+                            };
+                            let Some(reveal) = m.reveals.remove(&key) else {
+                                out.push(row);
+                                continue;
+                            };
+                            let content = reveal_content(reveal, row, false, window, cx)
+                                .unwrap_or_else(|| div().into_any_element());
+                            // A row crossing rows that move the other way rides above
+                            // them, the list's surface behind it (a selected row keeps
+                            // its own fill).
+                            let content = if m.riders.contains(&key) {
+                                gpui::deferred(
+                                    div()
+                                        .when(!m.selected[i], |el| el.bg(surface))
+                                        .child(content),
+                                )
+                                .into_any_element()
+                            } else {
+                                content
+                            };
+                            out.push(
+                                div()
+                                    .id(row_id(&self.id, &key))
+                                    .child(content)
+                                    .into_any_element(),
+                            );
+                        }
+                        Slot::Exit(j) => {
+                            let Some((exit, reveal)) = m.exits[j].take() else {
+                                continue;
+                            };
+                            let ghost = provide(
+                                ListRow {
+                                    first: false,
+                                    last: exit.ghost.last,
+                                    number: 0,
+                                    corners: RowCorners::default(),
+                                    index: usize::MAX,
+                                },
+                                exit.ghost.row(ElementId::Name(
+                                    format!("{}-leaving-{:?}", self.id, exit.key).into(),
+                                )),
+                            );
+                            let content = reveal_content(reveal, ghost, true, window, cx);
+                            out.push(
+                                div()
+                                    .id(ElementId::Name(
+                                        format!("{}-leaving-row-{:?}", self.id, exit.key).into(),
+                                    ))
+                                    .children(content)
+                                    .into_any_element(),
+                            );
+                        }
+                    }
+                }
+                out
+            }
+        };
 
         // AST-103: a reorderable list's session, its rows' bounds once laid
         // out, and its overlay (the line and the dragged row) last.
@@ -417,16 +516,25 @@ impl RenderOnce for List {
             .reorderable
             .as_ref()
             .map(|r| crate::reorderable::session::begin(&self.id, r, false, window, cx));
-        let base = match &reorder {
-            Some(rc) => {
+        let record = motion.as_ref().map(|m| m.record());
+        let base = match (&reorder, record) {
+            (Some(rc), record) => {
                 let session = rc.session.clone();
                 div()
                     .relative()
                     .on_children_prepainted(move |bounds, window, cx| {
+                        // The rows alone: a removed row's exit is not one of them.
+                        let bounds = match &record {
+                            Some(record) => record(&bounds, window, cx),
+                            None => bounds,
+                        };
                         crate::reorderable::session::finalize(&session, &bounds, count, window, cx)
                     })
             }
-            None => div(),
+            (None, Some(record)) => div().on_children_prepainted(move |bounds, window, cx| {
+                record(&bounds, window, cx);
+            }),
+            (None, None) => div(),
         };
         let overlay = reorder.as_ref().map(crate::reorderable::session::overlay);
         let mut list = base

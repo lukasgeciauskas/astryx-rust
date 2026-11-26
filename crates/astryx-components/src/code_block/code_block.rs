@@ -78,6 +78,9 @@ struct BlockState {
     pending: Option<u64>,
     /// The space the block may take, for its fit-content width.
     available: Option<Pixels>,
+    /// The collapse control showed last frame, and when it appeared (its reveal).
+    had_control: bool,
+    control_since: Option<Instant>,
 }
 
 /// Upstream `CodeBlock`.
@@ -323,6 +326,8 @@ impl RenderOnce for CodeBlock {
                 tokens: None,
                 pending: None,
                 available: None,
+                had_control: false,
+                control_since: None,
             },
         );
 
@@ -420,6 +425,46 @@ impl RenderOnce for CodeBlock {
             state.update(cx, |s, _| s.collapsed = false);
         }
         let collapsed = can_collapse && state.read(cx).collapsed;
+        // FR5's motion: the body's height eases over --duration-medium on --ease-standard
+        // (upstream's grid row), the chevron turns on --duration-fast, and an appearing
+        // control grows its chevron in over --duration-medium. Reduce Motion stops all of it.
+        let reduced = astryx_primitives::prefers_reduced_motion(cx);
+        let now = cx.background_executor().now();
+        let had_control = state.read(cx).had_control;
+        if can_collapse != had_control {
+            state.update(cx, |s, _| {
+                s.had_control = can_collapse;
+                s.control_since = (can_collapse && !reduced).then_some(now);
+            });
+        }
+        let control_reveal = match state.read(cx).control_since {
+            Some(since) if !t.duration.medium.is_zero() => {
+                let p = (now.saturating_duration_since(since).as_secs_f32()
+                    / t.duration.medium.as_secs_f32())
+                .min(1.);
+                if p < 1. {
+                    window.request_animation_frame();
+                }
+                t.ease.standard.ease(p)
+            }
+            _ => 1.,
+        };
+        let turn = crate::motion::transition(
+            format!("{}-chevron-turn", self.id),
+            !collapsed,
+            t.duration.fast,
+            t.ease.standard,
+            window,
+            cx,
+        );
+        let body_height = crate::animated_layout::adopt::use_height_transition(
+            format!("{}-body", self.id),
+            !collapsed,
+            t.duration.medium,
+            t.ease.standard,
+            window,
+            cx,
+        );
         // A section has no background of its own (upstream sets the syntax background clear).
         let surface_bg = match self.container {
             CodeBlockContainer::Card => colors.background,
@@ -536,18 +581,17 @@ impl RenderOnce for CodeBlock {
                     .flex_none()
                     .items_center()
                     .justify_center()
-                    .size(px(14.))
-                    .mr(t.spacing.s1)
+                    .overflow_hidden()
+                    .w(px(14.) * control_reveal)
+                    .h(px(14.))
+                    .mr(t.spacing.s1.to_pixels(rem) * control_reveal)
+                    .when(control_reveal < 1., |el| el.opacity(control_reveal))
                     .text_color(colors.comment)
                     .child(
                         Icon::new("chevronRight")
                             .size(IconSize::Xsm)
                             .color(IconColor::Inherit)
-                            .rotation(if collapsed {
-                                0.
-                            } else {
-                                std::f32::consts::FRAC_PI_2
-                            }),
+                            .rotation(std::f32::consts::FRAC_PI_2 * turn),
                     )
             });
             let mut title_el = div()
@@ -847,15 +891,19 @@ impl RenderOnce for CodeBlock {
             .children(fades);
         // FR5: collapsed, the body stays mounted but out of reach.
         let region = format!("{}-region", self.id);
-        let body = div()
-            .debug_selector(move || region)
-            .flex()
-            .flex_col()
-            .min_w_0()
-            .when(!collapsed, |d| d.flex_1())
-            .when(collapsed, |d| {
-                d.flex_none().h(px(0.)).min_h(px(0.)).overflow_hidden()
-            })
+        let moving = body_height.is_moving();
+        let body = body_height
+            .clip_box(
+                div()
+                    .debug_selector(move || region)
+                    .flex()
+                    .flex_col()
+                    .min_w_0()
+                    .when(!collapsed && !moving, |d| d.flex_1())
+                    // Inert from the moment it collapses, as upstream's region (fork
+                    // patch R20): out of the tab order, the pointer and the tree.
+                    .inert(collapsed),
+            )
             .child(body)
             .into_any_element();
 

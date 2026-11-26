@@ -1,10 +1,10 @@
 //! SegmentedControl. Upstream: `SegmentedControl/`.
 //!
-//! With a pointer, selection restyles the chosen segment. Upstream's
-//! sliding lens is part of its touch presentation and lands with the touch
-//! layer (M11).
+//! A change of selection slides the selected surface, one lens, from the old segment to
+//! the new one ([`lens`], FR9 and FR10).
 
 pub mod examples;
+mod lens;
 
 #[cfg(test)]
 pub(crate) mod tests;
@@ -225,6 +225,50 @@ impl RenderOnce for SegmentedControl {
         let fill = self.layout == SegmentLayout::Fill;
         let (hover, pressed) = (t.color.overlay_hover, t.color.overlay_pressed);
 
+        // FR9, FR10: the lens slides from the old segment to the new one.
+        let lens_state = lens::use_lens(&self.id, window, cx);
+        let touch = astryx_primitives::coarse_primary_pointer(window, cx);
+        lens::select(
+            &lens_state,
+            selected,
+            touch,
+            t.duration.fast,
+            t.ease.standard,
+            cx,
+        );
+        let lens_frame = lens::frame(&lens_state, selected, window, cx);
+        let carried = lens_frame.lens.is_some();
+        let count = self.items.len();
+        // The selected surface, as the lens paints it: the theme's selected segment.
+        let surface = |b: lens::SegmentBox, opacity: f32, selector: &'static str| {
+            let mut layer = div()
+                .rounded(inner_radius)
+                .bg(t.color.background_surface)
+                .shadow_token(&t.shadow.low);
+            theme.refine(
+                layer.style(),
+                "segmented-control-item",
+                &[("size", size.as_str()), ("selected", "selected")],
+                None,
+            );
+            let id = format!("{}-{selector}", self.id);
+            layer
+                .absolute()
+                .left(px(b.left))
+                .top(px(b.top))
+                .w(px(b.width))
+                .h(px(b.height))
+                .p_0()
+                .opacity(opacity)
+                .debug_selector(move || id.clone())
+        };
+        let leaving_layer = lens_frame
+            .leaving
+            .map(|(b, opacity)| surface(b, opacity, "leaving"));
+        let lens_layer = lens_frame
+            .lens
+            .map(|(b, opacity)| surface(b, opacity, "lens"));
+
         let segments = self.items.into_iter().enumerate().map(|(i, item)| {
             let is_selected = selected == Some(i);
             let item_disabled = disabled[i];
@@ -273,6 +317,10 @@ impl RenderOnce for SegmentedControl {
                 ],
                 None,
             );
+            if is_selected && carried {
+                // The lens carries the surface: the destination paints none of its own.
+                seg = seg.bg(gpui::transparent_black()).shadow(Vec::new());
+            }
             let icon_el = item.icon.map(|icon| {
                 div()
                     .flex()
@@ -356,12 +404,35 @@ impl RenderOnce for SegmentedControl {
             None,
         );
         el.style().refine(&self.style);
+        // The track's padding box, where the lens is placed, and the segments' boxes.
+        let origin = Rc::new(std::cell::Cell::new(gpui::Point::<gpui::Pixels>::default()));
+        let probe = {
+            let origin = origin.clone();
+            gpui::canvas(
+                move |bounds, _, _| origin.set(bounds.origin),
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+        };
+        let boxes = lens_state.read(cx).boxes.clone();
         let el = el
+            .relative()
+            .child(probe)
+            .children(leaving_layer)
+            .children(lens_layer)
+            .children(segments)
+            .on_children_prepainted(move |children, window, cx| {
+                if lens::measure(&boxes, origin.get(), &children, count) {
+                    window.defer(cx, |window, _| window.refresh());
+                }
+            })
             .id(self.id.clone())
             .on_key_down(list.key_down_listener())
             .role(Role::RadioGroup)
-            .aria_label(self.label)
-            .children(segments);
+            .aria_label(self.label);
         let el = hint.wrap(el, window, cx);
         crate::overlay::disabled_reason(
             &self.id,

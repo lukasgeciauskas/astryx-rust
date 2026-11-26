@@ -141,8 +141,10 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                 .into_any_element(),
         ))
         .child(
-            Text::new("The phone's bar: its toggle opens the drawer")
-                .text_type(TextType::Supporting),
+            Text::new(
+                "The phone's bar: its toggle opens the drawer, whose groups grow open and closed",
+            )
+            .text_type(TextType::Supporting),
         )
         .child(frame({
             let state = window.use_keyed_state("top-nav-example-drawer", cx, |_, _| false);

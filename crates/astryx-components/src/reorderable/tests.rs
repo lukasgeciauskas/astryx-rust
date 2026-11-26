@@ -474,8 +474,16 @@ fn fr9_shift_feedback_slides_the_passed_rows_aside(cx: &mut TestAppContext) {
     let bread = handle(cx, "Bread");
     let pitch = milk.top() - handle(cx, "Eggs").top();
     let jam = handle(cx, "Jam");
-    // Past Bread's slot centre: Milk and Bread slide up a pitch; Jam stays.
+    // Past Bread's slot centre: Milk and Bread slide up a pitch on springs.settle; Jam
+    // stays.
     drag(cx, from, point(from.x, bread.center().y + px(1.)));
+    wait(cx, 80);
+    let sliding = handle(cx, "Milk").top();
+    assert!(
+        sliding < milk.top() - px(1.) && sliding > milk.top() - pitch + px(1.),
+        "sliding: {sliding:?}"
+    );
+    wait(cx, 1000);
     assert_eq!(handle(cx, "Milk").top(), milk.top() - pitch);
     assert_eq!(handle(cx, "Bread").top(), bread.top() - pitch);
     assert_eq!(handle(cx, "Jam").top(), jam.top());
@@ -489,8 +497,57 @@ fn fr9_shift_feedback_slides_the_passed_rows_aside(cx: &mut TestAppContext) {
     assert_eq!(
         handle(cx, "Milk").top(),
         milk.top() - pitch,
-        "the new order, at rest"
+        "the new order, with no layout jump"
     );
+    // The dropped row settles into the open gap from where it was let go.
+    wait(cx, 1000);
+    assert_eq!(handle(cx, "Eggs").top(), bread.top(), "in the gap, at rest");
+}
+
+fn wait(cx: &mut VisualTestContext, ms: u64) {
+    for _ in 0..(ms / 16) {
+        cx.executor().advance_clock(Duration::from_millis(16));
+        settle(cx);
+    }
+}
+
+#[gpui::test]
+fn fr9_a_reorder_mode_move_under_shift_slides_the_rows_into_place(cx: &mut TestAppContext) {
+    let (cx, s) = host(cx, &FOUR, |h| h.feedback = FeedbackBehavior::Shift);
+    let (eggs, milk) = (handle(cx, "Eggs"), handle(cx, "Milk"));
+    click(cx, eggs.center());
+    press(cx, "down");
+    assert_eq!(*s.items.borrow(), ["Milk", "Eggs", "Bread", "Jam"]);
+    let shown = handle(cx, "Eggs").top();
+    assert!(
+        (shown - eggs.top()).abs() < px(2.),
+        "it starts where it was: {shown:?}"
+    );
+    wait(cx, 80);
+    let mid = handle(cx, "Eggs").top();
+    assert!(
+        mid > eggs.top() + px(1.) && mid < milk.top() - px(1.),
+        "sliding: {mid:?}"
+    );
+    wait(cx, 1000);
+    assert_eq!(handle(cx, "Eggs").top(), milk.top());
+    assert_eq!(handle(cx, "Milk").top(), eggs.top());
+}
+
+#[gpui::test]
+fn fr9_a_mouse_drop_behind_the_insertion_line_lands_at_once(cx: &mut TestAppContext) {
+    let (cx, s) = host(cx, &FOUR, |_| {});
+    let from = handle(cx, "Eggs").center();
+    let bread = handle(cx, "Bread");
+    drag(cx, from, point(from.x, bread.center().y + px(1.)));
+    cx.simulate_mouse_up(
+        point(from.x, bread.center().y),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    settle(cx);
+    assert_eq!(moves(&s.log), [("Text(\"Eggs\")".to_string(), 2)]);
+    assert_eq!(handle(cx, "Eggs").top(), bread.top(), "no glide");
 }
 
 #[gpui::test]
@@ -664,6 +721,7 @@ fn fr9_shift_in_a_grid_moves_items_slot_to_slot(cx: &mut TestAppContext) {
     let (c2, c3, c4) = (card(cx, 2), card(cx, 3), card(cx, 4));
     let from = card(cx, 1).center();
     drag(cx, from, c4.center() + point(px(0.), px(1.)));
+    wait(cx, 1000);
     // Cards 2-4 take the slots before them.
     assert_eq!(card(cx, 2).origin, card_slot(c2, -110., 0.));
     assert_eq!(card(cx, 3).origin, card_slot(c3, -110., 0.));
@@ -706,4 +764,55 @@ fn fr1_positions_of_the_wrong_length_are_ignored(cx: &mut TestAppContext) {
     cx.simulate_mouse_up(target, MouseButton::Left, Modifiers::none());
     settle(cx);
     assert_eq!(moves(&log), [("Text(\"Card 1\")".to_string(), 4)]);
+}
+
+/// A drag down past Bread's slot at 16 ms a step, released at once or after a pause.
+fn thrown_drop(cx: &mut VisualTestContext, pause: bool) -> (gpui::Pixels, gpui::Pixels) {
+    let from = handle(cx, "Eggs").center();
+    let bread = handle(cx, "Bread");
+    cx.simulate_mouse_down(from, MouseButton::Left, Modifiers::none());
+    settle(cx);
+    let to = point(from.x, bread.center().y + px(1.));
+    for i in 1..=8 {
+        cx.executor().advance_clock(Duration::from_millis(16));
+        let t = i as f32 / 8.;
+        let at = point(from.x, from.y + (to.y - from.y) * t);
+        cx.simulate_mouse_move(at, Some(MouseButton::Left), Modifiers::none());
+        settle(cx);
+    }
+    if pause {
+        wait(cx, 200);
+    }
+    let let_go = handle(cx, "Eggs").top();
+    cx.simulate_mouse_up(to, MouseButton::Left, Modifiers::none());
+    settle(cx);
+    cx.executor().advance_clock(Duration::from_millis(48));
+    settle(cx);
+    (let_go, handle(cx, "Eggs").top())
+}
+
+#[gpui::test]
+fn fr9_the_dropped_row_settles_from_the_release_velocity(cx: &mut TestAppContext) {
+    let (cx, _) = host(cx, &FOUR, |h| h.feedback = FeedbackBehavior::Shift);
+    let (let_go, thrown) = thrown_drop(cx, false);
+    wait(cx, 1000);
+    let rest = handle(cx, "Eggs").top();
+    assert!(
+        thrown > let_go.max(rest) + px(0.5),
+        "a thrown row carries on past its place before it settles: {thrown:?} vs {rest:?}"
+    );
+}
+
+#[gpui::test]
+fn fr9_a_row_held_still_before_the_drop_settles_from_rest(cx: &mut TestAppContext) {
+    let (cx, _) = host(cx, &FOUR, |h| h.feedback = FeedbackBehavior::Shift);
+    let (let_go, shown) = thrown_drop(cx, true);
+    wait(cx, 1000);
+    let rest = handle(cx, "Eggs").top();
+    let lo = let_go.min(rest) - px(0.5);
+    let hi = let_go.max(rest) + px(0.5);
+    assert!(
+        shown >= lo && shown <= hi,
+        "no overshoot from rest: {shown:?} in {lo:?}..{hi:?}"
+    );
 }

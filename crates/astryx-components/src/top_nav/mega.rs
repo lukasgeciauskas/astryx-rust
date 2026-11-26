@@ -244,6 +244,7 @@ impl TopNavMegaMenu {
         let (on_hover, on_click, on_escape) = (hover.clone(), hover.clone(), hover.clone());
         let probe_state = state.clone();
         let selector = format!("{}", self.id);
+        let chevron_el = chevron(format!("{:?}-chevron", self.id), open, window, cx);
         let mut trigger = div()
             .id(self.id.clone())
             .debug_selector(move || selector)
@@ -270,7 +271,7 @@ impl TopNavMegaMenu {
             .aria_label(self.label.clone())
             .aria_expanded(open)
             .child(self.label.clone())
-            .child(chevron(open))
+            .child(chevron_el)
             .on_hover(move |over, window, cx| {
                 if *over {
                     on_hover.trigger_enter(window, cx)
@@ -502,6 +503,22 @@ impl TopNavMegaMenu {
             |_, _| false,
         );
         let is_expanded = *expanded.read(cx);
+        let chevron_el = chevron(
+            format!("{:?}-drawer-chevron", self.id),
+            is_expanded,
+            window,
+            cx,
+        );
+        // FR9: the group's height eases open and closed over --duration-medium on
+        // --ease-standard, clipped until it is fully open; at once under Reduce Motion.
+        let height = crate::animated_layout::adopt::use_height_transition(
+            format!("{:?}-drawer-group", self.id),
+            is_expanded,
+            t.duration.medium,
+            t.ease.standard,
+            window,
+            cx,
+        );
         let focus = control_focus(&self.id, window, cx);
         let (hover, pressed) = (t.color.overlay_hover, t.color.overlay_pressed);
         let selector = format!("{}", self.id);
@@ -524,7 +541,7 @@ impl TopNavMegaMenu {
         .aria_label(self.label.clone())
         .aria_expanded(is_expanded)
         .child(self.label.clone())
-        .child(chevron(is_expanded))
+        .child(chevron_el)
         .on_click(move |_, _, cx| {
             expanded.update(cx, |e, cx| {
                 *e = !*e;
@@ -541,13 +558,14 @@ impl TopNavMegaMenu {
             &[("mode", "drawer")],
             None,
         );
-        // Collapsed content is out of the tree: inert and hidden.
-        let group = is_expanded.then(|| {
+        // Collapsed content is out of the tree (FR9); collapsing, it is inert.
+        let (items, featured) = (self.items, self.featured);
+        let group = height.wrap(move || {
             div()
                 .flex()
                 .flex_col()
-                .children(self.items)
-                .children(self.featured.map(|f| {
+                .children(items)
+                .children(featured.map(|f| {
                     div()
                         .mt(t.spacing.s2)
                         .ml(t.spacing.s6)
@@ -556,12 +574,15 @@ impl TopNavMegaMenu {
                         .overflow_hidden()
                         .child(f)
                 }))
+                // Collapsing, the group is inert (fork patch R20).
+                .inert(!is_expanded)
+                .into_any_element()
         });
         div()
             .flex()
             .flex_col()
             .child(header)
-            .children(group)
+            .child(group)
             .into_any_element()
     }
 }

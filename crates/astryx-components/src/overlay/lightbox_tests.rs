@@ -207,7 +207,100 @@ fn fr8_a_drag_down_closes_a_fitted_photo(cx: &mut TestAppContext) {
         Modifiers::none(),
     );
     settle(cx);
+    // The photo goes on down on the dismissal's spring and the viewer closes once it has
+    // left.
+    assert!(logged(&log).is_empty(), "still leaving");
+    let top = |cx: &mut VisualTestContext| cx.debug_bounds("lb-photo").unwrap().top();
+    let at_release = top(cx);
+    wait(cx, 48);
+    assert!(top(cx) > at_release, "it carries on down");
+    for _ in 0..40 {
+        wait(cx, 16);
+    }
     assert_eq!(logged(&log), ["open:false"]);
+}
+
+/// `springs.settle`'s progress `ms` in from rest: SwiftUI's smooth spring.
+fn settle_progress(ms: f64) -> f64 {
+    use astryx_primitives::motion::{solve_spring, uikit::springs::SETTLE};
+    solve_spring(SETTLE.to_spring(), 0., 1., 0.).value(ms / 1000.)
+}
+
+#[gpui::test]
+fn fr6_a_zoom_settles_on_springs_settle(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let cx = host(cx, viewer(&log, 1, true));
+    let width =
+        |cx: &mut VisualTestContext| f32::from(cx.debug_bounds("lb-photo").unwrap().size.width);
+    let fitted = width(cx);
+    press(cx, "+");
+    wait(cx, 1000);
+    let zoomed = width(cx);
+    assert!(zoomed > fitted * 1.5, "zoomed: {zoomed} vs {fitted}");
+    press(cx, "0");
+    wait(cx, 100);
+    let progress = f64::from((zoomed - width(cx)) / (zoomed - fitted));
+    let expected = settle_progress(100.);
+    // About 0.36 at 100 ms, where an ease over 280 ms is past 0.5.
+    assert!(
+        (progress - expected).abs() < 0.12,
+        "the spring's own course: {progress} vs {expected}"
+    );
+    wait(cx, 1000);
+    assert!((width(cx) - fitted).abs() < 0.5);
+}
+
+#[gpui::test]
+fn fr7_a_key_page_turn_slides_the_row_on_the_animated_page_scroll(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let cx = host(cx, viewer(&log, 3, false));
+    let left =
+        |cx: &mut VisualTestContext, s: &'static str| f32::from(cx.debug_bounds(s).unwrap().left());
+    let rest = left(cx, "lb-page-0");
+    press(cx, "right");
+    assert_eq!(logged(&log), ["index:1"]);
+    let start = left(cx, "lb-page-1");
+    assert!(
+        start > rest + 100.,
+        "the new page starts where it was: {start}"
+    );
+    wait(cx, 150);
+    let mid = left(cx, "lb-page-1");
+    assert!(mid < start && mid > rest, "sliding: {mid}");
+    wait(cx, 400);
+    assert!((left(cx, "lb-page-1") - rest).abs() < 0.5, "at rest");
+}
+
+#[gpui::test]
+fn fr7_a_drag_release_settles_on_the_paging_settle(cx: &mut TestAppContext) {
+    let log = Log::default();
+    let cx = host(cx, viewer(&log, 3, false));
+    let left =
+        |cx: &mut VisualTestContext, s: &'static str| f32::from(cx.debug_bounds(s).unwrap().left());
+    let rest = left(cx, "lb-page-0");
+    let c = centre(cx);
+    cx.simulate_mouse_down(c, MouseButton::Left, Modifiers::none());
+    for step in 1..=3 {
+        cx.simulate_mouse_move(
+            point(c.x - px(20. * step as f32), c.y),
+            MouseButton::Left,
+            Modifiers::none(),
+        );
+    }
+    wait(cx, 100);
+    cx.simulate_mouse_up(
+        point(c.x - px(60.), c.y),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    settle(cx);
+    assert!(logged(&log).is_empty(), "a short drag stays");
+    let back = left(cx, "lb-page-0");
+    assert!(back < rest - 1., "it starts where the drag left it: {back}");
+    for _ in 0..40 {
+        wait(cx, 16);
+    }
+    assert!((left(cx, "lb-page-0") - rest).abs() < 0.5, "back at rest");
 }
 
 #[gpui::test]

@@ -40,15 +40,13 @@ _Last updated: 2026-11-26, after M10 (Content)._
 
 | What | Waits for |
 |---|---|
-| Item swipe actions, SegmentedControl's sliding lens, Collapsible's and List's animated layout, reordering's shift slide (AST-103 FR9) | Motion layer (M11) |
-| Lightbox springs (it eases over 280ms now) | Motion layer (M11) |
 | Lightbox video playback and `hasAutoPlay` (a video opens in the system player now) | MediaPlayer's decoder (M13) |
 | Backdrop blur (Lightbox, scrims, ChatLayout's frosted dock) | Fork patch R2 |
+| Item and List swipe actions | M11 stage 5 (with fork patch R3) |
+| Transient copies: SideNav's two rail layers (FR6), AppShell's held content (FR17, AST-105 FR8), a List exit's and a dragged row's start and end content | M11 stage 5 (fork patch R3 snapshots) |
+| SegmentedControl's finger drag, label hysteresis and lift (FR11-FR14) | M11 stage 3 (gestures) |
 | ChatLayout's virtual-keyboard lift (`useChatKeyboard`) | Touch layer (M11) |
 | ChatTypingIndicator, ChatUnreadDivider, ChatVirtualizer, ChatEmojiPicker, ChatReactionBar (lab components) | Lab (M13) |
-| Table row expansion's `animatedLayout` glide (FR15) | Motion layer (M11) |
-| TreeList's `animatedLayout` and expand glide (FR8, FR9) | Motion layer (M11) |
-| Resizable's pane slide and rubber-band overshoot (FR8, AST-105 FR9); SideNav's rail reveal (FR6); TopNav's drawer groups' height (TopNavMenu FR7, TopNavMegaMenu FR9); AppShell's content swap (FR17); CodeBlock's collapse (FR5); ChatComposerDrawer's collapse; ChatToolCalls' group height | Motion layer (M11) |
 | ChatPastedTextToken's touch tap-stop | Touch layer (M11) |
 | Native date and time pickers on macOS and Linux (`Native` shows the Astryx surface there) | Fork patch R16 built and checked on those platforms |
 

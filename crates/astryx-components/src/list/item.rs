@@ -170,6 +170,55 @@ impl ListItem {
     }
 }
 
+/// What a List keeps of a keyed row to draw its exit once it is gone (List FR12): GPUI
+/// keeps no element from one frame to the next. Its start and end content are not kept; a
+/// faithful copy needs a snapshot of the row's last frame, which comes with fork patch R3
+/// (offscreen layers) in M11 stage 5.
+#[derive(Clone, Default)]
+pub(super) struct RowGhost {
+    label: Option<SharedString>,
+    description: Option<SharedString>,
+    align: ItemAlign,
+    selected: bool,
+    /// It was the list's last row: no divider under it.
+    pub last: bool,
+}
+
+impl RowGhost {
+    /// The row as its exit draws it: static, its text and selection.
+    pub(super) fn row(&self, id: ElementId) -> ListItem {
+        let mut item = ListItem::new(id, self.label.clone().unwrap_or_default())
+            .align(self.align)
+            .selected(self.selected);
+        if let Some(d) = &self.description {
+            item = item.description(d.clone());
+        }
+        item
+    }
+}
+
+impl ListItem {
+    /// The row's identity for a List's update motion (FR12): its `item_key`.
+    pub(super) fn motion_key(&self) -> Option<ItemKey> {
+        self.item_key.clone()
+    }
+
+    pub(super) fn is_selected(&self) -> bool {
+        self.selected
+    }
+
+    /// What the List keeps of the row for its exit.
+    pub(super) fn ghost(&self, last: bool) -> RowGhost {
+        RowGhost {
+            label: self.label_text.clone(),
+            description: self.description_string.clone(),
+            align: self.align,
+            selected: self.selected,
+            last,
+        }
+    }
+}
+
 impl Styled for ListItem {
     /// Upstream `xstyle`, `className` and `style`: after the row's own.
     fn style(&mut self) -> &mut StyleRefinement {

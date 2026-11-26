@@ -121,9 +121,78 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
         ))
         .child(reorderable(window, cx))
         .child(label(
+            "Animated: with an animatedLayout handle, added rows enter, removed rows collapse and the rest glide",
+        ))
+        .child(animated(window, cx))
+        .child(label(
             "Windowed: 10,000 rows, opened at row 5,000; only rows in view render",
         ))
         .child(windowed(window, cx))
+        .into_any_element()
+}
+
+/// A list whose row updates animate (FR12): add a row, remove one, or shuffle them.
+fn animated(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::button::Button;
+    let layout = crate::animated_layout::use_animated_layout("list-animated-layout", window, cx);
+    let rows = window.use_keyed_state("list-animated-rows", cx, |_, _| {
+        (4usize, vec![0usize, 1, 2, 3])
+    });
+    let (add, remove, shuffle) = (rows.clone(), rows.clone(), rows.clone());
+    let current = rows.read(cx).1.clone();
+    let list = List::new("animated")
+        .label("Tasks")
+        .dividers(true)
+        .animated_layout(layout.clone())
+        .children(current.iter().map(|n| {
+            ListItem::new(("task", *n), format!("Task {}", n + 1))
+                .description("Added to the list")
+                .item_key(*n)
+        }));
+    layout
+        .container(
+            gpui::div()
+                .flex()
+                .flex_col()
+                .gap(px(8.))
+                .w(px(320.))
+                .child(
+                    Stack::horizontal()
+                        .gap(SpacingStep::S2)
+                        .child(Button::new("list-animated-add", "Add").on_click(
+                            move |_, window, cx| {
+                                add.update(cx, |(next, rows), _| {
+                                    rows.insert(rows.len().min(1), *next);
+                                    *next += 1;
+                                });
+                                window.refresh();
+                            },
+                        ))
+                        .child(Button::new("list-animated-remove", "Remove").on_click(
+                            move |_, window, cx| {
+                                remove.update(cx, |(_, rows), _| {
+                                    if !rows.is_empty() {
+                                        rows.remove(rows.len() / 2);
+                                    }
+                                });
+                                window.refresh();
+                            },
+                        ))
+                        .child(Button::new("list-animated-shuffle", "Reverse").on_click(
+                            move |_, window, cx| {
+                                shuffle.update(cx, |(_, rows), _| rows.reverse());
+                                window.refresh();
+                            },
+                        )),
+                )
+                .child(Card::new().child(list))
+                .child(
+                    Text::new("This note glides as the list above it changes.")
+                        .text_type(TextType::Supporting),
+                ),
+            window,
+            cx,
+        )
         .into_any_element()
 }
 

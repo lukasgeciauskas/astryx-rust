@@ -11,6 +11,7 @@ use gpui::{
 
 use super::controller::{Basis, Controller, Options, Report};
 use super::model::{ResizableSize, ResizeDirection};
+use crate::animated_layout::LayoutMotion;
 
 type SizeFn = Rc<dyn Fn(f32, &mut Window, &mut App)>;
 type CollapseFn = Rc<dyn Fn(bool, &mut Window, &mut App)>;
@@ -353,11 +354,168 @@ impl ResizableProps {
         matches!(self.driver, Driver::Hook(_))
     }
 
+    /// A LayoutPanel renders the region's pane (LayoutPanel FR7): it lends its element,
+    /// so the pane slides and a pointer's pull draws the rubber band. A hand-built region
+    /// has no controller to lend it to, and never slides.
+    pub(crate) fn lend_pane(&self, cx: &mut App) {
+        if let Driver::Hook(d) = &self.driver
+            && !d.controller.read(cx).pane_lent
+        {
+            d.controller.update(cx, |c, _| c.pane_lent = true);
+        }
+    }
+
+    /// The lent pane's slide this frame (Resizable FR8, AST-105 FR9): on the theme's move
+    /// curve over `--duration-medium`, or a lift's `springs.settle`. Under Reduce Motion
+    /// with a coarse pointer an opening fades in and a closing lands at once; with a fine
+    /// pointer both land at once. Asks for frames while it plays.
+    pub(crate) fn pane_frame(&self, window: &mut Window, cx: &mut App) -> Option<PaneFrame> {
+        let Driver::Hook(d) = &self.driver else {
+            return None;
+        };
+        let (slide, held, open_size) = {
+            let c = d.controller.read(cx);
+            (c.slide.clone(), c.held, c.derived.size)
+        };
+        // A pointer holds a closing pane's slide: the edge stays under it.
+        if let Some(shown) = held {
+            return Some(PaneFrame {
+                shown,
+                to: 0.,
+                held: open_size.max(shown),
+                opacity: None,
+                by_pointer: true,
+                start: None,
+                curve: None,
+            });
+        }
+        let slide = slide?;
+        let motion = LayoutMotion::read(window, cx);
+        let now = cx.background_executor().now();
+        let finish = |cx: &mut App| {
+            d.controller.update(cx, |c, _| {
+                c.slide = None;
+                c.slide_shown = None;
+            });
+        };
+        if !motion.animates() || (motion.cross_fade.is_some() && slide.to < slide.from) {
+            finish(cx);
+            return None;
+        }
+        let (progress, done) = slide_progress(&slide, &motion, now);
+        if done {
+            finish(cx);
+            return None;
+        }
+        window.request_animation_frame();
+        if motion.cross_fade.is_some() {
+            return Some(PaneFrame {
+                shown: slide.to,
+                to: slide.to,
+                held: slide.held,
+                opacity: Some(progress),
+                by_pointer: false,
+                start: Some(slide.start),
+                curve: None,
+            });
+        }
+        let shown = (slide.from + (slide.to - slide.from) * progress).max(0.);
+        d.controller.update(cx, |c, _| c.slide_shown = Some(shown));
+        let curve = match &slide.release {
+            Some((duration, ease)) => SlideCurve::Release {
+                duration: *duration,
+                ease: ease.clone(),
+            },
+            None => SlideCurve::Theme {
+                duration: motion.duration,
+                ease: motion.ease,
+            },
+        };
+        Some(PaneFrame {
+            shown,
+            to: slide.to,
+            held: slide.held,
+            opacity: None,
+            by_pointer: false,
+            start: Some(slide.start),
+            curve: Some(curve),
+        })
+    }
+
+    /// While the lent pane slides open, how far its edge has yet to travel (px): the gap
+    /// the content beside it, laid out at its final width, would leave until the edge
+    /// arrives (AST-105 FR9). The content's trailing edge reaches over it. Nothing while it
+    /// closes (the pane covers the content), while a pointer drives it, or under Reduce
+    /// Motion, where nothing travels.
+    pub(crate) fn opening_gap(&self, window: &Window, cx: &mut App) -> f32 {
+        let Driver::Hook(d) = &self.driver else {
+            return 0.;
+        };
+        let (slide, held) = {
+            let c = d.controller.read(cx);
+            (c.slide.clone(), c.held)
+        };
+        let Some(slide) = slide.filter(|s| held.is_none() && s.to > s.from) else {
+            return 0.;
+        };
+        let motion = LayoutMotion::read(window, cx);
+        if !motion.animates() || motion.cross_fade.is_some() {
+            return 0.;
+        }
+        let (progress, done) = slide_progress(&slide, &motion, cx.background_executor().now());
+        if done {
+            return 0.;
+        }
+        let shown = slide.from + (slide.to - slide.from) * progress;
+        (slide.to - shown).max(0.)
+    }
+
+    /// How many times a pointer has caught a slide of the region.
+    pub(crate) fn catches(&self, cx: &App) -> u32 {
+        match &self.driver {
+            Driver::Hook(d) => d.controller.read(cx).catches,
+            Driver::Custom(_) => 0,
+        }
+    }
+
+    /// The handle's drawn travel past the size: a pull's rubber band, or its spring back
+    /// on `springs.settle` (frames are asked for while it springs).
+    pub(crate) fn handle_offset(&self, window: &mut Window, cx: &mut App) -> f32 {
+        let Driver::Hook(d) = &self.driver else {
+            return 0.;
+        };
+        let now = cx.background_executor().now();
+        let (offset, moving) = d.controller.update(cx, |c, _| c.handle_offset(now));
+        if moving {
+            window.request_animation_frame();
+        }
+        if crate::animated_layout::LayoutMotion::read(window, cx).reduced {
+            return 0.;
+        }
+        offset
+    }
+
+    /// A pointer presses the handle: the gesture begins, taking the edge where it shows.
+    pub(crate) fn start_pointer(&self, window: &mut Window, cx: &mut App) {
+        match &self.driver {
+            Driver::Hook(d) => {
+                let basis = d.basis(window);
+                d.controller.update(cx, |c, cx| c.start(&basis, true, cx));
+                window.refresh();
+            }
+            Driver::Custom(d) => {
+                if let Some(f) = &d.on_start {
+                    f(window, cx);
+                }
+            }
+        }
+    }
+
     pub(crate) fn start(&self, window: &mut Window, cx: &mut App) {
         match &self.driver {
             Driver::Hook(d) => {
                 let basis = d.basis(window);
-                d.controller.update(cx, |c, _| c.start(&basis));
+                d.controller.update(cx, |c, cx| c.start(&basis, false, cx));
             }
             Driver::Custom(d) => {
                 if let Some(f) = &d.on_start {
@@ -439,6 +597,53 @@ impl From<ResizableRegion> for ResizableProps {
 impl From<&ResizableRegion> for ResizableProps {
     fn from(region: &ResizableRegion) -> Self {
         region.props.clone()
+    }
+}
+
+/// What a lent pane shows this frame while it slides.
+#[derive(Clone)]
+pub(crate) struct PaneFrame {
+    /// The extent it shows, px: its edge facing the handle moves with it.
+    pub shown: f32,
+    /// The extent it is laid out at when the slide ends.
+    pub to: f32,
+    /// The extent its content stays laid out at, clipped to `shown`.
+    pub held: f32,
+    /// Reduce Motion under a coarse pointer: an opening fades in, at its new size.
+    pub opacity: Option<f32>,
+    /// A pointer holds the edge (a caught closing slide): the layout follows it.
+    pub by_pointer: bool,
+    /// When the slide began, and the curve it plays: the content beside glides on the
+    /// same one.
+    pub start: Option<web_time::Instant>,
+    pub curve: Option<SlideCurve>,
+}
+
+/// The curve a pane's slide plays, which the content beside it glides on too.
+#[derive(Clone)]
+pub(crate) enum SlideCurve {
+    /// The theme's move curve over `--duration-medium`.
+    Theme {
+        duration: std::time::Duration,
+        ease: astryx_theme::CubicBezier,
+    },
+    /// A lift's `springs.settle` from its release velocity.
+    Release {
+        duration: std::time::Duration,
+        ease: crate::animated_layout::engine::GlideEase,
+    },
+}
+
+impl SlideCurve {
+    /// The progress `seconds` after the slide began, 0 to 1.
+    pub fn at(&self, seconds: f32) -> f32 {
+        let (SlideCurve::Theme { duration, .. } | SlideCurve::Release { duration, .. }) = self;
+        let d = duration.as_secs_f32();
+        let t = if d <= 0. { 1. } else { (seconds / d).min(1.) };
+        match self {
+            SlideCurve::Theme { ease, .. } => ease.ease(t),
+            SlideCurve::Release { ease, .. } => ease(t),
+        }
     }
 }
 
@@ -623,4 +828,28 @@ pub fn use_resizable_regions(
         })
         .collect();
     ResizableRegions(regions)
+}
+
+/// A slide's progress at `now` (0 to 1) and whether it has ended: a lift's spring, or the
+/// theme's move curve (opacity's linear time under Reduce Motion's cross-fade).
+fn slide_progress(
+    slide: &super::controller::PaneSlide,
+    motion: &LayoutMotion,
+    now: web_time::Instant,
+) -> (f32, bool) {
+    if motion.cross_fade.is_some() {
+        let p = motion.progress(slide.start, now);
+        return (p, p >= 1.);
+    }
+    match &slide.release {
+        Some((duration, ease)) => {
+            let t = now.saturating_duration_since(slide.start).as_secs_f32()
+                / duration.as_secs_f32().max(1e-6);
+            (ease(t.min(1.)), t >= 1.)
+        }
+        None => {
+            let p = motion.progress(slide.start, now);
+            (p, p >= 1.)
+        }
+    }
 }

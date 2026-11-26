@@ -24,7 +24,7 @@ fn top_nav(id: &'static str) -> impl Fn() -> TopNav + 'static {
 
 fn side_nav(id: &'static str) -> impl Fn() -> SideNav + 'static {
     move || {
-        SideNav::new(format!("{id}-side")).child(
+        SideNav::new(format!("{id}-side")).collapsible(true).child(
             SideNavSection::new(format!("{id}-main"), "Projects")
                 .child(
                     SideNavItem::new(format!("{id}-a"), "Atlas")
@@ -65,7 +65,9 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     Stack::vertical()
         .gap(SpacingStep::S4)
         .child(
-            Text::new("AppShell: elevated, with a top nav and a side nav (fill)")
+            Text::new(
+                "AppShell: elevated, with a top nav and a side nav (fill). Collapse the side nav: the content glides beside its edge",
+            )
                 .text_type(TextType::Supporting),
         )
         .child(frame(

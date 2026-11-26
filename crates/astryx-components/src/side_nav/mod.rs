@@ -27,12 +27,14 @@ use crate::doc::{ComponentDoc, PropMapping, RustApi};
 /// A callback that acts.
 pub(crate) type Action = Rc<dyn Fn(&mut Window, &mut App)>;
 
-/// What a SideNav tells its parts: whether its rail is collapsed, and its toggle.
+/// What a SideNav tells its parts: whether its rail presents the collapsed state, its
+/// toggle, and its labels' opacity while the rail collapses or expands (FR6).
 #[derive(Clone)]
 pub(crate) struct SideNavCollapse {
     pub collapsed: bool,
     pub collapsible: bool,
     pub toggle: Action,
+    pub labels: f32,
 }
 
 impl SideNavCollapse {
@@ -41,8 +43,25 @@ impl SideNavCollapse {
             collapsed: false,
             collapsible: false,
             toggle: Rc::new(|_, _| {}),
+            labels: 1.,
         }
     }
+}
+
+/// What AppShell lends its SideNav (upstream `SideNavShellContext`): its own animated
+/// layout handle, whose area holds the rail and the content column that glides beside it
+/// (AppShell FR17). Outside AppShell, nothing.
+#[derive(Clone)]
+pub(crate) struct SideNavShell {
+    pub layout: crate::animated_layout::AnimatedLayout,
+    /// While the rail expands, the gap its edge has yet to close beside the content
+    /// column, which the content surface reaches over; written as the rail renders.
+    pub cover: Rc<std::cell::Cell<gpui::Pixels>>,
+    /// The rail may draw past its panel's inline edge (a fill shell, whose side region
+    /// scrolls only along the block axis): the layout snaps and the edge rides the
+    /// content column's glide. An `auto` shell clips its side region, so there the rail's
+    /// own box follows its edge.
+    pub rides: bool,
 }
 
 /// A SideNavItem's nesting depth.

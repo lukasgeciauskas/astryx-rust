@@ -4,6 +4,17 @@
 //! side nav leaves the inline region for the drawer, and the top nav turns into the
 //! phone's bar (FR8-FR12); AppShell tells its subtree about it through
 //! `AppShellMobile` (FR13). At its root a Layout lays out as at the page root (FR18).
+//!
+//! While the inline side nav collapses or expands (FR17), the shell holds its own animated
+//! layout handle: the rail's change arms it, so the content column beside the rail glides
+//! from its old place to its new one on the rail's one clock, the theme's move curve over
+//! `--duration-medium`, and never animates its width; on an expand the content surface
+//! reaches over the gap the narrower column leaves at its trailing edge until the rail's
+//! edge closes it. Upstream also holds the old content as one transient copy that fades out
+//! as the new content fades in (AST-105 FR8's swap); that copy waits for a snapshot of
+//! main's last frame, fork patch R3's offscreen layers in M11 stage 5, so the content
+//! plays upstream's no-copy path for now. Under Reduce Motion it cross-fades with a coarse pointer and lands at
+//! once with a fine one.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -23,7 +34,7 @@ use gpui::{
 use super::mobile::{AppShellMobile, OpenFn};
 use crate::layout::{Layout, LayoutHeader, LayoutHeight, LayoutPanel, SpacingStep, layout_reset};
 use crate::mobile_nav::MobileNavToggle;
-use crate::side_nav::SideNavRenderMode;
+use crate::side_nav::{SideNavRenderMode, SideNavShell};
 use crate::top_nav::{TopNavMobileContent, TopNavRenderMode};
 
 /// Builds a slot's element; AppShell may draw a nav more than once (the bar, the drawer).
@@ -401,6 +412,17 @@ impl RenderOnce for AppShell {
             el
         });
 
+        // FR17: the shell's own animated layout, lent to its inline SideNav.
+        let content_layout = crate::animated_layout::use_animated_layout(
+            ElementId::Name(format!("{}-content-layout", self.id).into()),
+            window,
+            cx,
+        );
+        let side_shell = SideNavShell {
+            layout: content_layout.clone(),
+            cover: Rc::new(Cell::new(px(0.))),
+            rides: !is_auto,
+        };
         // FR6, FR7: the inline side region; sticky below the header in auto.
         let side_inline = (has_side && !is_mobile).then(|| {
             let side = self.side_nav.clone().unwrap();
@@ -408,7 +430,7 @@ impl RenderOnce for AppShell {
                 .padding(SpacingStep::S0)
                 .has_divider(dividers)
                 .scrollable(!is_auto)
-                .child(side());
+                .child(provide(side_shell.clone(), side()));
             if let Some(bg) = nav_bg.or(is_auto.then_some(surface)) {
                 panel = panel.bg(bg);
             }
@@ -501,6 +523,18 @@ impl RenderOnce for AppShell {
                     rem,
                 ))
             });
+        // FR17: on an expand, the content surface reaches over the gap at its trailing edge
+        // until the rail's edge closes it.
+        let cover_color = match self.variant {
+            AppShellVariant::Wash => Some(body),
+            AppShellVariant::Surface | AppShellVariant::Elevated => Some(surface),
+            AppShellVariant::Section => None,
+        };
+        let cover = cover_color.map(|color| ContentCover {
+            gap: side_shell.cover.clone(),
+            color,
+            rtl: astryx_i18n::use_direction(cx).is_rtl(),
+        });
         // FR16: elevated, the content area is a raised surface with the page's corner.
         let content = if elevated {
             div()
@@ -517,14 +551,20 @@ impl RenderOnce for AppShell {
                         .rounded_tl(page_radius),
                 )
                 .child(main)
+                .children(cover)
                 .into_any_element()
         } else {
-            let bg = match self.variant {
-                AppShellVariant::Wash => Some(body),
-                AppShellVariant::Surface | AppShellVariant::Elevated => Some(surface),
-                AppShellVariant::Section => None,
-            };
-            main.when_some(bg, |el, bg| el.bg(bg)).into_any_element()
+            let bg = cover_color;
+            div()
+                .relative()
+                .flex()
+                .flex_col()
+                .flex_1()
+                .min_h_0()
+                .size_full()
+                .child(main.when_some(bg, |el, bg| el.bg(bg)))
+                .children(cover)
+                .into_any_element()
         };
 
         // FR5: the skip link, hidden until focused, moves focus to main.
@@ -598,6 +638,7 @@ impl RenderOnce for AppShell {
         };
 
         let layout = Layout::new()
+            .without_pane_glide()
             .height(self.height)
             .padding(SpacingStep::S0)
             // In auto the header slot sticks at the top of the page (FR6); it is the
@@ -633,6 +674,34 @@ impl RenderOnce for AppShell {
             .children(drawer);
         theme.refine(root.style(), "app-shell", &[("variant", variant)], None);
         root.style().refine(&self.style);
+        let root = content_layout.container(root, window, cx);
         provide(mobile, layout_reset(root, cx))
+    }
+}
+
+/// The content surface past the column's trailing edge while the rail expands (FR17):
+/// rendered after the rail, which writes the gap its edge has yet to close.
+#[derive(IntoElement)]
+struct ContentCover {
+    gap: Rc<Cell<Pixels>>,
+    color: gpui::Hsla,
+    rtl: bool,
+}
+
+impl RenderOnce for ContentCover {
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        let gap = self.gap.get();
+        let el = div()
+            .absolute()
+            .top_0()
+            .bottom_0()
+            .w(gap)
+            .bg(self.color)
+            .debug_selector(|| "app-shell-content-cover".into());
+        if self.rtl {
+            el.left(-gap)
+        } else {
+            el.right(-gap)
+        }
     }
 }

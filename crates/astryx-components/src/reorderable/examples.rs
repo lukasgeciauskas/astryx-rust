@@ -61,7 +61,9 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     Stack::vertical()
         .gap(SpacingStep::S3)
         .child(
-            Text::new("createReorderable: attached cards, shift feedback")
+            Text::new(
+                "createReorderable: attached cards, shift feedback (the cards slide aside on springs.settle, and the drop settles into the gap)",
+            )
                 .text_type(TextType::Supporting),
         )
         .child(

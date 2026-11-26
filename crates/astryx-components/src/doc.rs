@@ -104,6 +104,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::animator::CREATE_ANIMATOR_DOC,
     crate::animator::USE_ANIMATOR_DOC,
     crate::animator::USE_ENTRY_ANIMATION_DOC,
+    crate::animated_layout::USE_ANIMATED_LAYOUT_DOC,
     crate::top_nav::TOP_NAV_DOC,
     crate::top_nav::TOP_NAV_HEADING_DOC,
     crate::top_nav::TOP_NAV_ITEM_DOC,

@@ -31,11 +31,10 @@
 - **A dragged row's place shows its text, not a copy of the row.** GPUI draws an element
   once a frame, so while a row is dragged the row itself (dimmed) rides the pointer as
   the preview, and its place shows its label, description, grip and divider, dimmed;
-  start content and custom end content are not there. Upstream dims the row in place and
-  draws a copy at the pointer. GPUI also reports no pointer type, so a finger's drag
+  start content and custom end content are not there until fork patch R3's snapshots (M11
+  stage 5). Upstream dims the row in place and draws a copy at the pointer. GPUI also reports no pointer type, so a finger's drag
   starts like a mouse's (4px of travel), without upstream's hold; and Escape cancels a
-  drag, which upstream's mouse drag has no key for. Under shift feedback the passed items
-  jump to their slots; their slide waits for the motion layer (M11).
+  drag, which upstream's mouse drag has no key for.
 
 - **Table: what GPUI's layout and AccessKit change.** An unknown row total (ARIA's `aria-rowcount=-1`, while more rows may load) has no
   AccessKit form, so no count is exposed then. A composed table's columns fit their
@@ -128,10 +127,8 @@
   blurs as it opens (its `onBlur` runs) and focus comes back when it closes. Its strings
   ("Cut", "Add to dictionary"...) are the port's own, not upstream's, and ship in
   English: an app translates the `@astryx.textField.*` keys with its catalogs.
-- **Lightbox settles on eased timing, not springs, until M11.** Its zoom, paging and
-  drag-to-close settle over 280ms on the `move` easing; upstream uses UIKit's measured
-  springs, which arrive with the motion layer (M11). Lightbox has no backdrop blur (GPUI
-  has none; see `astryx docs effects`), and video items open in the system player until
+- **Lightbox has no backdrop blur, and plays no video.** GPUI has no backdrop blur (fork
+  patch R2; see `astryx docs effects`), and video items open in the system player until
   MediaPlayer's decoder (M13).
 - **A CommandPalette source has no identity across renders.** React compares the
   `searchSource` object; a Rust value built in `render` is new every frame. A source kept
@@ -321,15 +318,26 @@
   element's bounds from its focus handle, so a drawer opened by a pointer uses the
   pointer's half, one opened from the keyboard uses AppShell's toggle, and otherwise it
   keeps its last side, as upstream does when nothing is focused.
-- **A resizable pane, the SideNav rail and TopNav's drawer groups jump rather than slide
-  (M9, until M11).** Upstream reveals SideNav's rail as it collapses or expands (SideNav
-  FR6) while AppShell's content area swaps its old wrap for the new one in place (AppShell
-  FR17), grows or shrinks a collapsing CodeBlock's body (CodeBlock FR5), grows the height of a TopNavMenu's or TopNavMegaMenu's group in the phone's drawer
-  as it expands (TopNavMenu FR7, TopNavMegaMenu FR9), and slides a pane
-  that collapses or opens on the animated-layout system's edge reveal (Resizable FR8,
-  AST-105 FR9) and draws a pull past a bound as an 8 px rubber band that springs back;
-  here the pane takes its new size at once, a drawer group appears whole, and a pull
-  stops at the bound. They wait for the motion layer's animated layout (M11).
+- **No transient copies yet (until M11 stage 5).** Upstream holds an element's old look as
+  an inert copy while the new one enters: SideNav's rail cross-fades its expanded and
+  collapsed layers over the last 30% of a collapse (SideNav FR6), AppShell's content area
+  holds its old wrap (AppShell FR17, AST-105 FR8), and a List row's exit copy shows its
+  start and end content. GPUI keeps no element from one frame to the next, so the rail
+  shows its old state until 70% and then its new one, AppShell plays upstream's no-copy
+  path, and a List exit copy draws the row's label, description and divider only. Fork
+  patch R3 (offscreen layers, M11 stage 5) snapshots an element's last frame for these.
+  Outside AppShell, or in an `auto`-height AppShell, the SideNav rail's own width follows
+  its edge and its neighbours reflow.
+- **Animated layout keys elements without ids by where they were built (fork patch R19).**
+  Upstream's glide follows DOM nodes. GPUI elements do not outlive a frame, so a `div`
+  without an id is known from frame to frame by the source place that built it and how
+  many siblings that place built before it. Content inserted among siblings built by the
+  same place (rows from one loop) therefore jumps unless the rows have element ids, as
+  Astryx's own List and TreeList rows do. Elements inside a cached view are not followed.
+- **The edge reveal measures the content it reveals.** Upstream's block-end reveal slides
+  the content under a clip with transforms alone; here the clip's height follows the
+  shared motion (the content keeps its own height and slides under it), so the content
+  after it follows by layout, frame by frame, rather than by a transform.
 - **Remembered sizes live in a file natively (M9).** `autoSaveId` writes to
   `localStorage` in a browser, as upstream does; a native app keeps the entries in
   `<data dir>/astryx/<executable>.json` (`astryx_primitives::storage`, which an app can

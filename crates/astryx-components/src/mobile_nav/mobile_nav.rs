@@ -233,6 +233,8 @@ impl RenderOnce for MobileNav {
             .role(Role::Dialog)
             .aria_label(label.clone())
             .aria_modal(true);
+        // FR5: sliding out after the dialog closed, the drawer is inert (fork patch R20).
+        drawer = drawer.inert(inert);
         if !inert {
             drawer = drawer
                 .occlude()

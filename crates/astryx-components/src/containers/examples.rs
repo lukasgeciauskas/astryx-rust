@@ -26,6 +26,8 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
         }
     };
     let label = |text: &'static str| Text::new(text).text_type(TextType::Supporting);
+    // The FAQ's handle: opening an answer glides what follows it (AST-105).
+    let faq_layout = crate::animated_layout::use_animated_layout("faq-layout", window, cx);
     let card_body = |title: &'static str| {
         Stack::vertical()
             .gap(SpacingStep::S1)
@@ -149,25 +151,45 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                         ),
                 )
                 .child(
-                    Stack::vertical().width(px(320.)).child(
-                        CollapsibleGroup::new("faq", SelectionMode::Single)
-                            .dividers(true)
-                            .default_value(["q1"])
-                            .item(
-                                Collapsible::new("q1", "What is Astryx?")
-                                    .value("q1")
-                                    .child(Text::new("A design system, ported to GPUI.")),
+                    faq_layout.container(
+                        gpui::div()
+                            .flex()
+                            .flex_col()
+                            .gap(px(8.))
+                            .w(px(320.))
+                            .child(
+                                CollapsibleGroup::new("faq", SelectionMode::Single)
+                                    .dividers(true)
+                                    .default_value(["q1"])
+                                    .item(
+                                        Collapsible::new("q1", "What is Astryx?")
+                                            .value("q1")
+                                            .animated_layout(faq_layout.clone())
+                                            .child(Text::new("A design system, ported to GPUI.")),
+                                    )
+                                    .item(
+                                        Collapsible::new("q2", "Does it work on the web?")
+                                            .value("q2")
+                                            .animated_layout(faq_layout.clone())
+                                            .child(Text::new(
+                                                "Yes, through GPUI's wasm platform.",
+                                            )),
+                                    )
+                                    .item(
+                                        Collapsible::new("q3", "Is it themeable?")
+                                            .value("q3")
+                                            .animated_layout(faq_layout.clone())
+                                            .child(Text::new("Seven themes ship with it.")),
+                                    ),
                             )
-                            .item(
-                                Collapsible::new("q2", "Does it work on the web?")
-                                    .value("q2")
-                                    .child(Text::new("Yes, through GPUI's wasm platform.")),
-                            )
-                            .item(
-                                Collapsible::new("q3", "Is it themeable?")
-                                    .value("q3")
-                                    .child(Text::new("Seven themes ship with it.")),
+                            .child(
+                                Text::new(
+                                    "With an animatedLayout handle, this note glides as answers open and close.",
+                                )
+                                .text_type(TextType::Supporting),
                             ),
+                        window,
+                        cx,
                     ),
                 ),
         )

@@ -222,7 +222,7 @@ The remaining primitives:
     Item's core (from M6; swipe actions wait for M11).
   - Carried into later milestones, recorded in each doc: TabMenu and BreadcrumbItem
     menus (finished in M5 with DropdownMenu), Pagination's page-size selector (finished
-    in M6 with Selector); the SegmentedControl lens and Item swipe actions (M11). Tooltips, InfoTips, disabled messages and Stepper's on-track and compact
+    in M6 with Selector); the SegmentedControl lens (landed in M11 stage 2) and Item swipe actions (M11 stage 5). Tooltips, InfoTips, disabled messages and Stepper's on-track and compact
     modes were finished with M4.
   - A gallery test renders every page, so an example that panics fails `cargo test`.
 - **M4 Editing engine & fields (done):**
@@ -313,7 +313,7 @@ The remaining primitives:
     `aria-current` on a selected interactive row; swipe actions wait for M11.
   - MetadataList and MetadataListItem (done) on R7 grid tracks; OverflowList (done) with
     upstream's `computeOverflow` fit over a hidden measuring copy.
-  - Carried: List's and TreeList's `animatedLayout` (with TreeList's expand glide, FR8-FR9) to the motion layer (M11), like Collapsible's.
+  - Carried: List's and TreeList's `animatedLayout` (with TreeList's expand glide, FR8-FR9), like Collapsible's; landed in M11 stage 2.
   - Typeahead, BaseTypeahead and TypeaheadItem (done) on `search::SearchSource`: the
     threshold and debounce (FR2), stale answers dropped and answers kept through a
     dismissal (FR3), partial lists that keep their rows and highlight (FR10), grouped
@@ -471,7 +471,7 @@ The remaining primitives:
     rows by index with a plugin's synthetic rows among them. `TableRowExpansion` adds the
     chevron column, the detail panel that takes its row's divider (FR5) and the toggle in
     every cell's menu; each body cell now has its own right-click menu, as upstream's
-    TableCell does (FR4). The glide (FR15) waits for M11.
+    TableCell does (FR4). The glide (FR15) landed in M11 stage 2.
   - Column settings, sticky columns and column resize (done): `TableColumnSettings` and
     `use_table_column_settings_state` choose and order the columns (always-visible ones
     stay). `TableStickyColumns` pins contiguous runs to either edge: with no `position:
@@ -940,6 +940,31 @@ The remaining primitives:
     first paint enter on one of upstream's four presets). A Motion gallery page.
     - Carried to M12: the theme's motion tempo (every shipped theme plays at 1; theme
       authoring sets it).
+  - Stage 2 (done): animated layout (AST-105).
+    - Fork patch R19 (`3112acc`), layout glides: a `div` with `layout_glide` is an area,
+      and when a change is reported, every `div` inside it whose place relative to its
+      parent changed glides from where it was drawn, summed with a running glide; absolute
+      and stuck sticky elements jump, hit testing follows, an optional cross-fade replaces
+      the travel. Fork patch R20 (`c82ed93`), `inert(bool)`: a subtree out of the tab
+      order, the pointer's targets and the accessibility tree.
+    - `use_animated_layout` and the opaque `AnimatedLayout` (`container` is upstream's
+      `containerRef`), the shared motion (`--ease-move` over `--duration-medium`; a
+      cross-fade under Reduce Motion with a coarse pointer, a jump with a fine one), the
+      block-end edge reveal with reversal from what shows, the inline two-state edge, the
+      indicator turn and the grid-row height transition.
+    - Adopters: Collapsible (FR10), TreeList (FR8, FR9; its own coarse-pointer motion
+      without a handle), Table row expansion (FR15), List (FR12: rows enter, exit held and
+      inert, glide, crossing rows on top), CodeBlock's collapse (FR5), ChatComposerDrawer
+      and ChatToolCalls, TopNav's drawer groups (TopNavMenu FR7, TopNavMegaMenu FR9),
+      SideNav's rail (FR6), AppShell's content glide (FR17), Resizable and LayoutPanel's
+      pane slide on every path (FR8, FR7, AR2: a lift settles on `springs.settle` from its
+      release velocity, a catch holds the slide under the pointer, the rubber band
+      resists and springs back, LayoutContent moves at its final width with no gap beside
+      the edge), the reorder shift slide (AST-103 FR9, the drop from its release
+      velocity), SegmentedControl's lens (FR9, FR10) and Lightbox's springs.
+    - Carried to stage 5 (fork patch R3's snapshots): the transient copies (SideNav's two
+      rail layers, AppShell's held content, AST-105 FR8's swap copy, a List exit's and a
+      dragged row's slot content). Carried to stage 3: SegmentedControl FR11-FR14.
 - **M12 Theme authoring parity:** a Rust `defineTheme` builder with type/radius/motion scale
   expansion (with the motion tempo the animator plays at, carried from M11), OKLCH palette engine (`palette/`), HCT generator (`theme/hct.ts`), status-role
   derivation, contrast, `onDark`/`onLight`, adaptations, per-theme icons.

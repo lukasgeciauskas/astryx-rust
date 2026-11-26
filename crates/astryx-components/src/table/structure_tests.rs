@@ -388,3 +388,98 @@ fn a_row_click_expands_when_asked(cx: &mut TestAppContext) {
     click(cx, "t-cell-sc-age");
     assert!(!shown(cx, "t-panel-c"));
 }
+
+// ---- Row expansion's glide (FR15) ---------------------------------------------
+
+fn gliding_table(dividers: TableDividers) -> impl Fn(&mut Window, &mut App) -> gpui::AnyElement {
+    move |window, cx| {
+        let layout = crate::animated_layout::use_animated_layout("rows", window, cx);
+        let open = window.use_keyed_state("open", cx, |_, _| HashSet::<SharedString>::new());
+        let current = open.read(cx).clone();
+        let table = Table::new("t")
+            .data(rows())
+            .columns([TableColumn::new("name"), TableColumn::new("age")])
+            .id_key("id")
+            .dividers(dividers)
+            .plugin(
+                "expansion",
+                TableRowExpansion::new(
+                    current,
+                    move |key, window, cx| {
+                        open.update(cx, |s, _| {
+                            if !s.remove(&key) {
+                                s.insert(key);
+                            }
+                        });
+                        window.refresh();
+                    },
+                    |r: &Record| r.value("id").display_text(),
+                    |_, _, _| gpui::div().h(gpui::px(80.)).into_any_element(),
+                )
+                .animated_layout(layout.clone()),
+            );
+        layout
+            .container(gpui::div().w_full().child(table), window, cx)
+            .into_any_element()
+    }
+}
+
+fn frames(cx: &mut VisualTestContext, ms: u64) {
+    for _ in 0..(ms / 16) {
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(16));
+        settle(cx);
+    }
+}
+
+#[gpui::test]
+fn fr15_an_opening_panel_plays_in_and_the_rows_after_it_glide(cx: &mut TestAppContext) {
+    let cx = host(cx, 600., gliding_table(TableDividers::Rows));
+    let base = bounds(cx, "t-row-sb").top();
+    click(cx, "expansion-a");
+    frames(cx, 96);
+    let mid = bounds(cx, "t-row-sb").top() - base;
+    assert!(mid > gpui::px(1.), "gliding down: {mid:?}");
+    frames(cx, 600);
+    let open = bounds(cx, "t-row-sb").top() - base;
+    assert!(open > mid, "settled below the panel: {open:?}");
+    assert!(shown(cx, "t-panel-a"));
+
+    // Closing: the panel hides at once; its space is held while the rows glide up.
+    click(cx, "expansion-a");
+    assert!(!shown(cx, "t-panel-a"), "the panel hides at once");
+    frames(cx, 64);
+    let closing = bounds(cx, "t-row-sb").top() - base;
+    assert!(
+        closing > gpui::px(1.) && closing < open,
+        "gliding up into its space: {closing:?}"
+    );
+    frames(cx, 600);
+    assert_eq!(bounds(cx, "t-row-sb").top(), base);
+}
+
+fn changes_at_once(cx: &mut TestAppContext, dividers: TableDividers) {
+    let cx = host(cx, 600., gliding_table(dividers));
+    let base = bounds(cx, "t-row-sb").top();
+    click(cx, "expansion-a");
+    assert!(bounds(cx, "t-row-sb").top() - base > gpui::px(80.));
+}
+
+#[gpui::test]
+fn fr15_a_grid_table_changes_at_once(cx: &mut TestAppContext) {
+    changes_at_once(cx, TableDividers::Grid);
+}
+
+#[gpui::test]
+fn fr15_a_table_with_column_dividers_changes_at_once(cx: &mut TestAppContext) {
+    changes_at_once(cx, TableDividers::Columns);
+}
+
+#[gpui::test]
+fn fr15_under_reduced_motion_with_a_mouse_rows_change_at_once(cx: &mut TestAppContext) {
+    cx.update(|cx| astryx_primitives::set_reduced_motion(true, cx));
+    let cx = host(cx, 600., gliding_table(TableDividers::Rows));
+    let base = bounds(cx, "t-row-sb").top();
+    click(cx, "expansion-a");
+    assert!(bounds(cx, "t-row-sb").top() - base > gpui::px(80.));
+}

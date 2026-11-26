@@ -10,14 +10,16 @@ use crate::layout::{SpacingStep, Stack};
 use crate::text::{Text, TextType};
 use astryx_primitives::motion::AnimatorValues;
 
-pub fn examples(_window: &mut Window, _cx: &mut App) -> AnyElement {
+pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let label = |text: &'static str| Text::new(text).text_type(TextType::Supporting);
+    let animated_layout = crate::animated_layout::examples::examples(window, cx);
     Stack::vertical()
         .gap(SpacingStep::S3)
         .child(label("useAnimator: springs a card on the state-change role; press again mid-flight and it carries its velocity"))
         .child(SpringDemo { id: "animator-demo".into() })
         .child(label("useEntryAnimation: each added row slides in; the rows drawn on first paint did not"))
         .child(EntryDemo { id: "entry-demo".into() })
+        .child(animated_layout)
         .into_any_element()
 }
 

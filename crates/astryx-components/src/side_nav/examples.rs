@@ -77,7 +77,9 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     Stack::vertical()
         .gap(SpacingStep::S4)
         .child(
-            Text::new("SideNav: expanded and resizable, and collapsed to its rail")
+            Text::new(
+                "SideNav: expanded and resizable, and collapsed to its rail. The collapse button slides the rail's edge while its labels fade",
+            )
                 .text_type(TextType::Supporting),
         )
         .child(

@@ -33,8 +33,28 @@ fn files() -> Vec<TreeListItemData> {
     ]
 }
 
-pub fn examples(_window: &mut Window, _cx: &mut App) -> AnyElement {
+pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let label = |text: &'static str| Text::new(text).text_type(TextType::Supporting);
+    // An animatedLayout handle: expanding a folder glides the note after the tree.
+    let layout = crate::animated_layout::use_animated_layout("files-layout", window, cx);
+    let animated = layout.container(
+        gpui::div()
+            .flex()
+            .flex_col()
+            .gap(px(8.))
+            .w(px(320.))
+            .child(
+                TreeList::new("files-animated", files())
+                    .aria_label("Files, animated")
+                    .animated_layout(layout.clone()),
+            )
+            .child(
+                Text::new("This note glides as folders above it open and close.")
+                    .text_type(TextType::Supporting),
+            ),
+        window,
+        cx,
+    );
     Stack::vertical()
         .gap(SpacingStep::S4)
         .child(label("TreeList: line guides, and compact without guides"))
@@ -54,5 +74,9 @@ pub fn examples(_window: &mut Window, _cx: &mut App) -> AnyElement {
                         .w(px(280.)),
                 ),
         )
+        .child(label(
+            "With an animatedLayout handle (and under a finger without one), folders reveal their rows and the rest glides",
+        ))
+        .child(animated)
         .into_any_element()
 }

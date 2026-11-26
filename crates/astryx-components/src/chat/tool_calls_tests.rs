@@ -70,11 +70,33 @@ fn fr1_fr3_a_group_collapses_and_expands(cx: &mut TestAppContext) {
     let header = cx.debug_bounds("t-header").unwrap();
     cx.simulate_click(header.center(), Modifiers::none());
     settle(cx);
+    frames(cx, 64);
+    let easing = cx.debug_bounds("root").unwrap().size.height;
+    frames(cx, 600);
     let expanded = cx.debug_bounds("root").unwrap().size.height;
     assert!(
         expanded > collapsed * 3.,
         "every call listed: {collapsed:?} {expanded:?}"
     );
+    assert!(
+        easing > collapsed && easing < expanded,
+        "the group's height eases: {easing:?}"
+    );
+    // Collapsing eases back, and the calls go once it ends.
+    cx.simulate_click(header.center(), Modifiers::none());
+    settle(cx);
+    frames(cx, 64);
+    assert!(cx.debug_bounds("root").unwrap().size.height > collapsed);
+    frames(cx, 600);
+    assert_eq!(cx.debug_bounds("root").unwrap().size.height, collapsed);
+}
+
+fn frames(cx: &mut VisualTestContext, ms: u64) {
+    for _ in 0..(ms / 16) {
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(16));
+        settle(cx);
+    }
 }
 
 #[gpui::test]
@@ -121,4 +143,45 @@ fn fr4_a_result_detail_opens_with_pointer_and_keys(cx: &mut TestAppContext) {
     press(cx, "enter");
     settle(cx);
     assert_eq!(cx.debug_bounds("root").unwrap().size.height, closed);
+}
+
+#[gpui::test]
+fn fr3_a_collapsing_group_is_inert(cx: &mut TestAppContext) {
+    let detail_calls = || {
+        vec![
+            ChatToolCallItem::new("search")
+                .key("one")
+                .result_detail(|_, _| {
+                    div()
+                        .debug_selector(|| "detail-one".into())
+                        .h(px(20.))
+                        .into_any_element()
+                }),
+            ChatToolCallItem::new("read").key("two"),
+        ]
+    };
+    let cx = page(cx, move || {
+        ChatToolCalls::new("t", detail_calls()).default_expanded(true)
+    });
+    // The header takes focus from the press and collapses the group.
+    let header = cx.debug_bounds("t-header").unwrap();
+    cx.simulate_click(header.center(), Modifiers::none());
+    settle(cx);
+    frames(cx, 48);
+    let row = cx
+        .debug_bounds("t-call-one")
+        .expect("held while it collapses");
+    // A press on a call's disclosure reaches nothing.
+    cx.simulate_click(row.center(), Modifiers::none());
+    settle(cx);
+    assert!(
+        cx.debug_bounds("detail-one").is_none(),
+        "the call did not open"
+    );
+    // Tab skips the calls: it comes back to the header, which Enter expands again.
+    press(cx, "tab");
+    press(cx, "enter");
+    settle(cx);
+    frames(cx, 600);
+    assert!(cx.debug_bounds("t-call-one").is_some(), "expanded again");
 }

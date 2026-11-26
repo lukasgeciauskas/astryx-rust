@@ -92,7 +92,98 @@ fn the_collapse_button_toggles_the_rail(cx: &mut TestAppContext) {
     let at = cx.debug_bounds("side-nav-collapse").unwrap().center();
     cx.simulate_click(at, gpui::Modifiers::default());
     settle(cx);
+    frames(cx, 700);
     assert_eq!(cx.debug_bounds("nav").unwrap().size.width, px(48.));
+}
+
+fn frames(cx: &mut VisualTestContext, ms: u64) {
+    for _ in 0..(ms / 16) {
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(16));
+        settle(cx);
+    }
+}
+
+fn width(cx: &mut VisualTestContext) -> gpui::Pixels {
+    cx.debug_bounds("nav").unwrap().size.width
+}
+
+fn toggle(cx: &mut VisualTestContext) {
+    let at = cx.debug_bounds("side-nav-collapse").unwrap().center();
+    cx.simulate_click(at, gpui::Modifiers::default());
+    settle(cx);
+}
+
+#[gpui::test]
+fn fr6_a_collapse_moves_the_edge_and_holds_the_old_rail_until_it_fades(cx: &mut TestAppContext) {
+    let cx = side_nav(cx, false, Log::default());
+    toggle(cx);
+    assert!(
+        (width(cx) - px(260.)).abs() < px(2.),
+        "the edge starts where it was"
+    );
+    assert!(
+        cx.debug_bounds("plain").is_some(),
+        "the old, expanded rail shows"
+    );
+    frames(cx, 64);
+    let mid = width(cx);
+    assert!(mid < px(259.) && mid > px(49.), "the edge travels: {mid:?}");
+    frames(cx, 700);
+    assert_eq!(width(cx), px(48.));
+    assert!(
+        cx.debug_bounds("plain").is_none(),
+        "it ends in the real collapsed state, icons only"
+    );
+}
+
+#[gpui::test]
+fn fr6_an_expand_reveals_the_real_rail_from_the_collapsed_edge(cx: &mut TestAppContext) {
+    let cx = side_nav(cx, true, Log::default());
+    toggle(cx);
+    assert!(
+        cx.debug_bounds("plain").is_some(),
+        "the real, expanded rail"
+    );
+    assert!(
+        (width(cx) - px(48.)).abs() < px(2.),
+        "clipped at the old edge"
+    );
+    frames(cx, 64);
+    let mid = width(cx);
+    assert!(mid > px(49.) && mid < px(259.), "revealing: {mid:?}");
+    frames(cx, 700);
+    assert_eq!(width(cx), px(260.));
+}
+
+#[gpui::test]
+fn fr6_a_second_toggle_mid_motion_starts_from_what_the_rail_shows(cx: &mut TestAppContext) {
+    let cx = side_nav(cx, false, Log::default());
+    toggle(cx);
+    frames(cx, 96);
+    let shown = width(cx);
+    toggle(cx);
+    let from = width(cx);
+    assert!(
+        (from - shown).abs() < px(3.),
+        "no jump: {from:?} vs {shown:?}"
+    );
+    frames(cx, 800);
+    assert_eq!(width(cx), px(260.));
+}
+
+#[gpui::test]
+fn fr6_under_reduce_motion_with_a_mouse_the_rail_lands_at_once(cx: &mut TestAppContext) {
+    cx.update(|cx| astryx_primitives::set_reduced_motion(true, cx));
+    let cx = side_nav(cx, false, Log::default());
+    toggle(cx);
+    assert_eq!(width(cx), px(48.));
+}
+
+#[gpui::test]
+fn fr6_a_change_before_the_first_paint_lands_at_once(cx: &mut TestAppContext) {
+    let cx = side_nav(cx, true, Log::default());
+    assert_eq!(width(cx), px(48.), "the initial state never animates");
 }
 
 #[gpui::test]

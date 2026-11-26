@@ -211,7 +211,9 @@ pub fn regions_examples(window: &mut Window, cx: &mut App) -> AnyElement {
     Stack::vertical()
         .gap(SpacingStep::S4)
         .child(
-            Text::new("Layout: header, a resizable start panel, content, an end panel, footer")
+            Text::new(
+                "Layout: header, a resizable start panel, content, an end panel, footer. The panel slides shut and open; a pull past its limits bands the handle",
+            )
                 .text_type(TextType::Supporting),
         )
         .child(
@@ -228,8 +230,32 @@ pub fn regions_examples(window: &mut Window, cx: &mut App) -> AnyElement {
                     Layout::new()
                         .default_has_dividers(true)
                         .header(
-                            LayoutHeader::new()
-                                .child(Text::new("Inbox").text_type(TextType::Label)),
+                            LayoutHeader::new().child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
+                                    .child(Text::new("Inbox").text_type(TextType::Label))
+                                    .child({
+                                        // The panel slides shut and open by its edge.
+                                        let region = nav.clone();
+                                        crate::button::Button::new(
+                                            "layout-nav-toggle",
+                                            if nav.is_collapsed {
+                                                "Show folders"
+                                            } else {
+                                                "Hide folders"
+                                            },
+                                        )
+                                        .on_click(move |_, window, cx| {
+                                            if region.is_collapsed {
+                                                region.expand(window, cx);
+                                            } else {
+                                                region.collapse(window, cx);
+                                            }
+                                        })
+                                    }),
+                            ),
                         )
                         .start(
                             div()
