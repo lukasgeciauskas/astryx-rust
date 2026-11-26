@@ -3,7 +3,10 @@
 use super::uikit::scroll;
 
 fn decay_constant(rate: f64) -> f64 {
-    debug_assert!(rate > 0. && rate < 1., "decay: rate must be in (0, 1)");
+    assert!(
+        rate > 0. && rate < 1.,
+        "decay: rate must be in (0, 1), got {rate}"
+    );
     -1000. * rate.ln()
 }
 

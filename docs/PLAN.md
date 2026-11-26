@@ -899,8 +899,49 @@ The remaining primitives:
   - Table row expansion's `animatedLayout`: opening or closing a panel glides the rows
     after it, with the chevron on the glide's spring (Table FR15; Pending in
     `USE_TABLE_ROW_EXPANSION_DOC`).
+  - Upstream: `motion/` (the animator, roles, timing, reduced-motion plans, animated
+    layout), `animator/`, `gestures/`, `dragToSnapPoints/`, `keyboard/`, `Swipe/`,
+    `BottomSheet/`'s gestures and stack, and the hooks over them; the motion math
+    (`astryx_primitives::motion`), the velocity tracker and a first BottomSheet came earlier.
+  - Stages, each closed with tests, a gallery check, docs, the gate, a commit and CI:
+    1. The motion engine: motion roles and theme timing, reduced-motion plans, curves
+       (bezier, linear easing, coast, paging, progress), the animator that drives an
+       element's x, y, scale, rotate and opacity frame by frame with velocity carried
+       between curves (`createAnimator`, `useAnimator`), and `useEntryAnimation`. Its
+       `rotate` channel (no upstream component animates rotation) draws through stage 5's
+       offscreen layers.
+    2. Animated layout (`useAnimatedLayout`) and every glide earlier milestones carried:
+       Collapsible, List, TreeList and Table row expansion, CodeBlock's collapse, the Chat
+       drawer and tool-call group, TopNav's drawer groups, SideNav's rail, AppShell's
+       content swap, Resizable's pane slide, reordering's shift slide, SegmentedControl's
+       lens, and Lightbox's springs.
+    3. Gestures: the arena and host, the pan, tap, long-press, swipe, pinch and
+       screen-edge recognizers, the press tracker, finger scrolling, wheel segmenting,
+       haptics, and the hooks over them (`createPanGesture`, `usePanGesture`,
+       `useLongPress`, `useMenuPress`, `usePressFeedback`).
+    4. Drag to snap points (`createDragToSnapPoints`, `useDragToSnapPoints`) and
+       BottomSheet's full sheet gestures, stack, panel and switcher on it.
+    5. Fork patch R3 (offscreen layers: a subtree drawn to a texture and composited with
+       group opacity, a mask or a rotation), Swipe (`createSwipe`, `useSwipeAction`, the
+       actions layer), Item and List swipe actions, and the animator's `rotate`.
+    6. The keyboard: the mobile keyboard's model, height and layout guide, layers'
+       keyboard clearance, `useChatKeyboard`'s lift, the pasted token's touch tap-stop.
+    7. Coarse-pointer variants (sheet-backed overlays and selectors) and the close.
+  - Stage 1 (done): the motion engine in `astryx_primitives::motion`, pure Rust on an
+    injectable clock: roles and their values, theme timing and tempo, reduced-motion
+    plans, bezier and linear easings, coast, paging, progress, snap-point resolution, the
+    UIKit tables the roles read, and the animator engine (springs carrying velocity
+    between curves, interruption and rebasing, set, stop, decay, settle thresholds, calls
+    from rest starting on the next frame), checked against upstream's own motion tests
+    with their numbers (344 tests). `createAnimator`'s contract (`Animator`), and in GPUI
+    `use_animator` (an `AnimatorHandle` that springs, coasts, sets and stops x, y, scale
+    and opacity, drawn through fork patch R1 with frames requested while it moves, its
+    calls awaitable) and `use_entry_animation` (elements that appear after the window's
+    first paint enter on one of upstream's four presets). A Motion gallery page.
+    - Carried to M12: the theme's motion tempo (every shipped theme plays at 1; theme
+      authoring sets it).
 - **M12 Theme authoring parity:** a Rust `defineTheme` builder with type/radius/motion scale
-  expansion, OKLCH palette engine (`palette/`), HCT generator (`theme/hct.ts`), status-role
+  expansion (with the motion tempo the animator plays at, carried from M11), OKLCH palette engine (`palette/`), HCT generator (`theme/hct.ts`), status-role
   derivation, contrast, `onDark`/`onLight`, adaptations, per-theme icons.
 - **M13 Charts & lab:**
   - `astryx-charts`: d3-scale and d3-shape essentials; bar, line, area, dot, band,

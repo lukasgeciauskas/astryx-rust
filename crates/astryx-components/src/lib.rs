@@ -1,6 +1,7 @@
 //! Astryx components for GPUI. See `astryx docs porting` for how each one
 //! is ported, and `astryx parity` for what is done.
 
+pub mod animator;
 pub mod app_shell;
 pub mod breadcrumbs;
 pub mod button;
