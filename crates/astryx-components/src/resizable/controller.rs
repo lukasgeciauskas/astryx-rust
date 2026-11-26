@@ -80,6 +80,9 @@ pub(crate) struct Controller {
     has_been_resized: bool,
     must_write: bool,
     written: Option<(String, f32, bool)>,
+    /// The ResizeHandle that drives the region, where focus goes when its
+    /// LayoutPanel collapses around it (LayoutPanel AR2).
+    pub handle_focus: Option<gpui::FocusHandle>,
 }
 
 impl Controller {
@@ -105,6 +108,7 @@ impl Controller {
             has_been_resized: false,
             must_write: false,
             written: None,
+            handle_focus: None,
         };
         controller.compute(basis);
         controller

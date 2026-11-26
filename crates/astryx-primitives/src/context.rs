@@ -65,6 +65,41 @@ pub fn with_context<T: Clone + 'static, R>(
     result
 }
 
+/// A value that holds only in the layer it was provided in, upstream's
+/// layer-scoped contexts: content in a layer opened below the provider (a
+/// popover, a dialog) reads none.
+#[derive(Clone)]
+pub struct LayerScoped<T> {
+    depth: usize,
+    value: T,
+}
+
+fn layer_depth(cx: &App) -> usize {
+    use_context::<crate::layer::LayerDepth>(cx).map_or(0, |d| d.0)
+}
+
+/// Provides `value` to the descendants of `child` in the current layer.
+#[track_caller]
+pub fn provide_in_layer<T: Clone + 'static>(
+    value: T,
+    child: impl IntoElement,
+    cx: &App,
+) -> Provider<LayerScoped<T>> {
+    provide(
+        LayerScoped {
+            depth: layer_depth(cx),
+            value,
+        },
+        child,
+    )
+}
+
+/// The nearest value [`provide_in_layer`] gave in the current layer.
+pub fn use_layer_context<T: Clone + 'static>(cx: &App) -> Option<T> {
+    let scoped = use_context::<LayerScoped<T>>(cx)?;
+    (scoped.depth == layer_depth(cx)).then_some(scoped.value)
+}
+
 /// Provides `value` to every descendant of `child`.
 #[track_caller]
 pub fn provide<T: Clone + 'static>(value: T, child: impl IntoElement) -> Provider<T> {

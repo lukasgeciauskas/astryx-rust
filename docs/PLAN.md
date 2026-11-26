@@ -657,6 +657,20 @@ The remaining primitives:
     a lost release cancelling the drag, and the `resize-handle` and `resize-handle-pill`
     targets (FR1-FR4, FR7, FR9, AR1).
     - Carried to M11: the pane slide and the rubber-band overshoot (FR8, AST-105 FR9).
+  - Stage 4 (done): Layout, LayoutHeader, LayoutContent, LayoutFooter and LayoutPanel
+    (`layout/regions.rs`). The Layout escapes its parent's published padding, publishes
+    none inside, and arranges the slots; each region insets per edge by the Layout-edge
+    inset (`padding`, else the nearest padding container's, else step 4) or the inner
+    inset, collapses beside a header or footer without a divider, and publishes what it
+    applies. The divider default stops at a layer, as do the container kind and the
+    padding container (`astryx_primitives::provide_in_layer` and `use_layer_context`,
+    upstream's layer-scoped contexts). Content and panels scroll on `scroll_area`,
+    named only while they scroll; a panel takes a `resizable` region's size, draws its
+    divider on its content-facing edge or overlaps the content by the inner inset, and
+    sends focus to its handle when it collapses around it (AR2). Header, content and
+    footer reflect the container (`card`, `dialog`, `bottom-sheet`).
+    - Carried in: Dialog, Drawer and BottomSheet are padding containers, and
+      DialogHeader is a LayoutHeader, so a dialog composes a Layout as upstream's does.
 - **M10 Content:**
   - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
     URL safety.

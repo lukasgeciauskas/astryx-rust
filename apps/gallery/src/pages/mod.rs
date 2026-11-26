@@ -122,6 +122,9 @@ impl Page {
                 .child(astryx::components::resizable::examples::examples(
                     window, cx,
                 ))
+                .child(astryx::components::layout::examples::regions_examples(
+                    window, cx,
+                ))
                 .into_any_element(),
             Page::Dates => gpui::div()
                 .flex()

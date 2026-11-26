@@ -197,6 +197,9 @@ impl RenderOnce for ResizeHandle {
         let focused = focus.is_focused(window);
         let interacting = hovered || focused;
         let props = self.resizable.clone();
+        if let Some(p) = &props {
+            p.register_handle(&focus, cx);
+        }
         let inert = self.disabled || props.is_none();
         let collapsed = props.as_ref().is_some_and(|p| p.is_collapsed);
         let pane = props

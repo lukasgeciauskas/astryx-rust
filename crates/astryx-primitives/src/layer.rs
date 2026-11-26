@@ -111,7 +111,7 @@ const MODAL_DEPTH: usize = 100;
 
 /// The nesting depth a layer gives its content.
 #[derive(Clone, Copy)]
-struct LayerDepth(usize);
+pub(crate) struct LayerDepth(pub(crate) usize);
 
 /// Whether a layer is open in `window`, upstream `hasOpenLayer`.
 pub fn has_open_layer(window: &Window, cx: &App) -> bool {

@@ -4,9 +4,12 @@
 pub mod examples;
 mod grid;
 mod misc;
+mod regions;
 mod spacing;
 mod stack;
 
+#[cfg(test)]
+mod regions_tests;
 #[cfg(test)]
 mod tests;
 
@@ -14,6 +17,11 @@ pub use grid::{Grid, GridAlign, GridColumns, GridRepeat, GridSpan, SpanColumns};
 pub use misc::{
     AspectFit, AspectRatio, AspectShape, Center, CenterAxis, Divider, DividerVariant, Orientation,
     VisuallyHidden,
+};
+pub(crate) use regions::padding_container;
+pub use regions::{
+    Layout, LayoutArea, LayoutContainerKind, LayoutContent, LayoutDividerDefault, LayoutFooter,
+    LayoutHeader, LayoutHeight, LayoutPanel, LayoutSlots, PaddingContainer,
 };
 pub(crate) use spacing::host_children;
 pub use spacing::{
@@ -155,6 +163,92 @@ pub const VISUALLY_HIDDEN_DOC: ComponentDoc = ComponentDoc {
     props: &[
         p("children", RustApi::Trait("ParentElement")),
         p("as", RustApi::Waived(NO_ELEMENT_TYPE)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+const NO_REFS: &str = "GPUI elements have no refs";
+
+pub const LAYOUT_DOC: ComponentDoc = ComponentDoc {
+    name: "Layout",
+    rust_type: "astryx::components::layout::Layout",
+    props: &[
+        p("content", RustApi::Method("content")),
+        p("header", RustApi::Method("header")),
+        p("footer", RustApi::Method("footer")),
+        p("start", RustApi::Method("start")),
+        p("end", RustApi::Method("end")),
+        p("height", RustApi::Method("height")),
+        p("contentWidth", RustApi::Method("content_width")),
+        p("padding", RustApi::Method("padding")),
+        p("children", RustApi::Trait("ParentElement")),
+        p("ref", RustApi::Waived(NO_REFS)),
+        p(
+            "defaultHasDividers",
+            RustApi::Method("default_has_dividers"),
+        ),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const LAYOUT_HEADER_DOC: ComponentDoc = ComponentDoc {
+    name: "LayoutHeader",
+    rust_type: "astryx::components::layout::LayoutHeader",
+    props: &[
+        p("children", RustApi::Trait("ParentElement")),
+        p("hasDivider", RustApi::Method("has_divider")),
+        p("height", RustApi::Method("height")),
+        p("label", RustApi::Method("label")),
+        p("padding", RustApi::Method("padding")),
+        p("paddingBlockEnd", RustApi::Method("padding_block_end")),
+        p("role", RustApi::Method("role")),
+        p("ref", RustApi::Waived(NO_REFS)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const LAYOUT_CONTENT_DOC: ComponentDoc = ComponentDoc {
+    name: "LayoutContent",
+    rust_type: "astryx::components::layout::LayoutContent",
+    props: &[
+        p("children", RustApi::Trait("ParentElement")),
+        p("padding", RustApi::Method("padding")),
+        p("isScrollable", RustApi::Method("scrollable")),
+        p("label", RustApi::Method("label")),
+        p("role", RustApi::Method("role")),
+        p("ref", RustApi::Waived(NO_REFS)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const LAYOUT_FOOTER_DOC: ComponentDoc = ComponentDoc {
+    name: "LayoutFooter",
+    rust_type: "astryx::components::layout::LayoutFooter",
+    props: &[
+        p("children", RustApi::Trait("ParentElement")),
+        p("hasDivider", RustApi::Method("has_divider")),
+        p("height", RustApi::Method("height")),
+        p("label", RustApi::Method("label")),
+        p("padding", RustApi::Method("padding")),
+        p("role", RustApi::Method("role")),
+        p("ref", RustApi::Waived(NO_REFS)),
+    ],
+    example: include_str!("examples.rs"),
+};
+
+pub const LAYOUT_PANEL_DOC: ComponentDoc = ComponentDoc {
+    name: "LayoutPanel",
+    rust_type: "astryx::components::layout::LayoutPanel",
+    props: &[
+        p("children", RustApi::Trait("ParentElement")),
+        p("hasDivider", RustApi::Method("has_divider")),
+        p("padding", RustApi::Method("padding")),
+        p("isScrollable", RustApi::Method("scrollable")),
+        p("label", RustApi::Method("label")),
+        p("role", RustApi::Method("role")),
+        p("width", RustApi::Method("width")),
+        p("resizable", RustApi::Method("resizable")),
+        p("ref", RustApi::Waived(NO_REFS)),
     ],
     example: include_str!("examples.rs"),
 };

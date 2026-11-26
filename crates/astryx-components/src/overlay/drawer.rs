@@ -44,7 +44,11 @@ pub enum DrawerSide {
 /// ```ignore
 /// Drawer::new("inspector", open, "Order 1042")
 ///     .on_open_change(|open, window, cx| ...)
-///     .child(DrawerHeader::new("Order 1042").on_open_change(...))
+///     .child(
+///         Layout::new()
+///             .header(DrawerHeader::new("Order 1042").on_open_change(...))
+///             .content(LayoutContent::new("body").child(...)),
+///     )
 ///     .child(details)
 /// ```
 #[derive(IntoElement)]
@@ -210,9 +214,25 @@ impl RenderOnce for Drawer {
             .p(padding)
             .child(provide(
                 state.read(cx).focus.clone(),
-                provide(
-                    super::dialog::inset(padding),
-                    div().flex().flex_col().children(self.children),
+                crate::layout::padding_container(
+                    crate::layout::ContainerPadding {
+                        inline_start: padding,
+                        inline_end: padding,
+                        block_start: padding,
+                        block_end: padding,
+                    },
+                    None,
+                    crate::layout::host_children(
+                        self.children,
+                        crate::layout::ContainerPadding {
+                            inline_start: padding,
+                            inline_end: padding,
+                            block_start: padding,
+                            block_end: padding,
+                        },
+                        crate::layout::ContainerCorners::default(),
+                    ),
+                    cx,
                 ),
             ));
         let surface = surface.children(probes(&state, cx)).child(content);

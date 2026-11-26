@@ -307,13 +307,16 @@ impl ScrollableArea {
             ScrollKeyboardAccess::Content => {}
             ScrollKeyboardAccess::Viewport { label, role }
             | ScrollKeyboardAccess::ContentOrViewport { label, role } => {
-                el = el
-                    .track_focus(&self.focus.clone().tab_stop(state.is_scrollable()))
-                    .role(match role {
-                        ScrollRole::Group => Role::Group,
-                        ScrollRole::Region => Role::Region,
-                    })
-                    .aria_label(label.clone());
+                el = el.track_focus(&self.focus.clone().tab_stop(state.is_scrollable()));
+                // Named, with its role, only while it scrolls (AR1).
+                if state.is_scrollable() {
+                    el = el
+                        .role(match role {
+                            ScrollRole::Group => Role::Group,
+                            ScrollRole::Region => Role::Region,
+                        })
+                        .aria_label(label.clone());
+                }
             }
         }
         // The scrolling keys: from the viewport, or bubbling from content that left

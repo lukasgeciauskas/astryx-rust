@@ -29,7 +29,9 @@ pub mod typeahead;
 
 pub use anchored::{LayerAlign, LayerOptions, LayerPosition, Placement, position_layer};
 pub use announce::{Politeness, announce, announcer};
-pub use context::{Provider, provide, use_context, with_context};
+pub use context::{
+    LayerScoped, Provider, provide, provide_in_layer, use_context, use_layer_context, with_context,
+};
 pub use diagnostics::dev_warn_once;
 pub use focus::{
     FocusNext, FocusPrevious, OutOfTabOrder, RovingScope, control_focus, request_focus,

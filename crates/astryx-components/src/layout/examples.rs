@@ -182,3 +182,92 @@ fn inline_flow(window: &mut Window, cx: &mut App) -> impl IntoElement {
             .into_any_element()))
         .child(gap(Badge::new("12").into_any_element()))
 }
+
+/// Layout and its regions: an inbox with a resizable navigation panel.
+pub fn regions_examples(window: &mut Window, cx: &mut App) -> AnyElement {
+    use crate::layout::{Layout, LayoutContent, LayoutFooter, LayoutHeader, LayoutPanel};
+    use crate::resizable::{ResizeHandle, UseResizable, use_resizable};
+    let theme = current(window, cx);
+    let t = theme.tokens().clone();
+    let nav = use_resizable(
+        "layout-nav",
+        UseResizable::new()
+            .default_size(200.)
+            .min_size(140.)
+            .max_size(320.)
+            .collapsible(true),
+        window,
+        cx,
+    );
+    let item = |text: String| {
+        div()
+            .py(t.spacing.s2)
+            .border_b_1()
+            .border_color(t.color.border)
+            .text_style(&t.text.body)
+            .text_color(t.color.text_primary)
+            .child(text)
+    };
+    Stack::vertical()
+        .gap(SpacingStep::S4)
+        .child(
+            Text::new("Layout: header, a resizable start panel, content, an end panel, footer")
+                .text_type(TextType::Supporting),
+        )
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .w(px(760.))
+                .h(px(380.))
+                .border_1()
+                .border_color(t.color.border)
+                .rounded(t.radius.container)
+                .overflow_hidden()
+                .child(
+                    Layout::new()
+                        .default_has_dividers(true)
+                        .header(
+                            LayoutHeader::new()
+                                .child(Text::new("Inbox").text_type(TextType::Label)),
+                        )
+                        .start(
+                            div()
+                                .flex()
+                                .h_full()
+                                .child(
+                                    LayoutPanel::new("layout-nav-panel")
+                                        .resizable(&nav)
+                                        .label("Folders")
+                                        .children(
+                                            ["Inbox", "Drafts", "Sent", "Archive"]
+                                                .into_iter()
+                                                .map(|f| item(f.to_string())),
+                                        ),
+                                )
+                                .child(
+                                    ResizeHandle::new("layout-nav-handle")
+                                        .resizable(&nav)
+                                        .divider(true)
+                                        .label("Resize folders"),
+                                ),
+                        )
+                        .content(
+                            LayoutContent::new("layout-messages")
+                                .label("Messages")
+                                .children((1..=30).map(|i| item(format!("Message {i}")))),
+                        )
+                        .end(
+                            LayoutPanel::new("layout-details")
+                                .width(px(200.))
+                                .has_divider(true)
+                                .child(Text::new("Details").text_type(TextType::Supporting)),
+                        )
+                        .footer(
+                            LayoutFooter::new()
+                                .child(Text::new("30 messages").text_type(TextType::Supporting)),
+                        ),
+                ),
+        )
+        .into_any_element()
+}

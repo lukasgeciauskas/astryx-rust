@@ -87,19 +87,22 @@ fn dialog(purpose: DialogPurpose, log: Log) -> impl Fn(Rc<Cell<bool>>) -> AnyEle
                 close.set(is_open);
                 window.refresh();
             })
-            .child(DialogHeader::new("Rename file"))
             .child(
-                div()
-                    .debug_selector(|| "d-content".into())
-                    .flex()
-                    .gap(px(8.))
-                    .child(
-                        Button::new("first", "First")
-                            .on_click(move |_, _, _| first.borrow_mut().push("first")),
-                    )
-                    .child(
-                        Button::new("second", "Second")
-                            .on_click(move |_, _, _| second.borrow_mut().push("second")),
+                crate::layout::Layout::new()
+                    .header(DialogHeader::new("Rename file"))
+                    .content(
+                        div()
+                            .debug_selector(|| "d-content".into())
+                            .flex()
+                            .gap(px(8.))
+                            .child(
+                                Button::new("first", "First")
+                                    .on_click(move |_, _, _| first.borrow_mut().push("first")),
+                            )
+                            .child(
+                                Button::new("second", "Second")
+                                    .on_click(move |_, _, _| second.borrow_mut().push("second")),
+                            ),
                     ),
             )
             .into_any_element()
@@ -325,8 +328,11 @@ fn drawer(scrim: bool, clicks: Rc<Cell<usize>>) -> impl Fn(Rc<Cell<bool>>) -> An
                         close.set(is_open);
                         window.refresh();
                     })
-                    .child(DrawerHeader::new("Order 1042"))
-                    .child(div().debug_selector(|| "d-content".into()).child("Details")),
+                    .child(
+                        crate::layout::Layout::new()
+                            .header(DrawerHeader::new("Order 1042"))
+                            .content(div().debug_selector(|| "d-content".into()).child("Details")),
+                    ),
             )
             .into_any_element()
     }

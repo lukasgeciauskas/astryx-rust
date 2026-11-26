@@ -64,8 +64,16 @@ fn container_children(
     padding: ContainerPadding,
     corners: ContainerCorners,
     part_theme: Option<ResolvedTheme>,
+    kind: Option<crate::layout::LayoutContainerKind>,
+    cx: &App,
 ) -> AnyElement {
-    let content = crate::layout::host_children(children, padding, corners);
+    // A padding container: a Layout inside insets its regions by its padding.
+    let content = crate::layout::padding_container(
+        padding,
+        kind,
+        crate::layout::host_children(children, padding, corners),
+        cx,
+    );
     match part_theme {
         Some(theme) => scope(theme, content).into_any_element(),
         None => content,
@@ -262,7 +270,14 @@ impl RenderOnce for Card {
         let (mut el, padding) = self.root(&theme, use_direction(cx), rem);
         let corners = corners_of(&mut el, &theme, rem);
         let part = theme.for_part("card", &[("variant", self.variant.as_str())]);
-        el.child(container_children(self.children, padding, corners, part))
+        el.child(container_children(
+            self.children,
+            padding,
+            corners,
+            part,
+            Some(crate::layout::LayoutContainerKind::Card),
+            cx,
+        ))
     }
 }
 
@@ -390,6 +405,8 @@ impl RenderOnce for Section {
             padding,
             ContainerCorners::default(),
             None,
+            None,
+            cx,
         ))
     }
 }

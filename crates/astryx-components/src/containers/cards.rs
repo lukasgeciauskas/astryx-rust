@@ -105,6 +105,8 @@ impl PressableCard {
                 padding,
                 corners,
                 part,
+                Some(crate::layout::LayoutContainerKind::Card),
+                cx,
             ))
             .child(overlay);
 

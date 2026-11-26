@@ -5,15 +5,15 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 (fork patch R17), 2 (ScrollableArea) and 3 (Resizable) done._
+_Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 to 4 done (R17, ScrollableArea, Resizable, Layout)._
 
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7 and M8; M9 is under way (stage 1:
-  scroll chaining and scrollbars, fork patch R17; stage 2: ScrollableArea and its hook; stage 3: Resizable). Details and dates are in
+  scroll chaining and scrollbars, fork patch R17; stage 2: ScrollableArea and its hook; stage 3: Resizable; stage 4: Layout). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 89 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
+- **Parity:** 91 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
 - **Last commits on `main`:** M8's stages, from `90581cb` (calendar systems and
   Calendar) through the pointer fields, DateRangeInput, the wheels and the three bottom
@@ -29,7 +29,7 @@ _Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 (fork patch 
 
 ### Not yet ported (26)
 
-- **M9:** AppShell, Layout, Carousel,
+- **M9:** AppShell, Carousel,
   MobileNav, NavHeadingMenu, NavIcon, Outline, SideNav, TopNav. **M10:** Chat,
   ChatDictationButton, ChatToolCalls, CodeBlock, Markdown.
 - **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
@@ -45,7 +45,6 @@ _Last updated: 2026-11-26, during M9 (Shell & navigation): stages 1 (fork patch 
 | Item swipe actions, SegmentedControl's sliding lens, Collapsible's and List's animated layout, reordering's shift slide (AST-103 FR9) | Motion layer (M11) |
 | Lightbox springs (it eases over 280ms now) | Motion layer (M11) |
 | Lightbox video playback and `hasAutoPlay` (a video opens in the system player now) | MediaPlayer's decoder (M13) |
-| Dialog content inset done by the dialog itself | Layout (M9) |
 | Backdrop blur (Lightbox, scrims) | Fork patch R2 |
 | Table row expansion's `animatedLayout` glide (FR15) | Motion layer (M11) |
 | TreeList's `animatedLayout` and expand glide (FR8, FR9) | Motion layer (M11) |

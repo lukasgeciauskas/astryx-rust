@@ -117,10 +117,6 @@
   `astryx_primitives::spell::set_spell_checker(DictionaryChecker::new(aff, dic))`.
   `spellbook`, which reads the dictionaries, is MPL-2.0.
 
-- **Dialogs pad their own content until Layout lands (M9).** Upstream's Dialog holds a
-  Layout whose header, content and footer take the dialog's inset; here the dialog pads
-  its children by that inset (`spacing-4`) and DialogHeader reaches to the edges for its
-  divider. Long content scrolls the whole surface rather than a LayoutContent region.
 - **Toasts need a ToastViewport in the window.** Upstream mounts a fallback viewport on
   the first toast when no LayerProvider exists; GPUI cannot add to a window's tree from
   outside it, so an app renders `ToastViewport::new()` once in its root view.
@@ -264,6 +260,12 @@
   `localStorage` in a browser, as upstream does; a native app keeps the entries in
   `<data dir>/astryx/<executable>.json` (`astryx_primitives::storage`, which an app can
   replace with `set_storage`).
+
+- **A one-panel Layout with a content width keeps its whole middle to that width (M9).**
+  Upstream keeps the panel aligned to the content width while LayoutContent extends
+  through the open side, so its scrollbar sits at the window's edge; here the middle row
+  (panel and content) is centered at the content width. Without panels the content keeps
+  its own box and aligns its children through its padding, as upstream does.
 
 ## Tooling
 

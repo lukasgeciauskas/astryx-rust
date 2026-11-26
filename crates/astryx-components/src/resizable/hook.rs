@@ -330,6 +330,25 @@ impl ResizableProps {
             .or_else(|| self.max_size_px.is_finite().then_some(self.max_size_px))
     }
 
+    /// The handle registers its focus with the region (LayoutPanel AR2).
+    pub(crate) fn register_handle(&self, focus: &gpui::FocusHandle, cx: &mut App) {
+        if let Driver::Hook(d) = &self.driver {
+            let known = d.controller.read(cx).handle_focus.as_ref() == Some(focus);
+            if !known {
+                let focus = focus.clone();
+                d.controller.update(cx, |c, _| c.handle_focus = Some(focus));
+            }
+        }
+    }
+
+    /// The handle that drives the region.
+    pub(crate) fn handle_focus(&self, cx: &App) -> Option<gpui::FocusHandle> {
+        match &self.driver {
+            Driver::Hook(d) => d.controller.read(cx).handle_focus.clone(),
+            Driver::Custom(_) => None,
+        }
+    }
+
     pub(crate) fn has_collapse_controls(&self) -> bool {
         matches!(self.driver, Driver::Hook(_))
     }

@@ -160,24 +160,28 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                     }
                 })
                 .child(
-                    DialogHeader::new("Rename file")
-                        .subtitle("Names show in the sidebar and in links.")
-                        .on_open_change(move |_, window, cx| close_rename_header(window, cx)),
-                )
-                .child(
-                    Stack::vertical()
-                        .gap(SpacingStep::S4)
-                        .child(TextInput::new("file-name", "Name", "Quarterly report"))
-                        .child(
-                            Stack::horizontal()
-                                .gap(SpacingStep::S2)
-                                .h_align(crate::layout::StackAlign::End)
-                                .child(
-                                    Button::new("rename-cancel", "Cancel")
-                                        .variant(ButtonVariant::Ghost)
-                                        .on_click(move |_, window, cx| close_rename_cancel(window, cx)),
-                                )
-                                .child(Button::new("rename-save", "Rename")),
+                    crate::layout::Layout::new()
+                        .header(
+                            DialogHeader::new("Rename file")
+                                .subtitle("Names show in the sidebar and in links.")
+                                .on_open_change(move |_, window, cx| close_rename_header(window, cx)),
+                        )
+                        .content(
+                            crate::layout::LayoutContent::new("rename-body")
+                                .child(TextInput::new("file-name", "Name", "Quarterly report")),
+                        )
+                        .footer(
+                            crate::layout::LayoutFooter::new().child(
+                                Stack::horizontal()
+                                    .gap(SpacingStep::S2)
+                                    .h_align(crate::layout::StackAlign::End)
+                                    .child(
+                                        Button::new("rename-cancel", "Cancel")
+                                            .variant(ButtonVariant::Ghost)
+                                            .on_click(move |_, window, cx| close_rename_cancel(window, cx)),
+                                    )
+                                    .child(Button::new("rename-save", "Rename")),
+                            ),
                         ),
                 ),
         )
@@ -232,15 +236,23 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                     }
                 })
                 .child(
-                    DrawerHeader::new("Order 1042")
-                        .subtitle("Placed 2 hours ago")
-                        .on_open_change(move |_, window, cx| close_drawer_header(window, cx)),
-                )
-                .child(
-                    Stack::vertical()
-                        .gap(SpacingStep::S3)
-                        .child(Text::new("3 items, shipping to Lisbon.").text_type(TextType::Body))
-                        .child(TextInput::new("order-note", "Note", "")),
+                    crate::layout::Layout::new()
+                        .header(
+                            DrawerHeader::new("Order 1042")
+                                .subtitle("Placed 2 hours ago")
+                                .on_open_change(move |_, window, cx| close_drawer_header(window, cx)),
+                        )
+                        .content(
+                            crate::layout::LayoutContent::new("order-body").child(
+                                Stack::vertical()
+                                    .gap(SpacingStep::S3)
+                                    .child(
+                                        Text::new("3 items, shipping to Lisbon.")
+                                            .text_type(TextType::Body),
+                                    )
+                                    .child(TextInput::new("order-note", "Note", "")),
+                            ),
+                        ),
                 ),
         )
         .child(

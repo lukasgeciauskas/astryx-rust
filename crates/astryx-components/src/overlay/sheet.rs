@@ -28,7 +28,7 @@ use gpui::{
 };
 use smallvec::SmallVec;
 
-use super::dialog::{DialogPurpose, inset};
+use super::dialog::DialogPurpose;
 use super::modal::{
     ModalState, Phase, backdrop, faded, modal_layer, modal_state, phase, probes, sync_open,
 };
@@ -296,8 +296,14 @@ impl RenderOnce for BottomSheet {
             .pb(padding)
             .child(provide(
                 state.read(cx).focus.clone(),
-                provide(
-                    inset(padding),
+                crate::layout::padding_container(
+                    crate::layout::ContainerPadding {
+                        inline_start: padding,
+                        inline_end: padding,
+                        block_start: padding.max(handle_band),
+                        block_end: padding,
+                    },
+                    Some(crate::layout::LayoutContainerKind::BottomSheet),
                     crate::layout::host_children(
                         self.children,
                         crate::layout::ContainerPadding {
@@ -312,6 +318,7 @@ impl RenderOnce for BottomSheet {
                             ..Default::default()
                         },
                     ),
+                    cx,
                 ),
             ));
         let mut sheet = div()

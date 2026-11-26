@@ -17,9 +17,9 @@
 //!   from the side its opener was on.
 //! - Inline dialogs render in the flow, with no modality (FR5).
 //!
-//! The surface pads its children by the dialog padding (`spacing-4` by
-//! default), the inset upstream's Layout gives a dialog; DialogHeader
-//! reaches to the surface's edges for its divider, as LayoutHeader does.
+//! The surface is a padding container (`spacing-4` by default): it pads plain
+//! children, and a Layout inside escapes that padding and insets its regions by
+//! it, as upstream's Dialog with its Layout does. DialogHeader is a LayoutHeader.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -119,22 +119,17 @@ pub(crate) fn focus_scope(cx: &App) -> Option<FocusScope> {
     use_context::<FocusScope>(cx)
 }
 
-/// What a DialogHeader learns from its dialog: the inset it reaches past.
-#[derive(Clone, Copy)]
-pub(crate) struct DialogInset(Pixels);
-
-/// The inset a surface gives its DialogHeader or DrawerHeader.
-pub(crate) fn inset(padding: Pixels) -> DialogInset {
-    DialogInset(padding)
-}
-
 /// A modal surface that blocks the page until the user responds, upstream
 /// `Dialog`.
 ///
 /// ```ignore
 /// Dialog::new("rename", open)
 ///     .on_open_change(|open, _, cx| ...)
-///     .child(DialogHeader::new("Rename file").on_open_change(...))
+///     .child(
+///         Layout::new()
+///             .header(DialogHeader::new("Rename file").on_open_change(...))
+///             .content(LayoutContent::new("body").child(...)),
+///     )
 ///     .child(TextInput::new("name", "Name", value))
 /// ```
 #[derive(IntoElement)]
@@ -258,18 +253,15 @@ impl RenderOnce for Dialog {
                 .font_stack(&t.font.family.body)
                 .text_style(&t.text.body)
                 .role(Role::Group)
-                .child(provide(
-                    DialogInset(padding),
+                .child(crate::layout::padding_container(
+                    all(padding),
+                    Some(crate::layout::LayoutContainerKind::Dialog),
                     crate::layout::host_children(
                         self.children,
-                        crate::layout::ContainerPadding {
-                            inline_start: padding,
-                            inline_end: padding,
-                            block_start: padding,
-                            block_end: padding,
-                        },
+                        all(padding),
                         crate::layout::ContainerCorners::all(t.radius.container.to_pixels(rem)),
                     ),
+                    cx,
                 ));
             theme.refine(surface.style(), "dialog", &[], None);
             surface.style().refine(&self.style);
@@ -380,18 +372,11 @@ impl RenderOnce for Dialog {
         };
         let surface = surface.child(provide(
             scope,
-            provide(
-                DialogInset(padding),
-                crate::layout::host_children(
-                    self.children,
-                    crate::layout::ContainerPadding {
-                        inline_start: padding,
-                        inline_end: padding,
-                        block_start: padding,
-                        block_end: padding,
-                    },
-                    corners,
-                ),
+            crate::layout::padding_container(
+                all(padding),
+                Some(crate::layout::LayoutContainerKind::Dialog),
+                crate::layout::host_children(self.children, all(padding), corners),
+                cx,
             ),
         ));
 
@@ -425,6 +410,16 @@ impl RenderOnce for Dialog {
         let backdrop = backdrop.child(surface);
 
         super::modal::modal_layer(&self.id, backdrop, true, self.purpose, close)
+    }
+}
+
+/// The same padding on every edge.
+fn all(padding: Pixels) -> crate::layout::ContainerPadding {
+    crate::layout::ContainerPadding {
+        inline_start: padding,
+        inline_end: padding,
+        block_start: padding,
+        block_end: padding,
     }
 }
 
@@ -510,7 +505,6 @@ impl RenderOnce for DialogHeader {
         {
             scope.title(title_focus.clone(), self.title.clone());
         }
-        let inset = use_context::<DialogInset>(cx).map_or(px(0.), |i| i.0);
 
         // The title's center lines up with the close button's (upstream's
         // title and end offsets).
@@ -578,21 +572,12 @@ impl RenderOnce for DialogHeader {
             .children(start)
             .child(title_block)
             .children(actions);
-        // As a LayoutHeader in a dialog: the dialog's inset on every edge,
-        // reaching the surface's edges, with the divider under it.
-        let mut el = div()
-            .mx(-inset)
-            .mt(-inset)
-            .mb(inset)
-            .px(inset)
-            .pt(inset)
-            .pb(inset)
-            .child(row);
-        if self.divider {
-            el = el.border_b_1().border_color(t.color.border);
-        }
-        theme.refine(el.style(), "dialog-header", &[], None);
-        el
+        // A LayoutHeader: the Layout's insets, and the divider under it.
+        let mut row = row;
+        theme.refine(row.style(), "dialog-header", &[], None);
+        crate::layout::LayoutHeader::new()
+            .has_divider(self.divider)
+            .child(row)
     }
 }
 
