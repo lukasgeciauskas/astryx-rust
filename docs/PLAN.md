@@ -739,6 +739,17 @@ The remaining primitives:
     its rows close the drawer. `defaultIsMobile` (an SSR hint) has no native form: the
     first frame reads the window.
     - Carried to M11: the content area's swap as the side nav collapses (FR17).
+  - Stage 10 (done): Outline and `useOutlineFromDOM` (`outline/`), on in-page anchors
+    (`astryx_primitives::anchor`: a Heading with an id records its box and the scroll root
+    it sits in, which AppShell's main region and ScrollableArea provide). Links indented by
+    level, each in the Tab order, `aria-current="location"` on the current one, over a 2px
+    track whose indicator slides to it (FR1-FR3, FR6, FR7). A link scrolls its heading
+    smoothly to the scroll root's top below `offset` (at once under reduced motion);
+    `on_navigate_start` and `on_navigate_end`, once, when it settles or the reader's scroll
+    interrupts it; a second navigation ends the first; `scroll_on_click(false)` (FR4).
+    Uncontrolled, the current heading follows the scroll on the activation line (FR5).
+    `use_outline_from_container` lists the headings with ids inside a container.
+    - Carried to M10: `useOutlineFromMarkdown`, which shares Markdown's parser and slugs.
 - **M10 Content:**
   - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
     URL safety.

@@ -137,10 +137,14 @@ impl RenderOnce for ScrollableArea {
         let content =
             self.padding
                 .apply(area.content(div()), &t, dir)
-                .child(crate::layout::host_children(
-                    self.children,
-                    published,
-                    ContainerCorners::default(),
+                .child(astryx_primitives::provide(
+                    // Anchors inside scroll with this region (Outline's scroll root).
+                    astryx_primitives::anchor::ScrollRoot(area.scroll_handle().clone()),
+                    crate::layout::host_children(
+                        self.children,
+                        published,
+                        ContainerCorners::default(),
+                    ),
                 ));
 
         let mut viewport = div().relative().max_w_full().max_h_full();

@@ -134,6 +134,7 @@ impl Page {
                 .child(astryx::components::app_shell::examples::examples(
                     window, cx,
                 ))
+                .child(astryx::components::outline::examples::examples(window, cx))
                 .into_any_element(),
             Page::Dates => gpui::div()
                 .flex()

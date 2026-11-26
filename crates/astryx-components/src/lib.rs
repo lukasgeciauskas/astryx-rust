@@ -31,6 +31,7 @@ pub mod mobile_nav;
 mod motion;
 pub mod multi_selector;
 pub mod nav;
+pub mod outline;
 pub mod overflow;
 pub mod overlay;
 pub mod pagination;

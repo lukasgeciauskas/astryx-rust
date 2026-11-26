@@ -4,6 +4,7 @@
 //! layers and editing. Visual decisions belong to `astryx-components` and
 //! the theme.
 
+pub mod anchor;
 pub mod anchored;
 pub mod announce;
 pub mod context;

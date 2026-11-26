@@ -474,9 +474,10 @@ impl RenderOnce for AppShell {
                 cx,
             );
             let focus = area.focus_handle().clone();
+            let root = astryx_primitives::anchor::ScrollRoot(area.scroll_handle().clone());
             let el = area
                 .viewport(div().relative().size_full().p(padding))
-                .child(children);
+                .child(provide(root, children));
             (el, focus)
         };
         // A ring for Tab focus on a scroll region, never for the skip link's move.

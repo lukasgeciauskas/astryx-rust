@@ -257,6 +257,11 @@
   display cutouts, so AppShell's `env(safe-area-inset-*)` padding is zero; and GPUI
   elements have no DOM ids, so the main region's id, the drawer id and the toggle's
   `aria-controls` have no form (the skip link moves focus to the main region directly).
+- **Outline navigation has no history or focus move (M9).** A native window has no URL,
+  so choosing a link pushes no `#id`; GPUI has no sequential focus starting point, so the
+  next Tab does not continue from the heading (WCAG 2.4.3 in the browser); and the
+  heading scrolls within its scroll root only, where upstream's `offset: 0` path also
+  scrolls every scrolling ancestor.
 - **MobileNav's `side: auto` reads the pointer, not the focused element (M9).** Upstream
   resolves the side from the focused opener's half of the viewport. GPUI cannot report an
   element's bounds from its focus handle, so a drawer opened by a pointer uses the

@@ -223,12 +223,27 @@ impl RenderOnce for Heading {
         let placement = self.common.truncate_tooltip;
         let el = self.common.finish(el, trim);
         let el = match id {
-            Some(id) => el
-                .id(id)
-                .role(Role::Heading)
-                .aria_level(level)
-                .aria_label(label.clone())
-                .into_any_element(),
+            Some(id) => {
+                // The id is the heading's anchor (upstream's DOM id): an Outline finds it,
+                // and an outline source inside a container lists it.
+                let anchor: SharedString = format!("{id}").into();
+                if let Some(collect) =
+                    astryx_primitives::use_context::<crate::outline::OutlineCollect>(cx)
+                {
+                    collect.push(crate::outline::OutlineItem::new(
+                        anchor.clone(),
+                        label.clone(),
+                        level as u8,
+                    ));
+                }
+                el.id(id)
+                    .relative()
+                    .role(Role::Heading)
+                    .aria_level(level)
+                    .aria_label(label.clone())
+                    .child(astryx_primitives::anchor::anchor_probe(anchor, cx))
+                    .into_any_element()
+            }
             None => el.into_any_element(),
         };
         super::text::Common::truncation_tooltip(label, placement, measured, el, cx)
