@@ -41,6 +41,7 @@ pub mod scrollable_area;
 pub mod search;
 pub mod segmented;
 pub mod selector;
+pub mod side_nav;
 pub mod slider;
 pub mod status;
 pub mod stepper;

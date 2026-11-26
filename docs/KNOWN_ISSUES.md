@@ -251,7 +251,8 @@
   Table's and Tokenizer's fades (AST-025 FR22) are gradient overlays in
   `background-body`; on another surface that color shows at the edge.
 
-- **A resizable pane jumps rather than slides (M9, until M11).** Upstream slides a pane
+- **A resizable pane and the SideNav rail jump rather than slide (M9, until M11).** Upstream
+  reveals SideNav's rail as it collapses or expands (SideNav FR6) and slides a pane
   that collapses or opens on the animated-layout system's edge reveal (Resizable FR8,
   AST-105 FR9) and draws a pull past a bound as an 8 px rubber band that springs back;
   here the pane takes its new size at once and a pull stops at the bound. Both wait for

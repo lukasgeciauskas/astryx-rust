@@ -9,7 +9,6 @@ mod menu;
 mod tests;
 
 pub use icon::NavIcon;
-#[allow(unused_imports)]
 pub(crate) use menu::{NavHeadingClose, NavHeadingDismiss, NavHeadingMenuHost};
 pub use menu::{NavHeadingMenu, NavHeadingMenuItem, NavHeadingMenuSize};
 

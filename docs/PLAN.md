@@ -680,6 +680,19 @@ The remaining primitives:
     closes; a press that lands on a row slides across the rows and acts on the one it
     lifts on, and a mouse released elsewhere dismisses (FR1-FR8). The heading contexts
     (close, dismiss, host) wait for SideNavHeading and TopNavHeading.
+  - Stage 6 (done): SideNav (`side_nav/`). The nav landmark with a sticky top (header,
+    top content), a scrolling list, and a sticky bottom (footer, then the collapse button
+    and footer icons at the small size); `collapsible` (plain or controlled) and
+    `resizable` (plain, configured, or a `use_resizable` region that owns the width and
+    the collapse, FR7) both run on one region, with the overlay ResizeHandle at its end
+    edge; render modes for AppShell's top bar and drawer. SideNavItem: icon and selected
+    icon, `aria-current="page"`, end content and actions, nested items indented one
+    `spacing-6` per level inside the row (FR3, FR4), collapsible groups with a chevron or
+    an independent toggle; in the rail only items with icons show, a leaf with a tooltip
+    and a parent opening a flyout of its children (FR2). SideNavSection, SideNavHeading
+    (links, the menu popover from the heading or its own trigger, NavHeadingMenu's close
+    or dismiss by state) and SideNavCollapseButton (in the nav or controlled outside).
+    - Carried to M11: the rail's reveal motion (FR6, AST-105).
 - **M10 Content:**
   - Markdown: pulldown-cmark/GFM mapped to Astryx nodes; upstream plugins; streaming parse;
     URL safety.
