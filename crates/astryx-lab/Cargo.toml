@@ -9,13 +9,19 @@ publish.workspace = true
 
 [dependencies]
 astryx-charts.workspace = true
+astryx-markdown.workspace = true
+fancy-regex.workspace = true
 astryx-components.workspace = true
 astryx-i18n.workspace = true
 astryx-primitives.workspace = true
 astryx-theme.workspace = true
 gpui.workspace = true
+icu_collator.workspace = true
+icu_datetime.workspace = true
 icu_list.workspace = true
 icu_locale.workspace = true
+icu_time.workspace = true
+jiff.workspace = true
 web-time.workspace = true
 writeable.workspace = true
 

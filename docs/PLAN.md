@@ -1146,6 +1146,13 @@ The remaining primitives:
     (`use_refresh_control`), TransferList and TransferListSelector, ListInput,
     RadialChart and SankeyChart, their model and geometry checked against upstream
     under Node (V8's sine and cosine ported for the radial geometry's last digit).
+  - Stage 4 (done): Chat's lab parts (ChatTypingIndicator, ChatUnreadDivider,
+    ChatVirtualizer, ChatEmojiPicker, ChatReactionBar), EmojiPicker (its emoji set
+    generated from upstream), the Comments family (Comments, CommentThread,
+    CommentComposer) and Schedule (monthly, weekly, day and list views, plugins), with
+    the Core and primitives parity they needed: live containers, any element opening a
+    Popover, scrollable areas always named, Reorderable sharing its sessions, and
+    watching gestures that keep a finger the window scrolls.
 - **M14 Rich text:** a document model + editor on the engine, toolbar, lossless Markdown round
   trip (AST-062/064/106).
 - **M15 RTL, high contrast, polish:** RTL mirroring, Windows high contrast and macOS's

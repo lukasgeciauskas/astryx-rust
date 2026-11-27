@@ -53,7 +53,7 @@ pub use dialog::{
     AutoFocus, Dialog, DialogController, DialogHeader, DialogPosition, DialogPurpose, DialogVariant,
 };
 pub use dialog::{FocusScope, focus_scope};
-pub(crate) use disclosure::{Disclosure, disclosure};
+pub use disclosure::{Disclosure, disclosure};
 pub use drawer::{Drawer, DrawerHeader, DrawerSide};
 pub(crate) use dropdown::MenuTrigger;
 pub use dropdown::{DropdownMenu, MoreMenu};

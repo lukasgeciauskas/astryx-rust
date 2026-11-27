@@ -389,7 +389,8 @@ impl<T: 'static> RenderOnce for ChatVirtualizer<T> {
             // Attach mode: one content block in the caller's scroller.
             None => gesture_area(&attachment, block).into_any_element(),
             Some(area) => {
-                // Keyboard users reach and scroll the scroller, a group named by this list.
+                // Keyboard users reach and scroll the scroller, a group the scrollable
+                // area names with this list's label.
                 let selector = format!("{}-scroller", self.id);
                 let mut viewport = area.viewport(
                     div()
@@ -398,10 +399,7 @@ impl<T: 'static> RenderOnce for ChatVirtualizer<T> {
                         .size_full(),
                 );
                 viewport.style().refine(&self.style);
-                let viewport = viewport
-                    .role(Role::Group)
-                    .aria_label(label)
-                    .child(area.content(div()).child(block));
+                let viewport = viewport.child(area.content(div()).child(block));
                 gesture_area(&attachment, viewport).into_any_element()
             }
         }

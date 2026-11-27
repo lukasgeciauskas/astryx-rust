@@ -1556,6 +1556,13 @@ impl GestureHost {
             if !held {
                 self.emit_scroll(start, delta, gpui::TouchPhase::Moved, window, cx);
             }
+            // A watcher follows the finger the window took to the lift, as a passive
+            // `touchmove` listener keeps hearing it while the browser scrolls: a pull to
+            // refresh reads a drag that began as a scroll. The claiming recognizers
+            // let the touch go when the window took it.
+            let mut input = TouchInput::new(id, point.x, point.y, time);
+            input.force = force;
+            self.0.arena.moved(vec![input]);
             return;
         }
         let mut input = TouchInput::new(id, point.x, point.y, time);

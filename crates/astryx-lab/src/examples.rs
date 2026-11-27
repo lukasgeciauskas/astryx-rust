@@ -130,5 +130,13 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
             "EmojiPicker",
             crate::emoji_picker::examples::examples(window, cx),
         ))
+        .child(example(
+            "Comments",
+            crate::comments::examples::examples(window, cx),
+        ))
+        .child(example(
+            "Schedule",
+            crate::schedule::examples::examples(window, cx),
+        ))
         .into_any_element()
 }

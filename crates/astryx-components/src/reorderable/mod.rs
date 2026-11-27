@@ -158,8 +158,9 @@ pub struct Reorderable(pub(crate) Rc<ReorderableInner>);
 
 pub(crate) struct ReorderableInner {
     pub options: ReorderableOptions,
-    /// The collections it was rendered with, in the order they mounted.
-    pub sessions: RefCell<Vec<WeakEntity<session::Session>>>,
+    /// The collections it was rendered with, in the order they mounted. An adapted
+    /// object shares its source's, so the source's `start` finds the adapter's list.
+    pub sessions: Rc<RefCell<Vec<WeakEntity<session::Session>>>>,
 }
 
 /// Makes a collection's items reorderable (FR1).
@@ -174,7 +175,7 @@ pub(crate) struct ReorderableInner {
 pub fn create_reorderable(options: ReorderableOptions) -> Reorderable {
     Reorderable(Rc::new(ReorderableInner {
         options,
-        sessions: RefCell::new(Vec::new()),
+        sessions: Rc::new(RefCell::new(Vec::new())),
     }))
 }
 
@@ -207,12 +208,34 @@ impl Reorderable {
         }
     }
 
+    /// Whether the item with `key` can move: the object's `is_reorderable`, or every
+    /// item without one.
     pub fn can_move(&self, key: &ItemKey) -> bool {
         self.0
             .options
             .is_reorderable
             .as_ref()
             .is_none_or(|f| f(key))
+    }
+
+    /// Hands a move to the object's `on_reorder` (upstream
+    /// `reorderableOptions(reorderable).onReorder(move)`): a collection that adapts the
+    /// owner's object reports the owner's moves through it.
+    pub fn on_reorder(&self, m: &ReorderMove, window: &mut Window, cx: &mut App) {
+        (self.0.options.on_reorder)(m, window, cx);
+    }
+
+    /// An object that reorders with this one's collections but `options`' moves and
+    /// `is_reorderable` (upstream's internal `adaptReorderable`): a collection's
+    /// adapter of the owner's object, such as one that maps the moves among its shown
+    /// rows into the owner's order, or a staged selector that aims them at its draft.
+    /// This object's `start(key)` still finds the adapter's collection, and the
+    /// adapter's `start` is this one's.
+    pub fn adapt(&self, options: ReorderableOptions) -> Reorderable {
+        Reorderable(Rc::new(ReorderableInner {
+            options,
+            sessions: self.0.sessions.clone(),
+        }))
     }
 }
 
@@ -273,10 +296,23 @@ impl ReorderAttachment {
     /// name ("Reorder" and the item's name), toggle state, Tab stop, drag
     /// and keys. A rejected item's handle stays as it was.
     pub fn handle(&self, key: impl Into<ItemKey>, element: impl IntoElement) -> AnyElement {
+        self.handle_disabled(key, element, false)
+    }
+
+    /// [`handle`](Self::handle) for an item whose collection is disabled or busy: with
+    /// `disabled`, the handle stays a focusable Tab stop, named and described, but
+    /// starts no drag and no reorder mode (upstream's `Handle` with `isDisabled`).
+    pub fn handle_disabled(
+        &self,
+        key: impl Into<ItemKey>,
+        element: impl IntoElement,
+        disabled: bool,
+    ) -> AnyElement {
         AttachedHandle {
             rc: self.rc.clone(),
             key: key.into(),
             element: element.into_any_element(),
+            disabled,
         }
         .into_any_element()
     }
@@ -288,6 +324,7 @@ struct AttachedHandle {
     rc: session::ReorderCx,
     key: ItemKey,
     element: AnyElement,
+    disabled: bool,
 }
 
 impl RenderOnce for AttachedHandle {
@@ -301,7 +338,16 @@ impl RenderOnce for AttachedHandle {
                 format!("{:?}-reorder-{}", self.rc.id, session::key_text(&self.key)).into(),
             ))
             .child(self.element);
-        session::handle_on(&self.rc, &self.key, name, position, false, body, window, cx)
+        session::handle_on(
+            &self.rc,
+            &self.key,
+            name,
+            position,
+            self.disabled,
+            body,
+            window,
+            cx,
+        )
     }
 }
 

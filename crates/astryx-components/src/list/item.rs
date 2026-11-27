@@ -60,6 +60,8 @@ pub struct ListItem {
     disabled: bool,
     selected: bool,
     item_key: Option<ItemKey>,
+    reorder_label: Option<SharedString>,
+    reorder_tooltip: Option<SharedString>,
     menu: Option<Vec<MenuEntry>>,
     swipe: Option<Rc<SwipeHost>>,
     swipe_actions: Option<ItemSwipeActions>,
@@ -95,6 +97,8 @@ impl ListItem {
             disabled: false,
             selected: false,
             item_key: None,
+            reorder_label: None,
+            reorder_tooltip: None,
             menu: None,
             swipe: None,
             swipe_actions: None,
@@ -142,6 +146,20 @@ impl ListItem {
     /// string or a number from the data; `on_reorder` reports it as given.
     pub fn item_key(mut self, key: impl Into<ItemKey>) -> Self {
         self.item_key = Some(key.into());
+        self
+    }
+
+    /// The row's name in its reorder handle's label and the reorder announcements, for
+    /// a row whose label is an element (upstream reads the label's text).
+    pub fn reorder_label(mut self, label: impl Into<SharedString>) -> Self {
+        self.reorder_label = Some(label.into());
+        self
+    }
+
+    /// A tooltip on the row's reorder handle: why the row does not move, for a disabled
+    /// row (upstream TransferList's `DisabledHandleTooltip`).
+    pub fn reorder_tooltip(mut self, tooltip: impl Into<SharedString>) -> Self {
+        self.reorder_tooltip = Some(tooltip.into());
         self
     }
 
@@ -320,26 +338,32 @@ impl RenderOnce for ListItem {
         let handle = match (&reorder, &reorder_key) {
             (Some(rc), Some(key)) => {
                 let movable = rc.reorderable.can_move(key);
+                let name = self
+                    .reorder_label
+                    .clone()
+                    .or_else(|| self.label_text.clone());
                 reorder::register(
                     rc,
                     Registration {
                         index: row.index,
                         key: key.clone(),
-                        name: self.label_text.clone(),
+                        name: name.clone(),
                         movable,
                     },
                     cx,
                 );
                 movable.then(|| {
-                    reorder::handle(
-                        rc,
-                        key,
-                        self.label_text.clone(),
-                        row.index + 1,
-                        self.disabled,
-                        window,
-                        cx,
-                    )
+                    let handle =
+                        reorder::handle(rc, key, name, row.index + 1, self.disabled, window, cx);
+                    match self.reorder_tooltip.clone() {
+                        Some(text) => crate::overlay::Tooltip::new(
+                            ElementId::Name(format!("{}-reorder-tooltip", self.id).into()),
+                            text,
+                        )
+                        .child(handle)
+                        .into_any_element(),
+                        None => handle,
+                    }
                 })
             }
             _ => None,

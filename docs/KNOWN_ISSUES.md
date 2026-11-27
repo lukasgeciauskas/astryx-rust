@@ -420,6 +420,18 @@
   - An interrupted PageControl window slide restarts from where it is drawn without its
     velocity; CircleCheckIndicator fades its colors only when given an `id`.
 
+- **Comments and Schedule, where GPUI differs (M13).**
+  - Comments: an outside press dismisses a thread on mouse-down, not pointer-up; with
+    `on_dismiss` a thread draws as a layer above the page, so a scroller does not clip
+    it; a selection from the host opens the thread without scrolling it into view;
+    Copy link writes `#comment-{id}` (GPUI has no page URL); ChatMessageList takes no
+    accessible label, so the list's "Comments: {label}" name is not set.
+  - Schedule: date text comes from ICU4X, which has no interval patterns (en-GB writes
+    "5 – 11 August" where `Intl` writes "5–11 August") and other locale data (the
+    French hour gutter reads "07" where `Intl` reads "07 h"); jiff's bundled zone
+    database differs from Node's for America/Havana after November 2026; a failed
+    loader leaves the view empty where upstream throws to an error boundary.
+
 ## Tooling
 
 - **True hot-patching needs our patched dx.** `cargo xtask dev --hot-patch` patches

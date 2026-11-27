@@ -120,6 +120,28 @@ pub fn announce(
         .detach();
 }
 
+/// Marks a subtree as a live container: an element that delivers what is added inside
+/// it to screen reader users itself (upstream's live containers, an ancestor with role
+/// `log`, `status` or `alert`, or `aria-live`), so a component inside one leaves its
+/// own announcement to it instead of saying the same words again. Provided with
+/// [`provide_live_container`]; a layer opened from inside one (a popover, a dialog) is
+/// outside it, as a portal is upstream.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct LiveContainer;
+
+/// Marks `child` and its descendants in this layer as inside a [`LiveContainer`]. A
+/// container with a live role renders its content through this.
+#[track_caller]
+pub fn provide_live_container(child: impl IntoElement, cx: &App) -> impl IntoElement {
+    crate::context::provide_in_layer(LiveContainer, child, cx)
+}
+
+/// Whether the element rendering now sits inside a [`LiveContainer`] of its layer
+/// (upstream's `closest(LIVE_CONTAINER_SELECTOR) != null`).
+pub fn in_live_container(cx: &App) -> bool {
+    crate::context::use_layer_context::<LiveContainer>(cx).is_some()
+}
+
 /// The text a live region holds now, for tests.
 pub fn announcement(politeness: Politeness, window: &Window, cx: &mut App) -> SharedString {
     channel(window, cx)

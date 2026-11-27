@@ -6,8 +6,7 @@
 
 use std::rc::Rc;
 
-use astryx_components::button::{Button, ButtonVariant};
-use astryx_components::overlay::Tooltip;
+use astryx_components::overlay::{Tooltip, disclosure};
 use astryx_primitives::{control_focus, is_focus_visible};
 use astryx_theme::{ThemeStyled, current};
 use gpui::prelude::*;
@@ -265,37 +264,21 @@ impl RenderOnce for ChatReactionBar {
             {
                 drawn.add = Some(self.add_label.clone());
             }
-            // The trigger is a Button, which the picker's popover wires up; its tooltip
-            // names it as upstream's Tooltip does.
-            let selector = format!("{}-add", self.id);
-            let mut button = Button::new(
-                ElementId::Name(format!("{}-add", self.id).into()),
+            // Upstream's plain button inside a Tooltip; the picker's popover wires it up.
+            let button = AddButton {
+                id: ElementId::Name(format!("{}-add", self.id).into()),
+                label: self.add_label.clone(),
+            };
+            let trigger = Tooltip::new(
+                ElementId::Name(format!("{}-add-tip", self.id).into()),
                 self.add_label.clone(),
             )
-            .variant(ButtonVariant::Ghost)
-            .icon_only(true)
-            .tooltip(self.add_label.clone())
-            .icon(
-                div()
-                    .debug_selector(move || selector)
-                    .text_size(px(15.))
-                    .line_height(leading(t.text.supporting.size, t.text.supporting.leading))
-                    .child("+"),
-            );
-            button = button
-                .w(px(32.))
-                .h(px(24.))
-                .p_0()
-                .rounded_full()
-                .border_1()
-                .border_color(gpui::transparent_black())
-                .bg(t.color.background_muted)
-                .text_color(t.color.icon_secondary);
+            .child(button);
             let mut picker =
                 ChatEmojiPicker::new(ElementId::Name(format!("{}-picker", self.id).into()))
                     .label(self.add_label.clone())
                     .on_select(move |emoji, window, cx| on_add(emoji, window, cx))
-                    .child(button);
+                    .child(trigger);
             if let Some(emojis) = &self.emojis {
                 picker = picker.emojis(emojis.clone());
             }
@@ -310,5 +293,55 @@ impl RenderOnce for ChatReactionBar {
             .role(Role::Group)
             .aria_label(self.label.clone())
             .children(children)
+    }
+}
+
+/// The add-reaction button (upstream's `addButton`): a 32 by 24 pill holding "+", named
+/// by the add label, that opens the picker's popover as its trigger.
+#[derive(IntoElement)]
+struct AddButton {
+    id: ElementId,
+    label: SharedString,
+}
+
+impl RenderOnce for AddButton {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = current(window, cx);
+        let t = theme.tokens();
+        let rem = window.rem_size();
+        let focus = control_focus(&self.id, window, cx);
+        let emphasized = t.color.border_emphasized;
+        let selector = self.id.to_string();
+        let mut button = div()
+            .id(self.id.clone())
+            .debug_selector(move || selector)
+            .track_focus(&focus)
+            .relative()
+            .flex()
+            .items_center()
+            .justify_center()
+            .w(px(32.))
+            .h(px(24.))
+            .p_0()
+            .rounded_full()
+            .border_1()
+            .border_color(gpui::transparent_black())
+            .hover(move |s| s.border_color(emphasized))
+            .bg(t.color.background_muted)
+            .text_color(t.color.icon_secondary)
+            .cursor_pointer()
+            .text_size(px(15.))
+            .line_height(t.text.supporting.size.to_pixels(rem) * t.text.supporting.leading)
+            .role(Role::Button)
+            .aria_label(self.label.clone())
+            .child("+");
+        if is_focus_visible(&focus, window) {
+            button = button.child(astryx_components::focus::focus_ring(t, px(9999.), rem));
+        }
+        // The popover around the button gives it its trigger props.
+        match disclosure(cx) {
+            Some(d) => d.trigger(button),
+            None => button.into_any_element(),
+        }
     }
 }

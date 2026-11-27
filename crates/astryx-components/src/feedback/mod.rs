@@ -778,13 +778,17 @@ impl RenderOnce for Banner {
             None,
         );
         frame.style().refine(&self.style);
-        frame
-            .id(self.id)
-            .role(Role::Status)
-            .aria_label(self.title)
-            .child(header)
-            .children(body)
-            .into_any_element()
+        // A status is a live container: what renders inside leaves announcing to it.
+        astryx_primitives::provide_live_container(
+            frame
+                .id(self.id)
+                .role(Role::Status)
+                .aria_label(self.title)
+                .child(header)
+                .children(body),
+            cx,
+        )
+        .into_any_element()
     }
 }
 

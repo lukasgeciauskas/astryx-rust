@@ -3,7 +3,9 @@
 
 use std::rc::Rc;
 
-use astryx_primitives::{control_focus, is_focus_visible, provide_in_layer};
+use astryx_primitives::{
+    control_focus, is_focus_visible, provide_in_layer, provide_live_container,
+};
 use astryx_theme::current;
 use gpui::Refineable as _;
 use gpui::prelude::*;
@@ -233,6 +235,9 @@ impl RenderOnce for ChatMessageList {
             });
         let ring = is_focus_visible(&focus, window).then(|| focus_ring_inset(t, gpui::px(0.), rem));
         let root = root.child(inner).children(ring);
+        // The log is a live container: it delivers the messages and hints added inside
+        // it, so what renders inside leaves announcing to it.
+        let root = provide_live_container(root, cx);
         provide_in_layer(
             ChatListContext {
                 density: self.density,

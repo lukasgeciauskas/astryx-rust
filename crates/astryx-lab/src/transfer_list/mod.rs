@@ -2,6 +2,7 @@
 //! `TransferList`, the dual-panel content it hosts.
 
 mod list;
+pub(crate) mod responsive;
 mod selector;
 
 pub mod examples;

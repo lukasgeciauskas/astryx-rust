@@ -14,7 +14,7 @@ use gpui::{AnyElement, App, ElementId, ScrollHandle, SharedString, Window, div, 
 
 use super::{
     ChatEmojiPicker, ChatReaction, ChatReactionBar, ChatTypingIndicator, ChatUnreadDivider,
-    ChatVirtualizer, ChatVirtualizerHandle, ItemSize, provide_live_container,
+    ChatVirtualizer, ChatVirtualizerHandle, ItemSize,
 };
 
 fn example(title: &'static str, body: impl IntoElement) -> AnyElement {
@@ -94,9 +94,7 @@ fn typing_and_unread() -> AnyElement {
                 ),
             ),
         )
-        .child(provide_live_container(
-            ChatTypingIndicator::new("chat-example-typing").names(["Ana", "Ben", "Casey"]),
-        ))
+        .child(ChatTypingIndicator::new("chat-example-typing").names(["Ana", "Ben", "Casey"]))
         .into_any_element()
 }
 

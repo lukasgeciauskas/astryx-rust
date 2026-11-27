@@ -278,6 +278,41 @@ fn a_finger_nobody_claims_becomes_the_windows_scroll(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_watcher_follows_a_finger_the_window_took_to_the_lift(cx: &mut TestAppContext) {
+    // A watcher (upstream's pull to refresh) never claims: the window takes the finger
+    // for its scroll, and the watcher still reads every move until the lift.
+    let pan = PanGestureRecognizer::new(PanOptions {
+        direction: PanDirection::Vertical,
+        base: RecognizerOptions {
+            claims_touches: false,
+            ..RecognizerOptions::named("watch")
+        },
+        ..PanOptions::default()
+    });
+    let attach = pan.clone();
+    let f = mount(cx, move |attachment, _| attachment.add_recognizer(&attach));
+    touch(f.cx, 1, gpui::TouchPhase::Started, 60., 40.);
+    touch(f.cx, 1, gpui::TouchPhase::Moved, 60., 52.);
+    touch(f.cx, 1, gpui::TouchPhase::Moved, 60., 70.);
+    assert!(!f.scrolls.borrow().is_empty(), "the window scrolls");
+    touch(f.cx, 1, gpui::TouchPhase::Moved, 60., 90.);
+    assert_eq!(pan.state(), GestureState::Changed);
+    let followed = pan.translation().y;
+    touch(f.cx, 1, gpui::TouchPhase::Moved, 60., 110.);
+    assert_eq!(
+        pan.translation().y - followed,
+        20.,
+        "the move after the take"
+    );
+    touch(f.cx, 1, gpui::TouchPhase::Ended, 60., 110.);
+    assert_eq!(
+        pan.state(),
+        GestureState::Possible,
+        "ended at the lift and reset"
+    );
+}
+
+#[gpui::test]
 fn a_horizontal_drag_on_a_horizontal_pan_stays_the_pans(cx: &mut TestAppContext) {
     let pan = PanGestureRecognizer::new(PanOptions {
         direction: PanDirection::Horizontal,

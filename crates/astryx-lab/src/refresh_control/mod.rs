@@ -811,17 +811,17 @@ fn recognizers(
     cx: &mut App,
 ) -> Recognizers {
     let host = gesture_host(window, cx);
-    // Upstream's pull only watches the finger, which the browser keeps scrolling. GPUI's
-    // host stops feeding a watcher once the window takes a finger for its own scroll, so
-    // the pull is a scroll-edge pan: it takes the finger only where the scroll container
-    // cannot move that way (at its top, moving down), and the container scrolls natively
-    // otherwise. A pen's or a mouse's drag stays the platform's, for text selection.
+    // UIKit's refresh pull is the scroll view's own drag, not a second gesture: one touch
+    // can scroll, pull past the top, and scroll the same content again. So this pan never
+    // claims its touch and only watches it; the window keeps the finger for its own
+    // scrolling, and the pan reads it to the lift. A pen's or a mouse's drag stays the
+    // platform's, for text selection.
     let pan = PanGestureRecognizer::new(PanOptions {
         direction: PanDirection::Vertical,
         maximum_number_of_touches: 1,
-        scroll_edge: true,
         base: RecognizerOptions {
             allowed_pointer_types: Some(vec![PointerKind::Touch]),
+            claims_touches: false,
             ..RecognizerOptions::named("RefreshPull")
         },
         ..PanOptions::default()

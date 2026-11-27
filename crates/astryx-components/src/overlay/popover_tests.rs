@@ -214,3 +214,41 @@ fn a_popover_without_controls_focuses_its_surface(cx: &mut TestAppContext) {
     press(cx, "escape");
     assert!(!open(cx));
 }
+
+/// A trigger that is no Button: a plain element wired by the popover's disclosure.
+#[derive(IntoElement)]
+struct PlainTrigger;
+
+impl gpui::RenderOnce for PlainTrigger {
+    fn render(self, _: &mut Window, cx: &mut gpui::App) -> impl IntoElement {
+        use gpui::StatefulInteractiveElement as _;
+        let el = div()
+            .id("plain-trigger")
+            .w(px(40.))
+            .h(px(24.))
+            .role(gpui::Role::Button)
+            .aria_label("Filters");
+        match super::disclosure(cx) {
+            Some(d) => {
+                assert_eq!(d.has_popup(), gpui::HasPopup::Dialog);
+                d.trigger(el)
+            }
+            None => el.into_any_element(),
+        }
+    }
+}
+
+#[gpui::test]
+fn fr1_any_element_the_popover_wraps_can_open_it(cx: &mut TestAppContext) {
+    let cx = host(cx, || {
+        Popover::new("p", "Filters")
+            .content(div().debug_selector(|| "p-content".into()).child("Body"))
+            .child(PlainTrigger)
+            .into_any_element()
+    });
+    assert!(!open(cx));
+    cx.simulate_click(point(px(130.), px(130.)), Modifiers::none());
+    assert!(open(cx), "a press on the plain trigger opens it");
+    cx.simulate_click(point(px(130.), px(130.)), Modifiers::none());
+    assert!(!open(cx), "and a second press closes it");
+}

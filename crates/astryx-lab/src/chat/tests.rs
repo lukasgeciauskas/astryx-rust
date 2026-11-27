@@ -228,13 +228,17 @@ fn announces_each_new_label_nothing_on_clear_and_the_same_people_again(cx: &mut 
 }
 
 #[gpui::test]
-fn leaves_delivery_to_an_enclosing_live_container(cx: &mut TestAppContext) {
+fn leaves_delivery_to_an_enclosing_chat_log(cx: &mut TestAppContext) {
     ANNOUNCED.with(|a| a.borrow_mut().clear());
+    // Core's ChatMessageList is a log, a live container.
     let (view, cx) = host(cx, || {
-        provide_live_container(ChatTypingIndicator::new("typing").names(["Ana"])).into_any_element()
+        astryx_components::chat::ChatMessageList::new("log")
+            .child(ChatTypingIndicator::new("typing").names(["Ana"]))
+            .into_any_element()
     });
     rebuild(&view, cx, || {
-        provide_live_container(ChatTypingIndicator::new("typing").names(["Ana", "Ben"]))
+        astryx_components::chat::ChatMessageList::new("log")
+            .child(ChatTypingIndicator::new("typing").names(["Ana", "Ben"]))
             .into_any_element()
     });
     assert!(announced().is_empty());

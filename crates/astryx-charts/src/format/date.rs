@@ -342,7 +342,7 @@ pub(super) fn gregorian_month_year(date: PlainDate, locale: &str) -> Option<Stri
 }
 
 /// `Date.parse(s)`: the time value a date string names, or NaN.
-pub(super) fn date_parse(s: &str) -> f64 {
+pub fn date_parse(s: &str) -> f64 {
     let units: Vec<u16> = s.encode_utf16().collect();
     let Some(out) = parse(&units) else {
         return f64::NAN;

@@ -320,3 +320,158 @@ fn moves_a_record_in_reorder_mode_through_the_owner(cx: &mut TestAppContext) {
     r.settle();
     assert_eq!(*moves.borrow(), [(ItemKey::Text("a".into()), 1)]);
 }
+
+#[gpui::test]
+fn the_records_after_a_removal_glide_from_where_they_were(cx: &mut TestAppContext) {
+    let mut r = rig(cx, three(), Options::default());
+    let top = |r: &mut Rig, key: &str| {
+        r.cx.debug_bounds(Box::leak(format!("guests-record-{key}").into_boxed_str()))
+            .expect("drawn")
+            .origin
+            .y
+    };
+    let (b, c) = (top(&mut r, "b"), top(&mut r, "c"));
+    let row = r.cx.debug_bounds("guests-record-b").expect("drawn");
+    r.cx.simulate_mouse_move(row.center(), None, Modifiers::none());
+    r.settle();
+    r.settle();
+    let remove = r.cx.debug_bounds("guests-remove-b").expect("revealed");
+    r.cx.simulate_click(remove.center(), Modifiers::none());
+    r.cx.run_until_parked();
+    assert_eq!(r.ids(), ["a", "c"]);
+    // The frame of the removal shows c where it was; it glides up to b's place.
+    assert!(
+        (top(&mut r, "c") - c).abs() < px(0.5),
+        "starts where it was"
+    );
+    r.settle();
+    r.settle();
+    assert!((top(&mut r, "c") - b).abs() < px(0.5), "ends in b's place");
+}
+
+#[gpui::test]
+fn a_size_change_lands_the_removal_at_once(cx: &mut TestAppContext) {
+    // Removing the first record shows the column labels on the next: its size changes,
+    // and nothing glides (upstream's hasSizeChange).
+    let mut r = rig(cx, three(), Options::default());
+    let a =
+        r.cx.debug_bounds("guests-record-a")
+            .expect("drawn")
+            .origin
+            .y;
+    r.remove("a");
+    let b =
+        r.cx.debug_bounds("guests-record-b")
+            .expect("drawn")
+            .origin
+            .y;
+    assert!((b - a).abs() < px(0.5));
+}
+
+#[gpui::test]
+fn a_disabled_list_keeps_its_reorder_handles(cx: &mut TestAppContext) {
+    let reorderable = create_reorderable(ReorderableOptions::new(|_, _, _| {}));
+    let mut r = rig(
+        cx,
+        three(),
+        Options {
+            disabled: true,
+            reorder: Some(reorderable),
+            ..Options::default()
+        },
+    );
+    let row = r.cx.debug_bounds("guests-record-a").expect("drawn");
+    r.cx.simulate_mouse_move(row.center(), None, Modifiers::none());
+    r.settle();
+    r.settle();
+    let handle = r.cx.debug_bounds("guests-records-reorder-a");
+    assert!(handle.is_some(), "the handle stays, focusable and inert");
+}
+
+struct Scrolled {
+    value: Entity<Vec<Guest>>,
+    handle: gpui::ScrollHandle,
+}
+
+impl Render for Scrolled {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let columns = vec![ListInputColumn::new(
+            "name",
+            "Name",
+            |_: &ListInputRenderContext<Guest>, _: &mut Window, _: &mut App| {
+                div().h(px(32.)).w_full().into_any_element()
+            },
+        )];
+        let value = self.value.clone();
+        let counter = Rc::new(RefCell::new(0));
+        let input = ListInput::new(
+            "guests",
+            "Guests",
+            self.value.read(cx).clone(),
+            |g: &Guest| g.id.clone(),
+            move || {
+                *counter.borrow_mut() += 1;
+                guest(&format!("new-{}", counter.borrow()), "")
+            },
+            columns,
+        )
+        .on_change(move |next, _, _, cx| {
+            value.update(cx, |v, cx| {
+                *v = next;
+                cx.notify();
+            })
+        });
+        astryx_components::gestures::scroller::scroller_scope(
+            "page",
+            Some(&self.handle),
+            div()
+                .id("page")
+                .w(px(800.))
+                .h(px(200.))
+                .overflow_y_scroll()
+                .track_scroll(&self.handle)
+                .child(input),
+        )
+    }
+}
+
+#[gpui::test]
+fn a_pointers_add_keeps_add_under_the_pointer(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        astryx_theme::init(cx);
+        astryx_primitives::focus::init(cx);
+        astryx_primitives::editing::init(cx);
+    });
+    let many: Vec<Guest> = (0..8).map(|i| guest(&format!("g{i}"), "x")).collect();
+    let value = cx.update(|cx| cx.new(|_| many));
+    let handle = gpui::ScrollHandle::new();
+    let (v, h) = (value.clone(), handle.clone());
+    let (_, cx) = cx.add_window_view(move |_, _| Scrolled {
+        value: v,
+        handle: h,
+    });
+    cx.update(|window, _| window.activate_window());
+    for _ in 0..4 {
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+    // Scrolled to the end, Add in view.
+    let max = handle.max_offset().y;
+    handle.set_offset(point(px(0.), -max));
+    for _ in 0..4 {
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+    let add = cx.debug_bounds("guests-add").expect("drawn");
+    cx.simulate_click(add.center(), Modifiers::none());
+    for _ in 0..4 {
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+    assert_eq!(value.read_with(cx, |v, _| v.len()), 9);
+    let after = cx.debug_bounds("guests-add").expect("drawn");
+    assert!(
+        (after.origin.y - add.origin.y).abs() < px(0.5),
+        "{add:?} then {after:?}"
+    );
+}

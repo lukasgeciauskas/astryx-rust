@@ -24,8 +24,7 @@ pub use emoji_picker::{
 };
 pub use reaction_bar::{ChatReaction, ChatReactionBar, pill_label};
 pub use typing_indicator::{
-    ChatTypingIndicator, DOT_DELAYS_MS, LiveContainer, dot_frame, long_conjunction,
-    provide_live_container, typing_label,
+    ChatTypingIndicator, DOT_DELAYS_MS, dot_frame, long_conjunction, typing_label,
 };
 pub use unread_divider::{ChatUnreadDivider, unread_divider_name};
 pub use virtualizer::{ChatVirtualizer, ChatVirtualizerHandle, ItemSize};

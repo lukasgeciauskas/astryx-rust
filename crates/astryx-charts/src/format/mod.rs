@@ -8,7 +8,7 @@
 //! locale-aware and rounding is correct across the full magnitude range (K, M, B,
 //! T and beyond).
 
-mod date;
+pub mod date;
 
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;

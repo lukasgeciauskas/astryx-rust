@@ -10,9 +10,7 @@ use astryx_components::button::{Button, ButtonVariant};
 use astryx_components::complex_selector::{ComplexCommit, ComplexSelector, ComplexSelectorState};
 use astryx_components::field::{InputStatus, StatusPlacement};
 use astryx_components::layout::{SpacingStep, Stack, StackAlign};
-use astryx_components::reorderable::{
-    ItemKey, Reorderable, ReorderableOptions, create_reorderable,
-};
+use astryx_components::reorderable::{ItemKey, Reorderable, ReorderableOptions};
 use astryx_i18n::Arg;
 use astryx_primitives::{ElementSize, Placement};
 use gpui::prelude::*;
@@ -414,12 +412,10 @@ impl RenderOnce for TransferListSelector {
                     // The owner's reorder: aimed at the draft when staged, handed to the
                     // owner as it is when immediate.
                     let reorderable = owner.as_ref().map(|owner| {
-                        if !staged {
-                            return owner.clone();
-                        }
-                        let draft = content_draft.clone();
+                        // Adapted, so the owner's `start(key)` finds the list either way.
                         let keep = owner.clone();
-                        create_reorderable(
+                        let options = if staged {
+                            let draft = content_draft.clone();
                             ReorderableOptions::new(move |m, window, _| {
                                 if busy {
                                     return;
@@ -431,8 +427,17 @@ impl RenderOnce for TransferListSelector {
                                 draft.borrow_mut().draft = next;
                                 window.refresh();
                             })
-                            .is_reorderable(move |key| keep.can_move(key)),
-                        )
+                        } else {
+                            let target = owner.clone();
+                            ReorderableOptions::new(move |m, window, cx| {
+                                // One pending change at a time: a move while busy is dropped.
+                                if busy {
+                                    return;
+                                }
+                                target.on_reorder(m, window, cx);
+                            })
+                        };
+                        owner.adapt(options.is_reorderable(move |key| keep.can_move(key)))
                     });
                     let (
                         selected_label,

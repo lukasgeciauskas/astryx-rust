@@ -758,3 +758,31 @@ fn calls_on_refresh_once_a_pull_while_refreshing_only_stretches(cx: &mut TestApp
     r.frames(1500);
     assert!((r.control().offset() - 60.).abs() < 0.5);
 }
+
+#[gpui::test]
+fn a_drag_that_begins_as_a_scroll_pulls_once_the_content_reaches_its_top(cx: &mut TestAppContext) {
+    let calls = Rc::new(Cell::new(0));
+    let c = calls.clone();
+    let mut r = rig(cx, move |h| {
+        RefreshControlOptions::new()
+            .scroll_handle(h)
+            .on_refresh(counted(&c, Some(5000)))
+    });
+    // Scrolled 30 px into the content.
+    r.handle.set_offset(point(px(0.), px(-30.)));
+    r.frame();
+    let mut y = 100.;
+    r.finger(TouchPhase::Started, y);
+    // The finger scrolls the content back to its top, then pulls on.
+    for _ in 0..12 {
+        y += 10.;
+        r.finger(TouchPhase::Moved, y);
+    }
+    assert_eq!(r.scroll_top(), 0., "scrolled to the top");
+    assert!(
+        r.control().offset() > 0.,
+        "then pulled: {}",
+        r.control().offset()
+    );
+    r.finger(TouchPhase::Ended, y);
+}

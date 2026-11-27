@@ -274,8 +274,8 @@ impl ScrollableArea {
     }
 
     /// Upstream `getViewportProps`: overflow on the requested axes, containment on
-    /// the ones that scroll, a named tab stop while it scrolls (FR12, AR1) that keeps
-    /// focus when the overflow goes (AR2), the scrolling keys, and the measurement
+    /// the ones that scroll, a named viewport (its role and label) that is a tab stop
+    /// while it scrolls (FR12, AR1) and keeps focus when the overflow goes (AR2), the scrolling keys, and the measurement
     /// that publishes the state once a frame when it changes (FR5, FR9, PR1).
     /// The viewport takes the hook's id.
     pub fn viewport(&self, el: Div) -> Stateful<Div> {
@@ -307,16 +307,15 @@ impl ScrollableArea {
             ScrollKeyboardAccess::Content => {}
             ScrollKeyboardAccess::Viewport { label, role }
             | ScrollKeyboardAccess::ContentOrViewport { label, role } => {
-                el = el.track_focus(&self.focus.clone().tab_stop(state.is_scrollable()));
-                // Named, with its role, only while it scrolls (AR1).
-                if state.is_scrollable() {
-                    el = el
-                        .role(match role {
-                            ScrollRole::Group => Role::Group,
-                            ScrollRole::Region => Role::Region,
-                        })
-                        .aria_label(label.clone());
-                }
+                // A tab stop only while it scrolls (AR1); named, with its role, always,
+                // as upstream's viewport props are.
+                el = el
+                    .track_focus(&self.focus.clone().tab_stop(state.is_scrollable()))
+                    .role(match role {
+                        ScrollRole::Group => Role::Group,
+                        ScrollRole::Region => Role::Region,
+                    })
+                    .aria_label(label.clone());
             }
         }
         // The scrolling keys: from the viewport, or bubbling from content that left

@@ -4,10 +4,11 @@
 //!
 //! The label is announced once per change through the shared polite channel
 //! (`astryx_primitives::announce`), unless the indicator sits inside a live container
-//! ([`provide_live_container`], a chat log) that delivers it already (spec:AST-086).
+//! ([`astryx_primitives::provide_live_container`]: a chat log, a status) that delivers it
+//! already (spec:AST-086).
 
 use astryx_i18n::{Arg, I18n, current as i18n, use_locale};
-use astryx_primitives::{Politeness, announce, prefers_reduced_motion, provide, use_context};
+use astryx_primitives::{Politeness, announce, in_live_container, prefers_reduced_motion};
 use astryx_theme::{CubicBezier, ThemeStyled, current};
 use gpui::prelude::*;
 use gpui::{
@@ -16,18 +17,6 @@ use gpui::{
 use icu_list::ListFormatter;
 use icu_list::options::{ListFormatterOptions, ListLength};
 use writeable::Writeable as _;
-
-/// Marks a subtree as a live container (upstream: an ancestor with role `log`, `status` or
-/// `alert`, or `aria-live`), which delivers what is added inside it to assistive
-/// technology itself.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct LiveContainer;
-
-/// Gives `child` the [`LiveContainer`] mark: a typing indicator inside it leaves
-/// delivery to it (spec:AST-086 FR4).
-pub fn provide_live_container(child: impl IntoElement) -> impl IntoElement {
-    provide(LiveContainer, child)
-}
 
 /// The names joined as a long "and" list in `locale` (upstream's
 /// `Intl.ListFormat(locale, {style: 'long', type: 'conjunction'})`).
@@ -176,7 +165,7 @@ impl RenderOnce for ChatTypingIndicator {
         );
         // The label last announced, so a rerender does not repeat it; cleared when nobody
         // is typing, so the same people starting again is a new occasion (FR6).
-        let inside_live = use_context::<LiveContainer>(cx).is_some();
+        let inside_live = in_live_container(cx);
         let announce_now = state.update(cx, |s, _| match &label {
             None => {
                 s.announced = None;

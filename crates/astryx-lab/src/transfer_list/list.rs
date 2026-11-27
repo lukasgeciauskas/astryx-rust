@@ -11,7 +11,9 @@ use astryx_components::input::{InputType, TextInput};
 use astryx_components::item::{Item, ItemDensity};
 use astryx_components::layout::VisuallyHidden;
 use astryx_components::list::{List, ListItem};
-use astryx_components::reorderable::{ItemKey, Reorderable};
+use astryx_components::reorderable::{ItemKey, ReorderMove, Reorderable, ReorderableOptions};
+
+use super::responsive::Responsive;
 use astryx_components::text::{Text, TextColor, TextDisplay, TextType, TextWeight};
 use astryx_i18n::Arg;
 use astryx_primitives::{ElementSize, Politeness, announce, request_focus};
@@ -197,6 +199,37 @@ pub fn clear_selected(options: &[TransferListOption], value: &[SharedString]) ->
 /// The option for a value: the last with it, as a `Map` keeps it.
 fn option_of<'a>(options: &'a [TransferListOption], value: &str) -> Option<&'a TransferListOption> {
     options.iter().rev().find(|o| o.value.as_ref() == value)
+}
+
+/// Upstream `reorderSelected`: a List move among the shown rows (`key` to the shown
+/// index `to`) in the value's terms. The shown rows' new order goes back into the
+/// places the shown values held, so a value without an option keeps its place; the
+/// result is where the moved value lands in the value. `None` when nothing moves.
+pub fn reorder_in_value(
+    shown: &[SharedString],
+    value: &[SharedString],
+    key: &str,
+    to: usize,
+) -> Option<usize> {
+    let from = shown.iter().position(|v| v.as_ref() == key)?;
+    if from == to || to >= shown.len() {
+        return None;
+    }
+    let mut order = shown.to_vec();
+    let moved = order.remove(from);
+    order.insert(to, moved);
+    let mut next = order.into_iter();
+    let next_value: Vec<SharedString> = value
+        .iter()
+        .map(|item| {
+            if shown.contains(item) {
+                next.next().unwrap_or_else(|| item.clone())
+            } else {
+                item.clone()
+            }
+        })
+        .collect();
+    next_value.iter().position(|v| v.as_ref() == key)
 }
 
 type ChangeFn = Rc<dyn Fn(Vec<SharedString>, &mut Window, &mut App)>;
@@ -535,6 +568,34 @@ impl Built {
 
 impl RenderOnce for TransferList {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let id = self.id.clone();
+        let state = window.use_keyed_state(name(&id, "transfer-list"), cx, |_, _| {
+            Rc::new(RefCell::new(TransferState {
+                query: SharedString::default(),
+                current: Vec::new(),
+                focus_after: None,
+                narrow: false,
+            }))
+        });
+        let last_narrow = state.read(cx).borrow().narrow;
+        let shared = state.read(cx).clone();
+        let threshold = window.rem_size() * STACK_BELOW_REM;
+        let this = Rc::new(self);
+        let first = Rc::new(std::cell::Cell::new(true));
+        // Narrower than 40rem, the panels stack (upstream's container query): the list
+        // lays out as it did last frame, and on a frame whose width crosses the line it
+        // lays its content out again for the new width before it paints.
+        Responsive::new(threshold, last_narrow, move |narrow, window, cx| {
+            shared.borrow_mut().narrow = narrow;
+            this.build(narrow, first.replace(false), window, cx)
+        })
+    }
+}
+
+impl TransferList {
+    /// The list's content at `narrow`; `first` is the frame's first build, which moves
+    /// focus after a transfer.
+    fn build(&self, narrow: bool, first: bool, window: &mut Window, cx: &mut App) -> AnyElement {
         let theme = astryx_theme::current(window, cx);
         let t = theme.tokens();
         let i18n = astryx_i18n::current(cx);
@@ -615,17 +676,43 @@ impl RenderOnce for TransferList {
                     .is_none_or(|o| o.can_move(&ItemKey::Text(v.clone())))
             }
         };
-        // The owner's object goes to the List as it is, so its moves reach the owner and
-        // its `start(key)` finds this list. Its moves count the shown rows: with every
-        // value shown (no search runs while ordering) those are the value's indices.
-        let list_reorderable = owner.clone().filter(|_| ordering);
+        // The owner's object, adapted so the List's moves among the shown rows reach the
+        // owner in the value's terms. Its collections are the owner's, so the owner's
+        // `start(key)` finds this list.
+        let shown: Vec<SharedString> = selected.iter().map(|o| o.value.clone()).collect();
+        let list_reorderable = owner.as_ref().filter(|_| ordering).map(|owner| {
+            let (target, keep, value) = (owner.clone(), owner.clone(), value.clone());
+            owner.adapt(
+                ReorderableOptions::new(move |m, window, cx| {
+                    let ItemKey::Text(key) = &m.key else {
+                        return;
+                    };
+                    if let Some(to) = reorder_in_value(&shown, &value, key, m.to) {
+                        target.on_reorder(
+                            &ReorderMove {
+                                key: m.key.clone(),
+                                to,
+                            },
+                            window,
+                            cx,
+                        );
+                    }
+                })
+                .is_reorderable(move |key| keep.can_move(key)),
+            )
+        });
 
         // Focus after a transfer: the action at the same place on the same side, else
         // the search, else the panel.
         let selected_panel_focus = panel_focus(&id, TransferSide::Selected, window, cx);
         let available_panel_focus = panel_focus(&id, TransferSide::Available, window, cx);
         let search_id = name(&id, "search");
-        if let Some((side, index)) = shared.borrow_mut().focus_after.take() {
+        let pending_focus = if first {
+            shared.borrow_mut().focus_after.take()
+        } else {
+            None
+        };
+        if let Some((side, index)) = pending_focus {
             let actions: Vec<ElementId> = match side {
                 TransferSide::Selected => selected
                     .iter()
@@ -712,9 +799,17 @@ impl RenderOnce for TransferList {
                 row_label(option, window, cx),
             )
             .item_key(ItemKey::Text(option.value.clone()))
+            .reorder_label(option.label.clone())
             .end_content(end)
             .disabled(disabled)
             .px(t.spacing.s3);
+            // A disabled list's handle says why the row does not move.
+            if disabled && ordering && !fixed {
+                row = row.reorder_tooltip(i18n.format(
+                    "@astryx.transferList.reorderDisabled",
+                    &[("label", Arg::from(option.label.as_ref()))],
+                ));
+            }
             theme.refine(
                 row.style(),
                 "transfer-list-item",
@@ -798,7 +893,6 @@ impl RenderOnce for TransferList {
             }
         }
 
-        let narrow = shared.borrow().narrow;
         let empty = |side: TransferSide, text: SharedString| {
             div()
                 .flex()
@@ -1036,26 +1130,6 @@ impl RenderOnce for TransferList {
                     .display(TextDisplay::Block)
             }));
 
-        // The root measures itself: narrower than 40rem, the panels stack (upstream's
-        // container query), from the next frame.
-        let rem = window.rem_size();
-        let measure = {
-            let shared = shared.clone();
-            canvas(
-                move |bounds: Bounds<Pixels>, window, _| {
-                    let narrow = f32::from(bounds.size.width) < STACK_BELOW_REM * f32::from(rem);
-                    if bounds.size.width > px(0.) && shared.borrow().narrow != narrow {
-                        shared.borrow_mut().narrow = narrow;
-                        window.refresh();
-                    }
-                },
-                |_, _, _, _| {},
-            )
-            .absolute()
-            .top_0()
-            .left_0()
-            .size_full()
-        };
         let mut root = div()
             .id(id.clone())
             .relative()
@@ -1067,10 +1141,10 @@ impl RenderOnce for TransferList {
             .debug_selector(|| "transfer-list".into());
         theme.refine(root.style(), "transfer-list", &[], None);
         root.style().refine(&self.style);
-        root.child(measure)
-            .child(heading)
+        root.child(heading)
             .children(search)
             .child(collection)
+            .into_any_element()
     }
 }
 

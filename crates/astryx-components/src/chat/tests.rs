@@ -303,3 +303,29 @@ fn fr2_a_divider_system_message_draws_its_label_on_a_rule(cx: &mut TestAppContex
         "the full width"
     );
 }
+
+/// Records whether it renders inside a live container.
+#[derive(IntoElement)]
+struct LiveProbe(Rc<RefCell<Option<bool>>>);
+
+impl gpui::RenderOnce for LiveProbe {
+    fn render(self, _: &mut gpui::Window, cx: &mut gpui::App) -> impl IntoElement {
+        *self.0.borrow_mut() = Some(astryx_primitives::in_live_container(cx));
+        div()
+    }
+}
+
+#[gpui::test]
+fn the_log_is_a_live_container_for_what_renders_inside_it(cx: &mut TestAppContext) {
+    let (inside, outside) = (Rc::new(RefCell::new(None)), Rc::new(RefCell::new(None)));
+    let (i, o) = (inside.clone(), outside.clone());
+    let cx = host(cx, move || {
+        div()
+            .child(ChatMessageList::new("log").child(LiveProbe(i.clone())))
+            .child(LiveProbe(o.clone()))
+            .into_any_element()
+    });
+    settle(cx);
+    assert_eq!(*inside.borrow(), Some(true));
+    assert_eq!(*outside.borrow(), Some(false));
+}

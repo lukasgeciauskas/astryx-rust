@@ -29,8 +29,12 @@ use astryx_primitives::{
     ElementSize, Politeness, announce, dev_warn_once, prefers_reduced_motion, request_focus,
 };
 use gpui::prelude::*;
+use web_time::Instant;
+
+use crate::transfer_list::responsive::Responsive;
 use gpui::{
-    AnyElement, App, Bounds, ElementId, Pixels, SharedString, Window, canvas, div, px, relative,
+    AnyElement, App, Bounds, Element, ElementId, GlobalElementId, InspectorElementId, LayoutId,
+    Pixels, Point, ScrollHandle, SharedString, Window, div, point, px, relative,
 };
 
 /// Core List's reorder handle is 28 px wide for every pointer.
@@ -184,12 +188,42 @@ enum PendingFocus {
 
 struct ListState {
     pending_focus: Option<PendingFocus>,
-    /// The keys a mutation expects, and whether it animates (upstream
-    /// `pendingMutationMotion`).
-    pending_motion: Option<Vec<SharedString>>,
-    /// Records entering, and when they started.
-    entering: HashMap<SharedString, web_time::Instant>,
+    /// A mutation waiting for its value (upstream `pendingMutationMotion`): the
+    /// participants' boxes before it and the keys it expects.
+    pending_motion: Option<PendingMotion>,
+    /// The mutation whose value this frame shows: its participants move from their
+    /// boxes before it.
+    armed: Option<PendingMotion>,
+    /// Every participant's box last frame (`item:{key}`, `action:add`, `state:empty`).
+    bounds: HashMap<SharedString, Bounds<Pixels>>,
+    /// Participants entering, and when they started.
+    entering: HashMap<SharedString, Instant>,
+    /// Participants gliding from where they were: the offset and when it started.
+    moving: HashMap<SharedString, (Point<Pixels>, Instant)>,
+    /// The scroller around Add, for keeping Add under the pointer.
+    scroller: Option<ScrollHandle>,
+    /// A participant of this frame's mutation changed size.
+    size_changed: bool,
     narrow: bool,
+}
+
+/// A mutation's motion (upstream `PendingMutationMotion` and `PendingAddScrollAnchor`).
+#[derive(Clone)]
+struct PendingMotion {
+    before: HashMap<SharedString, Bounds<Pixels>>,
+    expected: Vec<SharedString>,
+    /// Some participant enters: the others keep their place (upstream's
+    /// `hasEnteringParticipant`).
+    entering_any: bool,
+    /// Add's top before a pointer's add, to keep Add under the pointer.
+    add_top: Option<Pixels>,
+}
+
+const ADD_KEY: &str = "action:add";
+const EMPTY_KEY: &str = "state:empty";
+
+fn item_key(key: &str) -> SharedString {
+    format!("item:{key}").into()
 }
 
 /// A compact editor for short collections of consistent, simple records (upstream lab
@@ -370,14 +404,17 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = astryx_theme::current(window, cx);
         let t = theme.tokens();
-        let i18n = astryx_i18n::current(cx);
         let id = self.id.clone();
-        let item_name = self.item_name.clone().unwrap_or_else(|| "item".into());
         let state = window.use_keyed_state(part(&id, "list-input"), cx, |_, _| {
             Rc::new(RefCell::new(ListState {
                 pending_focus: None,
                 pending_motion: None,
+                armed: None,
+                bounds: HashMap::new(),
                 entering: HashMap::new(),
+                moving: HashMap::new(),
+                scroller: None,
+                size_changed: false,
                 narrow: false,
             }))
         });
@@ -412,33 +449,50 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
             });
         }
 
-        // The entry motion of a mutation whose value arrived (upstream's layout effect):
-        // records that were not there before slide up from the theme's spacing-2.
+        // The motion of a mutation whose value arrived (upstream's layout effect): a
+        // participant that was not there enters from the theme's spacing-2, and when none
+        // enters, the others glide from where they were. A value that is not the one the
+        // mutation made drops its motion.
         let reduced = prefers_reduced_motion(cx);
         let duration = t.duration.fast_max;
+        let now = cx.background_executor().now();
         {
             let mut s = shared.borrow_mut();
-            if let Some(expected) = s.pending_motion.take()
-                && expected == keys
-                && !reduced
-                && !duration.is_zero()
+            s.armed = None;
+            s.size_changed = false;
+            if let Some(pending) = s.pending_motion.take()
+                && pending.expected == keys
             {
-                // The records the last frame did not have are entering.
-                let now = cx.background_executor().now();
-                let previous = LAST_KEYS
-                    .with(|l| l.borrow().get(&id.to_string()).cloned().unwrap_or_default());
-                for key in keys.iter().filter(|k| !previous.contains(k)) {
-                    s.entering.insert(key.clone(), now);
+                let mut participants: Vec<SharedString> =
+                    keys.iter().map(|k| item_key(k)).collect();
+                participants.push(ADD_KEY.into());
+                if keys.is_empty() {
+                    participants.push(EMPTY_KEY.into());
                 }
+                let entering: Vec<SharedString> = participants
+                    .into_iter()
+                    .filter(|k| !pending.before.contains_key(k))
+                    .collect();
+                let motion = !reduced && !duration.is_zero();
+                if motion {
+                    for key in &entering {
+                        s.entering.insert(key.clone(), now);
+                    }
+                }
+                s.armed = Some(PendingMotion {
+                    entering_any: !entering.is_empty() || !motion,
+                    ..pending
+                });
             }
-            let now = cx.background_executor().now();
             s.entering
                 .retain(|_, started| now.saturating_duration_since(*started) < duration);
+            s.moving
+                .retain(|_, (_, started)| now.saturating_duration_since(*started) < duration);
             if reduced {
                 s.entering.clear();
+                s.moving.clear();
             }
         }
-        LAST_KEYS.with(|l| l.borrow_mut().insert(id.to_string(), keys.clone()));
 
         // Focus after a mutation, once its value arrives.
         if let Some(pending) = shared.borrow_mut().pending_focus.take() {
@@ -456,9 +510,60 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
             }
         }
 
+        let last_narrow = shared.borrow().narrow;
+        let this = Rc::new(self);
+        let group = {
+            let (this, shared) = (this.clone(), shared.clone());
+            // Narrower than 640 px, the records stack (upstream's container query): the
+            // group lays out for the width it had last frame, and again before it paints
+            // on a frame whose width crosses the line.
+            Responsive::new(
+                px(STACK_BELOW_PX),
+                last_narrow,
+                move |narrow, window, cx| {
+                    shared.borrow_mut().narrow = narrow;
+                    this.build(narrow, &shared, &keys, window, cx)
+                },
+            )
+        };
+        let mut field = Field::new(id.clone(), this.label.clone())
+            .label_hidden(this.label_hidden)
+            .optional(this.optional)
+            .required(this.required)
+            .disabled(this.disabled)
+            .status_placement(StatusPlacement::Detached);
+        if let Some(d) = this.description.clone() {
+            field = field.description(d);
+        }
+        if let Some(s) = this.status.clone() {
+            field = field.status(s);
+        }
+        field.child(group)
+    }
+}
+
+impl<T: Clone + 'static> ListInput<T> {
+    /// The group at `narrow`: the records and Add.
+    fn build(
+        &self,
+        narrow: bool,
+        shared: &Rc<RefCell<ListState>>,
+        keys: &[SharedString],
+        window: &mut Window,
+        cx: &mut App,
+    ) -> AnyElement {
+        let theme = astryx_theme::current(window, cx);
+        let t = theme.tokens();
+        let i18n = astryx_i18n::current(cx);
+        let id = self.id.clone();
+        let item_name = self.item_name.clone().unwrap_or_else(|| "item".into());
+        let duration = t.duration.fast_max;
+        let ease = t.ease.standard;
+        let now = cx.background_executor().now();
+        let list_gap =
+            if narrow { t.spacing.s8 } else { t.spacing.s2 }.to_pixels(window.rem_size());
         let mutations_disabled = self.disabled || self.loading;
         let reached_max = self.max_items.is_some_and(|max| self.value.len() >= max);
-        let narrow = shared.borrow().narrow;
         let attached = self
             .reorderable
             .as_ref()
@@ -641,7 +746,12 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
                                     }
                                     _ => PendingFocus::Add,
                                 });
-                            s.pending_motion = Some(next.iter().map(|v| get_key(v)).collect());
+                            s.pending_motion = Some(PendingMotion {
+                                before: s.bounds.clone(),
+                                expected: next.iter().map(|v| get_key(v)).collect(),
+                                entering_any: false,
+                                add_top: None,
+                            });
                         }
                         if let Some(f) = &on_change {
                             f(
@@ -677,12 +787,8 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
                     } else {
                         t.color.text_secondary
                     });
-                    // A disabled or loading list keeps its handles in place but inert.
-                    if mutations_disabled {
-                        grip.into_any_element()
-                    } else {
-                        a.handle(item_key, grip)
-                    }
+                    // A disabled or loading list keeps its handles focusable but inert.
+                    a.handle_disabled(item_key, grip, mutations_disabled)
                 })
             });
             let controls = reveal
@@ -718,7 +824,7 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
                 .min_w_0()
                 .child(fields)
                 .child(controls);
-            let entering = shared.borrow().entering.get(&key).copied();
+            let entering = shared.borrow().entering.get(&item_key(&key)).copied();
             let mut record = div()
                 .flex()
                 .flex_col()
@@ -742,6 +848,7 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
                 record = record.translate_y(px(offset));
                 window.request_animation_frame();
             }
+            let record = Glide::new(item_key(&key), shared.clone(), duration, ease, record);
             records.push(match &attached {
                 Some(a) => a.item(
                     index,
@@ -760,7 +867,6 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
             });
         }
 
-        let list_gap = if narrow { t.spacing.s8 } else { t.spacing.s2 };
         let records_box = div().flex().flex_col().gap(list_gap).min_w_0();
         let list = div()
             .id(part(&id, "list"))
@@ -768,8 +874,22 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
             .role(gpui::Role::List)
             .aria_label(self.label.clone());
         let list = if value.is_empty() {
-            list.child(
-                div().w_full().child(
+            let entering = shared.borrow().entering.get(EMPTY_KEY).copied();
+            let mut empty = div().w_full();
+            if let Some(started) = entering {
+                let elapsed = now.saturating_duration_since(started);
+                let progress = (elapsed.as_secs_f64() / duration.as_secs_f64()).clamp(0., 1.);
+                let offset = f32::from(t.spacing.s2.to_pixels(rem))
+                    * (1. - t.ease.standard.ease(progress as f32));
+                empty = empty.translate_y(px(offset));
+                window.request_animation_frame();
+            }
+            list.child(Glide::new(
+                EMPTY_KEY.into(),
+                shared.clone(),
+                duration,
+                ease,
+                empty.child(
                     EmptyState::new(i18n.format(
                         "@astryx.listInput.emptyTitle",
                         &[("itemName", Arg::from(item_name.as_ref()))],
@@ -780,7 +900,7 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
                     ))
                     .compact(true),
                 ),
-            )
+            ))
             .into_any_element()
         } else {
             list.child(match &attached {
@@ -824,7 +944,7 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
                             .width(relative(1.))
                             .disabled(self.disabled || reached_max)
                             .loading(self.loading)
-                            .on_click(move |_, window, cx| {
+                            .on_click(move |event, window, cx| {
                                 if mutations_disabled || reached_max {
                                     return;
                                 }
@@ -835,8 +955,28 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
                                 {
                                     let mut s = shared.borrow_mut();
                                     s.pending_focus = Some(PendingFocus::FirstField(key));
-                                    s.pending_motion =
-                                        Some(next.iter().map(|v| get_key(v)).collect());
+                                    // A pointer's add keeps Add under the pointer: the new
+                                    // record's room scrolls away with the same frame, as
+                                    // tall as the last record and its gap, and what is left
+                                    // is scrolled once the record lays out.
+                                    let add_top = (!event.is_keyboard())
+                                        .then(|| s.bounds.get(ADD_KEY).map(|b| b.origin.y))
+                                        .flatten();
+                                    if add_top.is_some()
+                                        && let Some(last) =
+                                            value.last().map(|v| item_key(&get_key(v)))
+                                        && let Some(room) =
+                                            s.bounds.get(&last).map(|b| b.size.height + list_gap)
+                                        && let Some(scroller) = s.scroller.clone()
+                                    {
+                                        scroll_by(&scroller, room);
+                                    }
+                                    s.pending_motion = Some(PendingMotion {
+                                        before: s.bounds.clone(),
+                                        expected: next.iter().map(|v| get_key(v)).collect(),
+                                        entering_any: true,
+                                        add_top,
+                                    });
                                 }
                                 let index = value.len();
                                 if let Some(f) = &on_change {
@@ -855,26 +995,8 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
                 )
                 .child(div().flex_none().w(control_width))
         };
+        let add = Glide::new(ADD_KEY.into(), shared.clone(), duration, ease, add);
 
-        // The group measures itself: narrower than 640 px, the records stack (upstream's
-        // container query), from the next frame.
-        let measure = {
-            let shared = shared.clone();
-            canvas(
-                move |bounds: Bounds<Pixels>, window, _| {
-                    let narrow = f32::from(bounds.size.width) < STACK_BELOW_PX;
-                    if bounds.size.width > px(0.) && shared.borrow().narrow != narrow {
-                        shared.borrow_mut().narrow = narrow;
-                        window.refresh();
-                    }
-                },
-                |_, _, _, _| {},
-            )
-            .absolute()
-            .top_0()
-            .left_0()
-            .size_full()
-        };
         let state_name = if self.loading {
             "loading"
         } else if self.disabled {
@@ -901,27 +1023,155 @@ impl<T: Clone + 'static> RenderOnce for ListInput<T> {
             ],
             None,
         );
-        let group = group.child(measure).child(list).child(add);
-        let mut field = Field::new(id.clone(), self.label.clone())
-            .label_hidden(self.label_hidden)
-            .optional(self.optional)
-            .required(self.required)
-            .disabled(self.disabled)
-            .status_placement(StatusPlacement::Detached);
-        if let Some(d) = self.description.clone() {
-            field = field.description(d);
-        }
-        if let Some(s) = self.status.clone() {
-            field = field.status(s);
-        }
-        field.child(group)
+        group.child(list).child(add).into_any_element()
     }
 }
 
-thread_local! {
-    /// Each ListInput's keys in its last frame, by id: the records an added value
-    /// brings in are the ones not there.
-    static LAST_KEYS: RefCell<HashMap<String, Vec<SharedString>>> = RefCell::new(HashMap::new());
+/// Scrolls a scroller's content by `delta` (down for a positive one), within its range.
+fn scroll_by(scroller: &ScrollHandle, delta: Pixels) {
+    let offset = scroller.offset();
+    let max = scroller.max_offset().y;
+    let top = (-offset.y + delta).max(px(0.));
+    // A container that grows with the new record may scroll past its old range.
+    let top = if max > px(0.) {
+        top.min(max + delta.max(px(0.)))
+    } else {
+        top
+    };
+    scroller.set_offset(point(offset.x, -top));
+}
+
+/// A participant of the collection motion (upstream's `data-list-input-motion-key`
+/// element): it records its box each frame, and after a mutation it glides from the box
+/// it had before (upstream's FLIP animation). Add also keeps itself under the pointer
+/// that added a record.
+struct Glide {
+    key: SharedString,
+    shared: Rc<RefCell<ListState>>,
+    duration: std::time::Duration,
+    ease: astryx_theme::CubicBezier,
+    child: AnyElement,
+}
+
+impl Glide {
+    fn new(
+        key: SharedString,
+        shared: Rc<RefCell<ListState>>,
+        duration: std::time::Duration,
+        ease: astryx_theme::CubicBezier,
+        child: impl IntoElement,
+    ) -> Self {
+        Glide {
+            key,
+            shared,
+            duration,
+            ease,
+            child: child.into_any_element(),
+        }
+    }
+}
+
+impl Element for Glide {
+    type RequestLayoutState = ();
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+
+    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, ()) {
+        (self.child.request_layout(window, cx), ())
+    }
+
+    fn prepaint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let now = cx.background_executor().now();
+        let offset = {
+            let mut s = self.shared.borrow_mut();
+            if let Some(armed) = s.armed.clone() {
+                let before = armed.before.get(&self.key).copied();
+                // A size change lands everything at once (upstream's `hasSizeChange`):
+                // the participants after it in order see it.
+                if let Some(before) = before
+                    && ((before.size.width - bounds.size.width).abs() >= px(0.5)
+                        || (before.size.height - bounds.size.height).abs() >= px(0.5))
+                {
+                    s.size_changed = true;
+                }
+                // Appended rows already carry the orientation cue; the others keep their
+                // place while one enters.
+                if !armed.entering_any
+                    && !s.size_changed
+                    && let Some(before) = before
+                {
+                    let delta = before.origin - bounds.origin;
+                    if delta.x.abs() >= px(0.5) || delta.y.abs() >= px(0.5) {
+                        s.moving.insert(self.key.clone(), (delta, now));
+                    }
+                }
+                // What the scroll at the add left over: Add back where the pointer is.
+                if self.key.as_ref() == ADD_KEY
+                    && let Some(top) = armed.add_top
+                    && let Some(scroller) = s.scroller.clone()
+                {
+                    let left = bounds.origin.y - top;
+                    if left.abs() >= px(0.5) {
+                        scroll_by(&scroller, left);
+                        window.refresh();
+                    }
+                }
+            }
+            if self.key.as_ref() == ADD_KEY {
+                s.scroller = astryx_primitives::keyboard::nearest_scroller().map(|(h, _)| h);
+            }
+            s.bounds.insert(self.key.clone(), bounds);
+            s.moving.get(&self.key).map(|(delta, started)| {
+                let progress = (now.saturating_duration_since(*started).as_secs_f64()
+                    / self.duration.as_secs_f64())
+                .clamp(0., 1.) as f32;
+                *delta * (1. - self.ease.ease(progress))
+            })
+        };
+        match offset {
+            Some(offset) => {
+                window.request_animation_frame();
+                window.with_element_offset(offset, |window| self.child.prepaint(window, cx));
+            }
+            None => {
+                self.child.prepaint(window, cx);
+            }
+        }
+    }
+
+    fn paint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        _: &mut (),
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        self.child.paint(window, cx);
+    }
 }
 
 const fn p(prop: &'static str, rust: RustApi) -> PropMapping {

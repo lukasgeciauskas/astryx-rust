@@ -53,4 +53,8 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::chat::CHAT_EMOJI_PICKER_DOC,
     crate::chat::CHAT_REACTION_BAR_DOC,
     crate::emoji_picker::EMOJI_PICKER_DOC,
+    crate::comments::COMMENTS_DOC,
+    crate::comments::COMMENT_THREAD_DOC,
+    crate::comments::COMMENT_COMPOSER_DOC,
+    crate::schedule::SCHEDULE_DOC,
 ];

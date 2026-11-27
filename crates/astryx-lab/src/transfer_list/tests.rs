@@ -358,3 +358,168 @@ fn an_unchanged_apply_closes_without_a_change(cx: &mut TestAppContext) {
     assert!(changes.borrow().is_empty());
     assert!(!shown(cx, "tls-content"));
 }
+
+#[test]
+fn a_move_among_the_shown_rows_lands_in_the_values_terms() {
+    // A value without an option keeps its place in the order.
+    assert_eq!(
+        reorder_in_value(&s(&["a", "c"]), &s(&["a", "ghost", "c"]), "c", 0),
+        Some(0)
+    );
+    assert_eq!(
+        reorder_in_value(&s(&["a", "b", "c"]), &s(&["x", "a", "b", "c"]), "a", 2),
+        Some(3)
+    );
+    // Nothing moves onto itself or past the end, nor a key that is not shown.
+    assert_eq!(
+        reorder_in_value(&s(&["a", "b"]), &s(&["a", "b"]), "a", 0),
+        None
+    );
+    assert_eq!(
+        reorder_in_value(&s(&["a", "b"]), &s(&["a", "b"]), "a", 5),
+        None
+    );
+    assert_eq!(
+        reorder_in_value(&s(&["a", "b"]), &s(&["a", "b"]), "z", 1),
+        None
+    );
+}
+
+#[gpui::test]
+fn a_move_reaches_the_owner_in_the_values_terms_around_a_value_without_an_option(
+    cx: &mut TestAppContext,
+) {
+    let moves = Rc::new(RefCell::new(Vec::new()));
+    let m = moves.clone();
+    let reorderable = create_reorderable(ReorderableOptions::new(move |mv, _, _| {
+        m.borrow_mut().push((mv.key.clone(), mv.to));
+    }));
+    let r = reorderable.clone();
+    let (cx, _) = host(
+        cx,
+        &["name", "ghost", "owner", "status"],
+        move |value, _, cx| {
+            TransferList::new("tl", "Columns", options(), value.read(cx).clone())
+                .reorderable(r.clone())
+                .into_any_element()
+        },
+    );
+    // Shown: Name, Owner, Status. Owner down one place lands after Status: index 3.
+    cx.update(|window, cx| reorderable.start(ItemKey::Text("owner".into()), window, cx));
+    settle(cx);
+    cx.simulate_keystrokes("down");
+    settle(cx);
+    assert_eq!(*moves.borrow(), [(ItemKey::Text("owner".into()), 3)]);
+}
+
+#[gpui::test]
+fn a_staged_selector_moves_its_draft_and_the_owners_start_finds_its_list(cx: &mut TestAppContext) {
+    let moves = Rc::new(RefCell::new(Vec::new()));
+    let m = moves.clone();
+    let reorderable = create_reorderable(ReorderableOptions::new(move |mv, _, _| {
+        m.borrow_mut().push((mv.key.clone(), mv.to));
+    }));
+    let changes: Changes = Rc::default();
+    let (c, r) = (changes.clone(), reorderable.clone());
+    let (cx, _) = host(cx, &["name", "owner", "status"], move |value, _, cx| {
+        TransferListSelector::new("tls", "Columns", options(), value.read(cx).clone())
+            .on_change(recording(&c, value))
+            .commit_behavior(CommitBehavior::Staged)
+            .reorderable(r.clone())
+            .into_any_element()
+    });
+    click(cx, "tls-control");
+    cx.update(|window, cx| reorderable.start(ItemKey::Text("name".into()), window, cx));
+    settle(cx);
+    cx.simulate_keystrokes("down");
+    settle(cx);
+    assert!(
+        moves.borrow().is_empty(),
+        "a staged move goes to the draft, not the owner"
+    );
+    assert!(changes.borrow().is_empty());
+    click(cx, "tls-apply");
+    assert_eq!(*changes.borrow(), [s(&["owner", "name", "status"])]);
+}
+
+#[gpui::test]
+fn an_immediate_selector_drops_a_move_while_busy(cx: &mut TestAppContext) {
+    let moves = Rc::new(RefCell::new(Vec::new()));
+    let m = moves.clone();
+    let reorderable = create_reorderable(ReorderableOptions::new(move |mv, _, _| {
+        m.borrow_mut().push((mv.key.clone(), mv.to));
+    }));
+    let changes: Changes = Rc::default();
+    let (c, r) = (changes.clone(), reorderable.clone());
+    let (cx, _) = host(cx, &["name", "owner"], move |value, _, cx| {
+        TransferListSelector::new("tls", "Columns", options(), value.read(cx).clone())
+            .on_change(recording(&c, value))
+            .change_action(|_, _, cx| {
+                cx.background_executor()
+                    .timer(std::time::Duration::from_secs(60))
+            })
+            .reorderable(r.clone())
+            .into_any_element()
+    });
+    click(cx, "tls-control");
+    // A transfer starts the action: the selector is busy for a minute.
+    click(cx, "tls-list-available-status");
+    assert_eq!(changes.borrow().len(), 1);
+    cx.update(|window, cx| reorderable.start(ItemKey::Text("name".into()), window, cx));
+    settle(cx);
+    cx.simulate_keystrokes("down");
+    settle(cx);
+    assert!(moves.borrow().is_empty(), "no move while busy");
+}
+
+#[gpui::test]
+fn an_immediate_selector_hands_a_move_to_the_owner(cx: &mut TestAppContext) {
+    let moves = Rc::new(RefCell::new(Vec::new()));
+    let m = moves.clone();
+    let reorderable = create_reorderable(ReorderableOptions::new(move |mv, _, _| {
+        m.borrow_mut().push((mv.key.clone(), mv.to));
+    }));
+    let r = reorderable.clone();
+    let (cx, _) = host(cx, &["name", "owner"], move |value, _, cx| {
+        TransferListSelector::new("tls", "Columns", options(), value.read(cx).clone())
+            .reorderable(r.clone())
+            .into_any_element()
+    });
+    click(cx, "tls-control");
+    cx.update(|window, cx| reorderable.start(ItemKey::Text("name".into()), window, cx));
+    settle(cx);
+    cx.simulate_keystrokes("down");
+    settle(cx);
+    assert_eq!(*moves.borrow(), [(ItemKey::Text("name".into()), 1)]);
+}
+
+struct Narrow;
+
+impl Render for Narrow {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .w(px(400.))
+            .child(TransferList::new("tl", "Columns", options(), s(&["name"])))
+    }
+}
+
+#[gpui::test]
+fn a_narrow_list_stacks_its_panels_on_its_first_frame(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        astryx_theme::init(cx);
+        astryx_primitives::focus::init(cx);
+    });
+    let (_, cx) = cx.add_window_view(|_, _| Narrow);
+    cx.run_until_parked();
+    let selected = cx
+        .debug_bounds("transfer-list-panel-selected")
+        .expect("drawn");
+    let available = cx
+        .debug_bounds("transfer-list-panel-available")
+        .expect("drawn");
+    assert!(
+        available.origin.y > selected.origin.y,
+        "stacked: {selected:?} {available:?}"
+    );
+    assert_eq!(available.size.width, selected.size.width);
+}
