@@ -38,6 +38,7 @@ pub enum Page {
     Theme,
     Charts,
     Lab,
+    ThreeD,
 }
 
 impl Page {
@@ -70,6 +71,7 @@ impl Page {
         Page::Theme,
         Page::Charts,
         Page::Lab,
+        Page::ThreeD,
     ];
 
     pub fn title(self) -> &'static str {
@@ -102,6 +104,7 @@ impl Page {
             Page::Theme => "Theme",
             Page::Charts => "Charts",
             Page::Lab => "Lab",
+            Page::ThreeD => "3D",
         }
     }
 
@@ -169,6 +172,9 @@ impl Page {
             Page::Theme => astryx::components::theming::examples::examples(window, cx),
             Page::Charts => astryx::charts::examples::examples(window, cx),
             Page::Lab => astryx::lab::examples::examples(window, cx),
+            // The 3D charts turn by themselves and draw thousands of shapes: their own
+            // page keeps the Lab page still.
+            Page::ThreeD => astryx::lab::three_d::examples::examples(window, cx),
             Page::Dates => gpui::div()
                 .flex()
                 .flex_col()

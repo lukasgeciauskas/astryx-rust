@@ -29,19 +29,19 @@ use crate::types::{ChartScale, ResolvedPoint, SeriesContext};
 /// Upstream `POINT_SIZE_COMPENSATION`: the visible circle of a point sprite ends at
 /// 0.48 of the sprite (where the smoothstep edge starts), so sprites are drawn 1/0.96
 /// as large to match an SVG circle's radius.
-const POINT_SIZE_COMPENSATION: f64 = 1.0 / 0.96;
+pub const POINT_SIZE_COMPENSATION: f64 = 1.0 / 0.96;
 
 /// A color's red, green and blue as upstream's `hexToGL` reads them from a hex
 /// string: each channel's byte over 255. Alpha is ignored, as upstream ignores a hex
 /// alpha byte.
-pub(crate) fn gl_rgb(color: Hsla) -> [f64; 3] {
+pub fn gl_rgb(color: Hsla) -> [f64; 3] {
     let c = color.to_rgb();
     [c.r, c.g, c.b].map(|v| (f64::from(v.clamp(0., 1.)) * 255.).round() / 255.)
 }
 
 /// The scale of upstream's 2x-supersampled canvases (upstream `getCanvasDPR`):
 /// `(window.devicePixelRatio || 2) * 2`.
-pub(crate) fn canvas_dpr(scale_factor: f32) -> f64 {
+pub fn canvas_dpr(scale_factor: f32) -> f64 {
     let base = f64::from(scale_factor);
     (if base > 0. { base } else { 2. }) * 2.
 }
@@ -50,7 +50,7 @@ pub(crate) fn canvas_dpr(scale_factor: f32) -> f64 {
 /// as upstream's premultiplied canvases blend it (`ONE, ONE_MINUS_SRC_ALPHA`): GL
 /// clamps each output channel to [0, 1], so an alpha past 1 brightens the color and
 /// one at or below 0 draws nothing. `None` when nothing shows.
-pub(crate) fn premultiplied(rgb: [f64; 3], a: f64) -> Option<Hsla> {
+pub fn premultiplied(rgb: [f64; 3], a: f64) -> Option<Hsla> {
     if a.is_nan() || a <= 0. {
         return None;
     }
@@ -68,7 +68,7 @@ pub(crate) fn premultiplied(rgb: [f64; 3], a: f64) -> Option<Hsla> {
 }
 
 /// An opaque color from GL floats.
-pub(crate) fn rgb_color([r, g, b]: [f64; 3]) -> Hsla {
+pub fn rgb_color([r, g, b]: [f64; 3]) -> Hsla {
     Rgba {
         r: r as f32,
         g: g as f32,
@@ -117,7 +117,7 @@ pub(crate) fn resolve_dots(ctx: &SeriesContext, key: &str) -> Vec<ResolvedPoint>
 
 /// Fills a circle of radius `r` at (`x`, `y`) from `origin`, anti-aliased (the point
 /// sprites' circle).
-pub(crate) fn fill_circle(
+pub fn fill_circle(
     window: &mut gpui::Window,
     origin: gpui::Point<gpui::Pixels>,
     (x, y): (f64, f64),
@@ -137,7 +137,7 @@ pub(crate) fn fill_circle(
 /// Strokes a circle of radius `r` at (`x`, `y`), `width` wide centered on its edge
 /// as SVG strokes it, over a `fill` (transparent for none).
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn stroke_circle(
+pub fn stroke_circle(
     window: &mut gpui::Window,
     origin: gpui::Point<gpui::Pixels>,
     (x, y): (f64, f64),

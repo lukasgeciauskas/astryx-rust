@@ -18,6 +18,7 @@ pub mod lab_chart;
 pub mod line_clamp;
 pub mod list_input;
 pub mod log_stream;
+pub mod media_player;
 pub mod navigation_stack;
 pub mod page_control;
 pub mod radial;
@@ -29,7 +30,9 @@ pub mod stat;
 pub mod svg_icon;
 pub mod tab_bar;
 pub mod tab_bar_more_list;
+pub mod three_d;
 pub mod tour;
 pub mod transfer_list;
+pub(crate) mod trig;
 
 pub use stat::{Stat, StatDelta, StatDeltaDirection, StatDeltaSentiment, StatSize};

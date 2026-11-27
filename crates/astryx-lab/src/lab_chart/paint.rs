@@ -1,6 +1,7 @@
 //! Painting what upstream's SVG draws: lines, rectangles, circles, paths and text, from
 //! the plot's origin.
 
+pub(crate) use astryx_charts::marks::{fill_circle, stroke_circle};
 use astryx_charts::shape::{ChartPath, PathStyle};
 use gpui::{App, Bounds, Hsla, Pixels, Point, SharedString, TextAlign, Window, point, px, size};
 
@@ -81,52 +82,6 @@ pub(crate) fn fill_rect(
     window.paint_quad(quad);
 }
 
-/// Fills a circle of radius `r` at (`x`, `y`) (an SVG `<circle>`).
-pub(crate) fn fill_circle(
-    window: &mut Window,
-    origin: Point<Pixels>,
-    (x, y): (f64, f64),
-    r: f64,
-    color: Hsla,
-) {
-    if ![x, y, r].iter().all(|v| v.is_finite()) || r <= 0. || color.a <= 0. {
-        return;
-    }
-    let bounds = Bounds::new(
-        at(origin, x - r, y - r),
-        size(px((2. * r) as f32), px((2. * r) as f32)),
-    );
-    window.paint_quad(gpui::fill(bounds, color).corner_radii(px(r as f32)));
-}
-
-/// Strokes a circle of radius `r` at (`x`, `y`), `width` wide centered on its edge as SVG
-/// strokes it, over `fill` (transparent for `fill="none"`).
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn stroke_circle(
-    window: &mut Window,
-    origin: Point<Pixels>,
-    (x, y): (f64, f64),
-    r: f64,
-    width: f64,
-    stroke: Hsla,
-    fill: Hsla,
-) {
-    if ![x, y, r, width].iter().all(|v| v.is_finite()) || r <= 0. {
-        return;
-    }
-    let outer = r + width / 2.;
-    let bounds = Bounds::new(
-        at(origin, x - outer, y - outer),
-        size(px((2. * outer) as f32), px((2. * outer) as f32)),
-    );
-    window.paint_quad(
-        gpui::fill(bounds, fill)
-            .corner_radii(px(outer as f32))
-            .border_widths(px(width as f32))
-            .border_color(stroke),
-    );
-}
-
 /// Fills or strokes a path at `opacity` (an SVG `<path>`).
 pub(crate) fn paint_path(
     window: &mut Window,
@@ -162,6 +117,8 @@ pub(crate) enum Anchor {
 pub(crate) enum Baseline {
     Alphabetic,
     Em(f64),
+    /// SVG `dominant-baseline="central"`: the text's middle on its y.
+    Central,
 }
 
 /// Paints `text` at `font_size` with its baseline at (`x`, `y`) from `origin` (an SVG
@@ -196,11 +153,11 @@ pub(crate) fn paint_text(
         Anchor::Middle => x - f64::from(line.width) / 2.,
         Anchor::End => x - f64::from(line.width),
     };
-    let base = match baseline {
-        Baseline::Alphabetic => y,
-        Baseline::Em(em) => y + em * font_size,
-    };
     let line_height = line.ascent + line.descent;
-    let top = at(origin, left, base) - point(px(0.), line.ascent);
+    let top = match baseline {
+        Baseline::Alphabetic => at(origin, left, y) - point(px(0.), line.ascent),
+        Baseline::Em(em) => at(origin, left, y + em * font_size) - point(px(0.), line.ascent),
+        Baseline::Central => at(origin, left, y) - point(px(0.), line_height / 2.),
+    };
     let _ = line.paint(top, line_height, TextAlign::Left, None, window, cx);
 }

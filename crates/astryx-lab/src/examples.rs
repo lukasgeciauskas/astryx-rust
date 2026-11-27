@@ -154,5 +154,9 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
             "SVGIcon",
             crate::svg_icon::examples::examples(window, cx),
         ))
+        .child(example(
+            "MediaPlayer",
+            crate::media_player::examples::examples(window, cx),
+        ))
         .into_any_element()
 }

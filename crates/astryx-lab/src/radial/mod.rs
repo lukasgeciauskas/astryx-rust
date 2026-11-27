@@ -12,7 +12,7 @@
 pub(crate) mod marks;
 pub(crate) mod plot;
 mod tooltip;
-pub(crate) mod trig;
+pub(crate) use crate::trig;
 
 pub mod examples;
 

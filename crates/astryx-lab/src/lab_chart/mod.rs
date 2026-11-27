@@ -26,7 +26,7 @@ mod heatmap_gl;
 mod legend;
 mod line;
 mod m4;
-mod paint;
+pub(crate) mod paint;
 mod range;
 mod reference_line;
 mod select;
@@ -52,6 +52,7 @@ pub use brush::{
     BrushMode, BrushOutcome, BrushRange, BrushRect, ChartBrush, brush_outcome, brush_rect,
 };
 pub use candlestick::{Candle, CandlestickVariant, ChartCandlestick, candlestick_geometry};
+pub(crate) use chart::MeasuredArea;
 pub use chart::{
     Chart, MAX_TABLE_POINTS, YBaseline, accessible_label, chart_scales, shows_data_table,
 };
@@ -89,6 +90,7 @@ pub use tooltip::{
     ChartCrosshairMode, ChartTooltip, TooltipRender, XFormat, YFormat, find_nearest,
 };
 pub use utils::{is_band_scale, x_pixel};
+pub(crate) use webgl::premultiplied as webgl_premultiplied;
 pub use webgl::{POINT_SIZE_COMPENSATION, canvas_dpr, hex_to_gl};
 pub use zoom::{ChartZoom, ZoomToolbarPosition, pan_domain, wheel_factor, zoom_axis};
 

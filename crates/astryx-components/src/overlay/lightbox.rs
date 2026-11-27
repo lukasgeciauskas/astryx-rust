@@ -19,14 +19,21 @@
 //!   rubber-band edges (FR6, FR11).
 //! - The index is clamped to the media (FR17).
 //!
-//! Video plays through MediaPlayer's decoder (M13); until then a video item
-//! shows its name and a button that opens it in the system player.
+//! - Video (upstream `<video controls>`): a video item plays in place through
+//!   `astryx_primitives::media`, with the platform-style controls over the bottom of
+//!   the picture. A video left on another page, or in a closed viewer, pauses; with
+//!   `has_auto_play` the video shown plays, also when paged back to or reopened.
+//!   A paged-away video keeps its element and time.
 
+use std::cell::Cell;
 use std::f64::consts::E;
 use std::rc::Rc;
 use std::time::Duration;
 
 use astryx_i18n::{Arg, current as i18n, use_direction};
+use astryx_primitives::media::{
+    MediaElement, MediaKind, MediaPreload, MediaSource, new_media_backend,
+};
 use astryx_primitives::motion::paging::{
     paging_settle_velocity, solve_animated_page_scroll, solve_paging,
 };
@@ -35,9 +42,7 @@ use astryx_primitives::motion::uikit::zoom_media::role::{
     DISMISS_POSITION_SPRING, DISMISS_SIZE_SPRING,
 };
 use astryx_primitives::motion::{FnCurve, MotionSpring, SharedCurve, resolve_spring, solve_spring};
-use astryx_primitives::{
-    ElementSize, Politeness, announce, is_focus_visible, prefers_reduced_motion, use_link_handler,
-};
+use astryx_primitives::{Politeness, announce, is_focus_visible, prefers_reduced_motion};
 use astryx_theme::{Appearance, Pointer, ThemeStyled, current, scope};
 use gpui::{
     AnyElement, App, Bounds, DispatchPhase, ElementId, Entity, FocusHandle, ImageSource,
@@ -48,6 +53,7 @@ use gpui::{
 use web_time::Instant;
 
 use super::dialog::DialogPurpose;
+use super::lightbox_video::LightboxVideo;
 use super::modal::{Phase, backdrop, faded, modal_layer, modal_state, phase, probes, sync_open};
 use super::zoom_stage::{
     IDENTITY, PAGE_GAP, Rect, StagePoint, ZoomGeometry, ZoomTransform, dismiss_backdrop_alpha,
@@ -287,6 +293,13 @@ struct LightboxState {
     /// The theme's motion tempo, which every settle and the pager play at
     /// (`ResolvedTheme::motion_tempo`), as of the last frame.
     tempo: f64,
+    /// The video items' media elements, by source, kept while the viewer lives so a
+    /// paged-away video keeps its time.
+    videos: Vec<(SharedString, Entity<MediaElement>)>,
+    /// The open state, index and autoplay the videos were last synced to.
+    video_sync: Option<(bool, usize, bool)>,
+    /// The current video's picture, in window coordinates, as last painted.
+    video_picture: Rc<Cell<Option<Bounds<Pixels>>>>,
 }
 
 /// A released drag to dismiss, flying out.
@@ -621,8 +634,19 @@ impl RenderOnce for Lightbox {
                     dismissing: None,
                     _wheel_end: None,
                     tempo: 1.,
+                    videos: Vec::new(),
+                    video_sync: None,
+                    video_picture: Rc::default(),
                 }
             },
+        );
+        sync_videos(
+            &state,
+            &self.media,
+            self.open && count > 0,
+            self.index,
+            self.auto_play,
+            cx,
         );
         // The theme's motion tempo, which this frame's settles plan against.
         let tempo = theme.motion_tempo();
@@ -649,6 +673,7 @@ impl RenderOnce for Lightbox {
         let gallery = count > 1;
         let (can_prev, can_next) = (index > 0, index + 1 < count);
         let zoom_target = self.zoom && item.kind == LightboxMediaKind::Image;
+        let is_video = item.kind == LightboxMediaKind::Video;
 
         // Announce a page turn (not the opening).
         let announced = state.read(cx).announced;
@@ -851,6 +876,7 @@ impl RenderOnce for Lightbox {
                                 rtl,
                                 reduced,
                                 zoom_target,
+                                is_video,
                             };
                             drag_end(&s2, e.position, geo, release, window, cx);
                         }
@@ -1214,6 +1240,8 @@ struct Release {
     rtl: bool,
     reduced: bool,
     zoom_target: bool,
+    /// The current item is a video, whose picture decides a press beside it.
+    is_video: bool,
 }
 
 /// A drag's release: pages, closes or settles back.
@@ -1234,6 +1262,7 @@ fn drag_end(
         rtl,
         reduced,
         zoom_target,
+        is_video,
     } = release;
     let now = cx.background_executor().now();
     let Some(mut drag) = state.update(cx, |s, _| s.drag.take()) else {
@@ -1250,7 +1279,9 @@ fn drag_end(
     match drag.kind {
         DragKind::Undecided => {
             // A click: beside the photo it closes the viewer.
+            let video = state.read(cx).video_picture.get();
             let beside = match (geo, state.read(cx).stage) {
+                (None, _) if is_video => video.is_some_and(|picture| !picture.contains(&p)),
                 (Some(g), Some(stage)) => {
                     let shown = state.read(cx).shown.zoom;
                     let local = (
@@ -1359,6 +1390,91 @@ fn drag_end(
     window.refresh();
 }
 
+/// A video item's media element, made on first use and kept by its source. The
+/// current page's loads fully (upstream `preload="auto"`), the others their
+/// metadata; the current one starts by itself in an open viewer with `has_auto_play`.
+fn video_element(
+    state: &Entity<LightboxState>,
+    media: &LightboxMedia,
+    is_current: bool,
+    auto_play: bool,
+    cx: &mut App,
+) -> Entity<MediaElement> {
+    let existing = state
+        .read(cx)
+        .videos
+        .iter()
+        .find(|(src, _)| *src == media.src)
+        .map(|(_, e)| e.clone());
+    let element = existing.unwrap_or_else(|| {
+        let element = cx.new(|cx| MediaElement::new(new_media_backend(cx), cx));
+        // A new video frame draws the viewer again.
+        let observed = element.clone();
+        state.update(cx, |s, cx| {
+            s.videos.push((media.src.clone(), element.clone()));
+            cx.observe(&observed, |_, _, cx| cx.notify()).detach();
+        });
+        element
+    });
+    let source = MediaSource {
+        kind: MediaKind::Video,
+        src: media.src.clone(),
+        preload: if is_current {
+            MediaPreload::Auto
+        } else {
+            MediaPreload::Metadata
+        },
+        cross_origin: None,
+        autoplay: is_current && auto_play,
+        looping: false,
+        muted: false,
+        tracks: Vec::new(),
+    };
+    element.update(cx, |e, cx| e.set_source(source, cx));
+    element
+}
+
+/// Upstream's video effect: a video left on another page stops, since the pager
+/// keeps the neighbours drawn and a playing one would go on, with its sound, off
+/// screen; with `has_auto_play`, the video paged to plays again. A closed viewer
+/// stops a playing video.
+fn sync_videos(
+    state: &Entity<LightboxState>,
+    media: &[LightboxMedia],
+    open: bool,
+    index: Option<usize>,
+    auto_play: bool,
+    cx: &mut App,
+) {
+    let index = index
+        .unwrap_or_else(|| state.read(cx).index)
+        .min(media.len().saturating_sub(1));
+    let key = (open, index, auto_play);
+    if state.read(cx).video_sync == Some(key) {
+        return;
+    }
+    state.update(cx, |s, _| {
+        s.video_sync = Some(key);
+        s.videos
+            .retain(|(src, _)| media.iter().any(|m| m.src == *src));
+    });
+    let current = media
+        .get(index)
+        .filter(|m| open && m.kind == LightboxMediaKind::Video)
+        .map(|m| m.src.clone());
+    for (src, element) in state.read(cx).videos.clone() {
+        let is_current = current.as_ref() == Some(&src);
+        element.update(cx, |e, cx| {
+            if !is_current && !e.paused() {
+                e.pause(cx);
+            } else if is_current && auto_play && e.paused() {
+                // A platform can refuse playback without a person's gesture.
+                e.play(cx);
+            }
+        });
+    }
+}
+
 impl Lightbox {
     /// One page's media: the photo (a zoom button when it zooms), or the
     /// video's interim frame.
@@ -1399,28 +1515,15 @@ impl Lightbox {
             .justify_center()
             .overflow_hidden();
         if media.kind == LightboxMediaKind::Video {
-            let handler = use_link_handler(cx);
-            let src = media.src.clone();
-            let open_video = IconButton::new(
-                ElementId::Name(format!("{}-video-{}", self.id, media.src).into()),
-                media.alt.clone(),
-                Icon::new("externalLink").size(IconSize::Sm),
-            )
-            .variant(ButtonVariant::Secondary)
-            .size(ElementSize::Lg)
-            .on_click(move |_, window, cx| handler.open(&src, None, window, cx));
-            let frame = div()
-                .flex()
-                .flex_col()
-                .items_center()
-                .gap(t.spacing.s3)
-                .p(t.spacing.s6)
-                .rounded(t.radius.container)
-                .bg(faded(t.color.on_light, 0.9))
-                .text_color(t.color.on_dark)
-                .child(open_video)
-                .child(Text::new(media.alt.clone()).text_type(TextType::Body));
-            area = area.child(frame);
+            let element = video_element(state, media, is_current, self.open && self.auto_play, cx);
+            let picture = state.read(cx).video_picture.clone();
+            area = area.child(LightboxVideo {
+                id: ElementId::Name(format!("{}-video-{}", self.id, media.src).into()),
+                element,
+                alt: media.alt.clone(),
+                // Only the current page's picture decides a press beside the media.
+                picture: if is_current { picture } else { Rc::default() },
+            });
             return self.with_press(area, state, is_current);
         }
         let image = match (is_current.then_some(geo).flatten(), snap) {

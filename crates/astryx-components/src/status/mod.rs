@@ -128,7 +128,9 @@ impl Spinner {
         ?aria_label: SharedString,
     }
 
-    pub(crate) fn decorative(mut self) -> Self {
+    /// Upstream `aria-hidden`: no accessibility node, for a spinner that only echoes
+    /// a busy state shown some other way.
+    pub fn decorative(mut self) -> Self {
         self.decorative = true;
         self
     }

@@ -418,3 +418,201 @@ fn use_lightbox_opens_at_the_trigger_and_closes(cx: &mut TestAppContext) {
         "focus came back to the second trigger, which reopened it there"
     );
 }
+
+// --- Video (upstream `video support` and the video effect) ----------------------
+
+use astryx_primitives::media::{FakeMediaBackend, FakeMediaHandle, set_media_backend_factory};
+
+type Engines = Rc<RefCell<Vec<FakeMediaHandle>>>;
+
+/// A viewer of `media` whose open state and index the test drives; its videos play
+/// through fake engines.
+fn video_viewer(
+    cx: &mut TestAppContext,
+    media: Vec<LightboxMedia>,
+    auto_play: bool,
+) -> (
+    &mut VisualTestContext,
+    Engines,
+    Rc<RefCell<bool>>,
+    Rc<RefCell<usize>>,
+) {
+    let engines: Engines = Rc::default();
+    let made = engines.clone();
+    cx.update(|cx| {
+        set_media_backend_factory(
+            move || {
+                let (backend, handle) = FakeMediaBackend::new();
+                made.borrow_mut().push(handle);
+                Box::new(backend)
+            },
+            cx,
+        )
+    });
+    let open = Rc::new(RefCell::new(true));
+    let index = Rc::new(RefCell::new(0usize));
+    let (o, i) = (open.clone(), index.clone());
+    let cx = host(cx, move || {
+        let (o2, i2) = (o.clone(), i.clone());
+        Lightbox::new("lb", *o.borrow(), media.clone())
+            .index(*i.borrow())
+            .has_auto_play(auto_play)
+            .on_open_change(move |value, _, _| *o2.borrow_mut() = value)
+            .on_index_change(move |value, _, _| *i2.borrow_mut() = value)
+            .into_any_element()
+    });
+    (cx, engines, open, index)
+}
+
+fn clip(alt: &str) -> LightboxMedia {
+    LightboxMedia::video(format!("media/{alt}.mp4"), alt.to_string())
+}
+
+fn refresh(cx: &mut VisualTestContext) {
+    for _ in 0..3 {
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        cx.executor().advance_clock(Duration::from_millis(40));
+        cx.run_until_parked();
+    }
+}
+
+#[gpui::test]
+fn a_video_item_plays_in_place(cx: &mut TestAppContext) {
+    let (cx, engines, _, _) = video_viewer(cx, vec![clip("Clip")], false);
+    refresh(cx);
+    let media = engines.borrow()[0].clone();
+    let load = media.state().loads[0].clone();
+    assert_eq!(load.src.as_ref(), "media/Clip.mp4");
+    assert_eq!(
+        load.preload,
+        astryx_primitives::media::MediaPreload::Auto,
+        "the current page loads fully"
+    );
+    assert!(!load.autoplay);
+    media.load_metadata(30.);
+    refresh(cx);
+    let picture = cx
+        .debug_bounds("lb-video-media/Clip.mp4-picture")
+        .expect("the picture is drawn");
+    // A click on the picture plays it, as a browser's video does.
+    cx.simulate_click(picture.center(), Modifiers::none());
+    refresh(cx);
+    assert!(!media.state().paused);
+    assert!(
+        cx.debug_bounds("lb-video-media/Clip.mp4-controls")
+            .is_some(),
+        "its controls show"
+    );
+}
+
+#[gpui::test]
+fn the_controls_play_pause_and_mute(cx: &mut TestAppContext) {
+    let (cx, engines, _, _) = video_viewer(cx, vec![clip("Clip")], false);
+    let media = engines.borrow()[0].clone();
+    media.load_metadata(30.);
+    refresh(cx);
+    let toggle = cx.debug_bounds("lb-video-media/Clip.mp4-toggle").unwrap();
+    cx.simulate_click(toggle.center(), Modifiers::none());
+    refresh(cx);
+    assert!(!media.state().paused);
+    cx.simulate_click(toggle.center(), Modifiers::none());
+    refresh(cx);
+    assert!(media.state().paused);
+}
+
+#[gpui::test]
+fn starts_the_video_shown_with_has_auto_play(cx: &mut TestAppContext) {
+    let (cx, engines, _, _) = video_viewer(cx, vec![clip("Clip")], true);
+    refresh(cx);
+    assert!(engines.borrow()[0].state().loads[0].autoplay);
+}
+
+#[gpui::test]
+fn pauses_a_playing_video_once_the_viewer_moves_to_another_item(cx: &mut TestAppContext) {
+    let (cx, engines, _, index) =
+        video_viewer(cx, vec![clip("Clip"), photo(400, 200, "Photo")], false);
+    refresh(cx);
+    let media = engines.borrow()[0].clone();
+    media.load_metadata(30.);
+    media.update(|s| s.paused = false);
+    *index.borrow_mut() = 1;
+    refresh(cx);
+    assert!(media.state().paused);
+    assert_eq!(engines.borrow().len(), 1, "the video keeps its element");
+}
+
+#[gpui::test]
+fn pauses_a_playing_video_when_the_viewer_closes(cx: &mut TestAppContext) {
+    let (cx, engines, open, _) = video_viewer(cx, vec![clip("Clip")], false);
+    refresh(cx);
+    let media = engines.borrow()[0].clone();
+    media.update(|s| s.paused = false);
+    *open.borrow_mut() = false;
+    refresh(cx);
+    assert!(media.state().paused);
+}
+
+#[gpui::test]
+fn plays_a_video_again_when_paging_back_to_it_with_has_auto_play(cx: &mut TestAppContext) {
+    let (cx, engines, _, index) =
+        video_viewer(cx, vec![photo(400, 200, "Photo"), clip("Clip")], true);
+    *index.borrow_mut() = 1;
+    refresh(cx);
+    let media = engines.borrow()[0].clone();
+    media.load_metadata(30.);
+    *index.borrow_mut() = 0;
+    refresh(cx);
+    assert!(media.state().paused);
+    *index.borrow_mut() = 1;
+    refresh(cx);
+    assert!(!media.state().paused, "paged back, it plays again");
+}
+
+#[gpui::test]
+fn plays_a_single_video_again_when_the_viewer_reopens_with_has_auto_play(cx: &mut TestAppContext) {
+    let (cx, engines, open, _) = video_viewer(cx, vec![clip("Clip")], true);
+    refresh(cx);
+    let media = engines.borrow()[0].clone();
+    *open.borrow_mut() = false;
+    refresh(cx);
+    assert!(media.state().paused);
+    *open.borrow_mut() = true;
+    refresh(cx);
+    assert!(!media.state().paused);
+}
+
+#[gpui::test]
+fn keeps_a_paged_away_videos_element_and_time_once_the_viewer_pages_back(cx: &mut TestAppContext) {
+    let (cx, engines, _, index) =
+        video_viewer(cx, vec![clip("Clip"), photo(400, 200, "Photo")], false);
+    refresh(cx);
+    let media = engines.borrow()[0].clone();
+    media.load_metadata(30.);
+    media.advance_to(12.);
+    *index.borrow_mut() = 1;
+    refresh(cx);
+    *index.borrow_mut() = 0;
+    refresh(cx);
+    assert_eq!(engines.borrow().len(), 1);
+    assert_eq!(media.state().loads.len(), 1, "no reload");
+    assert_eq!(media.state().current_time, 12.);
+}
+
+#[gpui::test]
+fn a_press_beside_the_video_closes_the_viewer(cx: &mut TestAppContext) {
+    let (cx, engines, open, _) = video_viewer(cx, vec![clip("Clip")], false);
+    let media = engines.borrow()[0].clone();
+    // A portrait clip leaves room beside it.
+    media.update(|s| s.video_size = Some(gpui::size(100, 200)));
+    media.load_metadata(30.);
+    refresh(cx);
+    let picture = cx.debug_bounds("lb-video-media/Clip.mp4-picture").unwrap();
+    cx.simulate_click(picture.center(), Modifiers::none());
+    refresh(cx);
+    assert!(*open.borrow(), "a press on the picture keeps the viewer");
+    let beside = point(picture.left() - px(40.), picture.center().y);
+    cx.simulate_click(beside, Modifiers::none());
+    refresh(cx);
+    assert!(!*open.borrow());
+}

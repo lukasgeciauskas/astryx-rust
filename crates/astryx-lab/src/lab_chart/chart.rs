@@ -297,21 +297,23 @@ impl RenderOnce for Chart {
             entry.label = label.to_string();
             entry.table = rows;
         });
-        let plot = PlotArea {
+        let height = self.height.max(0.);
+        let input = PlotInput {
+            id: self.id.clone(),
+            data: self.data,
+            x_key: self.x_key,
+            y_keys: self.y_keys,
+            margin,
+            y_baseline: self.y_baseline,
+            y_domain: self.y_domain,
+            x_domain: self.x_domain,
+            label,
+            children: self.children,
+        };
+        let plot = MeasuredArea {
             id: (self.id.clone(), "plot").into(),
-            height: self.height.max(0.),
-            input: Some(PlotInput {
-                id: self.id.clone(),
-                data: self.data,
-                x_key: self.x_key,
-                y_keys: self.y_keys,
-                margin,
-                y_baseline: self.y_baseline,
-                y_domain: self.y_domain,
-                x_domain: self.x_domain,
-                label,
-                children: self.children,
-            }),
+            height,
+            build: Some(Box::new(move |bounds| build_plot(input, bounds, height))),
             child: None,
             source: self.source,
         };
@@ -391,18 +393,18 @@ struct PlotInput {
     children: Vec<AnyElement>,
 }
 
-/// The plot: as wide as it is given and `height` tall; it builds the scales and its
-/// children once its width is known (upstream measures it with a ResizeObserver and draws
-/// no SVG at width 0).
-struct PlotArea {
-    id: ElementId,
-    height: f64,
-    input: Option<PlotInput>,
-    child: Option<AnyElement>,
-    source: &'static Location<'static>,
+/// A box as wide as it is given and `height` tall that builds its content once its width is
+/// known, from its bounds (upstream measures its container with a ResizeObserver and draws
+/// nothing at width 0).
+pub(crate) struct MeasuredArea {
+    pub(crate) id: ElementId,
+    pub(crate) height: f64,
+    pub(crate) build: Option<Box<dyn FnOnce(Bounds<Pixels>) -> AnyElement>>,
+    pub(crate) child: Option<AnyElement>,
+    pub(crate) source: &'static Location<'static>,
 }
 
-impl Element for PlotArea {
+impl Element for MeasuredArea {
     type RequestLayoutState = ();
     type PrepaintState = ();
 
@@ -436,13 +438,13 @@ impl Element for PlotArea {
         window: &mut Window,
         cx: &mut App,
     ) {
-        let Some(input) = self.input.take() else {
+        let Some(build) = self.build.take() else {
             return;
         };
         if bounds.size.width <= px(0.) {
             return;
         }
-        let mut element = build_plot(input, bounds, self.height);
+        let mut element = build(bounds);
         element.layout_as_root(bounds.size.map(AvailableSpace::Definite), window, cx);
         element.prepaint_at(bounds.origin, window, cx);
         self.child = Some(element);

@@ -70,4 +70,10 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::diff_viewer::DIFF_VIEWER_DOC,
     crate::svg_icon::SVG_ICON_DOC,
     crate::svg_icon::WEIGHTED_SVG_ICON_DOC,
+    crate::three_d::THREE_D_CHART_DOC,
+    crate::three_d::THREE_D_BAR_DOC,
+    crate::three_d::THREE_D_SCATTER_DOC,
+    crate::three_d::THREE_D_SCATTER_GL_DOC,
+    crate::three_d::THREE_D_SURFACE_DOC,
+    crate::media_player::MEDIA_PLAYER_DOC,
 ];

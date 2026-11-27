@@ -1159,6 +1159,13 @@ The remaining primitives:
     lines), DiffViewer, SVGIcon and WeightedSVGIcon (their icons generated from
     upstream), a fix for astryx-i18n's Portuguese month-year panic (an ICU4X data defect),
     ChatMessageList's label and in-flow layer dismissal for Comments.
+  - Stage 5, part two (done): ThreeD (ThreeDChart, ThreeDBar, ThreeDScatter,
+    ThreeDScatterGL, ThreeDSurface, with V8's fdlibm trig and sort so the projection
+    matches upstream bit for bit), and MediaPlayer (VideoPlayer, AudioPlayer, the root and
+    every control part) on a media engine in `astryx_primitives::media`: Media Foundation
+    on Windows, AVFoundation on macOS, the browser's media elements on the web, none yet
+    on Linux. Lightbox plays video in place, `hasAutoPlay` included (carried from M10).
+  - M13 done (2026-11-27): core 110/110, charts 6/6, lab 47/47.
 - **M14 Rich text:** a document model + editor on the engine, toolbar, lossless Markdown round
   trip (AST-062/064/106).
 - **M15 RTL, high contrast, polish:** RTL mirroring, Windows high contrast and macOS's

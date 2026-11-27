@@ -5,19 +5,20 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-27, after M12 (Theme authoring parity)._
+_Last updated: 2026-11-27, after M13 (Charts & lab)._
 
 ## State
 
 - **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, macOS
-  support (a first-class platform) and M12. Details and dates are in
+  support (a first-class platform), M12 and M13. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** all 110 core components (`cargo run -q -p astryx-cli -- parity`).
-- **Last commits on `main`:** M12's stages: `astryx_theme::authoring` (color science,
-  the palette engine, `define_theme` and its parity test against the shipped themes,
-  adaptations, Dynamic Type, the registry, icons, the motion tempo) and the `theming`
-  module (Theme, MediaTheme). CI runs on
+- **Parity:** core 110/110, charts 6/6, lab 47/47 (`cargo run -q -p astryx-cli -- parity`,
+  which counts each package).
+- **Last commits on `main`:** M13's stages: `astryx-charts` (the d3 subset, `Chart` and its
+  chrome, every mark including the WebGL ones) and `astryx-lab` (all 47 lab components,
+  with the Core parity they exposed and a native media engine in
+  `astryx_primitives::media`). CI runs on
   ubuntu, windows, macos and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
@@ -25,16 +26,16 @@ _Last updated: 2026-11-27, after M12 (Theme authoring parity)._
   R16's macOS picker; see
   [`gpui-fork.md`](gpui-fork.md)). The `[patch.crates-io]` block in
   `Cargo.toml` (async-task, calloop) is legitimate and stays.
-- **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
+- **Repository:** https://github.com/lukasgeciauskas/astryx-rust, public (made public for
+  unlimited Actions minutes).
   Upstream Astryx (the specification) is at `../Astryx`.
 
 ### Carried into later milestones (recorded in each doc and in KNOWN_ISSUES)
 
 | What | Waits for |
 |---|---|
-| Lightbox video playback and `hasAutoPlay` (a video opens in the system player now) | MediaPlayer's decoder (M13) |
 | Backdrop blur (Lightbox, scrims, ChatLayout's frosted dock) | Fork patch R2 |
-| ChatTypingIndicator, ChatUnreadDivider, ChatVirtualizer, ChatEmojiPicker, ChatReactionBar (lab components) | Lab (M13) |
+| A media engine on Linux (MediaPlayer and Lightbox video report "can't be played" there) | The owner's approval of a GStreamer dependency |
 | Theme adaptation rules conditioned on contrast or reduced motion (none ships) | M15's reading of the system's settings |
 | Native date and time pickers on Linux (`Native` shows the Astryx surface there; GPUI has no toolkit on Linux) | Fork patch R16 built and checked on Linux (a GTK picker) |
 
@@ -222,11 +223,30 @@ time:
   exported in upstream's key order and `astryx-theme`'s JSON reader keeps it
   (`serde_json/preserve_order`).
 
-## Next: M13 Charts & lab
+## Lessons from M13
 
-M12 (Theme authoring parity) is done: `astryx_theme::authoring` defines themes the way
-upstream's `defineTheme` does, with the OKLCH palette engine, HCT, contrast, status roles,
-adaptations, Dynamic Type, icons and the motion tempo, and all 110 core components are
-ported. M13 builds `astryx-charts` (d3-scale and d3-shape essentials and the marks) and
-`astryx-lab` (all 31 lab components, with Chat's lab parts carried from M10). Start with
-upstream's `packages/charts` and `packages/lab`.
+- **Two helpers in parallel, one verified snapshot per commit.** While helpers edit the
+  working tree, a stage is committed from a chosen set of files (a crate root's module
+  list written as a blob with `git update-index --cacheinfo` when unfinished modules
+  must stay out), then checked in a git worktree (`../astryx-verify`) with a shared
+  `CARGO_TARGET_DIR` before the push.
+- **Check computations against upstream's own code under Node.** Helpers bundled
+  upstream's TypeScript with the esbuild in `../Astryx` and compared hundreds to
+  hundreds of thousands of cases bit for bit (d3, layouts, projections, formatters).
+  JavaScript details matter: V8's fdlibm `Math.sin`/`cos` (`crates/astryx-lab/src/trig.rs`),
+  V8's sort with NaN comparisons, `-0`, `Math.min`/`max` with NaN.
+- **Large data is generated, never copied:** the emoji set and the SVG icons come from
+  upstream through `tools/export` and `cargo xtask codegen` like the tokens.
+- **ICU4X differs from browsers' ICU** in places (CLDR versions, no interval patterns,
+  data defects such as Portuguese month-year); KNOWN_ISSUES lists what remains.
+
+## Next: M14 Rich text
+
+M13 (Charts & lab) is done: `astryx-charts` ports `@astryxdesign/charts` and
+`astryx-lab` all 47 lab components, with a native media engine (Media Foundation,
+AVFoundation, the browser's media elements) for MediaPlayer and Lightbox video. M14 builds
+the rich-text package (`../Astryx/packages/richtext`: RichTextEditor, its toolbar and
+auto-link plugin, RichTextView) on the editing engine: a document model, the editor, the
+toolbar, and a lossless Markdown round trip (`AST-062`, `AST-064`, `AST-106`). The CLI
+already lists the richtext entries (`astryx component RichTextEditor --package richtext`);
+add a `richtext` package count to `astryx parity` with the crate.

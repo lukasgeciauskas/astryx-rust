@@ -422,6 +422,8 @@ dependencies = [
  "gpui",
  "icu_collator",
  "icu_datetime",
+ "icu_decimal",
+ "icu_experimental",
  "icu_list",
  "icu_locale",
  "icu_time",
@@ -449,9 +451,12 @@ dependencies = [
  "accesskit",
  "gpui",
  "icu_normalizer",
+ "image",
  "js-sys",
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
+ "objc2-core-foundation",
+ "objc2-core-video",
  "objc2-foundation 0.3.2",
  "serde_json",
  "spellbook",
@@ -461,6 +466,7 @@ dependencies = [
  "web-sys",
  "web-time",
  "windows 0.62.2",
+ "windows-core 0.62.2",
 ]
 
 [[package]]

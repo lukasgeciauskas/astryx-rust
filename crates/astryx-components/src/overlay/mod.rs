@@ -12,6 +12,7 @@ pub mod examples;
 mod hover_card;
 mod info_tip;
 mod lightbox;
+mod lightbox_video;
 mod menu;
 pub(crate) mod modal;
 mod motion;
@@ -643,8 +644,6 @@ pub const MORE_MENU_DOC: ComponentDoc = ComponentDoc {
     example: include_str!("examples.rs"),
 };
 
-const VIDEO: &str = "video plays through MediaPlayer's decoder (M13); until then a video item opens in the system player";
-
 pub const LIGHTBOX_DOC: ComponentDoc = ComponentDoc {
     name: "Lightbox",
     rust_type: "astryx::components::overlay::Lightbox",
@@ -656,7 +655,7 @@ pub const LIGHTBOX_DOC: ComponentDoc = ComponentDoc {
         p("onIndexChange", RustApi::Method("on_index_change")),
         p("hasZoom", RustApi::Method("has_zoom")),
         p("defaultIndex", RustApi::Method("default_index")),
-        p("hasAutoPlay", RustApi::Pending("has_auto_play", VIDEO)),
+        p("hasAutoPlay", RustApi::Method("has_auto_play")),
         p("xstyle", RustApi::Trait("Styled")),
     ],
     example: include_str!("examples.rs"),
@@ -674,7 +673,7 @@ pub const USE_LIGHTBOX_DOC: ComponentDoc = ComponentDoc {
         p("options.hasZoom", RustApi::Method("element(cx).has_zoom")),
         p(
             "options.hasAutoPlay",
-            RustApi::Pending("element(cx).has_auto_play", VIDEO),
+            RustApi::Method("element(cx).has_auto_play"),
         ),
     ],
     example: include_str!("examples.rs"),

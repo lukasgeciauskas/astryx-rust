@@ -444,6 +444,18 @@
     code intends (a 0.75 gap for fills, stroke width plus twice the gap for strokes),
     which a browser may not resolve in SVG attributes.
 
+- **Media playback (M13).** Linux has no media engine (it needs a GStreamer dependency,
+  which waits for the owner's approval): MediaPlayer and Lightbox video report "This
+  media can't be played" there. The macOS (AVFoundation) and web backends have only run
+  in CI's build and tests, not with real media on screen. No backdrop blur behind the
+  player's frosted bar, no hidden cursor while idle, no system media controls for
+  AudioPlayer, captions from local paths or `data:` URLs only, and container queries
+  apply a frame after a resize.
+- **ThreeD (M13).** Touch rotation is not handled (mouse and keyboard are); the GL scatter
+  is GPUI circles over the other marks; auto-rotation steps on a 50 ms timer, at
+  upstream's rate and angle. The 3D examples have their own gallery page, since debug
+  builds draw their thousands of shapes slowly.
+
 ## Tooling
 
 - **True hot-patching needs our patched dx.** `cargo xtask dev --hot-patch` patches

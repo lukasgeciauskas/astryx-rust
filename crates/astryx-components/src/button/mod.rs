@@ -170,6 +170,7 @@ pub struct Button {
     pressed: Option<bool>,
     expanded: Option<bool>,
     current: Option<gpui::AriaCurrent>,
+    aria_label: Option<SharedString>,
     style: StyleRefinement,
     children: SmallVec<[AnyElement; 1]>,
 }
@@ -198,12 +199,16 @@ impl Button {
             pressed: None,
             expanded: None,
             current: None,
+            aria_label: None,
             style: StyleRefinement::default(),
             children: SmallVec::new(),
         }
     }
 
     astryx_primitives::setters! {
+        /// Upstream `aria-label`: the accessible name, in place of the label, for a
+        /// label that shows only part of it (a speed control's "1.5×").
+        ?aria_label: SharedString,
         /// Upstream `variant`.
         variant: ButtonVariant,
         /// Upstream `size`: else the nearest size provider, else `md`.
@@ -736,7 +741,7 @@ impl RenderOnce for Button {
         };
         let mut el = el
             .role(role)
-            .aria_label(self.label)
+            .aria_label(self.aria_label.unwrap_or(self.label))
             .aria_disabled(disabled)
             .aria_busy(busy);
         // A menu's trigger: its presses, hover and keys.

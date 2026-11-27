@@ -19,6 +19,7 @@ pub mod link;
 pub mod list_focus;
 #[doc(hidden)]
 pub mod list_window;
+pub mod media;
 pub mod modality;
 pub mod motion;
 pub mod platform;
