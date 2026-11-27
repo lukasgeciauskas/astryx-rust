@@ -663,7 +663,11 @@ pub(crate) fn menu_root(id: &ElementId, window: &mut Window, cx: &mut App) -> En
         cx,
         |window, cx| MenuRoot {
             initial: None,
-            press: MenuPress::new(window, cx),
+            press: {
+                let press = MenuPress::new(window, cx);
+                press.watch_activation(window, cx);
+                press
+            },
             opening_key: None,
             drilled: 0,
             generation: 0,

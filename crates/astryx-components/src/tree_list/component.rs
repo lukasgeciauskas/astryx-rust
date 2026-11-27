@@ -795,6 +795,16 @@ impl RenderOnce for TreeList {
                     guides.push(line(guide_x(v.level - 1), v.is_last));
                 }
             }
+            // The row's press (upstream `usePressFeedback`). A finger on the chevron shows
+            // the row's press only when the row's surface toggles too, since the chevron
+            // runs that same toggle; otherwise the chevron's press is its own.
+            let row_feedback = crate::gestures::use_press_feedback(
+                ElementId::Name(format!("tree-row-{}-press", item.id).into()),
+                window,
+                cx,
+            )
+            .disabled(item.disabled);
+            let surface_toggles = item.on_click.is_none();
             // The chevron (FR10: or the theme's disclosure mark).
             let chevron = branch.then(|| {
                 let state_name = if v.expanded { "expanded" } else { "collapsed" };
@@ -851,6 +861,16 @@ impl RenderOnce for TreeList {
                         cx.stop_propagation();
                         toggle(id.clone(), window, cx);
                     });
+                    if !surface_toggles {
+                        c = c.relative().child(
+                            row_feedback
+                                .nested_control()
+                                .absolute()
+                                .top_0()
+                                .left_0()
+                                .size_full(),
+                        );
+                    }
                 }
                 theme.refine(
                     c.style(),
@@ -958,10 +978,9 @@ impl RenderOnce for TreeList {
                 content = content
                     .cursor_pointer()
                     .hover(move |s| s.bg(astryx_theme::color::composite(base, hover)));
-                content = crate::press::touch_press(
+                content = crate::press::touch_press_with(
                     content,
-                    ElementId::Name(format!("tree-row-{}-press", item.id).into()),
-                    false,
+                    &row_feedback,
                     base,
                     pressed,
                     window,

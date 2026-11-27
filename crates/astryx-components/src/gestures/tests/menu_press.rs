@@ -721,3 +721,81 @@ fn a_press_on_caller_content_beside_the_rows_stays_that_contents(cx: &mut TestAp
     assert_eq!(w.logged(), ["content click"]);
     assert!(w.open.get());
 }
+
+// --- The window loses focus mid-press (spec:AST-094 FR28) ------------------------
+
+#[gpui::test]
+fn after_the_window_loses_focus_mid_press_a_fingers_lift_acts_on_nothing(cx: &mut TestAppContext) {
+    let (cx, w) = mount(cx, Setup::default());
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    open_by_click(cx, &w);
+    finger(cx, 1, TouchPhase::Started, row(0));
+    assert!(cx.debug_bounds("lit").is_some());
+    cx.deactivate_window();
+    settle(cx);
+    assert!(
+        cx.debug_bounds("lit").is_none(),
+        "the withdrawn finger's lit row clears"
+    );
+    assert!(
+        w.press().is_active(),
+        "withdrawn, not ended: tracked to its lift"
+    );
+    // Nothing it does highlights or acts, and its lift's click is the gesture's.
+    finger(cx, 1, TouchPhase::Moved, row(2));
+    assert!(cx.debug_bounds("lit").is_none());
+    finger(cx, 1, TouchPhase::Ended, row(2));
+    assert!(w.logged().is_empty(), "{:?}", w.logged());
+    assert!(!w.press().is_active());
+    assert!(
+        cx.update(|_, cx| w.press().take_stray_click(cx)),
+        "its click is swallowed"
+    );
+    // The next press acts as usual.
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    finger(cx, 2, TouchPhase::Started, row(2));
+    finger(cx, 2, TouchPhase::Ended, row(2));
+    assert_eq!(w.logged(), ["act c"]);
+}
+
+#[gpui::test]
+fn a_press_ends_a_withdrawn_gesture_whose_lift_the_window_never_saw(cx: &mut TestAppContext) {
+    let (cx, w) = mount(cx, Setup::default());
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    open_by_click(cx, &w);
+    finger(cx, 1, TouchPhase::Started, row(0));
+    cx.deactivate_window();
+    settle(cx);
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    // The finger lifted where the window could not see it: the next press ends the
+    // withdrawn gesture, and its click acts as the row's own (FR5); the press after it is
+    // the model's again.
+    finger(cx, 2, TouchPhase::Started, row(2));
+    finger(cx, 2, TouchPhase::Ended, row(2));
+    assert_eq!(w.logged(), ["click c"]);
+    finger(cx, 3, TouchPhase::Started, row(2));
+    finger(cx, 3, TouchPhase::Ended, row(2));
+    assert_eq!(w.logged(), ["click c", "act c"]);
+}
+
+#[gpui::test]
+fn a_mouse_press_the_blur_interrupts_ends_as_a_cancel_and_keeps_its_click(cx: &mut TestAppContext) {
+    let (cx, w) = mount(cx, Setup::default());
+    cx.update(|window, _| window.activate_window());
+    settle(cx);
+    open_by_click(cx, &w);
+    mdown(cx, row(0), Modifiers::none());
+    cx.deactivate_window();
+    settle(cx);
+    assert!(!w.press().is_active(), "a mouse's gesture ends");
+    mup(cx, row(0), Modifiers::none());
+    assert_eq!(
+        w.logged(),
+        ["click a"],
+        "nothing acted for the gesture; its click passes"
+    );
+}

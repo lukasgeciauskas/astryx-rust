@@ -142,3 +142,40 @@ fn the_remove_button_of_a_token(cx: &mut TestAppContext) {
         "the remove button paints, not the token"
     );
 }
+
+// --- The chevron of a TreeList row --------------------------------------------
+
+fn tree_row(cx: &mut TestAppContext, own_action: bool) -> (Vec<Bounds<Pixels>>, Bounds<Pixels>) {
+    let cx = host(cx, move |_, _| {
+        let mut folder = crate::tree_list::TreeListItemData::new("p", "Folder")
+            .children([crate::tree_list::TreeListItemData::new("k", "File")]);
+        if own_action {
+            folder = folder.on_click(|_, _, _| {});
+        }
+        div()
+            .p(px(8.))
+            .child(crate::tree_list::TreeList::new("t", vec![folder]).w(px(300.)))
+            .into_any_element()
+    });
+    let chevron = cx.debug_bounds("t-chevron-p").expect("the chevron");
+    (finger_paints(cx, chevron.center()), chevron)
+}
+
+#[gpui::test]
+fn the_chevron_paints_the_row_when_the_rows_surface_toggles(cx: &mut TestAppContext) {
+    let (painted, chevron) = tree_row(cx, false);
+    assert_eq!(
+        painted.len(),
+        1,
+        "the chevron runs the row's own toggle: {painted:?}"
+    );
+    assert!(area(&painted[0]) > area(&chevron), "the row paints");
+}
+
+#[gpui::test]
+fn the_chevron_paints_no_press_when_the_rows_surface_runs_a_different_action(
+    cx: &mut TestAppContext,
+) {
+    let (painted, _) = tree_row(cx, true);
+    assert!(painted.is_empty(), "{painted:?}");
+}

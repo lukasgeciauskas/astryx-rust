@@ -237,6 +237,8 @@ struct Inner {
     origin: Instant,
     /// The second finger that ended a gesture: it starts nothing and taps nothing.
     ignored: Cell<Option<u64>>,
+    /// The window's activation, watched for its blur.
+    activation: RefCell<Option<gpui::Subscription>>,
     /// The window was active as the gesture began: losing that (upstream's `blur`)
     /// withdraws it.
     was_active: Cell<bool>,
@@ -267,7 +269,11 @@ pub fn use_menu_press(
     let state = window.use_keyed_state(
         ElementId::Name(format!("{id}-menu-press").into()),
         cx,
-        |window, cx| MenuPress::new(window, cx),
+        |window, cx| {
+            let press = MenuPress::new(window, cx);
+            press.watch_activation(window, cx);
+            press
+        },
     );
     let press = state.read(cx).clone();
     *press.0.options.borrow_mut() = options;
@@ -296,6 +302,7 @@ impl MenuPress {
             reset_pending: Cell::new(false),
             origin: cx.background_executor().now(),
             ignored: Cell::new(None),
+            activation: RefCell::new(None),
             was_active: Cell::new(false),
         }));
         let weak = Rc::downgrade(&press.0);
@@ -323,6 +330,24 @@ impl MenuPress {
             clock,
         ));
         press
+    }
+
+    /// Watches the window's activation (from the keyed state that holds the model): the
+    /// window losing focus mid-press withdraws a finger's gesture to its lift and ends a
+    /// mouse's as a cancel, as upstream's `blur` listener does.
+    pub(crate) fn watch_activation<T: 'static>(&self, window: &mut Window, cx: &gpui::Context<T>) {
+        let weak = Rc::downgrade(&self.0);
+        let subscription = cx.observe_window_activation(window, move |_, window, cx| {
+            let Some(inner) = weak.upgrade() else {
+                return;
+            };
+            let press = MenuPress(inner);
+            if !window.is_window_active() && press.is_active() {
+                press.step(MenuPressInput::Withdraw, None, window, cx);
+                window.refresh();
+            }
+        });
+        *self.0.activation.borrow_mut() = Some(subscription);
     }
 
     /// Ends the gesture without the window (the menu closed under it).

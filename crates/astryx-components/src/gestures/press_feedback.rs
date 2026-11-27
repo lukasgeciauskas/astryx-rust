@@ -106,6 +106,9 @@ struct Controller {
     /// The surfaces under this dispatch's new touch or mouse press: the innermost (the
     /// smallest) takes it once the dispatch is over.
     candidates: RefCell<Vec<(SurfaceInfo, Candidate)>>,
+    /// Surfaces a press in this dispatch began on a control nested inside, other than the
+    /// surface's own action: they show no press for it (upstream `cancelNestedPress`).
+    vetoed: RefCell<Vec<u64>>,
     /// When and where a finger last drove a scroll.
     last_finger_scroll: Cell<Option<(Instant, gpui::Point<Pixels>)>>,
     space_held: Cell<bool>,
@@ -313,6 +316,7 @@ impl Controller {
                     return;
                 };
                 let list: Vec<_> = c.candidates.borrow_mut().drain(..).collect();
+                let vetoed: Vec<u64> = c.vetoed.borrow_mut().drain(..).collect();
                 let area = |b: &Bounds<Pixels>| f32::from(b.size.width) * f32::from(b.size.height);
                 let Some((info, candidate)) = list
                     .into_iter()
@@ -320,6 +324,10 @@ impl Controller {
                 else {
                     return;
                 };
+                // A press that began on a control inside the surface is that control's.
+                if vetoed.contains(&info.key) {
+                    return;
+                }
                 match candidate {
                     Candidate::Finger { id, x, y } => c.finger_down(info, id, x, y, window, cx),
                     Candidate::Mouse => c.press_button(info, Some(MOUSE), window, cx),
@@ -694,6 +702,39 @@ impl PressFeedback {
             },
             move |bounds, (hitbox, scroller), window, cx| {
                 paint.register(bounds, hitbox, scroller, window, cx)
+            },
+        )
+    }
+
+    /// Upstream `cancelNestedPress`: a child of an interactive control nested inside this
+    /// surface (absolute, its full size) that is not the surface's own action. A finger's
+    /// press that begins on it (and a mouse's, on a surface that owns a control's box) does
+    /// not activate the surface, so the surface shows no press for it.
+    pub fn nested_control(&self) -> gpui::Canvas<Hitbox> {
+        let (c, key, owns_box) = (self.controller.clone(), self.key, self.owns_box);
+        gpui::canvas(
+            |bounds, window, _| window.insert_hitbox(bounds, HitboxBehavior::Normal),
+            move |_, hitbox, window, _| {
+                let (touch, touch_hitbox) = (c.clone(), hitbox.clone());
+                window.on_touch_event(move |event: &TouchEvent, window, _| {
+                    if event.phase == TouchPhase::Started
+                        && touch_hitbox.is_hovered_at(event.position, window)
+                    {
+                        touch.vetoed.borrow_mut().push(key);
+                    }
+                    false
+                });
+                if owns_box {
+                    let mouse = c.clone();
+                    window.on_mouse_event(move |event: &MouseDownEvent, phase, window, _| {
+                        if phase == DispatchPhase::Capture
+                            && event.button == MouseButton::Left
+                            && hitbox.is_hovered(window)
+                        {
+                            mouse.vetoed.borrow_mut().push(key);
+                        }
+                    });
+                }
             },
         )
     }
