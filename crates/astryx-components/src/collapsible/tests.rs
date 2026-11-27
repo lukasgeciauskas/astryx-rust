@@ -97,7 +97,9 @@ fn a_cards_nested_button_keeps_its_click(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
-fn selectable_cards_toggle_with_space_but_not_enter(cx: &mut TestAppContext) {
+fn selectable_cards_toggle_with_space_and_with_enter(cx: &mut TestAppContext) {
+    // Upstream SelectableCard: a native checkbox reacts to Space, and Enter is wired up
+    // as an additional toggle key ("calls onChange with true when Enter is pressed").
     let next = Rc::new(RefCell::new(Vec::new()));
     let cx = host(cx, {
         let next = next.clone();
@@ -112,7 +114,8 @@ fn selectable_cards_toggle_with_space_but_not_enter(cx: &mut TestAppContext) {
     press(cx, "tab");
     press(cx, "enter");
     press(cx, "space");
-    assert_eq!(*next.borrow(), [true]);
+    // The app keeps its value, so each asks for the selected state.
+    assert_eq!(*next.borrow(), [true, true]);
 }
 
 #[gpui::test]

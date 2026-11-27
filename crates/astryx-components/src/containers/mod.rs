@@ -2,9 +2,14 @@
 //! Upstream: `Card/`, `Section/`, `EmptyState/`.
 
 mod cards;
+#[cfg(test)]
+mod cards_tests;
 pub mod examples;
 
-pub use cards::{CLICKABLE_CARD_DOC, ClickableCard, SELECTABLE_CARD_DOC, SelectableCard};
+pub use cards::{
+    CLICKABLE_CARD_DOC, ClickableCard, SELECTABLE_CARD_DOC, SelectableCard, SelectableCardInput,
+    SelectableCardInputType, provide_selectable_card_input,
+};
 
 use astryx_i18n::{Direction, LogicalStyled, use_direction};
 use astryx_theme::{ResolvedTheme, ThemeStyled, Tokens, current, scope};

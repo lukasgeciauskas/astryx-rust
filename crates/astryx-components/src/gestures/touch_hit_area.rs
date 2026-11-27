@@ -8,6 +8,10 @@
 //! row, card, tab and nav item registers one with the press controller, and each hit-area
 //! owner registers its own box): GPUI keeps no list of a page's interactive elements, so
 //! the surfaces that take presses stand in for upstream's `INTERACTIVE_SELECTOR`.
+//!
+//! Upstream keeps it internal (`@astryxdesign/core/internal/touch`'s `useTouchHitArea`
+//! and `touchHitAreaStyles`), for the packages built on Core; so is this module, public
+//! for Lab and hidden from the docs.
 
 use astryx_primitives::gestures::hit_area::{
     HitInsets, HitRect, MIN_TOUCH_TARGET, NO_HIT_INSETS, clamped_hit_insets,
@@ -21,21 +25,21 @@ use gpui::{
 use web_time::Instant;
 
 /// Notes a pressable target's box this frame (in paint).
-pub(crate) fn note_target(window: &Window, key: u64, bounds: Bounds<Pixels>, now: Instant) {
+pub fn note_target(window: &Window, key: u64, bounds: Bounds<Pixels>, now: Instant) {
     astryx_primitives::gestures::hit_area::note_target(window, key, bounds, now);
 }
 
 /// How far the target `key` (drawn last frame) may grow on each side now: toward 44 px,
 /// stopping halfway to each live neighbour. 0 until it has been drawn once.
-pub(crate) fn hit_insets(window: &Window, key: u64, now: Instant) -> HitInsets {
+pub fn hit_insets(window: &Window, key: u64, now: Instant) -> HitInsets {
     hit_insets_with(window, key, now, None)
 }
 
 /// An owner's activation, run by a tap on its hit layer.
-pub(crate) type ActivateFn = Rc<dyn Fn(&mut Window, &mut App)>;
+pub type ActivateFn = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// A stable key for the hit area of the element `id` names.
-pub(crate) fn key_of(id: &ElementId) -> u64 {
+pub fn key_of(id: &ElementId) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     format!("{id:?}-hit-area").hash(&mut hasher);
@@ -44,7 +48,7 @@ pub(crate) fn key_of(id: &ElementId) -> u64 {
 
 /// A probe (absolute, its parent's full size) that notes an interactive surface's box
 /// under a coarse primary pointer, so the hit areas around it stop halfway to it.
-pub(crate) fn target_probe(key: u64) -> impl IntoElement {
+pub fn target_probe(key: u64) -> impl IntoElement {
     astryx_primitives::gestures::hit_area::target_probe(key)
 }
 
@@ -53,7 +57,7 @@ pub(crate) fn target_probe(key: u64) -> impl IntoElement {
 /// layer grown toward 44 px (each side stopping halfway to a neighbour) takes the taps
 /// just past it and runs `activate`. `full` replaces the centered growth (a group's
 /// box grows by its edge members, upstream `groupGrowth`).
-pub(crate) fn hit_area(
+pub fn hit_area(
     id: &ElementId,
     enabled: bool,
     activate: Option<ActivateFn>,
@@ -67,14 +71,16 @@ pub(crate) fn hit_area(
 /// What a hit layer also belongs to: a gesture attachment's area (a group's slide, a
 /// handle's hold) and a press surface whose paint a finger on it shows.
 #[derive(Clone, Copy, Default)]
-pub(crate) struct HitLinks<'a> {
+pub struct HitLinks<'a> {
+    /// The gesture attachment whose recognizers a finger on the layer reaches.
     pub gestures: Option<&'a astryx_primitives::gestures::host::GestureAttachment>,
+    /// The press surface whose paint a finger on the layer shows.
     pub press: Option<&'a super::PressFeedback>,
 }
 
 /// [`hit_area`] whose layer is also part of a gesture attachment's area, so a finger
 /// that lands on it starts the owner's gestures (a group's slide, a handle's hold).
-pub(crate) fn hit_area_with(
+pub fn hit_area_with(
     id: &ElementId,
     enabled: bool,
     activate: Option<ActivateFn>,
@@ -122,7 +128,7 @@ pub(crate) fn hit_area_with(
 }
 
 /// [`hit_insets`] with a group's full growth in place of the centered one.
-pub(crate) fn hit_insets_with(
+pub fn hit_insets_with(
     window: &Window,
     key: u64,
     now: Instant,

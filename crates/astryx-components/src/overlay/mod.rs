@@ -49,10 +49,10 @@ pub use context_menu::{
 };
 pub(crate) use context_menu::{ContextSpec, InvokeFn, with_context_menu};
 pub(crate) use context_menu::{context_menu_button, with_row_menu};
-pub(crate) use dialog::focus_scope;
 pub use dialog::{
     AutoFocus, Dialog, DialogController, DialogHeader, DialogPosition, DialogPurpose, DialogVariant,
 };
+pub use dialog::{FocusScope, focus_scope};
 pub(crate) use disclosure::{Disclosure, disclosure};
 pub use drawer::{Drawer, DrawerHeader, DrawerSide};
 pub(crate) use dropdown::MenuTrigger;

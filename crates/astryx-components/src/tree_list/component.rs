@@ -813,6 +813,7 @@ impl RenderOnce for TreeList {
                         IndicatorRequest {
                             state: state_name,
                             size: chevron_box,
+                            ..IndicatorRequest::default()
                         },
                         window,
                         cx,

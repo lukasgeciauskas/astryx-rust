@@ -19,10 +19,9 @@ use crate::icon::{Icon, IconColor, IconSize};
 
 mod theme;
 
-pub(crate) use theme::theme_indicator;
 pub use theme::{
-    IndicatorRequest, SPINNER, TREE_DISCLOSURE, ThemeIndicatorFn, clear_theme_indicator,
-    set_theme_indicator,
+    CHECK, CHECKBOX, IndicatorRequest, RADIO, SPINNER, TREE_DISCLOSURE, ThemeIndicatorFn,
+    clear_theme_indicator, set_theme_indicator, theme_indicator,
 };
 
 /// Upstream indicator `state`.
@@ -127,6 +126,30 @@ fn paint(state: IndicatorState, disabled: bool, cx_tokens: &astryx_theme::Tokens
     }
 }
 
+/// A theme's picture for the choice indicator `name`, drawn in place of the built-in
+/// (upstream `useIndicator`: the theme's override, else the default).
+/// Without one, the request comes back, with the children the built-in draws.
+fn themed(
+    name: &str,
+    request: IndicatorRequest,
+    window: &mut Window,
+    cx: &mut App,
+) -> Result<AnyElement, IndicatorRequest> {
+    match theme_indicator(name, cx) {
+        Some(draw) => Ok(draw(request, window, cx)),
+        None => Err(request),
+    }
+}
+
+/// The state word of the `singleSelection` and `multiSelection` families.
+fn family_state(state: IndicatorState) -> &'static str {
+    match state {
+        IndicatorState::Unchecked => "unchecked",
+        IndicatorState::Checked => "checked",
+        IndicatorState::Indeterminate => "indeterminate",
+    }
+}
+
 macro_rules! indicator_common {
     ($name:ident) => {
         impl $name {
@@ -138,6 +161,32 @@ macro_rules! indicator_common {
                 /// The owner row's GPUI group: hovering the row tints the
                 /// indicator (upstream `indicatorScope`).
                 ?hover_group: SharedString,
+            }
+        }
+
+        impl $name {
+            /// Draws a theme's `name` entry, if it has one; else keeps the children.
+            fn themed(
+                &mut self,
+                name: &str,
+                window: &mut Window,
+                cx: &mut App,
+            ) -> Option<AnyElement> {
+                let request = IndicatorRequest {
+                    state: family_state(self.state),
+                    size: self.size.box_size(),
+                    control_size: self.size,
+                    disabled: self.disabled,
+                    hover_group: self.hover_group.clone(),
+                    children: std::mem::take(&mut self.children).into_vec(),
+                };
+                match themed(name, request, window, cx) {
+                    Ok(themed) => Some(themed),
+                    Err(request) => {
+                        self.children = SmallVec::from_vec(request.children);
+                        None
+                    }
+                }
             }
         }
 
@@ -184,7 +233,11 @@ impl CheckboxIndicator {
 indicator_common!(CheckboxIndicator);
 
 impl RenderOnce for CheckboxIndicator {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        // A theme's `checkbox` entry draws instead, in every host.
+        if let Some(themed) = self.themed(CHECKBOX, window, cx) {
+            return themed;
+        }
         let theme = current(window, cx);
         let t = theme.tokens();
         let p = paint(self.state, self.disabled, t);
@@ -214,7 +267,7 @@ impl RenderOnce for CheckboxIndicator {
         theme.refine(el.style(), "checkbox-indicator", &props, None);
         el.style().refine(&self.style);
         if !self.children.is_empty() {
-            return el.children(self.children);
+            return el.children(self.children).into_any_element();
         }
         // Mark sizes are shares of the outer box (upstream: 12/20, 14/24
         // for the check; half for the dash).
@@ -235,6 +288,7 @@ impl RenderOnce for CheckboxIndicator {
             }
             IndicatorState::Unchecked => el,
         }
+        .into_any_element()
     }
 }
 
@@ -265,7 +319,11 @@ impl RadioIndicator {
 indicator_common!(RadioIndicator);
 
 impl RenderOnce for RadioIndicator {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        // A theme's `radio` entry draws instead, in every host.
+        if let Some(themed) = self.themed(RADIO, window, cx) {
+            return themed;
+        }
         let theme = current(window, cx);
         let t = theme.tokens();
         let p = paint(self.state, self.disabled, t);
@@ -294,7 +352,7 @@ impl RenderOnce for RadioIndicator {
         theme.refine(el.style(), "radio-indicator", &props, None);
         el.style().refine(&self.style);
         if !self.children.is_empty() {
-            return el.children(self.children);
+            return el.children(self.children).into_any_element();
         }
         // The dot: 8/20 and 10/24 of the circle.
         let dot = match self.size {
@@ -304,6 +362,7 @@ impl RenderOnce for RadioIndicator {
         el.when(self.state.is_on(), |el| {
             el.child(div().size(dot).rounded_full().bg(t.color.on_accent))
         })
+        .into_any_element()
     }
 }
 
@@ -335,7 +394,11 @@ impl CheckIndicator {
 indicator_common!(CheckIndicator);
 
 impl RenderOnce for CheckIndicator {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        // A theme's `check` entry draws instead, in every host.
+        if let Some(themed) = self.themed(CHECK, window, cx) {
+            return themed;
+        }
         let theme = current(window, cx);
         let t = theme.tokens();
         if !self.children.is_empty() {

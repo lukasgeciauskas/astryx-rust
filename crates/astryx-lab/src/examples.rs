@@ -44,10 +44,51 @@ fn stats() -> AnyElement {
         .into_any_element()
 }
 
-/// The lab gallery.
-pub fn examples(_window: &mut Window, _cx: &mut App) -> AnyElement {
+/// The lab gallery: each component's own examples.
+pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     Stack::vertical()
         .gap(SpacingStep::S8)
         .child(example("Stat", stats()))
+        .child(example(
+            "LineClamp",
+            crate::line_clamp::examples::examples(window, cx),
+        ))
+        .child(example(
+            "CircleCheckIndicator",
+            crate::circle_check_indicator::examples::examples(window, cx),
+        ))
+        .child(example(
+            "CircularProgress",
+            crate::circular_progress::examples::examples(window, cx),
+        ))
+        .child(example(
+            "SelectableCardGroup",
+            crate::selectable_card_group::examples::examples(window, cx),
+        ))
+        .child(example(
+            "PageControl",
+            crate::page_control::examples::examples(window, cx),
+        ))
+        .child(example(
+            "InfoTip",
+            crate::info_tip::examples::examples(window, cx),
+        ))
+        .child(example(
+            "DialogHeroHeader",
+            crate::dialog_hero_header::examples::examples(window, cx),
+        ))
+        .child(example(
+            "ChatReasoning",
+            crate::chat_reasoning::examples::examples(window, cx),
+        ))
+        .child(example(
+            "LogStream",
+            crate::log_stream::examples::examples(window, cx),
+        ))
+        .child(example(
+            "CommentPin",
+            crate::comment_pin::examples::examples(window, cx),
+        ))
+        .child(example("Tour", crate::tour::examples::examples(window, cx)))
         .into_any_element()
 }

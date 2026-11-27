@@ -288,15 +288,40 @@ impl RenderOnce for InlineSpan {
 }
 
 /// A paragraph whose children flow inline. See the module docs.
-pub(crate) struct InlineFlow {
+pub struct InlineFlow {
     children: SmallVec<[AnyElement; 2]>,
+    on_report: Option<ReportFn>,
 }
 
+/// What a laid-out [`InlineFlow`] tells its owner each frame: whether its line clamp
+/// cut content off, and its text. A truncating owner names itself with the text and
+/// shows it whole on demand (LineClamp's tooltip, upstream's `textContent`).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FlowReport {
+    /// The line clamp (or a single unwrapped line) ended in an ellipsis: content is
+    /// cut off.
+    pub truncated: bool,
+    /// The flow's text: its strings and the text of its inline Texts, Headings, Links
+    /// and spans, a newline for each hard break. Other inline boxes have none.
+    pub text: SharedString,
+}
+
+type ReportFn = Rc<dyn Fn(FlowReport, &mut Window, &mut App)>;
+
 impl InlineFlow {
+    /// A paragraph of `children`: text, and the elements that flow with it.
     pub fn new(children: impl IntoIterator<Item = AnyElement>) -> Self {
         InlineFlow {
             children: children.into_iter().collect(),
+            on_report: None,
         }
+    }
+
+    /// Calls `f` with the flow's [`FlowReport`] after each prepaint, once its lines
+    /// are laid out at their width.
+    pub fn on_report(mut self, f: impl Fn(FlowReport, &mut Window, &mut App) + 'static) -> Self {
+        self.on_report = Some(Rc::new(f));
+        self
     }
 }
 
@@ -317,6 +342,8 @@ struct Lines {
     lines: Vec<Line>,
     width: Pixels,
     height: Pixels,
+    /// The clamp cut content off: the last line ends in an ellipsis.
+    truncated: bool,
 }
 
 struct Line {
@@ -370,6 +397,19 @@ impl Seg {
 }
 
 impl FlowData {
+    /// The flow's text, a newline for each hard break.
+    fn text(&self) -> SharedString {
+        let mut text = String::new();
+        for item in &self.items {
+            match item {
+                Item::Text { text: run, .. } => text.push_str(run),
+                Item::Break { hard: true } => text.push('\n'),
+                Item::Break { hard: false } | Item::Box { .. } => {}
+            }
+        }
+        text.into()
+    }
+
     fn shape(&self, item: usize, range: Range<usize>, window: &Window) -> ShapedLine {
         let Item::Text { text, style, .. } = &self.items[item] else {
             unreachable!("only text is shaped")
@@ -561,7 +601,10 @@ impl FlowData {
 
         // Shape each line's runs and stack the lines.
         let (strut_height, strut_baseline) = self.metrics(&self.base, window);
-        let mut out = Lines::default();
+        let mut out = Lines {
+            truncated: ellipsis_on.is_some(),
+            ..Lines::default()
+        };
         let mut top = px(0.);
         for (index, segs) in raw.into_iter().enumerate() {
             let mut fragments = self.fragments(segs, window);
@@ -834,13 +877,15 @@ impl FlowData {
     }
 }
 
-pub(crate) struct FlowFrame {
+/// What an [`InlineFlow`] keeps from layout to prepaint.
+pub struct FlowFrame {
     data: Rc<FlowData>,
     boxes: Vec<AtomicBox>,
     groups: Vec<InlineGroup>,
 }
 
-pub(crate) struct FlowPaint {
+/// What an [`InlineFlow`] keeps from prepaint to paint.
+pub struct FlowPaint {
     lines: Rc<Lines>,
     offsets: Vec<Pixels>,
     /// Each group's fragment bounds and hitboxes.
@@ -928,6 +973,13 @@ impl Element for InlineFlow {
         cx: &mut App,
     ) -> FlowPaint {
         let lines = frame.data.lines(Some(bounds.size.width), true, window);
+        if let Some(report) = &self.on_report {
+            let report_now = FlowReport {
+                truncated: lines.truncated,
+                text: frame.data.text(),
+            };
+            report(report_now, window, cx);
+        }
         let align = frame.data.base.text_align;
         let mut offsets = Vec::with_capacity(lines.lines.len());
         let mut placed: Vec<Vec<Bounds<Pixels>>> = vec![Vec::new(); frame.groups.len()];

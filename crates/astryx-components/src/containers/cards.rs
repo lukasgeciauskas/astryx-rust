@@ -7,14 +7,15 @@
 
 use std::rc::Rc;
 
-use astryx_primitives::{control_focus, is_focus_visible, use_link_handler};
+use astryx_primitives::{
+    Provider, control_focus, is_focus_visible, provide, use_context, use_link_handler,
+};
 use gpui::{
-    App, ClickEvent, ElementId, Hsla, InteractiveElement, Length, Role, StatefulInteractiveElement,
-    Toggled,
+    App, ClickEvent, ElementId, FocusHandle, Hsla, InteractiveElement, Length, Role,
+    StatefulInteractiveElement, Toggled,
 };
 
 use super::*;
-use crate::choice::row_toggles;
 use crate::focus::focus_ring;
 
 type ClickFn = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
@@ -47,6 +48,8 @@ struct PressableCard {
     /// The selection ring, for a selected SelectableCard.
     ring: Option<Hsla>,
     theme_target: &'static str,
+    /// A group's focus for the card (a radio card's), instead of its own.
+    focus: Option<FocusHandle>,
 }
 
 impl PressableCard {
@@ -62,7 +65,10 @@ impl PressableCard {
         let t = theme.tokens();
         let rem = window.rem_size();
         let dir = use_direction(cx);
-        let focus = control_focus(&self.id, window, cx);
+        let focus = match self.focus {
+            Some(focus) => focus,
+            None => control_focus(&self.id, window, cx),
+        };
         let group: SharedString = format!("{:?}-card", self.id).into();
         let radius = t.radius.container.to_pixels(rem);
         let variant = self.card.variant;
@@ -296,6 +302,7 @@ impl RenderOnce for ClickableCard {
             disabled: self.disabled,
             ring: None,
             theme_target: "clickable-card",
+            focus: None,
         }
         .render(role, None, Some(activate), window, cx)
     }
@@ -305,6 +312,49 @@ impl RenderOnce for ClickableCard {
 // SelectableCard
 
 type SelectFn = Rc<dyn Fn(bool, &mut Window, &mut App)>;
+
+/// The native input a group gives one card (upstream `SelectableCardInput`'s
+/// `type`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SelectableCardInputType {
+    /// Upstream `'checkbox'`: the card toggles.
+    #[default]
+    Checkbox,
+    /// Upstream `'radio'`: the card is one choice of a single-choice set; it selects
+    /// and never deselects itself.
+    Radio,
+}
+
+/// The input a card group gives one [`SelectableCard`] (upstream
+/// `SelectableCardInput`, through the internal `SelectableCardInputContext`). It is
+/// not public API upstream, so SelectableCard's own props do not change: Lab's
+/// SelectableCardGroup provides it with [`provide_selectable_card_input`]. Without a
+/// provider, a card is its own checkbox.
+#[doc(hidden)]
+#[derive(Clone, Debug)]
+pub struct SelectableCardInput {
+    /// Upstream `type`: `Radio` makes the card one choice of a single-choice set.
+    pub input_type: SelectableCardInputType,
+    /// Upstream `name`: radios that share it form one group. GPUI has no native radio
+    /// group, so the group itself gives each card its [`focus`](Self::focus).
+    pub name: SharedString,
+    /// Upstream `value`: what the card stands for in its group.
+    pub value: SharedString,
+    /// The group's focus handle for this card: a radio set is one tab stop whose arrow
+    /// keys the group handles, as a native radio group does. `None` keeps the card's
+    /// own focus.
+    pub focus: Option<FocusHandle>,
+}
+
+/// Gives the SelectableCards inside `child` their group's `input` (upstream
+/// `<SelectableCardInputContext value={input}>`).
+#[doc(hidden)]
+pub fn provide_selectable_card_input(
+    input: SelectableCardInput,
+    child: impl IntoElement,
+) -> Provider<SelectableCardInput> {
+    provide(input, child)
+}
 
 /// A card that toggles selected, upstream `SelectableCard`.
 ///
@@ -365,12 +415,20 @@ impl RenderOnce for SelectableCard {
             .then(|| ring_color(self.card.variant, theme.tokens()));
         let selected = self.selected;
         let on_change = self.on_change.clone();
-        // Like a checkbox: Space toggles, Enter does not.
-        let activate: ClickFn = Rc::new(move |event, window, cx| {
-            if row_toggles(event)
-                && let Some(f) = &on_change
-            {
+        // A group can make the input a radio. A radio only selects: a native radio
+        // stays checked when it is clicked again.
+        let group_input = use_context::<SelectableCardInput>(cx);
+        let is_radio = group_input
+            .as_ref()
+            .is_some_and(|input| input.input_type == SelectableCardInputType::Radio);
+        // A native checkbox or radio reacts to Space; Enter is wired up as an
+        // additional toggle key. A press, Space and Enter all request the change.
+        let activate: ClickFn = Rc::new(move |_, window, cx| {
+            let Some(f) = &on_change else { return };
+            if !is_radio {
                 f(!selected, window, cx);
+            } else if !selected {
+                f(true, window, cx);
             }
         });
         PressableCard {
@@ -380,9 +438,14 @@ impl RenderOnce for SelectableCard {
             disabled: self.disabled,
             ring,
             theme_target: "selectable-card",
+            focus: group_input.and_then(|input| input.focus),
         }
         .render(
-            Role::CheckBox,
+            if is_radio {
+                Role::RadioButton
+            } else {
+                Role::CheckBox
+            },
             Some(if selected {
                 Toggled::True
             } else {

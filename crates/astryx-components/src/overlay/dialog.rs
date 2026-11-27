@@ -78,9 +78,10 @@ pub struct DialogPosition {
 #[derive(Clone, Copy)]
 pub struct AutoFocus;
 
-/// Collects the requests for a focus-taking layer's initial focus.
+/// Collects the requests for a focus-taking layer's initial focus, and the name its
+/// header gives it.
 #[derive(Clone, Default)]
-pub(crate) struct FocusScope(Rc<FocusRequests>);
+pub struct FocusScope(Rc<FocusRequests>);
 
 #[derive(Default)]
 pub(crate) struct FocusRequests {
@@ -89,6 +90,9 @@ pub(crate) struct FocusRequests {
     /// The DialogHeader's title, the default, with its text (the dialog's
     /// name).
     title: RefCell<Option<(FocusHandle, SharedString)>>,
+    /// A header title that names the dialog but takes no focus (a visually
+    /// hidden one).
+    name: RefCell<Option<SharedString>>,
 }
 
 impl FocusScope {
@@ -97,8 +101,17 @@ impl FocusScope {
         *self.0.requested.borrow_mut() = Some(focus);
     }
 
-    fn title(&self, focus: FocusHandle, text: SharedString) {
+    /// A header's title (upstream: the heading with the dialog's `titleId` and
+    /// `data-autofocus`): where focus enters by default, and the layer's name.
+    pub fn title(&self, focus: FocusHandle, text: SharedString) {
         *self.0.title.borrow_mut() = Some((focus, text));
+    }
+
+    /// A header's title that names the layer but takes no focus (upstream: the
+    /// heading with the dialog's `titleId` and no `data-autofocus`, such as a
+    /// visually hidden one).
+    pub fn name(&self, text: SharedString) {
+        *self.0.name.borrow_mut() = Some(text);
     }
 
     pub(crate) fn requested(&self) -> Option<FocusHandle> {
@@ -109,13 +122,20 @@ impl FocusScope {
         self.0.title.borrow().as_ref().map(|(f, _)| f.clone())
     }
 
-    pub(crate) fn title_text(&self) -> Option<SharedString> {
-        self.0.title.borrow().as_ref().map(|(_, t)| t.clone())
+    /// The layer's name from its header: the focusable title's text, else a
+    /// name-only title's.
+    pub fn title_text(&self) -> Option<SharedString> {
+        self.0
+            .title
+            .borrow()
+            .as_ref()
+            .map(|(_, t)| t.clone())
+            .or_else(|| self.0.name.borrow().clone())
     }
 }
 
 /// The focus scope of the layer being rendered, if any.
-pub(crate) fn focus_scope(cx: &App) -> Option<FocusScope> {
+pub fn focus_scope(cx: &App) -> Option<FocusScope> {
     use_context::<FocusScope>(cx)
 }
 

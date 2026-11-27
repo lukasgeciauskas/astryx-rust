@@ -207,6 +207,7 @@ impl RenderOnce for Spinner {
                     crate::indicator::IndicatorRequest {
                         state: "busy",
                         size: px(frame),
+                        ..crate::indicator::IndicatorRequest::default()
                     },
                     window,
                     cx,

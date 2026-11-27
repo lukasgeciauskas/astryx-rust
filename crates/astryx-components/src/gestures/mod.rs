@@ -18,7 +18,8 @@ pub mod pan;
 pub mod press_feedback;
 pub mod press_gesture;
 pub mod scroller;
-pub(crate) mod touch_hit_area;
+#[doc(hidden)]
+pub mod touch_hit_area;
 
 /// Work a gesture listener hands the window and the app (a pan's `on_pan` runs inside
 /// the input).

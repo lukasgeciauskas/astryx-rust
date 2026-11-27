@@ -235,3 +235,51 @@ mod inline_flow {
         assert_eq!(*clicks.borrow(), 2, "but not past the text");
     }
 }
+
+type Reports = std::rc::Rc<std::cell::RefCell<Vec<FlowReport>>>;
+
+struct Flow(Reports, usize);
+
+impl gpui::Render for Flow {
+    fn render(
+        &mut self,
+        _: &mut gpui::Window,
+        _: &mut gpui::Context<Self>,
+    ) -> impl gpui::IntoElement {
+        use gpui::{IntoElement, ParentElement, px};
+        let reports = self.0.clone();
+        let mut el = gpui::div().w(px(160.));
+        if self.1 > 0 {
+            el = el.line_clamp(self.1).text_ellipsis();
+        }
+        el.child(
+            InlineFlow::new([
+                "Some ".into_any_element(),
+                Text::new("mixed").into_any_element(),
+                " content that runs well past one line\nand a second".into_any_element(),
+                gpui::div().size(px(8.)).into_any_element(),
+            ])
+            .on_report(move |report, _, _| reports.borrow_mut().push(report)),
+        )
+    }
+}
+
+#[gpui::test]
+fn a_flow_reports_whether_its_clamp_cut_content_and_its_text(cx: &mut gpui::TestAppContext) {
+    cx.update(astryx_theme::init);
+    for (clamp, truncated) in [(1, true), (0, false)] {
+        let reports = Reports::default();
+        let (_, cx) = cx.add_window_view({
+            let reports = reports.clone();
+            move |_, _| Flow(reports, clamp)
+        });
+        cx.run_until_parked();
+        let last = reports.borrow().last().cloned().expect("it reports");
+        assert_eq!(last.truncated, truncated, "clamp {clamp}");
+        // The strings, the inline Text's text and the hard break; a box has none.
+        assert_eq!(
+            last.text.as_ref(),
+            "Some mixed content that runs well past one line\nand a second"
+        );
+    }
+}

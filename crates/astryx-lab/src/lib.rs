@@ -1,8 +1,19 @@
 //! Astryx's lab components for GPUI (upstream `@astryxdesign/lab`): components upstream
 //! ships before they graduate to core.
 
+pub mod chat_reasoning;
+pub mod circle_check_indicator;
+pub mod circular_progress;
+pub mod comment_pin;
+pub mod dialog_hero_header;
 pub mod doc;
 pub mod examples;
+pub mod info_tip;
+pub mod line_clamp;
+pub mod log_stream;
+pub mod page_control;
+pub mod selectable_card_group;
 pub mod stat;
+pub mod tour;
 
 pub use stat::{Stat, StatDelta, StatDeltaDirection, StatDeltaSentiment, StatSize};
