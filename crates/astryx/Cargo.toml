@@ -23,6 +23,10 @@ theme-stone = ["dep:astryx-themes", "astryx-themes/stone"]
 theme-y2k = ["dep:astryx-themes", "astryx-themes/y2k"]
 # Load themes from their typed JSON at run time (`Theme::from_json`).
 json-themes = ["astryx-theme/json"]
+# Charts (upstream `@astryxdesign/charts`).
+charts = ["dep:astryx-charts"]
+# The lab components (upstream `@astryxdesign/lab`).
+lab = ["dep:astryx-lab", "charts"]
 
 [dependencies]
 gpui.workspace = true
@@ -35,3 +39,5 @@ astryx-i18n.workspace = true
 astryx-effects.workspace = true
 astryx-icons.workspace = true
 astryx-components.workspace = true
+astryx-charts = { workspace = true, optional = true }
+astryx-lab = { workspace = true, optional = true }

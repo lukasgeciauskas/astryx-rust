@@ -11,6 +11,27 @@ use crate::manifest::{self, Entry};
 
 type Result = std::result::Result<(), String>;
 
+/// Each package's registry of ported components.
+fn registries() -> [(&'static str, &'static [ComponentDoc]); 3] {
+    [
+        ("core", doc::REGISTRY),
+        ("charts", astryx_charts::doc::REGISTRY),
+        ("lab", astryx_lab::doc::REGISTRY),
+    ]
+}
+
+/// The Rust doc of an upstream entry, from its package's registry.
+fn find_doc(entry: &Entry) -> Option<&'static ComponentDoc> {
+    if entry.package == "core" {
+        return doc::find(entry.name());
+    }
+    registries()
+        .into_iter()
+        .filter(|(package, _)| *package == entry.package)
+        .flat_map(|(_, docs)| docs.iter())
+        .find(|d| d.name.eq_ignore_ascii_case(entry.name()))
+}
+
 const GUIDES: &[(&str, &str)] = &[
     ("gpui", include_str!("../../../docs/guide/gpui.md")),
     (
@@ -32,11 +53,7 @@ pub fn component_list(all: bool) -> Result {
             continue;
         }
         let group = entry.category().unwrap_or("(uncategorized)");
-        let mark = if doc::find(entry.name()).is_some() {
-            "*"
-        } else {
-            ""
-        };
+        let mark = if find_doc(entry).is_some() { "*" } else { "" };
         let name = if all && entry.package != "core" {
             format!("{}{mark} ({})", entry.name(), entry.package)
         } else {
@@ -96,7 +113,7 @@ pub fn component(name: &str, dense: bool, package: Option<&str>) -> Result {
         });
     };
     let doc_json = &entry.doc;
-    let rust = doc::find(entry.name());
+    let rust = find_doc(entry);
     let status = match rust {
         Some(d) => format!("ported: {}", d.rust_type),
         None => "not ported yet".to_string(),
@@ -329,8 +346,11 @@ pub fn docs(topic: Option<&str>) -> Result {
 /// registered component does not map.
 pub fn registry_problems() -> Vec<String> {
     let mut problems = Vec::new();
-    for rust in doc::REGISTRY {
-        let Some(entry) = manifest::find(rust.name, None).into_iter().next() else {
+    for (package, rust) in registries()
+        .into_iter()
+        .flat_map(|(package, docs)| docs.iter().map(move |d| (package, d)))
+    {
+        let Some(entry) = manifest::find(rust.name, Some(package)).into_iter().next() else {
             problems.push(format!(
                 "{} is registered but has no upstream doc",
                 rust.name
@@ -359,26 +379,25 @@ pub fn registry_problems() -> Vec<String> {
 }
 
 pub fn parity(missing: bool) -> Result {
-    let components: Vec<&Entry> = manifest::entries()
-        .iter()
-        .filter(|e| e.is_component())
-        .collect();
-    let ported = components
-        .iter()
-        .filter(|e| doc::find(e.name()).is_some())
-        .count();
-    println!("{ported}/{} core components ported", components.len());
-    if missing {
-        let mut groups: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
-        for entry in components.iter().filter(|e| doc::find(e.name()).is_none()) {
-            groups
-                .entry(entry.category().unwrap_or("-"))
-                .or_default()
-                .push(entry.name());
-        }
-        for (group, mut names) in groups {
-            names.sort();
-            println!("  {group}: {}", names.join(", "));
+    for package in ["core", "charts", "lab"] {
+        let components: Vec<&Entry> = manifest::entries()
+            .iter()
+            .filter(|e| e.package == package && e.is_ported_unit())
+            .collect();
+        let ported = components.iter().filter(|e| find_doc(e).is_some()).count();
+        println!("{ported}/{} {package} components ported", components.len());
+        if missing {
+            let mut groups: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+            for entry in components.iter().filter(|e| find_doc(e).is_none()) {
+                groups
+                    .entry(entry.category().unwrap_or("-"))
+                    .or_default()
+                    .push(entry.name());
+            }
+            for (group, mut names) in groups {
+                names.sort();
+                println!("  {group}: {}", names.join(", "));
+            }
         }
     }
     let problems = registry_problems();

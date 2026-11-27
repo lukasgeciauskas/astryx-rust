@@ -36,6 +36,8 @@ pub enum Page {
     Chat,
     Motion,
     Theme,
+    Charts,
+    Lab,
 }
 
 impl Page {
@@ -66,6 +68,8 @@ impl Page {
         Page::Chat,
         Page::Motion,
         Page::Theme,
+        Page::Charts,
+        Page::Lab,
     ];
 
     pub fn title(self) -> &'static str {
@@ -96,6 +100,8 @@ impl Page {
             Page::Chat => "Chat",
             Page::Motion => "Motion",
             Page::Theme => "Theme",
+            Page::Charts => "Charts",
+            Page::Lab => "Lab",
         }
     }
 
@@ -161,6 +167,8 @@ impl Page {
             Page::Chat => astryx::components::chat::examples::examples(window, cx),
             Page::Motion => astryx::components::animator::examples::examples(window, cx),
             Page::Theme => astryx::components::theming::examples::examples(window, cx),
+            Page::Charts => astryx::charts::examples::examples(window, cx),
+            Page::Lab => astryx::lab::examples::examples(window, cx),
             Page::Dates => gpui::div()
                 .flex()
                 .flex_col()

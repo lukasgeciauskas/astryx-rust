@@ -375,6 +375,32 @@
   system's text size (`UISettings::TextScaleFactor`). Upstream reads it only in iOS
   Safari and through `env(preferred-text-scale)`, which GPUI's platforms do not expose.
 
+- **Charts draw through GPUI, not SVG or WebGL (M13).** Marks paint paths and quads in
+  the plot; the WebGL marks (`dot_gl`, `heatmap_gl`, `stream_gl`, `dot_gl_interactive`)
+  draw through GPUI's GPU renderer the same way, above the chart as upstream's canvas
+  sits, and `dot_gl_interactive` finds the hovered point on the CPU with the result
+  upstream's GPU pick buffer gives.
+- **A start or end legend gives the plot the room beside it (M13).** Upstream sizes the
+  plot from the whole chart's width, so a legend beside the plot clips its far side;
+  here the plot fits next to the legend.
+- **The chart's first frame is drawn (M13).** Upstream draws an empty box until a
+  ResizeObserver reports the width; GPUI knows the width at layout, so the plot draws
+  at once.
+- **The chart tooltip closes on Escape (M13).** Its card is a layer on the window's layer
+  stack, which Escape closes; upstream's card closes only when the pointer leaves.
+- **Chart number and date text follows ICU4X's CLDR (M13).** Compact, percent, currency
+  and list text match the browser's `Intl` in the main locales; ICU4X's newer CLDR
+  writes some differently (`1.2k` in en-GB, Indian digit grouping for percents in
+  bn, ml, mr, or, te). Month-year labels (`monthYear`) match `Intl` in most locales but
+  not cs, fi, pt-PT, en-AU or si, and ru, uk, kk, mn, bg and mk put a narrow no-break
+  space where `Intl` has a space; `shortDate` differs in as, bg, pt-PT, ta and si. The
+  exact fix is a table of `Intl`'s month-year and month-day patterns generated into
+  astryx-i18n.
+- **`dot_gl_interactive` hovers (M13).** Upstream's chart lays its transparent pointer
+  rectangle over the mark's canvas, so in a browser the mark's hover never fires; here
+  GPUI's hitboxes let both hear the pointer, so the hover and its card work as the mark
+  intends.
+
 ## Tooling
 
 - **True hot-patching needs our patched dx.** `cargo xtask dev --hot-patch` patches

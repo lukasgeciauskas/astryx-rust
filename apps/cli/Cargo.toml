@@ -13,6 +13,8 @@ path = "src/main.rs"
 
 [dependencies]
 astryx-components.workspace = true
+astryx-charts.workspace = true
+astryx-lab.workspace = true
 astryx-theme.workspace = true
 astryx-themes = { workspace = true, features = ["all"] }
 serde_json.workspace = true

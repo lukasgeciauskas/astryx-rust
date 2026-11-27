@@ -12,7 +12,7 @@ pub mod css_values;
 pub mod define;
 pub mod dynamic_type;
 pub mod hct;
-pub(crate) mod js;
+pub mod js;
 pub mod local_tokens;
 pub mod merge_components;
 pub mod motion_knobs;

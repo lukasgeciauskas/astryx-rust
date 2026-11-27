@@ -11,6 +11,8 @@ members = [
     "crates/astryx-themes",
     "crates/astryx-syntax",
     "crates/astryx-markdown",
+    "crates/astryx-charts",
+    "crates/astryx-lab",
     "apps/gallery",
     "apps/cli",
     "examples/consumer",
@@ -45,6 +47,8 @@ astryx-components = { path = "crates/astryx-components" }
 astryx-themes = { path = "crates/astryx-themes", default-features = false }
 astryx-syntax = { path = "crates/astryx-syntax" }
 astryx-markdown = { path = "crates/astryx-markdown" }
+astryx-charts = { path = "crates/astryx-charts" }
+astryx-lab = { path = "crates/astryx-lab" }
 
 # The accessibility tree types GPUI uses; keep it at GPUI's version.
 accesskit = "0.24.1"

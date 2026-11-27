@@ -268,10 +268,12 @@ dependencies = [
 name = "astryx"
 version = "0.1.0"
 dependencies = [
+ "astryx-charts",
  "astryx-components",
  "astryx-effects",
  "astryx-i18n",
  "astryx-icons",
+ "astryx-lab",
  "astryx-markdown",
  "astryx-primitives",
  "astryx-syntax",
@@ -281,10 +283,36 @@ dependencies = [
 ]
 
 [[package]]
-name = "astryx-cli"
+name = "astryx-charts"
 version = "0.1.0"
 dependencies = [
  "astryx-components",
+ "astryx-effects",
+ "astryx-i18n",
+ "astryx-icons",
+ "astryx-primitives",
+ "astryx-theme",
+ "astryx-themes",
+ "gpui",
+ "icu_calendar",
+ "icu_datetime",
+ "icu_decimal",
+ "icu_experimental",
+ "icu_list",
+ "icu_locale",
+ "jiff",
+ "unicode-segmentation",
+ "web-time",
+ "writeable",
+]
+
+[[package]]
+name = "astryx-cli"
+version = "0.1.0"
+dependencies = [
+ "astryx-charts",
+ "astryx-components",
+ "astryx-lab",
  "astryx-theme",
  "astryx-themes",
  "serde_json",
@@ -376,6 +404,19 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "gpui",
+]
+
+[[package]]
+name = "astryx-lab"
+version = "0.1.0"
+dependencies = [
+ "astryx-components",
+ "astryx-i18n",
+ "astryx-primitives",
+ "astryx-theme",
+ "astryx-themes",
+ "gpui",
+ "web-time",
 ]
 
 [[package]]

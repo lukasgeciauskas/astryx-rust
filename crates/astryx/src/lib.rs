@@ -13,10 +13,14 @@
 //!     });
 //! ```
 
+#[cfg(feature = "charts")]
+pub use astryx_charts as charts;
 pub use astryx_components as components;
 pub use astryx_effects as effects;
 pub use astryx_i18n as i18n;
 pub use astryx_icons as icons;
+#[cfg(feature = "lab")]
+pub use astryx_lab as lab;
 pub use astryx_markdown as markdown;
 pub use astryx_primitives as primitives;
 pub use astryx_syntax as syntax;

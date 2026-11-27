@@ -9,7 +9,7 @@
 /// positive infinity, so `-2.5` is `-2`), where Rust's [`f64::round`] rounds a
 /// half away from zero. A result of zero keeps the sign of `value`, as
 /// `Math.round(-0.2)` is `-0`.
-pub(crate) fn js_round(value: f64) -> f64 {
+pub fn js_round(value: f64) -> f64 {
     if !value.is_finite() {
         return value;
     }
@@ -28,7 +28,7 @@ pub(crate) fn js_round(value: f64) -> f64 {
 
 /// `Math.min` of two numbers: NaN if either is NaN (where [`f64::min`]
 /// ignores a NaN), and -0 below +0.
-pub(crate) fn js_min(a: f64, b: f64) -> f64 {
+pub fn js_min(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
         f64::NAN
     } else if a == b {
@@ -42,7 +42,7 @@ pub(crate) fn js_min(a: f64, b: f64) -> f64 {
 
 /// `Math.max` of two numbers: NaN if either is NaN (where [`f64::max`]
 /// ignores a NaN), and +0 above -0.
-pub(crate) fn js_max(a: f64, b: f64) -> f64 {
+pub fn js_max(a: f64, b: f64) -> f64 {
     if a.is_nan() || b.is_nan() {
         f64::NAN
     } else if a == b {
@@ -57,7 +57,7 @@ pub(crate) fn js_max(a: f64, b: f64) -> f64 {
 /// `Math.hypot` of two numbers as V8 computes it: each scaled by the larger
 /// and the squares summed with Kahan compensation. It can differ from
 /// [`f64::hypot`] in the last bit.
-pub(crate) fn js_hypot(a: f64, b: f64) -> f64 {
+pub fn js_hypot(a: f64, b: f64) -> f64 {
     let mut absolute = [0.0; 2];
     let mut any_nan = false;
     let mut max: f64 = 0.0;
@@ -95,7 +95,7 @@ pub(crate) fn js_hypot(a: f64, b: f64) -> f64 {
 /// Whether `String.prototype.trim` and a regex `\s` count a character as
 /// whitespace: JavaScript's WhiteSpace and LineTerminator sets, which differ
 /// from [`char::is_whitespace`] at U+0085 and U+FEFF.
-pub(crate) fn is_js_whitespace(c: char) -> bool {
+pub fn is_js_whitespace(c: char) -> bool {
     matches!(
         c,
         '\u{9}'..='\u{D}'
@@ -113,14 +113,14 @@ pub(crate) fn is_js_whitespace(c: char) -> bool {
 }
 
 /// `String.prototype.trim`.
-pub(crate) fn js_trim(s: &str) -> &str {
+pub fn js_trim(s: &str) -> &str {
     s.trim_matches(is_js_whitespace)
 }
 
 /// `parseFloat`: the longest prefix of the string (after leading whitespace)
 /// that reads as a decimal number or `Infinity`, or NaN when there is none
 /// (`"12px"` is 12, `".5"` is 0.5, `"px"` is NaN).
-pub(crate) fn js_parse_float(s: &str) -> f64 {
+pub fn js_parse_float(s: &str) -> f64 {
     let s = s.trim_start_matches(is_js_whitespace);
     let bytes = s.as_bytes();
     let digits_from = |mut at: usize| {
@@ -166,7 +166,7 @@ pub(crate) fn js_parse_float(s: &str) -> f64 {
 /// `parseInt(s, 16)` over UTF-16 code units, as JavaScript strings are:
 /// leading whitespace, a sign and a `0x` prefix are skipped, then the longest
 /// run of hex digits is read; NaN when there is none.
-pub(crate) fn js_parse_int_hex(units: &[u16]) -> f64 {
+pub fn js_parse_int_hex(units: &[u16]) -> f64 {
     let char_at = |at: usize| {
         units
             .get(at)
@@ -199,7 +199,7 @@ pub(crate) fn js_parse_int_hex(units: &[u16]) -> f64 {
 /// `Number.prototype.toString(16)` of a whole number, lowercase (-127 is
 /// `"-7f"`; NaN and the infinities print as JavaScript prints them). Callers
 /// round first, so fractions never reach it.
-pub(crate) fn js_to_hex_string(n: f64) -> String {
+pub fn js_to_hex_string(n: f64) -> String {
     if n.is_nan() {
         return "NaN".to_string();
     }
@@ -227,7 +227,7 @@ pub(crate) fn js_to_hex_string(n: f64) -> String {
 /// `Number.prototype.toString()` (and `String(n)`): the shortest digits that
 /// read back as `n`, in plain notation from 1e-6 up to 1e21 and in exponent
 /// notation (`1e+21`, `1.5e-7`) outside that. -0 prints as `0`.
-pub(crate) fn js_number_to_string(n: f64) -> String {
+pub fn js_number_to_string(n: f64) -> String {
     if n.is_nan() {
         return "NaN".to_string();
     }
@@ -299,7 +299,7 @@ fn shortest_digits(n: f64) -> (String, i64) {
 /// decimals, an exact tie going to the larger magnitude (0.03125 to four
 /// places is `"0.0313"`, where Rust's `{:.4}` gives `"0.0312"`). From 1e21
 /// up it prints as [`js_number_to_string`] does.
-pub(crate) fn js_to_fixed(x: f64, digits: usize) -> String {
+pub fn js_to_fixed(x: f64, digits: usize) -> String {
     if !x.is_finite() {
         return js_number_to_string(x);
     }

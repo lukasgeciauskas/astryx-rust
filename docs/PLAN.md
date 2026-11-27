@@ -1113,6 +1113,28 @@ The remaining primitives:
     candlestick, errorBar, referenceLine, heatmap and stream marks.
   - `astryx-lab`: all 31 lab components. CodeEditor and DiffViewer are built on the engine
     plus the tokenizer; MediaPlayer and ThreeD carry risk.
+  - Stages, each closed with tests, a gallery check, docs, the gate, a commit and CI:
+    1. `astryx-charts`: the scales and shapes the marks need, Chart and its context,
+       ChartAxis, ChartGrid, ChartLegend, ChartSwatch, ChartTooltip, the colors and
+       formatters, and every mark (the GL marks drawn with GPUI paths and quads).
+    2. `astryx-lab` and its small components: Stat, InfoTip, LineClamp,
+       CircleCheckIndicator, CircularProgress, DialogHeroHeader, SelectableCardGroup,
+       ChatReasoning, LogStream, CommentPin, Tour, PageControl, TabBarMoreList.
+    3. The navigation and input components: TabBar, NavigationStack, RefreshControl,
+       TransferList, ListInput, Radial, Sankey.
+    4. Chat's lab parts (ChatTypingIndicator, ChatUnreadDivider, ChatVirtualizer,
+       ChatEmojiPicker, ChatReactionBar, carried from M10), EmojiPicker, Comments and
+       Schedule.
+    5. The lab Chart, DiffViewer and CodeEditor, SVGIcon, ThreeD, MediaPlayer (and the
+       Lightbox video playback carried from M10), and the close.
+  - Stage 1 (done): `astryx-charts`. The d3 subset (linear and band scales, d3-array's
+    ticks, d3-format for tick labels, line and area generators with their curves,
+    stacking) checked bit for bit against d3 under Node; `Chart` (one layout pass for
+    every series, the measured plot, the pointer layer and its context), ChartAxis
+    (thinned labels that slide as the scale moves), ChartGrid, ChartLegend, ChartSwatch,
+    ChartTooltip, every mark, the chart colors (checked against upstream on every
+    palette) and the formatters (checked against Node's `Intl`); the CLI counts parity
+    per package, and the gallery has a Charts page.
 - **M14 Rich text:** a document model + editor on the engine, toolbar, lossless Markdown round
   trip (AST-062/064/106).
 - **M15 RTL, high contrast, polish:** RTL mirroring, Windows high contrast and macOS's
