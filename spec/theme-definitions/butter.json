@@ -1,0 +1,1245 @@
+{
+  "adaptations": {
+    "rules": [
+      {
+        "value": {
+          "typography": {
+            "scale": {
+              "base": 16,
+              "ratio": 1.2225
+            }
+          }
+        },
+        "when": {
+          "pointer": "coarse",
+          "width": {
+            "below": "lg"
+          }
+        }
+      }
+    ]
+  },
+  "components": {
+    "app-shell": {
+      "variant:section": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      },
+      "variant:surface": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "app-shell-header": {
+      "variant:surface": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "app-shell-sidenav": {
+      "variant:surface": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "avatar": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "avatar-group-overflow": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "badge": {
+      "base": {
+        "height": "30px",
+        "paddingBlock": "0",
+        "paddingInline": "var(--spacing-3)"
+      },
+      "variant:error": {
+        "backgroundColor": "#e56241",
+        "color": "#1d1c11"
+      },
+      "variant:info": {
+        "backgroundColor": "#4d82ff",
+        "color": "#1d1c11"
+      },
+      "variant:neutral": {
+        "backgroundColor": "#fdee8c",
+        "color": "#194ce8"
+      },
+      "variant:success": {
+        "backgroundColor": "#7bbf7a",
+        "color": "#1d1c11"
+      },
+      "variant:warning": {
+        "backgroundColor": "#dfcf5b",
+        "color": "#1d1c11"
+      }
+    },
+    "banner": {
+      "status:error": {
+        "--color-error-muted": "#e56241",
+        "--color-on-error-muted": "#1d1c11"
+      },
+      "status:info": {
+        "--color-info-muted": "#4d82ff",
+        "--color-on-info-muted": "#1d1c11"
+      },
+      "status:success": {
+        "--color-on-success-muted": "#1d1c11",
+        "--color-success-muted": "#7bbf7a"
+      },
+      "status:warning": {
+        "--color-on-warning-muted": "#1d1c11",
+        "--color-warning-muted": "#dfcf5b"
+      }
+    },
+    "banner-content": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "bottom-sheet": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "button": {
+      "base": {
+        "paddingInline": "var(--spacing-4)"
+      },
+      "variant:destructive": {
+        "backgroundColor": "light-dark(#ffd9cf, #ffb09b)",
+        "color": "light-dark(#3b0200, #6f1400)"
+      },
+      "variant:ghost": {
+        "color": "light-dark(#225bff, #fdee8c)"
+      },
+      "variant:secondary": {
+        ":hover": {
+          "backgroundColor": "light-dark(#225bff14, #fdee8c14)"
+        },
+        "backgroundColor": "transparent",
+        "borderColor": "light-dark(#225bff, #fdee8c)",
+        "borderStyle": "solid",
+        "borderWidth": "1.5px",
+        "color": "light-dark(#225bff, #fdee8c)"
+      }
+    },
+    "card": {
+      "base": {
+        "borderRadius": "var(--radius-container)",
+        "padding": "var(--spacing-4)"
+      },
+      "variant:blue": {
+        "--color-text-accent": "#194ce8",
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:cyan": {
+        "--color-text-accent": "#194ce8",
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:default": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      },
+      "variant:error": {
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:gray": {
+        "--color-text-accent": "#194ce8",
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:green": {
+        "--color-text-accent": "#194ce8",
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:info": {
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:muted": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      },
+      "variant:orange": {
+        "--color-text-accent": "#194ce8",
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:pink": {
+        "--color-text-accent": "#194ce8",
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:purple": {
+        "--color-text-accent": "#194ce8",
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:red": {
+        "--color-text-accent": "#194ce8",
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:success": {
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:teal": {
+        "--color-text-accent": "#194ce8",
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:warning": {
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      },
+      "variant:yellow": {
+        "--color-text-accent": "#194ce8",
+        "--color-text-primary": "#1d1c11",
+        "--color-text-secondary": "#605f52"
+      }
+    },
+    "chat-composer-drawer": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "chat-send-button": {
+      "base": {
+        ":where(.astryx-chat-composer *)": {
+          "borderRadius": "16px"
+        }
+      }
+    },
+    "citation": {
+      "variant:number": {
+        "--color-text-secondary": "light-dark(#725538, #f0edd4)",
+        ":where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) *):not(:where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) *))": {
+          "--color-text-secondary": "light-dark(#4a4732, #605f52)"
+        },
+        ":where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) :is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) *):not(:where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) :is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) *))": {
+          "--color-text-secondary": "light-dark(#4a4732, #605f52)"
+        }
+      }
+    },
+    "clickable-card": {
+      "variant:default": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      },
+      "variant:muted": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "code": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "complex-selector": {
+      "variant:secondary": {
+        ":hover:not(:has(> :is(:disabled, [aria-disabled=\"true\"])))": {
+          "backgroundColor": "light-dark(#225bff14, #fdee8c14)"
+        },
+        "backgroundColor": "transparent",
+        "borderColor": "light-dark(#225bff, #fdee8c)",
+        "borderStyle": "solid",
+        "borderWidth": "1.5px",
+        "color": "light-dark(#225bff, #fdee8c)"
+      }
+    },
+    "context-menu": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "date-input": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)",
+        "borderColor": "var(--color-border)",
+        "paddingBlock": "var(--spacing-2)",
+        "paddingInline": "var(--spacing-3)"
+      },
+      "status:error": {
+        "--color-border-error": "#e56241",
+        "--color-icon-error": "#e56241"
+      },
+      "status:success": {
+        "--color-border-success": "light-dark(#4a984a, #7bbf7a)",
+        "--color-icon-success": "light-dark(#4a984a, #7bbf7a)"
+      },
+      "status:warning": {
+        "--color-border-warning": "light-dark(#958500, #dfcf5b)",
+        "--color-icon-warning": "light-dark(#958500, #dfcf5b)"
+      }
+    },
+    "date-range-input": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "date-time-input-date-segment": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "date-time-input-time-segment": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "dialog": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "drawer": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "dropdown-menu": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "dropdown-menu-radio": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "field-status": {
+      "type:error": {
+        "backgroundColor": "#e56241",
+        "color": "#1d1c11"
+      },
+      "type:success": {
+        "backgroundColor": "#7bbf7a",
+        "color": "#1d1c11"
+      },
+      "type:warning": {
+        "backgroundColor": "#dfcf5b",
+        "color": "#1d1c11"
+      }
+    },
+    "file-input": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      },
+      "mode:dropzone": {
+        "--color-text-secondary": "light-dark(#725538, #f0edd4)"
+      }
+    },
+    "hover-card": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "input-group-text": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "item": {
+      "selected": {
+        "--color-text-secondary": "light-dark(#725538, #f0edd4)",
+        ":where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) *):not(:where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) *))": {
+          "--color-text-secondary": "light-dark(#4a4732, #605f52)"
+        },
+        ":where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) :is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) *):not(:where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) :is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) *))": {
+          "--color-text-secondary": "light-dark(#4a4732, #605f52)"
+        }
+      }
+    },
+    "layout-content": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "layout-panel": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "multi-selector": {
+      "base": {
+        "borderColor": "var(--color-border)",
+        "paddingBlock": "var(--spacing-2)",
+        "paddingInline": "var(--spacing-3)"
+      },
+      "status:error": {
+        "--color-border-error": "#e56241",
+        "--color-icon-error": "#e56241"
+      },
+      "status:success": {
+        "--color-border-success": "light-dark(#4a984a, #7bbf7a)",
+        "--color-icon-success": "light-dark(#4a984a, #7bbf7a)"
+      },
+      "status:warning": {
+        "--color-border-warning": "light-dark(#958500, #dfcf5b)",
+        "--color-icon-warning": "light-dark(#958500, #dfcf5b)"
+      },
+      "variant:input": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      },
+      "variant:secondary": {
+        ":hover:not([data-disabled], [data-readonly], .astryx-input-group *)": {
+          "backgroundColor": "light-dark(#225bff14, #fdee8c14)"
+        },
+        ":not(.astryx-input-group *)": {
+          "backgroundColor": "transparent",
+          "borderColor": "light-dark(#225bff, #fdee8c)",
+          "borderStyle": "solid",
+          "borderWidth": "1.5px",
+          "color": "light-dark(#225bff, #fdee8c)"
+        }
+      }
+    },
+    "multi-selector-popup": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "number-input": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)",
+        "borderColor": "var(--color-border)",
+        "paddingBlock": "var(--spacing-2)",
+        "paddingInline": "var(--spacing-3)"
+      },
+      "status:error": {
+        "--color-border-error": "#e56241",
+        "--color-icon-error": "#e56241"
+      },
+      "status:success": {
+        "--color-border-success": "light-dark(#4a984a, #7bbf7a)",
+        "--color-icon-success": "light-dark(#4a984a, #7bbf7a)"
+      },
+      "status:warning": {
+        "--color-border-warning": "light-dark(#958500, #dfcf5b)",
+        "--color-icon-warning": "light-dark(#958500, #dfcf5b)"
+      }
+    },
+    "popover": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "progress-bar-fill": {
+      "variant:disabled": {
+        "backgroundColor": "light-dark(var(--color-text-secondary), #d6d3b8)"
+      },
+      "variant:error": {
+        "backgroundColor": "var(--color-error)"
+      },
+      "variant:neutral": {
+        "backgroundColor": "light-dark(var(--color-text-secondary), #d6d3b8)"
+      },
+      "variant:success": {
+        "backgroundColor": "var(--color-success)"
+      },
+      "variant:warning": {
+        "backgroundColor": "var(--color-warning)"
+      }
+    },
+    "progress-bar-mark": {
+      "placement:fill+variant:error": {
+        "backgroundColor": "var(--color-on-error)"
+      },
+      "placement:fill+variant:success": {
+        "backgroundColor": "var(--color-on-success)"
+      },
+      "placement:fill+variant:warning": {
+        "backgroundColor": "var(--color-on-warning)"
+      }
+    },
+    "progress-bar-track": {
+      "base": {
+        "backgroundColor": "light-dark(#e5e3d4, #725538)"
+      }
+    },
+    "section": {
+      "base": {
+        "padding": "var(--spacing-4)"
+      },
+      "variant:muted": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      },
+      "variant:section": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "segmented-control-item": {
+      "selected": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "selectable-card": {
+      "variant:default": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      },
+      "variant:muted": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "selector": {
+      "base": {
+        "borderColor": "var(--color-border)",
+        "paddingBlock": "var(--spacing-2)",
+        "paddingInline": "var(--spacing-3)"
+      },
+      "status:error": {
+        "--color-border-error": "#e56241",
+        "--color-icon-error": "#e56241"
+      },
+      "status:success": {
+        "--color-border-success": "light-dark(#4a984a, #7bbf7a)",
+        "--color-icon-success": "light-dark(#4a984a, #7bbf7a)"
+      },
+      "status:warning": {
+        "--color-border-warning": "light-dark(#958500, #dfcf5b)",
+        "--color-icon-warning": "light-dark(#958500, #dfcf5b)"
+      },
+      "variant:input": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      },
+      "variant:secondary": {
+        ":hover:not([data-disabled], [data-readonly], .astryx-input-group *)": {
+          "backgroundColor": "light-dark(#225bff14, #fdee8c14)"
+        },
+        ":not(.astryx-input-group *)": {
+          "backgroundColor": "transparent",
+          "borderColor": "light-dark(#225bff, #fdee8c)",
+          "borderStyle": "solid",
+          "borderWidth": "1.5px",
+          "color": "light-dark(#225bff, #fdee8c)"
+        }
+      }
+    },
+    "selector-popup": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "step-indicator": {
+      "progress:not-started": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)"
+      }
+    },
+    "table-row": {
+      "striped": {
+        ":nth-child(even of :not([data-expansion-panel]))": {
+          "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+          "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+          "--color-text-secondary": "light-dark(#605f52, #adac9e)",
+          "color": "var(--color-text-primary)"
+        }
+      }
+    },
+    "text": {
+      "type:display-1": {
+        "fontFamily": "Sarina, \"Brush Script MT\", \"Snell Roundhand\", cursive"
+      },
+      "type:display-2": {
+        "fontFamily": "Sarina, \"Brush Script MT\", \"Snell Roundhand\", cursive"
+      },
+      "type:display-3": {
+        "fontFamily": "Sarina, \"Brush Script MT\", \"Snell Roundhand\", cursive"
+      }
+    },
+    "text-area": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)",
+        "borderColor": "var(--color-border)",
+        "paddingBlock": "var(--spacing-2)",
+        "paddingInline": "var(--spacing-3)"
+      },
+      "status:error": {
+        "--color-border-error": "#e56241",
+        "--color-icon-error": "#e56241"
+      },
+      "status:success": {
+        "--color-border-success": "light-dark(#4a984a, #7bbf7a)",
+        "--color-icon-success": "light-dark(#4a984a, #7bbf7a)"
+      },
+      "status:warning": {
+        "--color-border-warning": "light-dark(#958500, #dfcf5b)",
+        "--color-icon-warning": "light-dark(#958500, #dfcf5b)"
+      }
+    },
+    "text-input": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)",
+        "borderColor": "var(--color-border)",
+        "paddingBlock": "var(--spacing-2)",
+        "paddingInline": "var(--spacing-3)"
+      },
+      "status:error": {
+        "--color-border-error": "#e56241",
+        "--color-icon-error": "#e56241"
+      },
+      "status:success": {
+        "--color-border-success": "light-dark(#4a984a, #7bbf7a)",
+        "--color-icon-success": "light-dark(#4a984a, #7bbf7a)"
+      },
+      "status:warning": {
+        "--color-border-warning": "light-dark(#958500, #dfcf5b)",
+        "--color-icon-warning": "light-dark(#958500, #dfcf5b)"
+      }
+    },
+    "time-input": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)",
+        "borderColor": "var(--color-border)",
+        "paddingBlock": "var(--spacing-2)",
+        "paddingInline": "var(--spacing-3)"
+      },
+      "status:error": {
+        "--color-border-error": "#e56241",
+        "--color-icon-error": "#e56241"
+      },
+      "status:success": {
+        "--color-border-success": "light-dark(#4a984a, #7bbf7a)",
+        "--color-icon-success": "light-dark(#4a984a, #7bbf7a)"
+      },
+      "status:warning": {
+        "--color-border-warning": "light-dark(#958500, #dfcf5b)",
+        "--color-icon-warning": "light-dark(#958500, #dfcf5b)"
+      }
+    },
+    "tokenizer": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)",
+        "borderColor": "var(--color-border)",
+        "paddingBlock": "var(--spacing-2)",
+        "paddingInline": "var(--spacing-3)"
+      },
+      "status:error": {
+        "--color-border-error": "#e56241",
+        "--color-icon-error": "#e56241"
+      },
+      "status:success": {
+        "--color-border-success": "light-dark(#4a984a, #7bbf7a)",
+        "--color-icon-success": "light-dark(#4a984a, #7bbf7a)"
+      },
+      "status:warning": {
+        "--color-border-warning": "light-dark(#958500, #dfcf5b)",
+        "--color-icon-warning": "light-dark(#958500, #dfcf5b)"
+      }
+    },
+    "top-nav-heading": {
+      "base": {
+        "--color-text-primary": "light-dark(#225bff, #fdee8c)",
+        "color": "light-dark(#225bff, #fdee8c)"
+      }
+    },
+    "top-nav-item": {
+      "base": {
+        "color": "light-dark(#225bff, #fdee8ccc)"
+      },
+      "selected": {
+        ":active": {
+          "backgroundColor": "var(--color-overlay-pressed)"
+        },
+        ":hover": {
+          "backgroundColor": "var(--color-overlay-hover)"
+        },
+        "backgroundColor": "transparent",
+        "color": "light-dark(#194ce8, #fdee8c)"
+      }
+    },
+    "tree-list-item": {
+      "selected": {
+        "--color-text-secondary": "light-dark(#725538, #f0edd4)",
+        ":where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) *):not(:where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) *))": {
+          "--color-text-secondary": "light-dark(#4a4732, #605f52)"
+        },
+        ":where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) :is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) *):not(:where(:is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) :is(.astryx-card[data-variant=\"blue\"], .astryx-card[data-variant=\"cyan\"], .astryx-card[data-variant=\"gray\"], .astryx-card[data-variant=\"green\"], .astryx-card[data-variant=\"orange\"], .astryx-card[data-variant=\"pink\"], .astryx-card[data-variant=\"purple\"], .astryx-card[data-variant=\"red\"], .astryx-card[data-variant=\"teal\"], .astryx-card[data-variant=\"yellow\"]) :is(.astryx-card[data-variant=\"default\"], .astryx-card[data-variant=\"muted\"], .astryx-clickable-card[data-variant=\"default\"], .astryx-clickable-card[data-variant=\"muted\"], .astryx-selectable-card[data-variant=\"default\"], .astryx-selectable-card[data-variant=\"muted\"], .astryx-section[data-variant=\"section\"], .astryx-section[data-variant=\"muted\"], .astryx-app-shell[data-variant=\"surface\"], .astryx-app-shell[data-variant=\"section\"], .astryx-app-shell-header[data-variant=\"surface\"], .astryx-app-shell-sidenav[data-variant=\"surface\"], .astryx-layout-panel, .astryx-layout-content, .astryx-code, .astryx-avatar, .astryx-avatar-group-overflow, .astryx-segmented-control-item[data-selected=\"selected\"], .astryx-step-indicator[data-progress=\"not-started\"], .astryx-banner-content, .astryx-input-group-text, .astryx-text-input, .astryx-text-area, .astryx-number-input, .astryx-date-input, .astryx-date-range-input, .astryx-date-time-input-date-segment, .astryx-date-time-input-time-segment, .astryx-time-input, .astryx-file-input, .astryx-typeahead, .astryx-tokenizer, .astryx-selector[data-variant=\"input\"], .astryx-multi-selector[data-variant=\"input\"], .astryx-selector-popup, .astryx-multi-selector-popup, .astryx-dropdown-menu, .astryx-dropdown-menu-radio, .astryx-context-menu, .astryx-popover, .astryx-hover-card, .astryx-dialog, .astryx-drawer, .astryx-bottom-sheet, .astryx-chat-composer-drawer) *))": {
+          "--color-text-secondary": "light-dark(#4a4732, #605f52)"
+        }
+      }
+    },
+    "typeahead": {
+      "base": {
+        "--color-text-accent": "light-dark(#225bff, #fdee8c)",
+        "--color-text-primary": "light-dark(#1d1c11, #f3f2e2)",
+        "--color-text-secondary": "light-dark(#605f52, #adac9e)",
+        "borderColor": "var(--color-border)",
+        "paddingBlock": "var(--spacing-2)",
+        "paddingInline": "var(--spacing-3)"
+      },
+      "status:error": {
+        "--color-border-error": "#e56241",
+        "--color-icon-error": "#e56241"
+      },
+      "status:success": {
+        "--color-border-success": "light-dark(#4a984a, #7bbf7a)",
+        "--color-icon-success": "light-dark(#4a984a, #7bbf7a)"
+      },
+      "status:warning": {
+        "--color-border-warning": "light-dark(#958500, #dfcf5b)",
+        "--color-icon-warning": "light-dark(#958500, #dfcf5b)"
+      }
+    }
+  },
+  "icons": {},
+  "motion": {
+    "fast": 125,
+    "medium": 300,
+    "ratio": 0.75,
+    "slow": 700
+  },
+  "name": "butter",
+  "syntax": {
+    "__inputTokens": {
+      "attribute": [
+        "#443c00",
+        "#bcae4e"
+      ],
+      "background": [
+        "#fdfbe4",
+        "#131107"
+      ],
+      "comment": [
+        "#605f52",
+        "#adac9e"
+      ],
+      "constant": [
+        "#622e00",
+        "#f2bd81"
+      ],
+      "function": [
+        "#203a6c",
+        "#bdc5eb"
+      ],
+      "keyword": [
+        "#52237b",
+        "#ddb9f6"
+      ],
+      "number": [
+        "#622e00",
+        "#f2bd81"
+      ],
+      "operator": [
+        "#605f52",
+        "#adac9e"
+      ],
+      "property": [
+        "#00482d",
+        "#94d3bb"
+      ],
+      "punctuation": [
+        "#605f52",
+        "#adac9e"
+      ],
+      "string": [
+        "#004a05",
+        "#a8d4a6"
+      ],
+      "tag": [
+        "#6f1400",
+        "#ffb09b"
+      ],
+      "type": [
+        "#52237b",
+        "#ddb9f6"
+      ],
+      "variable": [
+        "#605f52",
+        "#adac9e"
+      ]
+    },
+    "name": "astryx-butter",
+    "tokens": {
+      "added": "color-mix(in srgb, var(--color-success-muted) 25%, transparent)",
+      "added-marker": "var(--color-syntax-punctuation)",
+      "attribute": "light-dark(#443c00, #bcae4e)",
+      "background": "light-dark(#fdfbe4, #131107)",
+      "comment": "light-dark(#605f52, #adac9e)",
+      "constant": "light-dark(#622e00, #f2bd81)",
+      "diff-header": "transparent",
+      "function": "light-dark(#203a6c, #bdc5eb)",
+      "keyword": "light-dark(#52237b, #ddb9f6)",
+      "number": "light-dark(#622e00, #f2bd81)",
+      "operator": "light-dark(#605f52, #adac9e)",
+      "property": "light-dark(#00482d, #94d3bb)",
+      "punctuation": "light-dark(#605f52, #adac9e)",
+      "removed": "color-mix(in srgb, var(--color-error-muted) 25%, transparent)",
+      "removed-marker": "var(--color-syntax-punctuation)",
+      "string": "light-dark(#004a05, #a8d4a6)",
+      "tag": "light-dark(#6f1400, #ffb09b)",
+      "type": "light-dark(#52237b, #ddb9f6)",
+      "variable": "light-dark(#605f52, #adac9e)"
+    }
+  },
+  "tokens": {
+    "--color-accent": [
+      "#225bff",
+      "#fdee8c"
+    ],
+    "--color-accent-muted": [
+      "#225bff33",
+      "#fdee8c40"
+    ],
+    "--color-background-blue": [
+      "#dbe1ff",
+      "#dbe1ff"
+    ],
+    "--color-background-body": [
+      "#fdfbe4",
+      "#261a13"
+    ],
+    "--color-background-card": [
+      "#ffffff",
+      "#3a2a1f"
+    ],
+    "--color-background-cyan": [
+      "#a9eff0",
+      "#a9eff0"
+    ],
+    "--color-background-gray": [
+      "#f0edd4",
+      "#f0edd4"
+    ],
+    "--color-background-green": [
+      "#caeec8",
+      "#cdedcc"
+    ],
+    "--color-background-inverted": [
+      "#1d1c11",
+      "#fdfbe4"
+    ],
+    "--color-background-muted": [
+      "#f3f2e2",
+      "#3a2a1f"
+    ],
+    "--color-background-orange": [
+      "#ffdcb6",
+      "#ffdcb6"
+    ],
+    "--color-background-pink": [
+      "#ffd5fb",
+      "#ffd5fb"
+    ],
+    "--color-background-popover": [
+      "#ffffff",
+      "#3a2a1f"
+    ],
+    "--color-background-purple": [
+      "#f2daff",
+      "#f2daff"
+    ],
+    "--color-background-red": [
+      "#ffd9cf",
+      "#ffd9cf"
+    ],
+    "--color-background-surface": [
+      "#ffffff",
+      "#2e2117"
+    ],
+    "--color-background-teal": [
+      "#b0f0d7",
+      "#b0f0d7"
+    ],
+    "--color-background-yellow": [
+      "#f0df72",
+      "#eedf75"
+    ],
+    "--color-border": [
+      "#e5e3d4",
+      "#f3f2e21a"
+    ],
+    "--color-border-blue": [
+      "#bdc5eb",
+      "#bdc5eb"
+    ],
+    "--color-border-cyan": [
+      "#8dd2d3",
+      "#8dd2d3"
+    ],
+    "--color-border-emphasized": [
+      "#c7c4b2",
+      "#939184"
+    ],
+    "--color-border-gray": [
+      "#d6d3b8",
+      "#d6d3b8"
+    ],
+    "--color-border-green": [
+      "#a2d7a0",
+      "#a8d4a6"
+    ],
+    "--color-border-orange": [
+      "#f2bd81",
+      "#f2bd81"
+    ],
+    "--color-border-pink": [
+      "#f0b3e8",
+      "#f0b3e8"
+    ],
+    "--color-border-purple": [
+      "#ddb9f6",
+      "#ddb9f6"
+    ],
+    "--color-border-red": [
+      "#ffb09b",
+      "#ffb09b"
+    ],
+    "--color-border-teal": [
+      "#94d3bb",
+      "#94d3bb"
+    ],
+    "--color-border-yellow": [
+      "#bfae35",
+      "#bcae4e"
+    ],
+    "--color-error": [
+      "#821b00",
+      "#ffc5b5"
+    ],
+    "--color-error-muted": [
+      "#821b0033",
+      "#ffc5b540"
+    ],
+    "--color-icon-accent": [
+      "#225bff",
+      "#fdee8c"
+    ],
+    "--color-icon-blue": [
+      "#203a6c",
+      "#203a6c"
+    ],
+    "--color-icon-cyan": [
+      "#004649",
+      "#004649"
+    ],
+    "--color-icon-disabled": [
+      "#adac9e",
+      "#605f52"
+    ],
+    "--color-icon-gray": [
+      "#4a4732",
+      "#4a4732"
+    ],
+    "--color-icon-green": [
+      "#004a05",
+      "#063c0a"
+    ],
+    "--color-icon-orange": [
+      "#622e00",
+      "#622e00"
+    ],
+    "--color-icon-pink": [
+      "#6c0a68",
+      "#6c0a68"
+    ],
+    "--color-icon-primary": [
+      "#1d1c11",
+      "#f3f2e2"
+    ],
+    "--color-icon-purple": [
+      "#52237b",
+      "#52237b"
+    ],
+    "--color-icon-red": [
+      "#6f1400",
+      "#6f1400"
+    ],
+    "--color-icon-secondary": [
+      "#605f52",
+      "#adac9e"
+    ],
+    "--color-icon-teal": [
+      "#00482d",
+      "#00482d"
+    ],
+    "--color-icon-yellow": [
+      "#443c00",
+      "#443c00"
+    ],
+    "--color-info": [
+      "#225bff",
+      "#81a9ff"
+    ],
+    "--color-info-muted": "var(--color-background-blue)",
+    "--color-neutral": [
+      "#1d1c110f",
+      "#f3f2e21a"
+    ],
+    "--color-on-accent": [
+      "#ffffff",
+      "#1d1c11"
+    ],
+    "--color-on-dark": "#ffffff",
+    "--color-on-error": [
+      "#ffece7",
+      "#4c0700"
+    ],
+    "--color-on-error-muted": [
+      "#6f1400",
+      "#ffd9cf"
+    ],
+    "--color-on-info-muted": "var(--color-text-blue)",
+    "--color-on-light": "#1d1c11",
+    "--color-on-success": [
+      "#b6e3b4",
+      "#013004"
+    ],
+    "--color-on-success-muted": [
+      "#004a05",
+      "#a8d4a6"
+    ],
+    "--color-on-warning": [
+      "#fff7c0",
+      "#2c2600"
+    ],
+    "--color-on-warning-muted": [
+      "#443c00",
+      "#eedf75"
+    ],
+    "--color-overlay": [
+      "#1d1c1180",
+      "#261a13cc"
+    ],
+    "--color-overlay-hover": [
+      "#1d1c110d",
+      "#f3f2e20d"
+    ],
+    "--color-overlay-pressed": [
+      "#1d1c111a",
+      "#f3f2e21a"
+    ],
+    "--color-shadow": [
+      "#1d1c111a",
+      "#0000004d"
+    ],
+    "--color-skeleton": [
+      "#e5e3d4",
+      "#49473b"
+    ],
+    "--color-success": [
+      "#004a05",
+      "#83bc82"
+    ],
+    "--color-success-muted": [
+      "#004a0533",
+      "#83bc8240"
+    ],
+    "--color-text-accent": [
+      "#225bff",
+      "#fdee8c"
+    ],
+    "--color-text-blue": [
+      "#203a6c",
+      "#203a6c"
+    ],
+    "--color-text-cyan": [
+      "#004649",
+      "#004649"
+    ],
+    "--color-text-disabled": [
+      "#adac9e",
+      "#605f52"
+    ],
+    "--color-text-error": [
+      "#6f1400",
+      "#ffb09b"
+    ],
+    "--color-text-gray": [
+      "#4a4732",
+      "#4a4732"
+    ],
+    "--color-text-green": [
+      "#004a05",
+      "#063c0a"
+    ],
+    "--color-text-info": [
+      "#225bff",
+      "#81a9ff"
+    ],
+    "--color-text-orange": [
+      "#622e00",
+      "#622e00"
+    ],
+    "--color-text-pink": [
+      "#6c0a68",
+      "#6c0a68"
+    ],
+    "--color-text-primary": [
+      "#1d1c11",
+      "#f3f2e2"
+    ],
+    "--color-text-purple": [
+      "#52237b",
+      "#52237b"
+    ],
+    "--color-text-red": [
+      "#6f1400",
+      "#6f1400"
+    ],
+    "--color-text-secondary": [
+      "#605f52",
+      "#adac9e"
+    ],
+    "--color-text-success": [
+      "#004a05",
+      "#a8d4a6"
+    ],
+    "--color-text-teal": [
+      "#00482d",
+      "#00482d"
+    ],
+    "--color-text-warning": [
+      "#443c00",
+      "#eedf75"
+    ],
+    "--color-text-yellow": [
+      "#443c00",
+      "#443c00"
+    ],
+    "--color-tint-hover": [
+      "#000000",
+      "#ffffff"
+    ],
+    "--color-warning": [
+      "#514700",
+      "#cdbe59"
+    ],
+    "--color-warning-muted": [
+      "#51470033",
+      "#cdbe5940"
+    ],
+    "--radius-chat": "28px",
+    "--radius-container": "0.75rem",
+    "--radius-element": "0.5rem",
+    "--radius-full": "9999px",
+    "--radius-inner": "0.375rem",
+    "--radius-none": "0px",
+    "--radius-page": "1.5rem",
+    "--shadow-high": "0 4px 6px #1d1c111a, 0 12px 24px #1d1c1126",
+    "--shadow-inset-error": "inset 0px 0px 0px 2px #821b0030",
+    "--shadow-inset-hover": "inset 0px 0px 0px 2px #79786a30",
+    "--shadow-inset-selected": "inset 0px 0px 0px 2px #79786a50",
+    "--shadow-inset-success": "inset 0px 0px 0px 2px #004a0530",
+    "--shadow-inset-warning": "inset 0px 0px 0px 2px #51470030",
+    "--shadow-low": "0 2px 4px #1d1c110d, 0 4px 8px #1d1c111a",
+    "--shadow-med": "0 2px 4px #1d1c110d, 0 4px 12px #1d1c111a",
+    "--size-element-lg": "48px",
+    "--size-element-md": "40px",
+    "--size-element-sm": "32px",
+    "--text-supporting-size": "0.75rem"
+  },
+  "typography": {
+    "body": {
+      "fallbacks": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif",
+      "family": "Outfit"
+    },
+    "code": {
+      "fallbacks": "\"SF Mono\", Monaco, Consolas, monospace",
+      "family": "JetBrains Mono"
+    },
+    "heading": {
+      "fallbacks": "-apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif",
+      "family": "Outfit",
+      "weights": {
+        "3": "bold",
+        "4": "bold"
+      }
+    },
+    "scale": {
+      "base": 14,
+      "ratio": 1.25
+    }
+  }
+}

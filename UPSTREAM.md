@@ -27,4 +27,7 @@ snapshots in `spec/` and never runs Node.
    hold upstream's own tokenizer and Markdown parser output (core, plugins, streaming,
    legacy shapes); when they change, the
    fixture tests in `astryx-syntax` and `astryx-markdown` fail until the port follows.
+   `spec/theme-definitions/*.json` (each shipped theme's `defineTheme` input) and
+   `spec/palettes/*.json` (each generated palette's request and output) do the same for
+   theme authoring (`astryx_theme::authoring`).
 5. Update the commit hash in the table above.

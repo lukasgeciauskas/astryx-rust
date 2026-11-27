@@ -4,6 +4,7 @@
 //! from upstream Astryx by `cargo xtask codegen`; see `UPSTREAM.md`. The
 //! published themes live in `astryx-themes`.
 
+pub mod authoring;
 pub mod color;
 pub mod fonts;
 #[cfg(feature = "json")]

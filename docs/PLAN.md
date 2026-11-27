@@ -1039,8 +1039,39 @@ The remaining primitives:
     Storage (`~/Library/Application Support/astryx`), the coarse-pointer reading (no
     touchscreens) and the keyboard module (no on-screen keyboard) needed no change.
 - **M12 Theme authoring parity:** a Rust `defineTheme` builder with type/radius/motion scale
-  expansion (with the motion tempo the animator plays at, carried from M11), OKLCH palette engine (`palette/`), HCT generator (`theme/hct.ts`), status-role
-  derivation, contrast, `onDark`/`onLight`, adaptations, per-theme icons.
+  expansion (with the motion tempo the animator plays at, carried from M11), OKLCH palette
+  engine (`palette/`), HCT generator (`theme/hct.ts`), status-role derivation, contrast,
+  `onDark`/`onLight`, adaptations, per-theme icons. In `astryx_theme::authoring`.
+  - Stages, each closed with tests, a gallery check, docs, the gate, a commit and CI:
+    1. Color science and scales: `utils/color.ts` and `palette/color.ts` (OKLab, OKLCH,
+       gamut), `theme/contrast.ts`, `theme/hct.ts`, `theme/statusColor.ts`;
+       `expandTypeScale`, `expandRadiusScale`, `expandMotionScale`, the motion knobs
+       (tempo, character) and `themeMotion`, `tokenReferences`, the UIKit type table;
+       upstream's unit tests with their numbers.
+    2. The palette engine (`palette/`: the tonal generator and its recipes, mapping, the
+       derived and editor looks, `themePalette`) and `expandColorScale`; checked by
+       regenerating each shipped theme's `*Palettes.generated.ts` from its recipe.
+    3. `defineTheme`: token defaults and references, `resolveThemeValues`, status-role
+       defaults and derivation, local tokens, `extends`, component merging and the theme
+       rules (`generateThemeRules` to `ComponentRule`s), and resolving the flat CSS token
+       map into typed `Tokens` (upstream `resolveThemeTokens` and the CSS value
+       readers); checked by defining the seven shipped themes from their exported
+       definitions and comparing with their resolved exports.
+    4. `onDark`/`onLight`, adaptations (`themeAdaptations`), Dynamic Type, per-theme
+       icons and icon variants, the theme registry, the motion tempo reaching the
+       animator, MediaTheme's `auto` mode, the Theme and MediaTheme docs, a theme
+       authoring gallery page, and the close.
+  - Stage 1 (done): `astryx_theme::authoring`: `color` (`utils/color.ts` and
+    `palette/color.ts`: parsing, sRGB, OKLab, OKLCH, gamut clamping), `contrast`, `hct`
+    (upstream's HCT is CIELAB hue and chroma with L* tone, not CAM16), `status_color`,
+    `type_scale`, `radius_scale`, `motion_scale`, `motion_knobs`, `theme_motion`,
+    `token_references` and `uikit_typography`, with JavaScript's number rules in one
+    place (`js`: `Math.round`, `toFixed`, `String(n)` and the rest) so every value is the
+    string upstream writes. Upstream's unit tests with their numbers (185), and each module
+    compared with upstream's TypeScript under Node on thousands of inputs. The theme
+    export also writes each shipped theme's `defineTheme` input
+    (`spec/theme-definitions`) and each generated palette's request and output
+    (`spec/palettes`), for stages 2 and 3.
 - **M13 Charts & lab:**
   - `astryx-charts`: d3-scale and d3-shape essentials; bar, line, area, dot, band,
     candlestick, errorBar, referenceLine, heatmap and stream marks.

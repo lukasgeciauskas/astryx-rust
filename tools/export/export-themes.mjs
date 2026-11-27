@@ -1,6 +1,11 @@
 // Writes spec/themes/<name>.json for core's defaults and every published
 // theme package: typed tokens per mode, component override rules,
 // adaptations, inverted-surface overrides, icon mappings and font faces.
+// Also writes spec/theme-definitions/<name>.json: each theme's own
+// `defineTheme` input (its JSON-able part), which the Rust port's
+// `define_theme` is checked against, and spec/palettes/<name>.json: each
+// generated palette's request (from its receipt) and output, which the Rust
+// palette generator is checked against (M12).
 //
 // Values come only from core's resolver (`resolveThemeTokens`), as in the
 // upstream Swift generator (packages/native/specs/swift/library/theme-generator.md G1).
@@ -26,12 +31,15 @@ export async function exportThemes(root, specDir, warnings) {
   const {resolveThemeTokens} = await importFile(root, 'packages/core/dist/theme/tokens.js');
 
   const sources = [{theme: null, name: 'default', package: '@astryxdesign/core', dir: null}];
+  globalThis.__astryxDefinitions = new Map();
   for (const p of swift.publishedThemePackages()) {
-    const module = await importTs(root, p.sourceFile);
+    const module = await importTs(root, p.sourceFile, [recordDefinitions()]);
     const theme = module[p.exportName];
     if (!theme) throw new Error(`${p.packageName} does not export ${p.exportName}`);
     sources.push({theme, name: theme.name.replace(/^astryx-/, ''), package: p.packageName, dir: p.dir});
   }
+  writeDefinitions(specDir, sources);
+  await writePalettes(root, specDir, sources);
 
   const outDir = path.join(specDir, 'themes');
   fs.mkdirSync(outDir, {recursive: true});
@@ -219,4 +227,75 @@ function fontFaces(dir) {
   return [...faces.values()].sort((a, b) =>
     `${a.family}${a.weight}${a.style}`.localeCompare(`${b.family}${b.weight}${b.style}`),
   );
+}
+
+/**
+ * A Vite plugin that makes each `defineTheme(...)` call in a theme package's
+ * sources record its input by theme name. (Vite runs `@astryxdesign/core`
+ * outside its pipeline, so the call sites are rewritten rather than the import.)
+ */
+function recordDefinitions() {
+  globalThis.__astryxRecordDefinition = (define, input) => {
+    const theme = define(input);
+    globalThis.__astryxDefinitions.set(theme.name, input);
+    return theme;
+  };
+  return {
+    name: 'astryx-record-definitions',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!/[\\/]packages[\\/]themes[\\/]/.test(id) || !code.includes('defineTheme(')) return null;
+      return code.replace(/\bdefineTheme\(/g, 'globalThis.__astryxRecordDefinition(defineTheme, ');
+    },
+  };
+}
+
+/**
+ * A definition as JSON: functions and React nodes (icons, indicators) drop
+ * out, and a base theme (`extends`) is named rather than copied.
+ */
+function definitionJson(input) {
+  return JSON.parse(
+    JSON.stringify(input, (key, value) => {
+      if (typeof value === 'function') return undefined;
+      if (value && typeof value === 'object' && '$$typeof' in value) return undefined;
+      if (key === 'extends' && value && typeof value === 'object') return {name: value.name};
+      return value;
+    }),
+  );
+}
+
+function writeDefinitions(specDir, sources) {
+  const dir = path.join(specDir, 'theme-definitions');
+  fs.rmSync(dir, {recursive: true, force: true});
+  fs.mkdirSync(dir, {recursive: true});
+  for (const source of sources) {
+    if (!source.theme) continue;
+    const input = globalThis.__astryxDefinitions.get(source.theme.name);
+    if (!input) throw new Error(`${source.name}: its defineTheme input was not recorded`);
+    fs.writeFileSync(path.join(dir, `${source.name}.json`), stableStringify(definitionJson(input)));
+    console.log(`wrote spec/theme-definitions/${source.name}.json`);
+  }
+}
+
+/**
+ * Each theme's generated palette: the generator request its receipt records
+ * and the palette the generator wrote (`<theme>Palettes.generated.ts`).
+ */
+async function writePalettes(root, specDir, sources) {
+  const dir = path.join(specDir, 'palettes');
+  fs.rmSync(dir, {recursive: true, force: true});
+  fs.mkdirSync(dir, {recursive: true});
+  for (const source of sources) {
+    if (!source.dir) continue;
+    const src = path.join(source.dir, 'src');
+    const receipt = fs.readdirSync(src).find(f => f.endsWith('Palettes.generated.receipt.json'));
+    if (!receipt) continue;
+    const generated = path.join(src, receipt.replace('.receipt.json', '.ts'));
+    const module = await importTs(root, generated);
+    const {request, recipe, generatorVersion} = JSON.parse(fs.readFileSync(path.join(src, receipt), 'utf8'));
+    const out = {recipe, generatorVersion, request, black: module.black, white: module.white, palette: module.palette};
+    fs.writeFileSync(path.join(dir, `${source.name}.json`), stableStringify(out));
+    console.log(`wrote spec/palettes/${source.name}.json`);
+  }
 }
