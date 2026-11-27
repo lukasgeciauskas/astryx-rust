@@ -17,7 +17,7 @@ use icu_datetime::fieldsets::enums::{CalendarPeriodFieldSet, DateFieldSet};
 use icu_datetime::fieldsets::{self, Y, YM};
 use icu_datetime::input::Date;
 use icu_datetime::options::{Length, YearStyle};
-use icu_datetime::pattern::{DateTimePattern, FixedCalendarDateTimeNames};
+use icu_datetime::pattern::{DateTimeNames, DateTimePattern, FixedCalendarDateTimeNames};
 use icu_datetime::{DateTimeFormatter, DateTimeFormatterPreferences};
 use icu_decimal::DecimalFormatter;
 use icu_decimal::input::Decimal;
@@ -322,13 +322,44 @@ pub(crate) fn locale_with_calendar(tag: &str, calendar: CalendarSystem) -> Local
     locale
 }
 
-enum Formatter {
+/// ICU4X's formatter, and what it needs to mend its data (see
+/// [`repair_year_literal`]).
+struct Formatter {
+    kind: FormatterKind,
+    prefs: DateTimeFormatterPreferences,
+    /// A Gregorian style with a year, whose era patterns can lack the year.
+    mend_year: bool,
+}
+
+enum FormatterKind {
     Date(DateTimeFormatter<DateFieldSet>),
     Period(DateTimeFormatter<CalendarPeriodFieldSet>),
 }
 
+/// A formatter that always carries its decimal formatter. ICU4X loads one
+/// only when the era variant of the pattern has a number in it, taking that
+/// variant to hold every field; Portuguese's Gregorian month-and-year era
+/// pattern has its year as literal text ("MMMM 'de Y' GGG"), so the standard
+/// pattern ("MMMM 'de' y") had no digits to write its year with, which
+/// panics in a debug build and cuts the label short in a release build.
+macro_rules! with_decimals {
+    ($prefs:expr, $set:expr) => {{
+        let set = $set;
+        DateTimeFormatter::try_new($prefs, set)
+            .ok()
+            .and_then(|formatter| {
+                let mut names = DateTimeNames::from_formatter($prefs, formatter);
+                let loaded = names.as_mut().include_decimal_formatter().is_ok();
+                loaded
+                    .then(|| names.try_into_formatter(set).ok())
+                    .flatten()
+                    .or_else(|| DateTimeFormatter::try_new($prefs, set).ok())
+            })
+    }};
+}
+
 impl Formatter {
-    fn new(locale: &Locale, style: DateStyle) -> Option<Self> {
+    fn new(locale: &Locale, style: DateStyle, calendar: CalendarSystem) -> Option<Self> {
         let prefs = DateTimeFormatterPreferences::from(locale);
         let length = style.length();
         let year_style = style.year_style();
@@ -340,12 +371,16 @@ impl Formatter {
         );
         macro_rules! date {
             ($variant:ident, $set:expr) => {
-                DateTimeFormatter::try_new(prefs, DateFieldSet::$variant($set))
-                    .ok()
-                    .map(Formatter::Date)
+                with_decimals!(prefs, DateFieldSet::$variant($set)).map(FormatterKind::Date)
             };
         }
-        match (y, m, d, e) {
+        macro_rules! period {
+            ($variant:ident, $set:expr) => {
+                with_decimals!(prefs, CalendarPeriodFieldSet::$variant($set))
+                    .map(FormatterKind::Period)
+            };
+        }
+        let kind = match (y, m, d, e) {
             (true, true, true, true) => date!(
                 YMDE,
                 fieldsets::YMDE::for_length(length).with_year_style(year_style)
@@ -359,34 +394,133 @@ impl Formatter {
             (false, false, true, true) => date!(DE, fieldsets::DE::for_length(length)),
             (false, false, true, false) => date!(D, fieldsets::D::for_length(length)),
             (false, false, false, true) => date!(E, fieldsets::E::for_length(length)),
-            (true, true, false, _) => DateTimeFormatter::try_new(
-                prefs,
-                CalendarPeriodFieldSet::YM(YM::for_length(length).with_year_style(year_style)),
-            )
-            .ok()
-            .map(Formatter::Period),
-            (true, false, _, _) => DateTimeFormatter::try_new(
-                prefs,
-                CalendarPeriodFieldSet::Y(Y::for_length(length).with_year_style(year_style)),
-            )
-            .ok()
-            .map(Formatter::Period),
-            (false, true, false, _) => DateTimeFormatter::try_new(
-                prefs,
-                CalendarPeriodFieldSet::M(fieldsets::M::for_length(length)),
-            )
-            .ok()
-            .map(Formatter::Period),
+            (true, true, false, _) => {
+                period!(YM, YM::for_length(length).with_year_style(year_style))
+            }
+            (true, false, _, _) => period!(Y, Y::for_length(length).with_year_style(year_style)),
+            (false, true, false, _) => period!(M, fieldsets::M::for_length(length)),
             (false, false, false, false) => None,
-        }
+        }?;
+        Some(Self {
+            kind,
+            prefs,
+            mend_year: y && label_calendar(calendar) == CalendarSystem::Gregory,
+        })
     }
 
     fn parts(&self, date: &Date<icu_calendar::Iso>) -> Vec<DatePart> {
-        match self {
-            Formatter::Date(f) => parts_of(&f.format(date)),
-            Formatter::Period(f) => parts_of(&f.format(date)),
+        match &self.kind {
+            FormatterKind::Date(f) => {
+                let formatted = f.format(date);
+                self.mended(&formatted.pattern(), date)
+                    .unwrap_or_else(|| parts_of(&formatted))
+            }
+            FormatterKind::Period(f) => {
+                let formatted = f.format(date);
+                self.mended(&formatted.pattern(), date)
+                    .unwrap_or_else(|| parts_of(&formatted))
+            }
         }
     }
+
+    /// The date written with [`repair_year_literal`]'s pattern, when the one
+    /// ICU4X picked lost its year.
+    fn mended(
+        &self,
+        pattern: &DateTimePattern,
+        date: &Date<icu_calendar::Iso>,
+    ) -> Option<Vec<DatePart>> {
+        if !self.mend_year {
+            return None;
+        }
+        let pattern = repair_year_literal(pattern)?;
+        let mut names =
+            FixedCalendarDateTimeNames::<Gregorian, DateFieldSet>::try_new(self.prefs).ok()?;
+        let formatter = names.include_for_pattern(&pattern).ok()?;
+        let formatted = formatter.format(&date.to_calendar(Gregorian));
+        Some(parts_of(&Lossy(&formatted)))
+    }
+}
+
+/// A [`TryWriteable`] written as far as it goes.
+struct Lossy<'a, T>(&'a T);
+
+impl<T: TryWriteable> Writeable for Lossy<'_, T> {
+    fn write_to_parts<S: PartsWrite + ?Sized>(&self, sink: &mut S) -> fmt::Result {
+        self.0.try_write_to_parts(sink).map(|_| ())
+    }
+}
+
+/// A pattern whose year field ICU4X's data turned into the quoted literal
+/// `Y`, with the year back: Portuguese's Gregorian month-and-year era pattern
+/// is `MMMM 'de Y' GGG` (Portuguese for Portugal has `MMMM 'de' y GGG`) and
+/// German's long weekday-date era pattern is `d MMMM 'Y' GGG, EEEE`; written
+/// as they are, they put a "Y" where the year goes ("maio de Y d.C."). None
+/// for a pattern with a year field or without a stray `Y`.
+fn repair_year_literal(pattern: &DateTimePattern) -> Option<DateTimePattern> {
+    let text = pattern.to_string();
+    // The pattern as (quoted, text) runs; '' is an apostrophe in either.
+    let mut runs: Vec<(bool, String)> = Vec::new();
+    let mut chars = text.chars().peekable();
+    let mut quoted = false;
+    let mut run = String::new();
+    while let Some(c) = chars.next() {
+        if c == '\'' {
+            if chars.peek() == Some(&'\'') {
+                chars.next();
+                run.push('\'');
+                continue;
+            }
+            runs.push((quoted, std::mem::take(&mut run)));
+            quoted = !quoted;
+            continue;
+        }
+        run.push(c);
+    }
+    runs.push((quoted, run));
+    let has_year = runs
+        .iter()
+        .any(|(quoted, text)| !quoted && text.contains(['y', 'Y', 'u', 'U', 'r']));
+    if has_year {
+        return None;
+    }
+    let mut out = String::new();
+    let mut mended = false;
+    let quote = |out: &mut String, text: &str| {
+        if !text.is_empty() {
+            out.push('\'');
+            out.push_str(&text.replace('\'', "''"));
+            out.push('\'');
+        }
+    };
+    for (quoted, text) in runs {
+        if !quoted {
+            out.push_str(&text);
+            continue;
+        }
+        let chars: Vec<char> = text.chars().collect();
+        let mut literal = String::new();
+        for (i, c) in chars.iter().enumerate() {
+            let standalone = *c == 'Y'
+                && !chars
+                    .get(i.wrapping_sub(1))
+                    .is_some_and(|p| p.is_alphabetic())
+                && !chars.get(i + 1).is_some_and(|n| n.is_alphabetic());
+            if standalone {
+                quote(&mut out, &literal);
+                literal.clear();
+                out.push('y');
+                mended = true;
+            } else {
+                literal.push(*c);
+            }
+        }
+        quote(&mut out, &literal);
+    }
+    if !mended {
+        return None;
+    }
+    out.parse().ok()
 }
 
 type FormatterKey = (String, CalendarSystem, DateStyle);
@@ -408,7 +542,7 @@ fn formatter(tag: &str, calendar: CalendarSystem, style: DateStyle) -> Option<Rc
             .borrow_mut()
             .entry(key)
             .or_insert_with(|| {
-                Formatter::new(&locale_with_calendar(tag, calendar), style).map(Rc::new)
+                Formatter::new(&locale_with_calendar(tag, calendar), style, calendar).map(Rc::new)
             })
             .clone()
     })
@@ -817,5 +951,160 @@ mod tests {
         assert_eq!(week_field_name("en"), "week");
         assert_eq!(format_day_number(15, "fa"), "۱۵");
         assert_eq!(format_day_number(1234, "en"), "1234");
+    }
+
+    /// Every calendar system a provider can choose.
+    const CALENDARS: [CalendarSystem; 16] = [
+        CalendarSystem::Gregory,
+        CalendarSystem::Iso8601,
+        CalendarSystem::Buddhist,
+        CalendarSystem::Roc,
+        CalendarSystem::Japanese,
+        CalendarSystem::Persian,
+        CalendarSystem::Indian,
+        CalendarSystem::Hebrew,
+        CalendarSystem::Chinese,
+        CalendarSystem::Dangi,
+        CalendarSystem::Coptic,
+        CalendarSystem::Ethiopic,
+        CalendarSystem::Ethioaa,
+        CalendarSystem::IslamicCivil,
+        CalendarSystem::IslamicTbla,
+        CalendarSystem::IslamicUmalqura,
+    ];
+
+    fn every_style() -> Vec<DateStyle> {
+        let mut styles = vec![
+            DateStyle::NUMERIC,
+            DateStyle::MEDIUM,
+            DateStyle::LONG,
+            DateStyle::MEDIUM_WEEKDAY,
+            DateStyle::LONG_WEEKDAY,
+            DateStyle::MONTH_YEAR,
+            DateStyle::MONTH,
+            DateStyle::MONTH_DAY,
+            DateStyle::YEAR,
+            DateStyle::WEEKDAY,
+        ];
+        for width in [Width::Numeric, Width::Narrow, Width::Short, Width::Long] {
+            styles.push(DateStyle::month(width));
+            styles.push(DateStyle::weekday(width));
+        }
+        for width in [Width::Narrow, Width::Short, Width::Long] {
+            styles.push(DateStyle::LONG.with_era(width));
+            styles.push(DateStyle::MONTH_YEAR.with_era(width));
+            styles.push(DateStyle::YEAR.with_era(width));
+        }
+        styles
+    }
+
+    /// Every shipped locale writes every field every style asks for, in every
+    /// calendar: ICU4X's data once lost a year to literal text (Portuguese's
+    /// and German's Gregorian era patterns) and a decimal formatter with it.
+    #[test]
+    fn every_style_writes_its_fields_in_every_shipped_locale_and_calendar() {
+        let mut locales: Vec<&str> = crate::catalog::shipped_locales().collect();
+        locales.push("en");
+        assert!(locales.len() >= 31, "the 30 shipped locales and English");
+        // A current date, and one old enough for ICU4X to pick the era patterns.
+        let dates = [d(2026, 5, 13), d(1, 3, 4)];
+        let is_year = |k: PartKind| {
+            matches!(
+                k,
+                PartKind::Year | PartKind::RelatedYear | PartKind::YearName
+            )
+        };
+        for locale in &locales {
+            for calendar in CALENDARS {
+                for style in every_style() {
+                    for date in dates {
+                        let parts = format_date_to_parts(date, style, locale, calendar);
+                        let text = join_parts(&parts);
+                        let at = format!("{locale} {calendar:?} {style:?} {date:?}: {text:?}");
+                        let has = |want: fn(PartKind) -> bool| parts.iter().any(|p| want(p.kind));
+                        assert!(!text.is_empty(), "{at}");
+                        assert!(!style.year || has(is_year), "no year in {at}");
+                        assert!(
+                            style.month.is_none() || has(|k| k == PartKind::Month),
+                            "no month in {at}"
+                        );
+                        assert!(!style.day || has(|k| k == PartKind::Day), "no day in {at}");
+                        assert!(
+                            style.weekday.is_none() || has(|k| k == PartKind::Weekday),
+                            "no weekday in {at}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn portuguese_month_titles_keep_their_year() {
+        let may = d(2026, 5, 13);
+        for locale in ["pt", "pt-BR", "pt-PT"] {
+            assert_eq!(
+                format_date(may, DateStyle::MONTH_YEAR, locale, CalendarSystem::Gregory),
+                "maio de 2026",
+                "{locale}"
+            );
+            assert_eq!(
+                format_standalone_month_year(may, locale, CalendarSystem::Gregory),
+                "maio de 2026",
+                "{locale}"
+            );
+            // `Intl.DateTimeFormat('pt-BR', {month: 'long', year: 'numeric', era: 'short'})`.
+            assert_eq!(
+                format_date(
+                    may,
+                    DateStyle::MONTH_YEAR.with_era(Width::Short),
+                    locale,
+                    CalendarSystem::Gregory
+                ),
+                "maio de 2026 d.C.",
+                "{locale}"
+            );
+        }
+        let first = format_date(
+            d(1, 5, 13),
+            DateStyle::MONTH_YEAR,
+            "pt-BR",
+            CalendarSystem::Gregory,
+        );
+        assert!(
+            first.starts_with("maio de 1") && !first.contains('Y'),
+            "{first}"
+        );
+        let german = format_date(
+            d(1, 5, 13),
+            DateStyle::LONG_WEEKDAY,
+            "de-DE",
+            CalendarSystem::Gregory,
+        );
+        assert!(
+            german.contains("Mai 1 n. Chr.") && !german.contains('Y'),
+            "{german}"
+        );
+    }
+
+    #[test]
+    fn repairs_only_a_year_turned_into_literal_text() {
+        let pattern = |text: &str| text.parse::<DateTimePattern>().unwrap();
+        let mended = repair_year_literal(&pattern("MMMM 'de Y' GGG")).unwrap();
+        assert_eq!(mended.to_string(), pattern("MMMM 'de' y GGG").to_string());
+        let mended = repair_year_literal(&pattern("d MMMM 'Y' GGG, EEEE")).unwrap();
+        assert_eq!(
+            mended.to_string(),
+            pattern("d MMMM y GGG, EEEE").to_string()
+        );
+        assert!(
+            repair_year_literal(&pattern("MMMM 'de' y")).is_none(),
+            "a year field"
+        );
+        assert!(
+            repair_year_literal(&pattern("MMMM 'Yes'")).is_none(),
+            "a word with Y"
+        );
+        assert!(repair_year_literal(&pattern("EEEE")).is_none());
     }
 }

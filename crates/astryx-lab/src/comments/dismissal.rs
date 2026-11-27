@@ -4,20 +4,25 @@
 //! unsaved draft, the first request shakes the thread, returns focus to the draft,
 //! and announces instead, and the next consecutive one dismisses.
 //!
-//! The thread joins the window's layer stack, deeper than its host, and its content
+//! The thread joins the window's layer stack in flow
+//! ([`astryx_primitives::layer_dismissal`]), deeper than its host, and its content
 //! nests a layer so layers it opens sit deeper still. An Escape goes to the top-most
 //! layer only, and an outside press counts only while the thread is that layer: with
-//! the emoji picker open, the picker's own light dismiss takes the press.
+//! the emoji picker open, the picker's own light dismiss takes the press. The press
+//! acts on its release, as native light dismiss does.
 
-use std::rc::Rc;
 use std::time::Duration;
 
 use web_time::Instant;
 
 use astryx_primitives::motion::cubic_bezier;
-use astryx_primitives::{Politeness, announce, prefers_reduced_motion};
+use astryx_primitives::{LayerDismissalHandle, Politeness, announce, prefers_reduced_motion};
 use astryx_theme::authoring::js::js_trim;
-use gpui::{App, Entity, Pixels, Window, px};
+use gpui::prelude::*;
+use gpui::{
+    App, DispatchPhase, Entity, MouseButton, MouseDownEvent, MouseUpEvent, Pixels, Window, canvas,
+    px,
+};
 
 use super::context::{ControllerState, Scope};
 use super::types::ActionFn;
@@ -81,6 +86,9 @@ pub(crate) struct DismissalState {
     pub guarded: Option<String>,
     /// The running shake: when it started and how long it lasts.
     pub shake: Option<(Instant, Duration)>,
+    /// A primary press outside that will request dismissal on its release, and
+    /// whether it landed on the host's trigger.
+    pub pending: Option<bool>,
 }
 
 /// The shake's keyframes, symmetric about the resting position, so it reads the same
@@ -168,21 +176,85 @@ fn focus_draft_input(scope: &Scope, draft: &UnsavedDraft, window: &mut Window, c
 }
 
 /// Upstream `onRootPointerDownCapture`: a press inside re-arms the guard.
-pub(crate) fn rearm(state: &Entity<DismissalState>, cx: &mut App) {
+fn rearm(state: &Entity<DismissalState>, cx: &mut App) {
     state.update(cx, |s, _| s.guarded = None);
 }
 
-/// The dismissal the thread's layer runs: a guarded press is spent on the warning
-/// and activates nothing.
-pub(crate) fn layer_dismiss(
+/// Upstream `wouldGuard`: whether a request now would be guarded.
+fn would_guard(scope: &Scope, state: &Entity<DismissalState>, cx: &App) -> bool {
+    let guarded = state.read(cx).guarded.clone();
+    unsaved_draft_of(scope.read(cx)).is_some_and(|d| guarded.as_deref() != Some(d.signature()))
+}
+
+/// The thread's watch on presses (upstream's document listeners), drawn as an
+/// invisible layer over the thread root so it knows the root's box: a press inside
+/// re-arms the guard; a primary press outside the thread, its host's surface and the
+/// layers it opened requests dismissal on its release, while the thread is the
+/// top-most layer.
+pub(crate) fn press_watch(
     scope: Scope,
     state: Entity<DismissalState>,
     on_dismiss: ActionFn,
-) -> impl Fn(&mut Window, &mut App) + 'static {
-    let on_dismiss: ActionFn = Rc::new(move |window, cx| on_dismiss(window, cx));
-    move |window, cx| {
-        if request(&scope, &state, &on_dismiss, window, cx) == RequestOutcome::Guarded {
-            cx.stop_propagation();
-        }
-    }
+    handle: LayerDismissalHandle,
+) -> impl IntoElement {
+    canvas(
+        |_, _, _| {},
+        move |bounds, _, window, _| {
+            // Where the thread shows: a scroller's clip cuts it down.
+            let visible = bounds.intersect(&window.content_mask().bounds);
+            let (down_scope, down_state, down_handle) =
+                (scope.clone(), state.clone(), handle.clone());
+            window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
+                if phase != DispatchPhase::Capture {
+                    return;
+                }
+                down_state.update(cx, |s, _| s.pending = None);
+                if event.button != MouseButton::Left {
+                    return;
+                }
+                let point = event.position;
+                // Presses inside, and in the layers the thread opened (its picker, its
+                // menus, its dialogs), are inside.
+                if visible.contains(&point) || down_handle.nested_contains(point, window, cx) {
+                    rearm(&down_state, cx);
+                    return;
+                }
+                // So are presses on the host surface around the thread.
+                if down_handle.host_contains(point) {
+                    return;
+                }
+                // A layer above the thread takes this press through its own light
+                // dismiss.
+                if !down_handle.is_topmost(window, cx) {
+                    return;
+                }
+                let trigger = down_handle.host_trigger_contains(point);
+                down_state.update(cx, |s, _| s.pending = Some(trigger));
+                // A guarded press keeps focus and selection where they are.
+                if would_guard(&down_scope, &down_state, cx) {
+                    cx.stop_propagation();
+                }
+            });
+            let (scope, state, on_dismiss) = (scope.clone(), state.clone(), on_dismiss.clone());
+            window.on_mouse_event(move |event: &MouseUpEvent, phase, window, cx| {
+                if phase != DispatchPhase::Capture || event.button != MouseButton::Left {
+                    return;
+                }
+                let Some(trigger) = state.update(cx, |s, _| s.pending.take()) else {
+                    return;
+                };
+                if request(&scope, &state, &on_dismiss, window, cx) == RequestOutcome::Guarded {
+                    // The press was spent on the warning; it activates nothing.
+                    cx.stop_propagation();
+                } else if trigger {
+                    // The host's trigger would reopen the surface this press just closed.
+                    cx.stop_propagation();
+                }
+            });
+        },
+    )
+    .absolute()
+    .top_0()
+    .left_0()
+    .size_full()
 }

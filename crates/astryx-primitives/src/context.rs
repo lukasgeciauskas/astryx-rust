@@ -75,7 +75,7 @@ pub struct LayerScoped<T> {
 }
 
 fn layer_depth(cx: &App) -> usize {
-    use_context::<crate::layer::LayerDepth>(cx).map_or(0, |d| d.0)
+    use_context::<crate::layer::SurfaceDepth>(cx).map_or(0, |d| d.0)
 }
 
 /// Provides `value` to the descendants of `child` in the current layer.

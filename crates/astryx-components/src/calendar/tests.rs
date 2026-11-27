@@ -116,6 +116,32 @@ fn fr1_month_labels_stand_alone_in_the_locale(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn fr1_month_labels_keep_their_year_in_portuguese(cx: &mut TestAppContext) {
+    // ICU4X's Portuguese month-and-year data once lost its decimal formatter, and the
+    // heading its year (`Intl.DateTimeFormat('pt-BR', {month: 'long', year: 'numeric'})`).
+    let out: Rc<RefCell<Option<CalendarNavigation>>> = Rc::default();
+    let shown = out.clone();
+    let _cx = host(cx, move || {
+        astryx_i18n::provider(
+            astryx_i18n::I18n::new("pt-BR"),
+            NavProbe {
+                options: CalendarNavigationOptions {
+                    initial_value: Some(d(2026, 5, 13)),
+                    number_of_months: 2,
+                    ..Default::default()
+                },
+                out: shown.clone(),
+            },
+        )
+        .into_any_element()
+    });
+    assert_eq!(
+        out.borrow().as_ref().unwrap().month_year_label,
+        "maio de 2026 – junho de 2026"
+    );
+}
+
+#[gpui::test]
 fn fr2_the_tab_stop_is_the_selected_day(cx: &mut TestAppContext) {
     let (cx, log) = single(cx, |c| c.default_value(d(2026, 11, 10)));
     tab_into_grid(cx);

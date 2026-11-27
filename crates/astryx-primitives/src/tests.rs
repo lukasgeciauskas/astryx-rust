@@ -423,6 +423,159 @@ mod layer_tests {
         cx.run_until_parked();
         assert_eq!(*log.borrow(), ["inner", "outer"]);
     }
+
+    /// A layer whose content holds an in-flow dismissal region, which may open a
+    /// layer of its own.
+    struct Region {
+        nested: bool,
+        handle: crate::LayerDismissalHandle,
+        log: Rc<RefCell<Vec<&'static str>>>,
+        scoped_seen: Rc<RefCell<Option<u32>>>,
+    }
+
+    #[derive(Clone)]
+    struct Scoped(u32);
+
+    #[derive(IntoElement)]
+    struct ReadScoped(Rc<RefCell<Option<u32>>>);
+
+    impl RenderOnce for ReadScoped {
+        fn render(self, _: &mut Window, cx: &mut gpui::App) -> impl IntoElement {
+            *self.0.borrow_mut() = crate::use_layer_context::<Scoped>(cx).map(|s| s.0);
+            div().size(px(10.))
+        }
+    }
+
+    /// Provides `Scoped(7)` in the layer it renders in.
+    #[derive(IntoElement)]
+    struct ProvideScoped(gpui::AnyElement);
+
+    impl RenderOnce for ProvideScoped {
+        fn render(self, _: &mut Window, cx: &mut gpui::App) -> impl IntoElement {
+            crate::provide_in_layer(Scoped(7), self.0, cx)
+        }
+    }
+
+    impl Render for Region {
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let entity = cx.entity();
+            let log = |name: &'static str| {
+                let log = self.log.clone();
+                let entity = entity.clone();
+                move |_: &mut Window, cx: &mut gpui::App| {
+                    log.borrow_mut().push(name);
+                    if name == "nested" {
+                        entity.update(cx, |this, cx| {
+                            this.nested = false;
+                            cx.notify();
+                        });
+                    }
+                }
+            };
+            let nested = self.nested.then(|| {
+                layer(div().w(px(40.)).h(px(40.)), log("nested"))
+                    .anchor(point(px(200.), px(200.)), Anchor::TopLeft)
+            });
+            let region = crate::layer_dismissal(
+                "region",
+                div()
+                    .w(px(60.))
+                    .h(px(60.))
+                    .child(ReadScoped(self.scoped_seen.clone()))
+                    .children(nested),
+                log("region"),
+            )
+            .handle(&self.handle);
+            let surface = div().p(px(20.)).w(px(100.)).h(px(100.)).child(region);
+            div().size_full().child(
+                layer(ProvideScoped(surface.into_any_element()), log("host"))
+                    .anchor(point(px(0.), px(0.)), Anchor::TopLeft),
+            )
+        }
+    }
+
+    type DismissLog = Rc<RefCell<Vec<&'static str>>>;
+    type Seen = Rc<RefCell<Option<u32>>>;
+
+    fn open_region(
+        cx: &mut TestAppContext,
+        nested: bool,
+    ) -> (
+        DismissLog,
+        crate::LayerDismissalHandle,
+        Seen,
+        &mut gpui::VisualTestContext,
+    ) {
+        let log = Rc::new(RefCell::new(Vec::new()));
+        let seen = Rc::new(RefCell::new(None));
+        let handle = crate::LayerDismissalHandle::new();
+        let (_, cx) = cx.add_window_view({
+            let (log, seen, handle) = (log.clone(), seen.clone(), handle.clone());
+            move |_, _| Region {
+                nested,
+                handle,
+                log,
+                scoped_seen: seen,
+            }
+        });
+        cx.run_until_parked();
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        (log, handle, seen, cx)
+    }
+
+    #[gpui::test]
+    fn an_in_flow_region_ranks_above_its_host_for_escape(cx: &mut TestAppContext) {
+        let (log, handle, _, cx) = open_region(cx, false);
+        assert!(cx.update(|window, cx| handle.is_topmost(window, cx)));
+        cx.simulate_keystrokes("escape");
+        cx.run_until_parked();
+        assert_eq!(*log.borrow(), ["region"], "the region answers first");
+    }
+
+    #[gpui::test]
+    fn a_layer_opened_inside_the_region_ranks_above_it(cx: &mut TestAppContext) {
+        let (log, handle, _, cx) = open_region(cx, true);
+        assert!(!cx.update(|window, cx| handle.is_topmost(window, cx)));
+        assert!(cx.update(|window, cx| handle.nested_contains(
+            point(px(210.), px(210.)),
+            window,
+            cx
+        )));
+        cx.simulate_keystrokes("escape");
+        cx.run_until_parked();
+        assert_eq!(*log.borrow(), ["nested"]);
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        assert!(cx.update(|window, cx| handle.is_topmost(window, cx)));
+        cx.simulate_keystrokes("escape");
+        cx.run_until_parked();
+        assert_eq!(*log.borrow(), ["nested", "region"]);
+    }
+
+    #[gpui::test]
+    fn the_region_tells_its_hosts_surface_and_leaves_presses_to_its_owner(cx: &mut TestAppContext) {
+        let (log, handle, _, cx) = open_region(cx, false);
+        // The host's padding, around the region.
+        assert!(handle.host_contains(point(px(5.), px(5.))));
+        assert!(!handle.host_contains(point(px(300.), px(300.))));
+        assert!(!handle.host_trigger_contains(point(px(5.), px(5.))));
+        // A press outside is the owner's to judge: the top-most region dismisses
+        // nothing on its own, and the host below it stays.
+        cx.simulate_click(point(px(300.), px(300.)), Modifiers::none());
+        cx.run_until_parked();
+        assert!(log.borrow().is_empty());
+    }
+
+    #[gpui::test]
+    fn the_region_keeps_its_layers_scoped_contexts(cx: &mut TestAppContext) {
+        let (_, _, seen, _) = open_region(cx, false);
+        assert_eq!(
+            *seen.borrow(),
+            Some(7),
+            "content in flow is still in the host's layer"
+        );
+    }
 }
 
 mod announce_tests {

@@ -293,6 +293,12 @@ pub struct TextEditState {
     pub on_paste_override: Option<PasteOverrideFn>,
     /// A paste waiting for `on_paste_override`.
     paste_waiting: Option<ClipboardItem>,
+    /// Colors for ranges of the text (byte ranges of the buffer), over the style's
+    /// text color: a code editor's syntax paint, set by its component each render.
+    pub highlights: Vec<(Range<usize>, gpui::Hsla)>,
+    /// A multiline field that keeps each line whole (CSS `white-space: pre`): it grows
+    /// as wide as its longest line instead of wrapping, for its container to scroll.
+    pub no_wrap: bool,
     /// The misspelled ranges last found, and the text they were found in.
     spelling: Option<(String, Vec<Range<usize>>)>,
     /// Whether the field has had focus: browsers check its text from then on.
@@ -348,6 +354,8 @@ impl TextEditState {
             inline_objects: None,
             on_paste_override: None,
             paste_waiting: None,
+            highlights: Vec::new(),
+            no_wrap: false,
             spelling: None,
             spell_armed: false,
             _subscriptions: vec![keys],

@@ -14,6 +14,7 @@ fancy-regex.workspace = true
 astryx-components.workspace = true
 astryx-i18n.workspace = true
 astryx-primitives.workspace = true
+astryx-syntax.workspace = true
 astryx-theme.workspace = true
 gpui.workspace = true
 icu_collator.workspace = true

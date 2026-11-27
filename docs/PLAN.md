@@ -1153,6 +1153,12 @@ The remaining primitives:
     the Core and primitives parity they needed: live containers, any element opening a
     Popover, scrollable areas always named, Reorderable sharing its sessions, and
     watching gestures that keep a finger the window scrolls.
+  - Stage 5, part one (done): the lab Chart family (the composition API: Chart, its marks
+    and GL marks, axis, grid, legend, tooltip, brush, select, zoom, m4 and
+    useChartRange), CodeEditor (the editing engine with syntax highlights and unwrapped
+    lines), DiffViewer, SVGIcon and WeightedSVGIcon (their icons generated from
+    upstream), a fix for astryx-i18n's Portuguese month-year panic (an ICU4X data defect),
+    ChatMessageList's label and in-flow layer dismissal for Comments.
 - **M14 Rich text:** a document model + editor on the engine, toolbar, lossless Markdown round
   trip (AST-062/064/106).
 - **M15 RTL, high contrast, polish:** RTL mirroring, Windows high contrast and macOS's

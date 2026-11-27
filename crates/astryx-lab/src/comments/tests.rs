@@ -1535,6 +1535,129 @@ fn closes_an_open_emoji_picker_on_escape_before_the_thread(cx: &mut TestAppConte
     assert_eq!(*dismissals.borrow(), 1);
 }
 
+/// A thread in a Popover that hands it the Popover's light dismissal (upstream's
+/// `CommentThreadInPopover` and the trigger test's `Host`).
+fn popover_host<'a>(
+    cx: &'a mut TestAppContext,
+    padding: astryx_components::layout::SpacingStep,
+    composers: &Composers,
+) -> (&'a mut VisualTestContext, Rc<RefCell<bool>>) {
+    let open = Rc::new(RefCell::new(false));
+    let (o, r) = (open.clone(), composers.clone());
+    let cx = host(cx, move |_, _| {
+        let (set, dismiss) = (o.clone(), o.clone());
+        div()
+            .flex()
+            .items_start()
+            .p(px(40.))
+            .child(
+                div()
+                    .flex_none()
+                    .debug_selector(|| "open-comment".into())
+                    .child(
+                        astryx_components::overlay::Popover::new("host-popover", "Comment")
+                            .open(*o.borrow())
+                            .on_open_change(move |next, _, _| *set.borrow_mut() = next)
+                            .light_dismiss(false)
+                            .escape_dismiss(false)
+                            .auto_focus(false)
+                            .padding(padding)
+                            .width(px(340.))
+                            .content(
+                                CommentThread::new("ct", thread_fixture())
+                                    .current_user(viewer())
+                                    .selected(true)
+                                    .container(CommentContainer::Card)
+                                    .on_submit(|_, _, _, _| ok())
+                                    .on_dismiss(move |_, _| *dismiss.borrow_mut() = false)
+                                    .render_composer(test_composer(&r)),
+                            )
+                            .child(astryx_components::button::Button::new(
+                                "open-comment",
+                                "Open comment",
+                            )),
+                    ),
+            )
+            .into_any_element()
+    });
+    (cx, open)
+}
+
+#[gpui::test]
+fn keeps_a_popover_host_open_on_its_trigger_over_a_draft_and_closes_without_reopening_otherwise(
+    cx: &mut TestAppContext,
+) {
+    let composers: Composers = Rc::default();
+    let (cx, open) = popover_host(cx, astryx_components::layout::SpacingStep::S0, &composers);
+    click(cx, "open-comment");
+    assert!(*open.borrow(), "the trigger opens the host");
+    assert!(shown(cx, "thread-t1"));
+    hover(cx, "t1");
+    click(cx, "comment-action-reply-t1");
+    click(cx, "set-draft-reply");
+    click(cx, "open-comment");
+    assert!(*open.borrow(), "the guarded press keeps the host open");
+    assert!(said(cx, Politeness::Polite).contains("Unsaved draft"));
+    click(cx, "open-comment");
+    // Closed, and the same press's click did not toggle it back open.
+    assert!(!*open.borrow());
+    assert!(!shown(cx, "thread-t1"));
+}
+
+#[gpui::test]
+fn a_press_on_the_hosts_padding_is_inside_the_thread(cx: &mut TestAppContext) {
+    let composers: Composers = Rc::default();
+    let (cx, open) = popover_host(cx, astryx_components::layout::SpacingStep::S4, &composers);
+    click(cx, "open-comment");
+    let thread = bounds(cx, "ct").expect("the thread is drawn");
+    // Just above the thread, on the Popover's padding.
+    cx.simulate_click(
+        thread.origin + gpui::point(px(20.), px(-6.)),
+        Modifiers::none(),
+    );
+    settle(cx);
+    assert!(*open.borrow(), "the host's own surface is inside");
+    click(cx, "outside");
+    assert!(!*open.borrow(), "outside the host dismisses");
+}
+
+#[gpui::test]
+fn a_thread_inside_a_scroller_draws_in_flow_and_is_clipped(cx: &mut TestAppContext) {
+    let dismissals = Rc::new(RefCell::new(0));
+    let d = dismissals.clone();
+    let cx = host(cx, move |_, _| {
+        let d = d.clone();
+        div()
+            .id("scroller")
+            .debug_selector(|| "scroller".into())
+            .h(px(120.))
+            .overflow_hidden()
+            .child(
+                CommentThread::new("ct", thread_fixture())
+                    .current_user(viewer())
+                    .on_dismiss(move |_, _| *d.borrow_mut() += 1)
+                    .on_submit(|_, _, _, _| ok()),
+            )
+            .into_any_element()
+    });
+    let scroller = bounds(cx, "scroller").unwrap();
+    let thread = bounds(cx, "ct").unwrap();
+    assert!(
+        thread.size.height > scroller.size.height,
+        "the thread runs past the scroller's clip"
+    );
+    // Below the clip, over where the thread would be, a press is outside.
+    let below = gpui::point(thread.origin.x + px(20.), scroller.bottom() + px(4.));
+    assert!(thread.contains(&below));
+    cx.simulate_click(below, Modifiers::none());
+    settle(cx);
+    assert_eq!(
+        *dismissals.borrow(),
+        1,
+        "the clipped part is not the thread"
+    );
+}
+
 #[gpui::test]
 fn a_thread_without_on_dismiss_dismisses_nothing(cx: &mut TestAppContext) {
     let cx = host(cx, |_, _| {

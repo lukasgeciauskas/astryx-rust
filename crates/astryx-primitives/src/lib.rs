@@ -44,7 +44,8 @@ pub use focus::{
 };
 pub use hotkeys::{Hotkey, hotkeys};
 pub use layer::{
-    AnchoredLayer, EscapeBehavior, Layer, PositionFn, anchored_layer, has_open_layer, layer,
+    AnchoredLayer, EscapeBehavior, Layer, LayerDismissal, LayerDismissalHandle, PositionFn,
+    anchored_layer, has_open_layer, layer, layer_dismissal,
 };
 pub use link::{LinkHandler, Navigation, link_provider, set_link_handler, use_link_handler};
 pub use list_focus::{ListFocus, ListKeys, ListOrientation};

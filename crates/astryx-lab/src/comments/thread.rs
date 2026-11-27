@@ -7,12 +7,12 @@
 
 use std::rc::Rc;
 
-use astryx_primitives::{EscapeBehavior, layer};
+use astryx_primitives::{EscapeBehavior, LayerDismissalHandle, layer_dismissal};
 use gpui::prelude::*;
 use gpui::{AnyElement, App, ElementId, SharedString, StyleRefinement, Window, div};
 
 use super::context::{ControllerOptions, provide_scope, scoped, use_controller};
-use super::dismissal::{DismissalState, layer_dismiss, rearm, shake_offset};
+use super::dismissal::{DismissalState, press_watch, request, shake_offset};
 use super::row::CommentRow;
 use super::shared::CommentThreadShared;
 use super::types::{
@@ -192,16 +192,29 @@ fn render_thread(thread: CommentThread, window: &mut Window, cx: &mut App) -> An
             None => state.update(cx, |s, _| s.shake = None),
         }
     }
-    // The thread's content draws in its layer, so the press inside is caught there,
-    // before any control inside keeps it.
-    let rearm_state = state.clone();
-    let content = content.capture_any_mouse_down(move |_, _, cx| rearm(&rearm_state, cx));
+    let handle = window
+        .use_keyed_state(scoped(&scope_id, "dismissal-layer"), cx, |_, _| {
+            LayerDismissalHandle::new()
+        })
+        .read(cx)
+        .clone();
+    // An Escape that reaches the thread while it is top-most.
+    let escape = {
+        let (scope, state, on_dismiss) = (scope.clone(), state.clone(), on_dismiss.clone());
+        move |window: &mut Window, cx: &mut App| {
+            request(&scope, &state, &on_dismiss, window, cx);
+        }
+    };
     // Layers the thread opens sit above it on the dismissal stack.
-    let surface = layer(
+    let region = layer_dismissal(
+        scoped(&scope_id, "dismissal-region"),
         provide_scope(scope.clone(), content),
-        layer_dismiss(scope, state, on_dismiss),
+        escape,
     )
-    .escape(EscapeBehavior::Close);
-    root.child(div().id("comment-thread-layer").w_full().child(surface))
+    .escape(EscapeBehavior::Close)
+    .handle(&handle);
+    root.relative()
+        .child(region)
+        .child(press_watch(scope, state, on_dismiss, handle))
         .into_any_element()
 }

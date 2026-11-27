@@ -879,6 +879,10 @@ fn render_comments(props: Comments, window: &mut Window, cx: &mut App) -> AnyEle
                 .into_any_element(),
             _ => div().into_any_element(),
         };
+        let list_label = i18n.format(
+            "@astryx.comments.commentsLabel",
+            &[("label", Arg::from(label.as_ref()))],
+        );
         let mut chat = ChatLayout::new(scoped(&sid, "layout"), dock).density(list_density);
         if !has_load_error {
             chat = chat.empty_state(empty_state);
@@ -889,6 +893,7 @@ fn render_comments(props: Comments, window: &mut Window, cx: &mut App) -> AnyEle
                     .align(ChatListAlign::Top)
                     .density(list_density)
                     .gap(SpacingStep::S0)
+                    .label(list_label.clone())
                     .streaming(true)
                     .child(stack),
             );
@@ -898,6 +903,7 @@ fn render_comments(props: Comments, window: &mut Window, cx: &mut App) -> AnyEle
                     .align(ChatListAlign::Top)
                     .density(list_density)
                     .gap(SpacingStep::S0)
+                    .label(list_label.clone())
                     .child(timeline_stack),
             );
         }

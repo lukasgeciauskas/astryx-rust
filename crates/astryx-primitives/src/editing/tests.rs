@@ -415,3 +415,43 @@ fn lines_with_objects_wrap_at_their_widened_width(cx: &mut TestAppContext) {
     }
     assert!(rows >= 2);
 }
+
+#[gpui::test]
+fn a_multiline_field_that_keeps_lines_whole_grows_as_wide_as_its_longest(cx: &mut TestAppContext) {
+    let long = "x".repeat(120);
+    let (cx, state, _) = field(cx, &format!("short\n{long}"), true);
+    let wrapped = state.read_with(cx, |s, _| s.bounds().unwrap());
+    state.update(cx, |s, cx| {
+        s.no_wrap = true;
+        cx.notify();
+    });
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    let whole = state.read_with(cx, |s, _| s.bounds().unwrap());
+    assert!(
+        whole.size.width > wrapped.size.width,
+        "{whole:?} {wrapped:?}"
+    );
+    assert!(
+        whole.size.height < wrapped.size.height,
+        "two rows, not wrapped ones"
+    );
+}
+
+#[gpui::test]
+fn highlights_paint_ranges_and_ignore_ranges_past_the_text(cx: &mut TestAppContext) {
+    let (cx, state, _) = field(cx, "let a = 1;", false);
+    state.update(cx, |s, cx| {
+        s.highlights = vec![
+            (0..3, hsla(0.6, 1., 0.5, 1.)),
+            (4..400, hsla(0., 1., 0.5, 1.)),
+        ];
+        cx.notify();
+    });
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    // The field still draws (a stale range past the text is skipped), and editing
+    // keeps working.
+    cx.simulate_input("x");
+    assert_eq!(text(cx, &state), "let a = 1;x");
+}

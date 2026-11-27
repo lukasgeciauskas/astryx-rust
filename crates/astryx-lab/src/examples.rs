@@ -138,5 +138,21 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
             "Schedule",
             crate::schedule::examples::examples(window, cx),
         ))
+        .child(example(
+            "Chart (lab)",
+            crate::lab_chart::examples::examples(window, cx),
+        ))
+        .child(example(
+            "CodeEditor",
+            crate::code_editor::examples::examples(window, cx),
+        ))
+        .child(example(
+            "DiffViewer",
+            crate::diff_viewer::examples::examples(window, cx),
+        ))
+        .child(example(
+            "SVGIcon",
+            crate::svg_icon::examples::examples(window, cx),
+        ))
         .into_any_element()
 }

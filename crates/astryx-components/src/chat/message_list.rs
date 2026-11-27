@@ -11,7 +11,7 @@ use gpui::Refineable as _;
 use gpui::prelude::*;
 use gpui::{
     AnyElement, App, Bounds, ElementId, IntoElement, ParentElement, Pixels, RenderOnce, Role,
-    StyleRefinement, Styled, Task, Window, canvas, div,
+    SharedString, StyleRefinement, Styled, Task, Window, canvas, div,
 };
 use smallvec::SmallVec;
 
@@ -45,6 +45,7 @@ pub struct ChatMessageList {
     gap: Option<SpacingStep>,
     align: ChatListAlign,
     streaming: bool,
+    label: Option<SharedString>,
     style: StyleRefinement,
     children: SmallVec<[AnyElement; 8]>,
 }
@@ -59,6 +60,7 @@ impl ChatMessageList {
             gap: None,
             align: ChatListAlign::Bottom,
             streaming: false,
+            label: None,
             style: StyleRefinement::default(),
             children: SmallVec::new(),
         }
@@ -73,6 +75,8 @@ impl ChatMessageList {
         align: ChatListAlign,
         /// Upstream `isStreaming`: the log is busy while a reply streams.
         !streaming,
+        /// Upstream `aria-label`: the log's accessible name.
+        ?label: SharedString,
     }
 
     /// Upstream `emptyState`: shown when there are no messages.
@@ -140,6 +144,7 @@ impl RenderOnce for ChatMessageList {
             .id(self.id.clone())
             .role(Role::Log)
             .aria_busy(self.streaming)
+            .when_some(self.label.clone(), |el, label| el.aria_label(label))
             .track_focus(&focus)
             .relative()
             .flex()

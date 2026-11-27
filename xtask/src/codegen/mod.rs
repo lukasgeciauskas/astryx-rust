@@ -12,6 +12,8 @@
 //! - `crates/astryx-markdown/src/generated/`: Markdown's named character references.
 //! - `crates/astryx-lab/src/emoji_picker/generated/emoji_data.rs`: EmojiPicker's bundled
 //!   emoji set.
+//! - `crates/astryx-lab/src/svg_icon/generated/icons.rs`: SVGIcon's and WeightedSVGIcon's
+//!   starter icons.
 //! - `docs/theme-overrides-todo.md`: overrides that need a hand port.
 //!
 //! `--check` writes nothing and fails when any file differs from what it
@@ -23,6 +25,7 @@ mod emoji;
 mod literal;
 mod locales;
 mod markdown;
+mod svg_icons;
 mod themes;
 mod tokens;
 
@@ -189,6 +192,11 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
     files.push((
         PathBuf::from("crates/astryx-lab/src/emoji_picker/generated/emoji_data.rs"),
         rustfmt(&format!("{HEADER}{}", emoji::render(&emoji)?))?,
+    ));
+    let svg_icons = read_json(&spec.join("svg-icons.json"))?;
+    files.push((
+        PathBuf::from("crates/astryx-lab/src/svg_icon/generated/icons.rs"),
+        rustfmt(&format!("{HEADER}{}", svg_icons::render(&svg_icons)?))?,
     ));
     files.push((
         PathBuf::from("docs/theme-overrides-todo.md"),

@@ -332,6 +332,29 @@ impl Element for EditorElement {
         let widths = self.object_widths(&boxes, cx);
         let mut style = Style::default();
         style.size.width = relative(1.).into();
+        let no_wrap = self.style.multiline && self.state.read(cx).no_wrap;
+        if no_wrap && self.style.height.is_none() {
+            // As wide as its longest line, never narrower than its container, and as
+            // tall as its lines, within its rows.
+            let text_style = window.text_style();
+            let font_size = text_style.font_size.to_pixels(window.rem_size());
+            let text = self.state.read(cx).display_text();
+            let runs = [text_style.to_run(text.len())];
+            let lines = shape_lines(&text, &runs, font_size, None, &widths, window);
+            let widest = lines
+                .iter()
+                .map(|(_, line)| line.size(line_height).width)
+                .fold(px(0.), Pixels::max);
+            let (min, max) = (self.style.min_lines.max(1), self.style.max_lines);
+            let mut count = rows(lines.iter().map(|(_, l)| l)).max(min);
+            if let Some(max) = max {
+                count = count.min(max.max(min));
+            }
+            style.size.width = (widest + CARET_WIDTH).into();
+            style.min_size.width = relative(1.).into();
+            style.size.height = (line_height * count as f32).into();
+            return (window.request_layout(style, [], cx), boxes);
+        }
         if !self.style.multiline {
             style.size.height = line_height.into();
             return (window.request_layout(style, [], cx), boxes);
@@ -383,7 +406,8 @@ impl Element for EditorElement {
         let text_style = window.text_style();
         let font_size = text_style.font_size.to_pixels(window.rem_size());
         let line_height = window.line_height();
-        let wrap = self.style.multiline.then_some(bounds.size.width);
+        let wrap =
+            (self.style.multiline && !self.state.read(cx).no_wrap).then_some(bounds.size.width);
         let focus = gpui::Focusable::focus_handle(self.state.read(cx), cx);
         let focused = focus.is_focused(window);
         // Every Core field registers with the keyboard module where it is drawn, so the
@@ -429,9 +453,22 @@ impl Element for EditorElement {
                 },
             ));
         }
+        // The component's color ranges, as display ranges.
+        let painted: Vec<(std::ops::Range<usize>, Hsla)> = state
+            .highlights
+            .iter()
+            .filter(|(r, _)| r.start < r.end && r.end <= buffer.text().len())
+            .map(|(r, color)| {
+                (
+                    state.offset_to_display(r.start)..state.offset_to_display(r.end),
+                    *color,
+                )
+            })
+            .collect();
         let mut cuts: Vec<usize> = decorations
             .iter()
             .flat_map(|(r, _)| [r.start, r.end])
+            .chain(painted.iter().flat_map(|(r, _)| [r.start, r.end]))
             .chain([0, display.len()])
             .filter(|at| *at <= display.len())
             .collect();
@@ -442,7 +479,10 @@ impl Element for EditorElement {
             .map(|pair| {
                 let (from, to) = (pair[0], pair[1]);
                 TextRun {
-                    color: self.style.text_color,
+                    color: painted
+                        .iter()
+                        .find(|(r, _)| r.start <= from && to <= r.end)
+                        .map_or(self.style.text_color, |(_, color)| *color),
                     underline: decorations
                         .iter()
                         .find(|(r, _)| r.start <= from && to <= r.end)

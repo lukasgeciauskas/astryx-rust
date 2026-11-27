@@ -415,6 +415,7 @@ dependencies = [
  "astryx-i18n",
  "astryx-markdown",
  "astryx-primitives",
+ "astryx-syntax",
  "astryx-theme",
  "astryx-themes",
  "fancy-regex",

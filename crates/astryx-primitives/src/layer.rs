@@ -113,6 +113,18 @@ pub const MODAL_DEPTH: usize = 100;
 #[derive(Clone, Copy)]
 pub(crate) struct LayerDepth(pub(crate) usize);
 
+/// The depth of the surface content draws on: only layers that draw a surface of
+/// their own ([`layer`], [`anchored_layer`]) change it, so a [`layer_dismissal`]
+/// region, which draws in flow, keeps the layer-scoped contexts around it (upstream
+/// resets them at a layer's content boundary, not at a `LayerDepthProvider`).
+#[derive(Clone, Copy)]
+pub(crate) struct SurfaceDepth(pub(crate) usize);
+
+/// The layer whose content this is, for a nested [`layer_dismissal`] region to
+/// tell its host's surface and trigger.
+#[derive(Clone)]
+struct HostLayer(Weak<Entry>);
+
 /// Whether a layer is open in `window`, upstream `hasOpenLayer`.
 pub fn has_open_layer(window: &Window, cx: &App) -> bool {
     cx.try_global::<LayerStacks>()
@@ -322,6 +334,7 @@ impl Element for Layer {
             (entry, registration)
         });
         let content = self.content.take().expect("a layer is drawn once");
+        let host = HostLayer(Rc::downgrade(&entry));
         let surface = Measured {
             entry,
             child: content,
@@ -336,9 +349,12 @@ impl Element for Layer {
                 .into_any_element(),
             None => surface.into_any_element(),
         };
-        let mut child = deferred(provide(LayerDepth(self.depth), placed))
-            .with_priority(self.depth)
-            .into_any_element();
+        let mut child = deferred(provide(
+            SurfaceDepth(self.depth),
+            provide(host, provide(LayerDepth(self.depth), placed)),
+        ))
+        .with_priority(self.depth)
+        .into_any_element();
         let layout_id = child.request_layout(window, cx);
         (layout_id, child)
     }
@@ -575,12 +591,18 @@ impl Element for AnchoredLayer {
         // The keyboard module samples after each frame a reader draws.
         crate::keyboard::keyboard_probe(window, cx);
         let surface = provide(
-            LayerDepth(depth),
-            Measured {
-                entry: entry.clone(),
-                child: content,
-                cap: clearance.0.cap.get(),
-            },
+            SurfaceDepth(depth),
+            provide(
+                HostLayer(Rc::downgrade(&entry)),
+                provide(
+                    LayerDepth(depth),
+                    Measured {
+                        entry: entry.clone(),
+                        child: content,
+                        cap: clearance.0.cap.get(),
+                    },
+                ),
+            ),
         )
         .into_any_element();
         (
@@ -688,6 +710,222 @@ fn dismiss_on_outside_press(entry: &Rc<Entry>, window: &mut Window, cx: &mut App
         let dismiss = entry.dismiss.borrow().clone();
         dismiss(window, cx);
     });
+}
+
+// ----------------------------------------------------------------------------
+// In-flow dismissal (upstream `Layer/useLayerDismissal.ts` with `getContainer`)
+
+#[derive(Default)]
+struct DismissalLinks {
+    /// This region's place on the stack.
+    entry: Weak<Entry>,
+    /// The layer the region's content sits in, if any.
+    host: Option<Weak<Entry>>,
+}
+
+/// What a [`layer_dismissal`] region answers between frames: whether it is the
+/// top-most layer, and where its host's surface and trigger are. Cheap to clone;
+/// make one, keep it (in keyed state, say) and pass it to the region each frame.
+#[derive(Clone, Default)]
+pub struct LayerDismissalHandle(Rc<RefCell<DismissalLinks>>);
+
+impl LayerDismissalHandle {
+    /// A handle no region has registered with yet.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Upstream `shouldDismissOnCloseRequest`'s stack rule: whether the region is
+    /// registered and the top-most layer, so a press or a close request is its to
+    /// answer rather than a layer opened above it.
+    pub fn is_topmost(&self, window: &Window, cx: &mut App) -> bool {
+        let Some(entry) = self.0.borrow().entry.upgrade() else {
+            return false;
+        };
+        let stack = window_stack(window, cx);
+        let top = stack.borrow_mut().topmost();
+        top.is_some_and(|top| Rc::ptr_eq(&top, &entry))
+    }
+
+    /// Whether `point` (window coordinates) is on the surface of the layer the region
+    /// sits in, such as the Popover around it (its padding, its close control).
+    pub fn host_contains(&self, point: Point<Pixels>) -> bool {
+        self.host()
+            .is_some_and(|host| host.bounds.get().is_some_and(|b| b.contains(&point)))
+    }
+
+    /// Whether `point` is on the host layer's trigger, the control that toggles it.
+    pub fn host_trigger_contains(&self, point: Point<Pixels>) -> bool {
+        self.host()
+            .is_some_and(|host| host.inside.borrow().iter().any(|b| b.contains(&point)))
+    }
+
+    /// Whether `point` is on a layer opened above the region (deeper on the stack),
+    /// such as a picker its content opened.
+    pub fn nested_contains(&self, point: Point<Pixels>, window: &Window, cx: &mut App) -> bool {
+        let Some(entry) = self.0.borrow().entry.upgrade() else {
+            return false;
+        };
+        let stack = window_stack(window, cx);
+        let live = stack.borrow_mut().live();
+        live.iter()
+            .filter(|e| (e.depth, e.seq) > (entry.depth, entry.seq))
+            .any(|e| e.bounds.get().is_some_and(|b| b.contains(&point)))
+    }
+
+    fn host(&self) -> Option<Rc<Entry>> {
+        self.0.borrow().host.as_ref().and_then(Weak::upgrade)
+    }
+}
+
+/// A region drawn in flow that joins the window's layer stack while it is drawn,
+/// upstream `useLayerDismissal` with a `getContainer` and a `LayerDepthProvider`
+/// around its content: it ranks above the layer it sits in, layers opened inside it
+/// rank above it, and an Escape that reaches it while it is top-most calls
+/// `on_dismiss`. It leaves presses outside it to its owner, as upstream's hook does
+/// (read [`LayerDismissalHandle::is_topmost`] at press time).
+///
+/// Unlike [`layer`] it draws where it is laid out, so a scroller clips it.
+#[track_caller]
+pub fn layer_dismissal(
+    id: impl Into<ElementId>,
+    content: impl IntoElement,
+    on_dismiss: impl Fn(&mut Window, &mut App) + 'static,
+) -> LayerDismissal {
+    LayerDismissal {
+        id: id.into(),
+        content: Some(content.into_any_element()),
+        dismiss: Rc::new(on_dismiss),
+        escape: EscapeBehavior::Close,
+        handle: None,
+    }
+}
+
+/// The element [`layer_dismissal`] returns.
+pub struct LayerDismissal {
+    id: ElementId,
+    content: Option<AnyElement>,
+    dismiss: Dismiss,
+    escape: EscapeBehavior,
+    handle: Option<LayerDismissalHandle>,
+}
+
+impl LayerDismissal {
+    /// Upstream `escapeBehavior`: what Escape does while the region is top-most.
+    pub fn escape(mut self, behavior: EscapeBehavior) -> Self {
+        self.escape = behavior;
+        self
+    }
+
+    /// The handle the region answers through.
+    pub fn handle(mut self, handle: &LayerDismissalHandle) -> Self {
+        self.handle = Some(handle.clone());
+        self
+    }
+}
+
+/// What a [`LayerDismissal`] keeps from layout to paint.
+pub struct LayerDismissalState {
+    child: AnyElement,
+    entry: Rc<Entry>,
+}
+
+impl Element for LayerDismissal {
+    type RequestLayoutState = LayerDismissalState;
+    type PrepaintState = ();
+
+    fn id(&self) -> Option<ElementId> {
+        Some(self.id.clone())
+    }
+
+    fn source_location(&self) -> Option<&'static Location<'static>> {
+        None
+    }
+
+    fn request_layout(
+        &mut self,
+        id: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> (LayoutId, LayerDismissalState) {
+        let depth = use_context::<LayerDepth>(cx).map_or(1, |d| d.0 + 1);
+        let host = use_context::<HostLayer>(cx).map(|h| h.0);
+        let id = id.expect("dismissal regions have an element id");
+        let escape = self.escape;
+        let dismiss = self.dismiss.clone();
+        let entry = window.with_element_state::<Registration, _>(id, |registration, window| {
+            let registration = registration
+                .filter(|r| r.0.depth == depth)
+                .unwrap_or_else(|| {
+                    let stack = window_stack(window, cx);
+                    let mut stack = stack.borrow_mut();
+                    let entry = Rc::new(Entry {
+                        depth,
+                        seq: stack.next_seq,
+                        escape: Cell::new(escape),
+                        dismiss: RefCell::new(dismiss.clone()),
+                        bounds: Cell::new(None),
+                        inside: RefCell::new(Vec::new()),
+                    });
+                    stack.next_seq += 1;
+                    stack.entries.push(Rc::downgrade(&entry));
+                    Registration(entry)
+                });
+            let entry = registration.0.clone();
+            entry.escape.set(escape);
+            *entry.dismiss.borrow_mut() = dismiss.clone();
+            (entry, registration)
+        });
+        if let Some(handle) = &self.handle {
+            *handle.0.borrow_mut() = DismissalLinks {
+                entry: Rc::downgrade(&entry),
+                host,
+            };
+        }
+        let content = self
+            .content
+            .take()
+            .expect("a dismissal region is drawn once");
+        let mut child = provide(
+            HostLayer(Rc::downgrade(&entry)),
+            provide(LayerDepth(depth), content),
+        )
+        .into_any_element();
+        let layout_id = child.request_layout(window, cx);
+        (layout_id, LayerDismissalState { child, entry })
+    }
+
+    fn prepaint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        bounds: Bounds<Pixels>,
+        state: &mut LayerDismissalState,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        // Where it shows: a scroller's clip cuts the region down.
+        let visible = bounds.intersect(&window.content_mask().bounds);
+        state
+            .entry
+            .bounds
+            .set(Some(window.element_transform().apply_bounds(visible)));
+        state.child.prepaint(window, cx);
+    }
+
+    fn paint(
+        &mut self,
+        _: Option<&GlobalElementId>,
+        _: Option<&InspectorElementId>,
+        _: Bounds<Pixels>,
+        state: &mut LayerDismissalState,
+        _: &mut (),
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        state.child.paint(window, cx);
+    }
 }
 
 // ----------------------------------------------------------------------------

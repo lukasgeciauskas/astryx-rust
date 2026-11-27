@@ -432,6 +432,18 @@
     database differs from Node's for America/Havana after November 2026; a failed
     loader leaves the view empty where upstream throws to an error boundary.
 
+- **The lab Chart, editors and icons, where GPUI differs (M13).**
+  - Lab Chart: touch taps and pinch-zoom are not handled (mouse and wheel are), and
+    `interactive` is accepted but does nothing (it only blocks touch scrolling).
+  - DiffViewer: GPUI has no sticky positioning, so unwrapped code shifts inside its cell
+    by one shared sideways offset (wheel and trackpad only) to keep the gutters still;
+    tabs draw as two spaces; no screen-reader column headers, forced-colors bar or
+    right-to-left handling.
+  - CodeEditor's escape hint is its accessible description, not a hidden element.
+  - SVGIcon resolves upstream's `var()`/`calc()` knockout widths to the values the
+    code intends (a 0.75 gap for fills, stroke width plus twice the gap for strokes),
+    which a browser may not resolve in SVG attributes.
+
 ## Tooling
 
 - **True hot-patching needs our patched dx.** `cargo xtask dev --hot-patch` patches
