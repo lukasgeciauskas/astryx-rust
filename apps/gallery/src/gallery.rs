@@ -163,9 +163,13 @@ impl Render for Gallery {
                     .flex_1()
                     .min_h_0()
                     .child(
+                        // The page list scrolls when the window is too short for it.
                         div()
+                            .id("pages")
                             .w(px(200.))
                             .flex_none()
+                            .min_h_0()
+                            .overflow_y_scroll()
                             .flex()
                             .flex_col()
                             .gap(t.spacing.s1)

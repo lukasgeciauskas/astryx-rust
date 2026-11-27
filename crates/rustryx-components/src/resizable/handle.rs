@@ -148,7 +148,7 @@ struct Drag {
     /// -1 under right-to-left on the inline axis.
     rtl: f32,
     tracker: VelocityTracker,
-    started_at: std::time::Instant,
+    started_at: web_time::Instant,
     props: ResizableProps,
 }
 
@@ -359,7 +359,7 @@ impl RenderOnce for ResizeHandle {
                             start: pos,
                             rtl: if horizontal && rtl { -1. } else { 1. },
                             tracker,
-                            started_at: std::time::Instant::now(),
+                            started_at: web_time::Instant::now(),
                             props,
                         });
                         window.refresh();

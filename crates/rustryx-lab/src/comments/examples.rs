@@ -2,7 +2,7 @@
 //! `CommentsShowcase`, `CommentThreadShowcase`, `CommentThreadInPopover` and
 //! `CommentComposerShowcase` blocks they render).
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use web_time::{SystemTime, UNIX_EPOCH};
 
 use gpui::{
     AnyElement, App, Entity, IntoElement, ParentElement, SharedString, Styled, Task, Window, div,
