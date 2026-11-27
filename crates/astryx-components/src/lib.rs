@@ -62,6 +62,7 @@ pub mod syntax_theme;
 pub mod table;
 pub mod tabs;
 pub mod text;
+pub mod theming;
 pub mod time;
 pub mod time_input;
 pub mod token;

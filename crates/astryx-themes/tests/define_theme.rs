@@ -1,10 +1,11 @@
 //! `define_theme` against the shipped themes: each theme's definition (the
 //! JSON-able part of upstream's `defineTheme` input, `spec/theme-definitions`)
 //! defined at run time and made a typed theme must give exactly the tokens,
-//! component rules and surfaces of its compiled twin, which is generated from
-//! upstream's own resolved output.
+//! component rules, surfaces, adaptations and width points of its compiled
+//! twin, which is generated from upstream's own resolved output.
 //!
-//! Adaptations are not compared: `define_theme` stores them as written.
+//! Adaptations are compared in order, each by its pointer, its width edges and
+//! its tokens in both modes, since a later matching rule wins.
 //!
 //! Rules are compared by what selects them (target, conditions, state) and in
 //! order, since a later rule wins: the definition files keep upstream's key
@@ -15,8 +16,8 @@ use std::collections::BTreeMap;
 use astryx_theme::authoring::define::{DefineThemeInput, define_theme};
 use astryx_theme::authoring::to_theme::to_theme;
 use astryx_theme::{
-    AbsoluteLength, Appearance, ComponentRule, Declaration, StyleProp, SurfaceOverride, Theme,
-    Tokens, hex,
+    AbsoluteLength, Adaptation, Appearance, ComponentRule, Declaration, StyleProp, SurfaceOverride,
+    Theme, Tokens, hex,
 };
 
 fn length(length: &AbsoluteLength) -> String {
@@ -96,8 +97,27 @@ fn surface(surface: &Option<SurfaceOverride>) -> Option<(Appearance, Vec<String>
     })
 }
 
-/// Every way `defined` differs from `compiled`: tokens in both modes, rules
-/// and surfaces.
+/// An adaptation as text: what selects it, then its light and dark tokens.
+fn adaptation(adaptation: &Adaptation) -> [String; 3] {
+    let tokens = |tokens: &[(std::borrow::Cow<'static, str>, astryx_theme::TokenValue)]| {
+        tokens
+            .iter()
+            .map(|(name, value)| format!("{name}: {value}"))
+            .collect::<Vec<_>>()
+            .join("; ")
+    };
+    [
+        format!(
+            "pointer {:?}, width below {:?}, at least {:?}",
+            adaptation.pointer, adaptation.width_below, adaptation.width_at_least
+        ),
+        tokens(&adaptation.light),
+        tokens(&adaptation.dark),
+    ]
+}
+
+/// Every way `defined` differs from `compiled`: tokens in both modes, rules,
+/// surfaces, adaptations and width points.
 fn differences(defined: &Theme, compiled: &Theme) -> Vec<String> {
     let mut out = Vec::new();
     let name = &compiled.name;
@@ -155,6 +175,36 @@ fn differences(defined: &Theme, compiled: &Theme) -> Vec<String> {
                 surface(b)
             ));
         }
+    }
+    if defined.adaptations.len() != compiled.adaptations.len() {
+        out.push(format!(
+            "{name}: {} adaptations defined, {} compiled",
+            defined.adaptations.len(),
+            compiled.adaptations.len()
+        ));
+    }
+    for (index, (ours, theirs)) in defined
+        .adaptations
+        .iter()
+        .zip(compiled.adaptations.iter())
+        .enumerate()
+    {
+        for (part, (a, b)) in ["condition", "light tokens", "dark tokens"]
+            .into_iter()
+            .zip(adaptation(ours).into_iter().zip(adaptation(theirs)))
+        {
+            if a != b {
+                out.push(format!(
+                    "{name} adaptation {index} {part}: defined {a}, compiled {b}"
+                ));
+            }
+        }
+    }
+    if defined.width_breakpoints != compiled.width_breakpoints {
+        out.push(format!(
+            "{name} width points: defined {:?}, compiled {:?}",
+            defined.width_breakpoints, compiled.width_breakpoints
+        ));
     }
     out
 }

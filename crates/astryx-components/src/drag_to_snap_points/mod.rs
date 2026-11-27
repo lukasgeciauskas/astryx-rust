@@ -125,12 +125,14 @@ impl AttachedSnapDrag {
         self.wrap(drawn)
     }
 
-    /// Moves the drag on to this frame: the engine's environment, its frame, the
-    /// frames it needs next, and the `on_settle` calls it owes, after the frame.
+    /// Moves the drag on to this frame: the engine's environment (the theme's motion
+    /// tempo among it), its frame, the frames it needs next, and the `on_settle` calls
+    /// it owes, after the frame.
     pub(crate) fn advance(&self, window: &mut Window, cx: &mut App) {
         let engine = &self.snap.animator;
         engine.set_reduced_motion(prefers_reduced_motion(cx));
         engine.set_coarse_pointer(coarse_primary_pointer(window, cx));
+        engine.set_tempo(astryx_theme::current(window, cx).motion_tempo());
         if !self.snap.is_destroyed() {
             self.snap.frame((self.clock)());
             if self.snap.is_moving() {

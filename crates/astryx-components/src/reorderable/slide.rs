@@ -69,14 +69,14 @@ impl Axis {
     }
 
     /// Springs to `to` from where it shows plus `moved` (the layout's own move), at
-    /// the speed it has.
-    fn spring_to(&mut self, to: f32, moved: f32, now: Instant) {
+    /// the speed it has, at the theme's `tempo`.
+    fn spring_to(&mut self, to: f32, moved: f32, now: Instant, tempo: f64) {
         let velocity = self.velocity(now);
-        self.spring_with(to, moved, velocity, now);
+        self.spring_with(to, moved, velocity, now, tempo);
     }
 
     /// [`Axis::spring_to`], starting at `velocity` (px/s).
-    fn spring_with(&mut self, to: f32, moved: f32, velocity: f64, now: Instant) {
+    fn spring_with(&mut self, to: f32, moved: f32, velocity: f64, now: Instant, tempo: f64) {
         let from = f64::from(self.value(now) + moved);
         let to64 = f64::from(to);
         self.rest = to;
@@ -84,7 +84,12 @@ impl Axis {
             self.curve = None;
             return;
         }
-        let curve = solve_spring(resolve_spring(SETTLE, 1.).to_spring(), from, to64, velocity);
+        let curve = solve_spring(
+            resolve_spring(SETTLE, tempo).to_spring(),
+            from,
+            to64,
+            velocity,
+        );
         let duration = curve.settle_time(EPSILON);
         let curve = FnCurve::new(
             duration,
@@ -144,6 +149,9 @@ pub(crate) struct Slides {
     /// A drop, a cancel or a move is landing: rows the layout moves glide from where
     /// they showed. Set until the collection's children are laid out.
     landing: Rc<std::cell::Cell<bool>>,
+    /// The theme's motion tempo where the rows draw, read as they prepaint (1 until
+    /// then).
+    tempo: Rc<std::cell::Cell<Option<f64>>>,
 }
 
 impl Slides {
@@ -194,6 +202,7 @@ impl Slides {
         cx: &App,
     ) -> AnyElement {
         let now = cx.background_executor().now();
+        let tempo = self.tempo.get().unwrap_or(1.);
         let slide = self.slide(key);
         let fade_opacity = {
             let mut s = slide.borrow_mut();
@@ -201,8 +210,8 @@ impl Slides {
                 s.target = target;
                 match motion {
                     SlideMotion::Glide => {
-                        s.x.spring_to(target.0, 0., now);
-                        s.y.spring_to(target.1, 0., now);
+                        s.x.spring_to(target.0, 0., now, tempo);
+                        s.y.spring_to(target.1, 0., now, tempo);
                     }
                     SlideMotion::Fade => {
                         s.x.jump(target.0);
@@ -246,6 +255,7 @@ impl Slides {
             child: element,
             landing: self.landing.get() && motion == SlideMotion::Glide,
             fading: fade_opacity.is_some(),
+            tempo: self.tempo.clone(),
         }
         .into_any_element()
     }
@@ -257,6 +267,7 @@ struct SlideElement {
     child: AnyElement,
     landing: bool,
     fading: bool,
+    tempo: Rc<std::cell::Cell<Option<f64>>>,
 }
 
 impl Element for SlideElement {
@@ -291,6 +302,9 @@ impl Element for SlideElement {
         cx: &mut App,
     ) {
         let now = cx.background_executor().now();
+        // The theme's tempo where the row draws (upstream reads it at the element).
+        let tempo = astryx_theme::current(window, cx).motion_tempo();
+        self.tempo.set(Some(tempo));
         let offset = {
             let mut s = self.slide.borrow_mut();
             // A landing: the row glides from where it showed into its new place.
@@ -302,12 +316,12 @@ impl Element for SlideElement {
                 let target = s.target;
                 match s.release.take() {
                     Some((vx, vy)) => {
-                        s.x.spring_with(target.0, f32::from(moved.x), vx, now);
-                        s.y.spring_with(target.1, f32::from(moved.y), vy, now);
+                        s.x.spring_with(target.0, f32::from(moved.x), vx, now, tempo);
+                        s.y.spring_with(target.1, f32::from(moved.y), vy, now, tempo);
                     }
                     None => {
-                        s.x.spring_to(target.0, f32::from(moved.x), now);
-                        s.y.spring_to(target.1, f32::from(moved.y), now);
+                        s.x.spring_to(target.0, f32::from(moved.x), now, tempo);
+                        s.y.spring_to(target.1, f32::from(moved.y), now, tempo);
                     }
                 }
             }

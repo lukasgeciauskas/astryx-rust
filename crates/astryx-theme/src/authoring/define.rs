@@ -17,24 +17,29 @@
 //! their keys in the order they were first set, and that order shows in the
 //! resolved tokens and in the order of a theme's component rules.
 //!
-//! Upstream's icons, component icon slots and indicators are React nodes and
-//! functions, not values a definition here carries; the theme registry and the
-//! stylesheet are upstream's CSS runtime. Adaptations are stored as written
-//! ([`DefinedTheme::adaptations`]) and not resolved into rules here.
+//! Upstream's icons and component icon slots are React nodes and functions; a
+//! definition here carries them as values ([`ThemeIconEntry`], an SVG asset path
+//! per name and variant, and [`ThemeComponentIcon`], a request per slot and state).
+//! Indicators are not carried, the theme registry is [`super::registry`], and the
+//! stylesheet is upstream's CSS runtime. Adaptations are validated over the
+//! base's ([`DefinedTheme::adaptations`]) and every rule is lowered to the
+//! writes it makes ([`DefinedTheme::adaptation_rules`], see
+//! [`super::adaptations`]).
 
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
 use super::TOKEN_DEFAULTS;
-use super::color_scale::{AccentSeed, ColorContrast, ColorScaleConfig, NeutralStyle};
+use super::adaptations::{normalize_theme_adaptations, resolve_theme_adaptation_rules};
+use super::color_scale::ColorScaleConfig;
 use super::local_tokens::resolve_local_token_contract;
 use super::merge_components::{ComponentStyleMap, StyleValue, deep_merge_components};
 use super::on_media::{OnMediaOverrides, ResolvedOnMedia, resolve_on_media};
 use super::palette::types::ThemePalette;
 use super::radius_scale::RadiusScaleConfig;
 use super::resolve_values::{
-    ResolveThemeValuesOptions, ThemeValuesInput, ThemeValuesSeed, TypographyConfig, TypographyRole,
+    ResolveThemeValuesOptions, ThemeValuesInput, ThemeValuesSeed, TypographyConfig,
     resolve_theme_values,
 };
 use super::theme_motion::ThemeMotionConfig;
@@ -288,136 +293,18 @@ impl fmt::Display for DefineThemeError {
 impl std::error::Error for DefineThemeError {}
 
 // =============================================================================
-// Adaptations as written
+// Adaptations and generative axes
 // =============================================================================
 
-/// The width range of an adaptation rule, by named width point (`sm`, `md`,
-/// `lg`, `xl`, `2xl`): at and above `from`, strictly below `below`. Upstream
-/// `ThemeAdaptationWidthCondition`.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ThemeAdaptationWidthCondition {
-    /// Match at and above this named point.
-    pub from: Option<String>,
-    /// Match strictly below this named point.
-    pub below: Option<String>,
-}
-
-/// When an adaptation rule applies; every field it sets must hold. Upstream
-/// `ThemeAdaptationCondition`, its values kept as written.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ThemeAdaptationCondition {
-    /// The viewport-width range.
-    pub width: Option<ThemeAdaptationWidthCondition>,
-    /// The primary pointer's precision: `coarse` or `fine`.
-    pub pointer: Option<String>,
-    /// The contrast preference: `more`, `less` or `no-preference`.
-    pub contrast: Option<String>,
-    /// The reduced-motion preference: `reduce` or `no-preference`.
-    pub motion: Option<String>,
-}
-
-/// A partial type scale in an adaptation rule, completed from the theme's
-/// own. Upstream `Partial<TypographyConfig['scale']>`.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct ThemeAdaptationScale {
-    /// The base size in px.
-    pub base: Option<f64>,
-    /// The ratio.
-    pub ratio: Option<f64>,
-}
-
-/// Typography in an adaptation rule. Upstream
-/// `ThemeAdaptationTypographyConfig`.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ThemeAdaptationTypographyConfig {
-    /// A partial type scale.
-    pub scale: Option<ThemeAdaptationScale>,
-    /// Body text.
-    pub body: Option<TypographyRole>,
-    /// Headings.
-    pub heading: Option<TypographyRole>,
-    /// Code.
-    pub code: Option<TypographyRole>,
-}
-
-/// A partial color scale in an adaptation rule. Upstream
-/// `Partial<ColorScaleConfig>`.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ThemeAdaptationColorConfig {
-    /// The accent seed.
-    pub accent: Option<AccentSeed>,
-    /// The neutral style.
-    pub neutral_style: Option<NeutralStyle>,
-    /// The contrast level.
-    pub contrast: Option<ColorContrast>,
-}
-
-/// A partial radius scale in an adaptation rule. Upstream
-/// `Partial<RadiusScaleConfig>`.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct ThemeAdaptationRadiusConfig {
-    /// The base unit in px.
-    pub base: Option<f64>,
-    /// The multiplier.
-    pub multiplier: Option<f64>,
-}
-
-/// What an adaptation rule writes while its condition holds. Upstream
-/// `ThemeAdaptationValue`.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ThemeAdaptationValue {
-    /// Typography.
-    pub typography: Option<ThemeAdaptationTypographyConfig>,
-    /// The color scale.
-    pub color: Option<ThemeAdaptationColorConfig>,
-    /// The radius scale.
-    pub radius: Option<ThemeAdaptationRadiusConfig>,
-    /// Motion: scale fields, `tempo` or `character`.
-    pub motion: Option<ThemeMotionConfig>,
-    /// Token writes.
-    pub tokens: Option<TokenInputs>,
-    /// Replacements for theme-local tokens the theme already declares.
-    pub local_tokens: Option<TokenInputs>,
-    /// Component style writes.
-    pub components: Option<ComponentStyleMap>,
-}
-
-/// One ordered adaptation rule. Upstream `ThemeAdaptationRule`.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ThemeAdaptationRule {
-    /// When it applies.
-    pub when: ThemeAdaptationCondition,
-    /// What it writes.
-    pub value: ThemeAdaptationValue,
-}
-
-/// A definition's adaptations, as written. Upstream `ThemeAdaptations`.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ThemeAdaptations {
-    /// Overrides of the named width points, in CSS px.
-    pub width_breakpoints: Option<OrderedMap<f64>>,
-    /// The rules, in order.
-    pub rules: Option<Vec<ThemeAdaptationRule>>,
-}
-
-// =============================================================================
-// Generative axes
-// =============================================================================
-
-/// The generative axes a theme resolves (upstream `ThemeGenerativeAxes`): its
-/// own over those of the theme it extends. A theme extending this one inherits
-/// its motion from here, field by field.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct ThemeGenerativeAxes {
-    /// Typography.
-    pub typography: Option<TypographyConfig>,
-    /// The color scale.
-    pub color: Option<ColorScaleConfig>,
-    /// The radius scale.
-    pub radius: Option<RadiusScaleConfig>,
-    /// Motion.
-    pub motion: Option<ThemeMotionConfig>,
-}
+// The adaptation input types and the generative axes live with the rest of
+// upstream's `theme/themeAdaptations.ts`; a definition names them from here.
+pub use super::adaptations::{
+    NormalizedThemeAdaptations, ResolvedThemeAdaptationRule, ThemeAdaptationColorConfig,
+    ThemeAdaptationCondition, ThemeAdaptationRadiusConfig, ThemeAdaptationRule,
+    ThemeAdaptationScale, ThemeAdaptationTypographyConfig, ThemeAdaptationValue,
+    ThemeAdaptationWidthCondition, ThemeAdaptations, ThemeGenerativeAxes,
+    resolve_theme_generative_axes,
+};
 
 /// `{...base, ...own}` of two motion configs: each field `own` sets, else
 /// `base`'s.
@@ -433,163 +320,162 @@ pub(crate) fn merge_motion(base: &ThemeMotionConfig, own: &ThemeMotionConfig) ->
     }
 }
 
-/// `{...root, ...rule}` of two heading weight maps, by level. Levels list in
-/// ascending order, as a JavaScript object lists integer keys.
-fn merge_weights(
-    root: Option<&[(u8, String)]>,
-    rule: Option<&[(u8, String)]>,
-) -> Option<Vec<(u8, String)>> {
-    if root.is_none() && rule.is_none() {
-        return None;
+// =============================================================================
+// Icons
+// =============================================================================
+
+/// The artwork a theme gives a semantic icon name (upstream `IconEntry`, the part of
+/// it that is values): an SVG asset path, as the Icon component draws one
+/// (`icons/lucide/x.svg`, or any path the app's asset source serves). Names are the
+/// built-in ones (`close`, `chevronDown`) and namespaced ones
+/// (`numberInput:stepperDown`).
+#[derive(Clone, Debug, PartialEq)]
+pub enum ThemeIconEntry {
+    /// No artwork: the icon falls back to the built-in one (upstream a `null` entry).
+    Fallback,
+    /// One artwork for every request (upstream a node).
+    Icon(String),
+    /// Artwork by variant (upstream an entry function that draws by `variant`):
+    /// `icon` for a request with no variant or one the entry cannot receive, and
+    /// `variants` for the variants it draws differently. The entry receives a
+    /// variant only when the theme's `icon_variants` lists it and, for an entry the
+    /// theme inherits, so does the list of the theme that defined it.
+    Variants {
+        icon: String,
+        variants: OrderedMap<String>,
+    },
+}
+
+impl From<&str> for ThemeIconEntry {
+    fn from(path: &str) -> Self {
+        Self::Icon(path.to_string())
     }
-    let mut merged: Vec<(u8, String)> = Vec::new();
-    for (level, weight) in root.into_iter().flatten().chain(rule.into_iter().flatten()) {
-        match merged.iter_mut().find(|(l, _)| l == level) {
-            Some(entry) => entry.1 = weight.clone(),
-            None => merged.push((*level, weight.clone())),
+}
+
+impl From<String> for ThemeIconEntry {
+    fn from(path: String) -> Self {
+        Self::Icon(path)
+    }
+}
+
+/// A theme's icon entries by name.
+pub type ThemeIcons = OrderedMap<ThemeIconEntry>;
+
+/// A partial request for a component icon slot (upstream `ComponentIconRequest`),
+/// applied to the component's own icon field by field; a field left out keeps the
+/// component's.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ThemeComponentIconRequest {
+    /// The shared icon name to draw; `Some(None)` hides the icon.
+    pub icon: Option<Option<String>>,
+    /// The icon variant, one the theme's `icon_variants` lists.
+    pub variant: Option<String>,
+    /// The icon size: `xsm`, `sm`, `md` or `lg`.
+    pub size: Option<String>,
+}
+
+/// What a theme gives a component's icon slot (upstream `StoredComponentIconValue`,
+/// the part of it that is values), by the slot names `astryx-components` lists
+/// (`table-sort-indicator`, `table-row-expand`).
+#[derive(Clone, Debug, PartialEq)]
+pub enum ThemeComponentIcon {
+    /// A shared icon name, which replaces the component's own (upstream a string).
+    Icon(String),
+    /// No icon (upstream `null`).
+    Hidden,
+    /// A partial request (upstream `{icon, variant, size}`).
+    Request(ThemeComponentIconRequest),
+    /// By the slot's state (upstream a slot function of its state): a request for
+    /// each state it lists, `None` to hide the icon; a state it does not list
+    /// changes nothing (the function returning `undefined`).
+    ByState(OrderedMap<Option<ThemeComponentIconRequest>>),
+}
+
+/// A theme's component icon slots by slot name.
+pub type ThemeComponentIcons = OrderedMap<ThemeComponentIcon>;
+
+/// What [`define_theme`] resolves of a definition's icons.
+struct ResolvedIcons {
+    icons: Option<ThemeIcons>,
+    icon_entry_variants: Option<OrderedMap<Option<Vec<String>>>>,
+    component_icons: Option<ThemeComponentIcons>,
+}
+
+/// A definition's icons over its base's: entries by name, the definition's own
+/// winning (upstream `defineTheme`'s `{...baseIcons, ...input.icons}`), the variant
+/// lists inherited by-variant entries keep, and the component icon slots by slot.
+fn resolve_icons(
+    input: &DefineThemeInput,
+    base: Option<&DefinedTheme>,
+    icon_variants: Option<&Vec<String>>,
+) -> ResolvedIcons {
+    let base_icons = base.and_then(|base| base.icons.as_ref());
+    let icons = match (&input.icons, base_icons) {
+        (Some(own), Some(base_icons)) => {
+            let mut merged = base_icons.clone();
+            merged.assign(own);
+            Some(merged)
+        }
+        (own, base_icons) => own.clone().or_else(|| base_icons.cloned()),
+    };
+    let icon_entry_variants =
+        resolve_icon_entry_variants(icons.as_ref(), input.icons.as_ref(), base, icon_variants);
+    let component_icons = merge_component_icons(
+        base.and_then(|base| base.component_icons.as_ref()),
+        input.component_icons.as_ref(),
+    );
+    ResolvedIcons {
+        icons,
+        icon_entry_variants,
+        component_icons,
+    }
+}
+
+/// For each by-variant entry this theme inherits, the variant list of the theme that
+/// defined it, where that list is not this theme's own (upstream
+/// `resolveIconEntryVariants`). Entries this theme defines use its own list, so they
+/// need no record. Upstream compares the lists by identity; they are compared by
+/// value here, which receives the same variants.
+fn resolve_icon_entry_variants(
+    entries: Option<&ThemeIcons>,
+    own_entries: Option<&ThemeIcons>,
+    base: Option<&DefinedTheme>,
+    icon_variants: Option<&Vec<String>>,
+) -> Option<OrderedMap<Option<Vec<String>>>> {
+    let (entries, base) = (entries?, base?);
+    let base_record = base.icon_entry_variants.as_ref();
+    let mut record: Option<OrderedMap<Option<Vec<String>>>> = None;
+    for (name, entry) in entries.iter() {
+        if !matches!(entry, ThemeIconEntry::Variants { .. })
+            || own_entries.is_some_and(|own| own.contains_key(name))
+        {
+            continue;
+        }
+        let defining = match base_record.and_then(|record| record.get(name)) {
+            Some(list) => list.as_ref(),
+            None => base.icon_variants.as_ref(),
+        };
+        if defining != icon_variants {
+            record
+                .get_or_insert_with(OrderedMap::new)
+                .insert(name, defining.cloned());
         }
     }
-    merged.sort_by_key(|(level, _)| *level);
+    record
+}
+
+/// A theme's slot values: the base's, then this theme's own, by slot (upstream
+/// `mergeComponentIcons`). An own entry replaces the inherited one whole.
+fn merge_component_icons(
+    inherited: Option<&ThemeComponentIcons>,
+    own: Option<&ThemeComponentIcons>,
+) -> Option<ThemeComponentIcons> {
+    let Some(own) = own else {
+        return inherited.cloned();
+    };
+    let mut merged = inherited.cloned().unwrap_or_default();
+    merged.assign(own);
     Some(merged)
-}
-
-/// One typography role over another: the rule's fields over the root's, with
-/// their heading weights merged by level. Upstream `mergeRole`
-/// (`theme/themeAdaptations.ts`).
-fn merge_role(
-    root: Option<&TypographyRole>,
-    rule: Option<&TypographyRole>,
-) -> Option<TypographyRole> {
-    let (root, rule) = match (root, rule) {
-        (None, rule) => return rule.cloned(),
-        (root, None) => return root.cloned(),
-        (Some(root), Some(rule)) => (root, rule),
-    };
-    Some(TypographyRole {
-        family: rule.family.clone().or_else(|| root.family.clone()),
-        fallbacks: rule.fallbacks.clone().or_else(|| root.fallbacks.clone()),
-        weight: rule.weight.clone().or_else(|| root.weight.clone()),
-        weights: merge_weights(root.weights.as_deref(), rule.weights.as_deref()),
-    })
-}
-
-/// Whether a role names a family, as JavaScript reads `role?.family` (an empty
-/// name is none).
-fn has_family(role: Option<&TypographyRole>) -> bool {
-    role.and_then(|role| role.family.as_deref())
-        .is_some_and(|family| !family.is_empty())
-}
-
-/// A theme's effective generative axes through `extends` (upstream
-/// `resolveThemeGenerativeAxes`, `theme/themeAdaptations.ts`): an axis the
-/// theme sets replaces the inherited one, and one it leaves out is inherited.
-///
-/// Typography merges role by role. A role's family and fallbacks come whole
-/// from the theme that names a family (a heading follows the theme's own body
-/// when only the body names one); its weights come from the most recent theme
-/// that sets a type scale, since weights reach tokens only through a scale.
-/// Radius and motion merge field by field; a color config replaces the
-/// inherited one whole, since it regenerates the neutrals even without an
-/// accent.
-pub fn resolve_theme_generative_axes(
-    inherited: Option<&ThemeGenerativeAxes>,
-    own: &ThemeGenerativeAxes,
-) -> ThemeGenerativeAxes {
-    let inherited_typography = inherited.and_then(|axes| axes.typography.as_ref());
-    let own_typography = own.typography.as_ref();
-    let resolve_family = |inherited_role: Option<&TypographyRole>,
-                          own_role: Option<&TypographyRole>,
-                          follows_own_body: bool|
-     -> Option<TypographyRole> {
-        let merged = merge_role(inherited_role, own_role)?;
-        if let Some(own_role) = own_role.filter(|role| has_family(Some(role))) {
-            return Some(TypographyRole {
-                family: own_role.family.clone(),
-                fallbacks: own_role.fallbacks.clone(),
-                ..merged
-            });
-        }
-        if follows_own_body {
-            return Some(TypographyRole {
-                family: None,
-                fallbacks: None,
-                ..merged
-            });
-        }
-        // A fallback without a family is inert in buildFontFamilyTokens(), so
-        // it cannot replace the fallback of an inherited family.
-        Some(TypographyRole {
-            family: inherited_role.and_then(|role| role.family.clone()),
-            fallbacks: inherited_role.and_then(|role| role.fallbacks.clone()),
-            ..merged
-        })
-    };
-
-    let body = resolve_family(
-        inherited_typography.and_then(|t| t.body.as_ref()),
-        own_typography.and_then(|t| t.body.as_ref()),
-        false,
-    );
-    let heading = resolve_family(
-        inherited_typography.and_then(|t| t.heading.as_ref()),
-        own_typography.and_then(|t| t.heading.as_ref()),
-        has_family(own_typography.and_then(|t| t.body.as_ref()))
-            && !has_family(own_typography.and_then(|t| t.heading.as_ref())),
-    );
-    let code = resolve_family(
-        inherited_typography.and_then(|t| t.code.as_ref()),
-        own_typography.and_then(|t| t.code.as_ref()),
-        false,
-    );
-
-    // Weights reach tokens only when a scale is expanded. The most recent
-    // config that declares a scale owns every weight; omitted weights become
-    // the expander defaults rather than values from an earlier scale.
-    let weight_owner = if own_typography.is_some_and(|t| t.scale.is_some()) {
-        own_typography
-    } else if inherited_typography.is_some_and(|t| t.scale.is_some()) {
-        inherited_typography
-    } else {
-        None
-    };
-    let apply_weights = |role: Option<TypographyRole>, owner: Option<&TypographyRole>| {
-        role.map(|role| TypographyRole {
-            weight: owner.and_then(|owner| owner.weight.clone()),
-            weights: owner.and_then(|owner| owner.weights.clone()),
-            ..role
-        })
-    };
-    let body = apply_weights(body, weight_owner.and_then(|t| t.body.as_ref()));
-    let heading = apply_weights(heading, weight_owner.and_then(|t| t.heading.as_ref()));
-    let code = apply_weights(code, weight_owner.and_then(|t| t.code.as_ref()));
-
-    let typography =
-        (inherited_typography.is_some() || own_typography.is_some()).then(|| TypographyConfig {
-            scale: own_typography
-                .and_then(|t| t.scale)
-                .or_else(|| inherited_typography.and_then(|t| t.scale)),
-            body,
-            heading,
-            code,
-        });
-    let color = own
-        .color
-        .clone()
-        .or_else(|| inherited.and_then(|axes| axes.color.clone()));
-    let radius = own
-        .radius
-        .or_else(|| inherited.and_then(|axes| axes.radius));
-    let motion = match (&own.motion, inherited.and_then(|axes| axes.motion.as_ref())) {
-        (Some(own), Some(base)) => Some(merge_motion(base, own)),
-        (Some(own), None) => Some(own.clone()),
-        (None, base) => base.cloned(),
-    };
-    ThemeGenerativeAxes {
-        typography,
-        color,
-        radius,
-        motion,
-    }
 }
 
 // =============================================================================
@@ -624,6 +510,12 @@ pub struct DefineThemeInput {
     /// The icon variant names the theme supports; a theme that leaves them out
     /// inherits its base's.
     pub icon_variants: Option<Vec<String>>,
+    /// The artwork for semantic icon names, by name (upstream `icons`); a name the
+    /// theme sets replaces its base's, the others are inherited.
+    pub icons: Option<ThemeIcons>,
+    /// Which icon each component icon slot draws, by slot (upstream
+    /// `componentIcons`); a slot the theme sets replaces its base's.
+    pub component_icons: Option<ThemeComponentIcons>,
     /// The syntax theme's tokens (upstream `SyntaxThemeDefinition['tokens']`),
     /// by name without the `--color-syntax-` prefix.
     pub syntax: Option<CssMap>,
@@ -631,7 +523,8 @@ pub struct DefineThemeInput {
     pub on_dark: Option<OnMediaOverrides>,
     /// Overrides for content on a light surface.
     pub on_light: Option<OnMediaOverrides>,
-    /// Ordered environment-conditioned adaptations, stored as written.
+    /// Ordered environment-conditioned adaptations: width points and rules
+    /// that change the theme's values where the environment matches.
     pub adaptations: Option<ThemeAdaptations>,
     /// Colors made by the palette generator: tokens and part styles under the
     /// theme's own `tokens` and `components`.
@@ -673,6 +566,15 @@ pub struct DefinedTheme {
     pub components: Option<ComponentStyleMap>,
     /// The icon variant names: the theme's own, or inherited.
     pub icon_variants: Option<Vec<String>>,
+    /// The icon entries, the base's merged under the theme's own by name (upstream
+    /// `__icons`, or `icons` when no entry is a function).
+    pub icons: Option<ThemeIcons>,
+    /// For each by-variant entry the theme inherits under another variant list, the
+    /// list of the theme that defined it (upstream `__iconEntryVariants`).
+    pub icon_entry_variants: Option<OrderedMap<Option<Vec<String>>>>,
+    /// The component icon slots, the base's merged under the theme's own by slot
+    /// (upstream `__componentIcons`, or `componentIcons`).
+    pub component_icons: Option<ThemeComponentIcons>,
     /// Whether upstream's theme build compiled this theme (upstream `__built`).
     pub built: bool,
     /// The token values the definitions wrote, the base's, then the palette's,
@@ -683,8 +585,14 @@ pub struct DefinedTheme {
     pub on_dark: Option<ResolvedOnMedia>,
     /// The resolved light surface (upstream `__onLight`).
     pub on_light: Option<ResolvedOnMedia>,
-    /// The theme's own adaptations, as written.
-    pub adaptations: Option<ThemeAdaptations>,
+    /// The effective width points and every rule, the inherited ones first,
+    /// validated (upstream `__adaptations`). [`define_theme`] always sets
+    /// them; a built theme carries its build's, which a theme extending it
+    /// re-resolves.
+    pub adaptations: Option<NormalizedThemeAdaptations>,
+    /// Every rule lowered to its concrete writes, in order (upstream
+    /// `__adaptationRules`); `None` when there are no rules.
+    pub adaptation_rules: Option<Vec<ResolvedThemeAdaptationRule>>,
     /// The effective generative axes (upstream `__axes`).
     pub axes: Option<ThemeGenerativeAxes>,
     /// Whether [`define_theme`] made this theme: upstream's `'__inputTokens' in
@@ -839,10 +747,14 @@ fn spread(maps: &[Option<&TokenInputs>]) -> TokenInputs {
 /// rules under the definition's own. Motion inherits field by field: a
 /// duration-scale field or knob the definition leaves out keeps its base's.
 ///
+/// Adaptations inherit the base's width points and rules, the definition's own
+/// appended; every rule is re-resolved against this theme's effective axes
+/// ([`normalize_theme_adaptations`], [`resolve_theme_adaptation_rules`]).
+///
 /// Fails, with upstream's message, on a base that is not a theme, a palette
 /// the generator did not make, a duration scale missing `fast`, `medium` or
-/// `ratio`, and a local token that is misnamed, also in `tokens` or in a
-/// reference cycle.
+/// `ratio`, a local token that is misnamed, also in `tokens` or in a
+/// reference cycle, and adaptations that do not validate or resolve.
 pub fn define_theme(input: &DefineThemeInput) -> Result<DefinedTheme, DefineThemeError> {
     // A base that is not a theme is refused rather than ignored.
     if let Some(base) = &input.extends
@@ -947,7 +859,25 @@ pub fn define_theme(input: &DefineThemeInput) -> Result<DefinedTheme, DefineThem
         TOKEN_DEFAULTS,
     )?;
 
+    // Adaptations inherit their width points and ordered rules. Every rule is
+    // re-resolved against this theme's effective root axes, so a child can
+    // change the root scale while keeping the base rule's authored intent.
     let axes = resolve_theme_generative_axes(base.and_then(|base| base.axes.as_ref()), &own_axes);
+    let adaptations = normalize_theme_adaptations(
+        &input.name,
+        base.and_then(|base| base.adaptations.as_ref()),
+        input.adaptations.as_ref(),
+    )?;
+    let adaptation_rules = resolve_theme_adaptation_rules(
+        &input.name,
+        &adaptations,
+        &axes,
+        &resolved.tokens,
+        local_token_contract
+            .as_ref()
+            .map(|contract| &contract.local_tokens),
+        resolved.components.as_ref(),
+    )?;
 
     // The variant list is theme-level: a list this theme sets replaces the
     // inherited one; an omitted list is inherited.
@@ -955,6 +885,14 @@ pub fn define_theme(input: &DefineThemeInput) -> Result<DefinedTheme, DefineThem
         .icon_variants
         .clone()
         .or_else(|| base.and_then(|base| base.icon_variants.clone()));
+
+    // Icons: the definition's entries over the base's by name, and its component
+    // icon slots over the base's by slot.
+    let ResolvedIcons {
+        icons,
+        icon_entry_variants,
+        component_icons,
+    } = resolve_icons(input, base, icon_variants.as_ref());
 
     let base_input_tokens = base.and_then(|base| base.input_tokens.as_ref());
     let input_tokens = (base_input_tokens.is_some() || palette.is_some() || input.tokens.is_some())
@@ -982,11 +920,15 @@ pub fn define_theme(input: &DefineThemeInput) -> Result<DefinedTheme, DefineThem
         local_token_lineage,
         components: resolved.components,
         icon_variants,
+        icons,
+        icon_entry_variants,
+        component_icons,
         built: false,
         input_tokens,
         on_dark: Some(on_dark),
         on_light: Some(on_light),
-        adaptations: input.adaptations.clone(),
+        adaptations: Some(adaptations),
+        adaptation_rules,
         axes: Some(axes),
         defined: true,
     })
@@ -1245,24 +1187,57 @@ mod json {
         })
     }
 
+    /// Fails on a key of `map` that is not one of `allowed`, as upstream's
+    /// `assertAllowedKeys` refuses one.
+    fn allowed_keys(map: &Map<String, Value>, allowed: &[&str], path: &str) -> Result<()> {
+        match map.keys().find(|key| !allowed.contains(&key.as_str())) {
+            Some(key) => Err(DefineThemeError(format!("{path}.{key} is not supported."))),
+            None => Ok(()),
+        }
+    }
+
+    /// A condition's named value: a string as it is, anything else as its
+    /// JSON text, which the vocabulary check refuses by name.
+    fn condition_value(value: &Value, _: &str) -> Result<String> {
+        Ok(match value {
+            Value::String(text) => text.clone(),
+            other => other.to_string(),
+        })
+    }
+
     fn condition(value: &Value, path: &str) -> Result<ThemeAdaptationCondition> {
         let when = object(value, path)?;
+        allowed_keys(when, &["width", "pointer", "contrast", "motion"], path)?;
         Ok(ThemeAdaptationCondition {
             width: opt(when, "width", path, |value, path| {
                 let width = object(value, path)?;
+                allowed_keys(width, &["from", "below"], path)?;
                 Ok(ThemeAdaptationWidthCondition {
-                    from: opt(width, "from", path, string)?,
-                    below: opt(width, "below", path, string)?,
+                    from: opt(width, "from", path, condition_value)?,
+                    below: opt(width, "below", path, condition_value)?,
                 })
             })?,
-            pointer: opt(when, "pointer", path, string)?,
-            contrast: opt(when, "contrast", path, string)?,
-            motion: opt(when, "motion", path, string)?,
+            pointer: opt(when, "pointer", path, condition_value)?,
+            contrast: opt(when, "contrast", path, condition_value)?,
+            motion: opt(when, "motion", path, condition_value)?,
         })
     }
 
     fn adaptation_value(value: &Value, path: &str) -> Result<ThemeAdaptationValue> {
         let rule = object(value, path)?;
+        allowed_keys(
+            rule,
+            &[
+                "typography",
+                "color",
+                "radius",
+                "motion",
+                "tokens",
+                "localTokens",
+                "components",
+            ],
+            path,
+        )?;
         let typography = opt(rule, "typography", path, |value, path| {
             let typo = object(value, path)?;
             Ok(ThemeAdaptationTypographyConfig {
@@ -1278,38 +1253,62 @@ mod json {
                 code: opt(typo, "code", path, role)?,
             })
         })?;
+        let motion = opt(rule, "motion", path, |value, path| {
+            // Not a field a rule's motion has, but plain JavaScript may pass
+            // it; upstream's completeMotion refuses it by name.
+            if field(object(value, path)?, "reducedMotion").is_some() {
+                return Err(DefineThemeError(format!(
+                    "{path}.reducedMotion is a theme-wide setting: set it on the theme's own motion, not in an adaptation rule."
+                )));
+            }
+            motion(value, path)
+        })?;
         Ok(ThemeAdaptationValue {
             typography,
             color: opt(rule, "color", path, color)?,
             radius: opt(rule, "radius", path, radius)?,
-            motion: opt(rule, "motion", path, motion)?,
+            motion,
             tokens: opt(rule, "tokens", path, token_inputs)?,
             local_tokens: opt(rule, "localTokens", path, token_inputs)?,
             components: opt(rule, "components", path, components)?,
         })
     }
 
+    /// A definition's adaptations, refused where upstream's normalization
+    /// refuses their shape: an unknown key, a rule that is not a `{when,
+    /// value}` object or lacks either. A width point that is not a number
+    /// reads as `NaN`, which [`normalize_theme_adaptations`] refuses after
+    /// the unknown names, as upstream checks them.
+    ///
+    /// [`normalize_theme_adaptations`]: super::super::adaptations::normalize_theme_adaptations
     fn adaptations(value: &Value, path: &str) -> Result<ThemeAdaptations> {
         let adaptations = object(value, path)?;
+        allowed_keys(adaptations, &["widthBreakpoints", "rules"], path)?;
         let width_breakpoints = opt(adaptations, "widthBreakpoints", path, |value, path| {
-            object(value, path)?
+            Ok(object(value, path)?
                 .iter()
-                .map(|(name, px)| Ok((name.clone(), number(px, &format!("{path}.{name}"))?)))
-                .collect::<Result<OrderedMap<f64>>>()
+                .filter(|(_, px)| !px.is_null())
+                .map(|(name, px)| (name.clone(), px.as_f64().unwrap_or(f64::NAN)))
+                .collect::<OrderedMap<f64>>())
         })?;
         let rules = opt(adaptations, "rules", path, |value, path| {
             value
                 .as_array()
-                .ok_or_else(|| shape(path, "an array"))?
+                .ok_or_else(|| shape(path, "an array of {when, value} objects"))?
                 .iter()
                 .enumerate()
                 .map(|(index, rule)| {
                     let at = format!("{path}[{index}]");
                     let rule_object = object(rule, &at)?;
+                    allowed_keys(rule_object, &["when", "value"], &at)?;
+                    let required = |key: &str| {
+                        rule_object
+                            .get(key)
+                            .ok_or_else(|| DefineThemeError(format!("{at}.{key} is required.")))
+                    };
                     Ok(ThemeAdaptationRule {
-                        when: opt(rule_object, "when", &at, condition)?.unwrap_or_default(),
-                        value: opt(rule_object, "value", &at, adaptation_value)?
-                            .unwrap_or_default(),
+                        when: condition(required("when")?, &format!("{at}.when"))?,
+                        value: adaptation_value(required("value")?, &format!("{at}.value"))?,
                     })
                 })
                 .collect::<Result<Vec<_>>>()
@@ -1469,6 +1468,9 @@ mod json {
                 local_tokens: opt(root, "localTokens", &path, token_inputs)?,
                 components: opt(root, "components", &path, components)?,
                 icon_variants,
+                // The export writes no artwork: upstream's icons are React nodes.
+                icons: None,
+                component_icons: None,
                 syntax,
                 on_dark: opt(root, "onDark", &path, surface)?,
                 on_light: opt(root, "onLight", &path, surface)?,
@@ -1484,8 +1486,9 @@ mod json {
 
 #[cfg(test)]
 mod tests {
+    use super::super::color_scale::{AccentSeed, ColorContrast, NeutralStyle};
     use super::super::merge_components::StyleMap;
-    use super::super::resolve_values::TypographyScale;
+    use super::super::resolve_values::{TypographyRole, TypographyScale};
     use super::super::status_roles::generated_scoped_status_role_defaults;
     use super::super::theme_motion::MotionCharacter;
     use super::super::theme_tokens::{resolve_theme_token, resolve_theme_tokens};
@@ -3103,5 +3106,235 @@ mod tests {
         );
         assert_eq!(typography.body, role(Some("Inter"), Some("sans-serif")));
         assert_eq!(axes.radius, Some(RadiusScaleConfig::default()));
+    }
+}
+
+#[cfg(test)]
+mod icon_tests {
+    use super::*;
+
+    fn define(input: DefineThemeInput) -> Arc<DefinedTheme> {
+        Arc::new(define_theme(&input).unwrap())
+    }
+
+    fn icons<const N: usize>(entries: [(&str, ThemeIconEntry); N]) -> Option<ThemeIcons> {
+        Some(entries.into())
+    }
+
+    fn listed(names: &[&str]) -> Option<Vec<String>> {
+        Some(names.iter().map(|name| name.to_string()).collect())
+    }
+
+    fn by_variant(icon: &str, variants: &[(&str, &str)]) -> ThemeIconEntry {
+        ThemeIconEntry::Variants {
+            icon: icon.to_string(),
+            variants: variants
+                .iter()
+                .map(|(variant, path)| (*variant, path.to_string()))
+                .collect(),
+        }
+    }
+
+    // Upstream defineTheme.test.ts: "includes icons in the theme".
+    #[test]
+    fn includes_icons_in_the_theme() {
+        let theme = define(DefineThemeInput {
+            icons: icons([("close", "X".into())]),
+            ..DefineThemeInput::new("icons")
+        });
+        assert_eq!(theme.icons, icons([("close", "X".into())]));
+    }
+
+    // Upstream: "reads function icon entries at md in the public icons view". A
+    // by-variant entry and a fallback (`null`) entry are kept as written.
+    #[test]
+    fn keeps_by_variant_and_fallback_entries() {
+        let entries = icons([
+            ("info", by_variant("info-md", &[])),
+            ("close", "X".into()),
+            ("menu", ThemeIconEntry::Fallback),
+        ]);
+        let theme = define(DefineThemeInput {
+            icons: entries.clone(),
+            ..DefineThemeInput::new("fn-icons")
+        });
+        assert_eq!(theme.icons, entries);
+        assert_eq!(theme.icon_entry_variants, None);
+    }
+
+    // Upstream: "merges icons — child overrides base".
+    #[test]
+    fn a_childs_icons_override_its_bases_by_name() {
+        let base = define(DefineThemeInput {
+            icons: icons([("close", "X".into()), ("menu", "M".into())]),
+            ..DefineThemeInput::new("base")
+        });
+        let child = define(DefineThemeInput {
+            extends: Some(base),
+            icons: icons([("close", "Y".into())]),
+            ..DefineThemeInput::new("child")
+        });
+        assert_eq!(
+            child.icons,
+            icons([("close", "Y".into()), ("menu", "M".into())])
+        );
+    }
+
+    // Upstream: "inherits icons when child has none".
+    #[test]
+    fn a_child_with_no_icons_inherits_its_bases() {
+        let base = define(DefineThemeInput {
+            icons: icons([("close", "X".into())]),
+            ..DefineThemeInput::new("base")
+        });
+        let child = define(DefineThemeInput {
+            extends: Some(base),
+            ..DefineThemeInput::new("child")
+        });
+        assert_eq!(child.icons, icons([("close", "X".into())]));
+        assert_eq!(define(DefineThemeInput::new("bare")).icons, None);
+    }
+
+    // Upstream: "merges function icon entries by key and reads them at md".
+    #[test]
+    fn by_variant_entries_merge_by_name() {
+        let base = define(DefineThemeInput {
+            icons: icons([
+                ("close", by_variant("base-close", &[])),
+                ("menu", "M".into()),
+            ]),
+            ..DefineThemeInput::new("base")
+        });
+        let child = define(DefineThemeInput {
+            extends: Some(base),
+            icons: icons([("menu", by_variant("child-menu", &[]))]),
+            ..DefineThemeInput::new("child")
+        });
+        assert_eq!(
+            child.icons,
+            icons([
+                ("close", by_variant("base-close", &[])),
+                ("menu", by_variant("child-menu", &[])),
+            ])
+        );
+    }
+
+    // Upstream `resolveIconEntryVariants`: an inherited by-variant entry keeps the list
+    // of the theme that defined it when the child's list differs; an entry the child
+    // defines, a static one, or one under the same list needs no record, and a
+    // grandchild keeps its parent's record.
+    #[test]
+    fn an_inherited_by_variant_entry_keeps_its_defining_list() {
+        let base = define(DefineThemeInput {
+            icon_variants: listed(&["outline", "filled"]),
+            icons: icons([
+                ("info", by_variant("info", &[("outline", "info-outline")])),
+                ("close", "X".into()),
+            ]),
+            ..DefineThemeInput::new("variants-base")
+        });
+        let same = define(DefineThemeInput {
+            extends: Some(base.clone()),
+            ..DefineThemeInput::new("variants-same")
+        });
+        assert_eq!(same.icon_entry_variants, None);
+        let replaced = define(DefineThemeInput {
+            extends: Some(base.clone()),
+            icon_variants: listed(&["bold"]),
+            icons: icons([("menu", by_variant("menu", &[("bold", "menu-bold")]))]),
+            ..DefineThemeInput::new("variants-replace")
+        });
+        let record: OrderedMap<Option<Vec<String>>> =
+            [("info", listed(&["outline", "filled"]))].into();
+        assert_eq!(replaced.icon_entry_variants, Some(record.clone()));
+        let grandchild = define(DefineThemeInput {
+            extends: Some(Arc::new((*replaced).clone())),
+            ..DefineThemeInput::new("variants-grandchild")
+        });
+        assert_eq!(grandchild.icon_entry_variants, Some(record));
+        // A base with no list records `None` under a child that sets one.
+        let unlisted = define(DefineThemeInput {
+            icons: icons([("info", by_variant("info", &[]))]),
+            ..DefineThemeInput::new("variants-none")
+        });
+        let listing = define(DefineThemeInput {
+            extends: Some(unlisted),
+            icon_variants: listed(&["outline"]),
+            ..DefineThemeInput::new("variants-listing")
+        });
+        assert_eq!(listing.icon_entry_variants, Some([("info", None)].into()));
+    }
+
+    // Upstream `mergeComponentIcons`: the base's slots, then the theme's own, by slot;
+    // an own value replaces the inherited one whole.
+    #[test]
+    fn component_icons_merge_by_slot() {
+        let sort = ThemeComponentIcon::ByState(
+            [
+                (
+                    "ascending",
+                    Some(ThemeComponentIconRequest {
+                        icon: Some(Some("arrowUp".into())),
+                        ..ThemeComponentIconRequest::default()
+                    }),
+                ),
+                ("none", None),
+            ]
+            .into(),
+        );
+        let base = define(DefineThemeInput {
+            component_icons: Some(
+                [
+                    ("table-sort-indicator", sort.clone()),
+                    (
+                        "table-row-expand",
+                        ThemeComponentIcon::Icon("chevronDown".into()),
+                    ),
+                ]
+                .into(),
+            ),
+            ..DefineThemeInput::new("slots-base")
+        });
+        let child = define(DefineThemeInput {
+            extends: Some(base.clone()),
+            component_icons: Some([("table-row-expand", ThemeComponentIcon::Hidden)].into()),
+            ..DefineThemeInput::new("slots-child")
+        });
+        assert_eq!(
+            child.component_icons,
+            Some(
+                [
+                    ("table-sort-indicator", sort),
+                    ("table-row-expand", ThemeComponentIcon::Hidden),
+                ]
+                .into()
+            )
+        );
+        let inherit = define(DefineThemeInput {
+            extends: Some(base.clone()),
+            ..DefineThemeInput::new("slots-inherit")
+        });
+        assert_eq!(inherit.component_icons, base.component_icons);
+        let own = define(DefineThemeInput {
+            component_icons: Some(
+                [(
+                    "table-row-expand",
+                    ThemeComponentIcon::Request(ThemeComponentIconRequest {
+                        size: Some("sm".into()),
+                        ..ThemeComponentIconRequest::default()
+                    }),
+                )]
+                .into(),
+            ),
+            ..DefineThemeInput::new("slots-own")
+        });
+        assert_eq!(
+            own.component_icons.as_ref().map(|slots| slots.len()),
+            Some(1)
+        );
+        assert_eq!(
+            define(DefineThemeInput::new("slots-none")).component_icons,
+            None
+        );
     }
 }

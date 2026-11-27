@@ -208,16 +208,22 @@ fn settle_threshold(channel: usize) -> f64 {
     }
 }
 
-/// `spring` (a motion role, at the theme's tempo) from `from` to `to`, starting at
+/// `spring` (a motion role, at the theme's `tempo`) from `from` to `to`, starting at
 /// `velocity` (units/s), as a curve that ends exactly on `to` once it settles.
 fn spring_curve(
     spring: MotionSpring,
+    tempo: f64,
     from: f64,
     to: f64,
     velocity: f64,
     epsilon: f64,
 ) -> SharedCurve {
-    let curve = solve_spring(resolve_spring(spring, 1.).to_spring(), from, to, velocity);
+    let curve = solve_spring(
+        resolve_spring(spring, tempo).to_spring(),
+        from,
+        to,
+        velocity,
+    );
     let duration = curve.settle_time(epsilon);
     FnCurve::new(
         duration,
@@ -278,6 +284,9 @@ struct LightboxState {
     /// and the photo's travel then. The viewer closes once the photo has left.
     dismissing: Option<Dismissal>,
     _wheel_end: Option<gpui::Task<()>>,
+    /// The theme's motion tempo, which every settle and the pager play at
+    /// (`ResolvedTheme::motion_tempo`), as of the last frame.
+    tempo: f64,
 }
 
 /// A released drag to dismiss, flying out.
@@ -368,9 +377,11 @@ impl LightboxState {
         reduced: bool,
         velocity: [Option<f64>; CHANNELS],
     ) {
+        let tempo = self.tempo;
         self.settle_with(to, now, reduced, |i, from, to, v| {
             spring_curve(
                 SETTLE_SPRING,
+                tempo,
                 from,
                 to,
                 velocity[i].unwrap_or(v),
@@ -391,15 +402,18 @@ impl LightboxState {
             page: 0.,
             ..self.target()
         };
+        let tempo = self.tempo;
         self.settle_with(to, now, reduced, |i, from, to, v| {
             if i != PAGE {
-                return spring_curve(SETTLE_SPRING, from, to, v, settle_threshold(i));
+                return spring_curve(SETTLE_SPRING, tempo, from, to, v, settle_threshold(i));
             }
             match release {
-                Some(velocity) => {
-                    Rc::new(solve_paging(from, paging_settle_velocity(velocity), to, 1.))
-                        as SharedCurve
-                }
+                Some(velocity) => Rc::new(solve_paging(
+                    from,
+                    paging_settle_velocity(velocity),
+                    to,
+                    tempo,
+                )) as SharedCurve,
                 None => solve_animated_page_scroll(from, to, None, None, (v != 0.).then_some(v))
                     .shared(),
             }
@@ -423,11 +437,12 @@ impl LightboxState {
             leave: 1.,
             ..self.shown
         };
+        let tempo = self.tempo;
         self.settle_with(to, now, reduced, |i, from, to, v| match i {
-            DISMISS_X => spring_curve(DISMISS_POSITION_SPRING, from, to, velocity.0, 0.05),
-            DISMISS_Y => spring_curve(DISMISS_POSITION_SPRING, from, to, velocity.1, 0.05),
-            LEAVE => spring_curve(DISMISS_SIZE_SPRING, from, to, v, 0.001),
-            _ => spring_curve(SETTLE_SPRING, from, to, v, settle_threshold(i)),
+            DISMISS_X => spring_curve(DISMISS_POSITION_SPRING, tempo, from, to, velocity.0, 0.05),
+            DISMISS_Y => spring_curve(DISMISS_POSITION_SPRING, tempo, from, to, velocity.1, 0.05),
+            LEAVE => spring_curve(DISMISS_SIZE_SPRING, tempo, from, to, v, 0.001),
+            _ => spring_curve(SETTLE_SPRING, tempo, from, to, v, settle_threshold(i)),
         });
     }
 
@@ -605,9 +620,13 @@ impl RenderOnce for Lightbox {
                     wheel: None,
                     dismissing: None,
                     _wheel_end: None,
+                    tempo: 1.,
                 }
             },
         );
+        // The theme's motion tempo, which this frame's settles plan against.
+        let tempo = theme.motion_tempo();
+        state.update(cx, |s, _| s.tempo = tempo);
         if shown_phase == Phase::Hidden || count == 0 {
             state.update(cx, |s, _| {
                 s.announced = None;

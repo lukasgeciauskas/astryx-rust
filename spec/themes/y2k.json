@@ -4418,6 +4418,7 @@
       "lucide": "Wrench"
     }
   },
+  "motionTempo": 1,
   "name": "y2k",
   "onDark": {
     "colorScheme": "dark",

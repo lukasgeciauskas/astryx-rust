@@ -71,10 +71,12 @@ pub fn use_animator(id: impl Into<ElementId>, window: &mut Window, cx: &mut App)
         let s = state.read(cx);
         (s.animator.clone(), s.origin)
     };
-    // The environment each call plans against (upstream reads these from the page).
+    // The environment each call plans against (upstream reads these from the page,
+    // the tempo from the theme the element is in, `--_astryx-motion-tempo`).
     let engine = animator.engine();
     engine.set_reduced_motion(prefers_reduced_motion(cx));
     engine.set_coarse_pointer(coarse_primary_pointer(window, cx));
+    engine.set_tempo(astryx_theme::current(window, cx).motion_tempo());
     AnimatorHandle { animator, origin }
 }
 

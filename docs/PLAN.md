@@ -1092,6 +1092,22 @@ The remaining primitives:
     exported definitions and gets their compiled twins exactly: every token in both
     modes, every component rule in order, both surfaces; a name alone gives core's
     defaults. 462 authoring tests.
+  - Stage 4 (done): `adaptations` (`themeAdaptations`: width points, the compact
+    definition, normalizing and resolving rules against the theme's effective axes), so
+    the parity test also matches every theme's adaptations and width points;
+    `dynamic_type` (the reader's text size categories and UIKit curves, applied to the
+    font sizes at an app-set category, Windows following `UISettings::TextScaleFactor`);
+    the theme `registry` (`define_theme_in` defines and registers); theme icons,
+    icon variants and component icons (`theming::apply_component_icons`); the motion
+    tempo as `Theme::motion_tempo`, exported, generated and read by the animator, the
+    animated layout, snap points, sheets, resizable, the lightbox and reorder slides;
+    `ThemeProvider` and `MediaTheme` (`theming`, `auto` reading the surface color it
+    is given), and the docs of InternationalizationProvider, Layer and LinkProvider, so
+    all 110 core components are ported; a Theme gallery page with a theme defined at run
+    time from one accent seed. 554 authoring tests.
+    - Carried to M15 (it reads the system's settings): adaptation rules conditioned on
+      contrast or reduced motion, which apply nowhere until then.
+  - M12 done (2026-11-27).
 - **M13 Charts & lab:**
   - `astryx-charts`: d3-scale and d3-shape essentials; bar, line, area, dot, band,
     candlestick, errorBar, referenceLine, heatmap and stream marks.
@@ -1102,7 +1118,8 @@ The remaining primitives:
 - **M15 RTL, high contrast, polish:** RTL mirroring, Windows high contrast and macOS's
   Increase Contrast, reduced-motion audit (reading the system's Reduce Motion setting
   natively: Windows' client-area animation setting, macOS's
-  `accessibilityDisplayShouldReduceMotion`), remaining page templates, theme-showcase,
+  `accessibilityDisplayShouldReduceMotion`), theme adaptation rules conditioned on
+  contrast or reduced motion (carried from M12), remaining page templates, theme-showcase,
   rustdoc on every public item, README.
 
 ## Verification

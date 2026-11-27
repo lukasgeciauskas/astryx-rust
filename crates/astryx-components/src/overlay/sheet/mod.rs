@@ -1016,6 +1016,7 @@ fn render_sheet(sheet: BottomSheet, window: &mut Window, cx: &mut App) -> AnyEle
     let viewport = window.viewport_size();
     let reduced = prefers_reduced_motion(cx);
     let coarse = coarse_primary_pointer(window, cx);
+    let tempo = theme.motion_tempo();
     let key = format!("{:?}", sheet.id);
     let modal = modal_state(&sheet.id, window, cx);
     let state = sheet_state(&sheet.id, window, cx);
@@ -1036,6 +1037,7 @@ fn render_sheet(sheet: BottomSheet, window: &mut Window, cx: &mut App) -> AnyEle
         let engine = &s.engine;
         engine.set_reduced_motion(reduced);
         engine.set_coarse_pointer(coarse);
+        engine.set_tempo(tempo);
         Rc::downgrade(&s.token)
     });
 

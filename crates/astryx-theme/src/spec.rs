@@ -300,7 +300,7 @@ impl Theme {
                     _ => None,
                 },
                 width_below: width("below"),
-                width_at_least: width("above"),
+                width_at_least: width("from"),
                 light: token_list(&rule["tokens"]["light"])?,
                 dark: token_list(&rule["tokens"]["dark"])?,
             });
@@ -339,6 +339,7 @@ impl Theme {
             on_light: surface(&spec["onLight"])?,
             icons: base.icons.clone(),
             fonts: base.fonts.clone(),
+            motion_tempo: spec["motionTempo"].as_f64().unwrap_or(1.0),
         })
     }
 }

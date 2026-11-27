@@ -399,6 +399,36 @@ impl Adaptation {
     }
 }
 
+/// The tempo a theme's motion plays at: what it writes to upstream's private
+/// `--_astryx-motion-tempo`, which the animator reads (upstream `themeTempo`), and
+/// whether the theme sets `tempo` itself (`ResolvedMotionKnobs::tempo_is_set`).
+///
+/// A theme whose durations come from a duration scale alone writes a tempo of 1, so
+/// its springs keep their own pace (`spec:AST-108` FR5); every shipped theme plays at
+/// 1.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MotionTempo {
+    /// The tempo springs and timed motion play at: 1 is Astryx's own, 0.75 the
+    /// quickest and 1.5 the slowest.
+    pub tempo: f64,
+    /// Whether the theme sets `tempo` itself, rather than playing at 1 by default.
+    pub is_set: bool,
+}
+
+impl MotionTempo {
+    /// Tempo 1, not set: a theme that sets no tempo.
+    pub const DEFAULT: MotionTempo = MotionTempo {
+        tempo: 1.0,
+        is_set: false,
+    };
+}
+
+impl Default for MotionTempo {
+    fn default() -> Self {
+        MotionTempo::DEFAULT
+    }
+}
+
 /// Token overrides for content on an inverted surface (`MediaTheme`).
 #[derive(Clone, Debug)]
 pub struct SurfaceOverride {

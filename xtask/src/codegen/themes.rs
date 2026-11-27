@@ -231,7 +231,7 @@ pub fn render_theme(
         adaptations.push(format!(
             "Adaptation {{ pointer: {pointer}, width_below: {}, width_at_least: {}, light: {}, dark: {} }}",
             width("below")?,
-            width("above")?,
+            width("from")?,
             token_list(rule["tokens"]["light"].as_object().context("adaptation tokens")?)?,
             token_list(rule["tokens"]["dark"].as_object().context("adaptation tokens")?)?,
         ));
@@ -320,9 +320,11 @@ pub fn render_theme(
         fonts.join(",\n")
     )?;
 
+    // The tempo at the theme's root (upstream `--_astryx-motion-tempo`).
+    let tempo = format!("{:?}", theme["motionTempo"].as_f64().unwrap_or(1.0));
     writeln!(
         out,
-        "/// The {name} theme.\npub fn theme() -> Theme {{\n    Theme {{\n        name: Cow::Borrowed({name:?}),\n        light: LIGHT,\n        dark: DARK,\n        components: Cow::Borrowed(COMPONENTS),\n        adaptations: Cow::Borrowed(ADAPTATIONS),\n        width_breakpoints: WIDTH_BREAKPOINTS,\n        on_dark: ON_DARK,\n        on_light: ON_LIGHT,\n        icons: Cow::Borrowed(ICONS),\n        fonts: Cow::Borrowed(FONTS),\n    }}\n}}"
+        "/// The {name} theme.\npub fn theme() -> Theme {{\n    Theme {{\n        name: Cow::Borrowed({name:?}),\n        light: LIGHT,\n        dark: DARK,\n        components: Cow::Borrowed(COMPONENTS),\n        adaptations: Cow::Borrowed(ADAPTATIONS),\n        width_breakpoints: WIDTH_BREAKPOINTS,\n        on_dark: ON_DARK,\n        on_light: ON_LIGHT,\n        icons: Cow::Borrowed(ICONS),\n        fonts: Cow::Borrowed(FONTS),\n        motion_tempo: {tempo},\n    }}\n}}"
     )?;
     Ok(ThemeOutput { module: out, todo })
 }

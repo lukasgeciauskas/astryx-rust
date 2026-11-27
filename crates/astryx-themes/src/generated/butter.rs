@@ -5852,5 +5852,6 @@ pub fn theme() -> Theme {
         on_light: ON_LIGHT,
         icons: Cow::Borrowed(ICONS),
         fonts: Cow::Borrowed(FONTS),
+        motion_tempo: 1.0,
     }
 }

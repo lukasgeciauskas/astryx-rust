@@ -52,11 +52,14 @@ impl FrameEngine {
             * 1000.
     }
 
-    /// Reduce Motion and the pointer, as the calls plan against them.
+    /// Reduce Motion, the pointer and the theme's motion tempo, as the calls plan
+    /// against them.
     pub(crate) fn sync_environment(&self, window: &Window, cx: &mut App) {
         self.engine.set_reduced_motion(prefers_reduced_motion(cx));
         self.engine
             .set_coarse_pointer(coarse_primary_pointer(window, cx));
+        self.engine
+            .set_tempo(astryx_theme::current(window, cx).motion_tempo());
     }
 
     /// A frame: runs what came due, starts the calls waiting for a frame, and asks for the
@@ -78,10 +81,14 @@ pub(crate) type GlideEase = Rc<dyn Fn(f32) -> f32>;
 
 /// A glide on `spring`'s progress (upstream `springGlide`): the duration it takes to
 /// settle and its progress from 0 to 1 over that time, starting with `velocity` in
-/// progress per second (a release's speed over the distance it has left). The spring
-/// plays at tempo 1, as every role does until a theme sets one.
-pub(crate) fn spring_glide(spring: MotionSpring, velocity: f64) -> (Duration, GlideEase) {
-    let resolved = resolve_spring(spring, 1.);
+/// progress per second (a release's speed over the distance it has left). A role's
+/// spring plays at the theme's motion `tempo` (`ResolvedTheme::motion_tempo`).
+pub(crate) fn spring_glide(
+    spring: MotionSpring,
+    velocity: f64,
+    tempo: f64,
+) -> (Duration, GlideEase) {
+    let resolved = resolve_spring(spring, tempo);
     let curve = progress_curve(resolved, velocity, Some(SETTLING_EPSILON));
     let seconds = curve.duration().max(0.);
     let ease: GlideEase = Rc::new(move |t: f32| {

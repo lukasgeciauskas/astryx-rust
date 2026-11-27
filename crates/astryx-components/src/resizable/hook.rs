@@ -184,6 +184,7 @@ impl UseResizable {
             default_is_collapsed: self.default_is_collapsed,
             is_collapsed: self.is_collapsed,
             has_container: self.container.is_some(),
+            tempo: 1.,
         }
     }
 }
@@ -702,7 +703,10 @@ pub fn use_resizable(
 ) -> ResizableRegion {
     let id = id.into();
     let basis = read_basis(config.direction, config.container.as_ref(), window);
-    let options = config.options();
+    let options = Options {
+        tempo: astryx_theme::current(window, cx).motion_tempo(),
+        ..config.options()
+    };
     let created = Cell::new(false);
     let controller = window.use_keyed_state(
         ElementId::Name(format!("{id:?}-resizable").into()),

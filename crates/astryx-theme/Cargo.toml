@@ -19,5 +19,9 @@ serde_json = { workspace = true, optional = true, features = ["preserve_order"] 
 astryx-primitives.workspace = true
 gpui.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+# The system's text size (`UISettings::TextScaleFactor`), which Dynamic Type follows.
+windows = { workspace = true, features = ["UI_ViewManagement"] }
+
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

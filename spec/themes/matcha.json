@@ -1483,6 +1483,7 @@
       "lucide": "Wrench"
     }
   },
+  "motionTempo": 1,
   "name": "matcha",
   "onDark": {
     "colorScheme": "dark",

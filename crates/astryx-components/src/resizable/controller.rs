@@ -9,7 +9,7 @@
 use astryx_primitives::motion::uikit::springs::role::SETTLE;
 use astryx_primitives::motion::{
     FnCurve, SharedCurve, project, resolve_spring, rubber_band, rubber_band_inverse,
-    rubber_band_slope, solve_spring, uikit::scroll,
+    rubber_band_slope, solve_spring, theme_tempo, uikit::scroll,
 };
 use gpui::App;
 use web_time::Instant;
@@ -34,6 +34,9 @@ pub(crate) struct Options {
     pub is_collapsed: Option<bool>,
     /// A caller-owned container is the percentage basis.
     pub has_container: bool,
+    /// The theme's motion tempo, which a lift's settle and the spring back play at
+    /// (`ResolvedTheme::motion_tempo`; 0, the default, plays at 1).
+    pub tempo: f64,
 }
 
 /// The measurements a resolution reads.
@@ -368,7 +371,9 @@ impl Controller {
                 // The extent's speed over the distance left, in progress per second.
                 let progress = -f64::from(velocity) / f64::from(from - to);
                 Some(crate::animated_layout::engine::spring_glide(
-                    SETTLE, progress,
+                    SETTLE,
+                    progress,
+                    theme_tempo(Some(self.opts.tempo)),
                 ))
             }
             _ => None,
@@ -452,7 +457,7 @@ impl Controller {
         let dimension = f64::from(RUBBER_BAND_TRAVEL_PX);
         let slope = rubber_band_slope(rubber_band_inverse(f64::from(from), dimension), dimension);
         let curve = solve_spring(
-            resolve_spring(SETTLE, 1.).to_spring(),
+            resolve_spring(SETTLE, theme_tempo(Some(self.opts.tempo))).to_spring(),
             f64::from(from),
             0.,
             f64::from(velocity) * slope,

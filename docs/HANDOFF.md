@@ -5,18 +5,19 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-27, after M11 (Motion & touch) and macOS support._
+_Last updated: 2026-11-27, after M12 (Theme authoring parity)._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8, M9, M10 and M11, then macOS
-  support (a first-class platform, between M11 and M12). Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, macOS
+  support (a first-class platform) and M12. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** 105 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
-  `component --list` marks ported ones with `*`).
-- **Last commits on `main`:** macOS support: Metal offscreen layers (fork patch R3), the
-  macOS native pickers (R16), the platform audit and the `macos-latest` CI job. CI runs on
+- **Parity:** all 110 core components (`cargo run -q -p astryx-cli -- parity`).
+- **Last commits on `main`:** M12's stages: `astryx_theme::authoring` (color science,
+  the palette engine, `define_theme` and its parity test against the shipped themes,
+  adaptations, Dynamic Type, the registry, icons, the motion tempo) and the `theming`
+  module (Theme, MediaTheme). CI runs on
   ubuntu, windows, macos and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
@@ -27,15 +28,6 @@ _Last updated: 2026-11-27, after M11 (Motion & touch) and macOS support._
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
   Upstream Astryx (the specification) is at `../Astryx`.
 
-### Not yet ported (5)
-
-- **Utilities with no ComponentDoc yet:** InternationalizationProvider, Layer,
-  LinkProvider, MediaTheme, Theme. All five already exist as Rust APIs
-  (`astryx_i18n::provider`, `astryx_primitives::layer`, `link_provider`,
-  `ResolvedTheme::on_surface` with `scope`, `astryx_theme::scope`); registering their docs
-  is a quick win, except MediaTheme's `auto` mode, which needs the surface's luminance
-  (GPUI cannot read a parent's background from a child).
-
 ### Carried into later milestones (recorded in each doc and in KNOWN_ISSUES)
 
 | What | Waits for |
@@ -43,6 +35,7 @@ _Last updated: 2026-11-27, after M11 (Motion & touch) and macOS support._
 | Lightbox video playback and `hasAutoPlay` (a video opens in the system player now) | MediaPlayer's decoder (M13) |
 | Backdrop blur (Lightbox, scrims, ChatLayout's frosted dock) | Fork patch R2 |
 | ChatTypingIndicator, ChatUnreadDivider, ChatVirtualizer, ChatEmojiPicker, ChatReactionBar (lab components) | Lab (M13) |
+| Theme adaptation rules conditioned on contrast or reduced motion (none ships) | M15's reading of the system's settings |
 | Native date and time pickers on Linux (`Native` shows the Astryx surface there; GPUI has no toolkit on Linux) | Fork patch R16 built and checked on Linux (a GTK picker) |
 
 ## The owner's standing instructions
@@ -215,19 +208,25 @@ time:
   status from the window): open it from the window's foreground executor, as `prompt`
   does.
 
-## Next: M12 Theme authoring parity
+## Lessons from M12
 
-M11 (Motion & touch) is done: the motion engine and `useAnimator`, animated layout (fork
-patches R19 glides and R20 inert) with every glide earlier milestones carried, gestures
-(R21 Windows touchscreens, R23 raw touch listeners) and the public gesture hooks adopted
-across core, drag-to-snap-points and BottomSheet's full gestures, offscreen layers (R3:
-rotation, group opacity, filters, masks, snapshots) with Swipe and the transient copies,
-the on-screen keyboard, and the coarse-pointer variants. R22 lets the web gallery's
-browser context menu (Inspect) open when the app takes no right click. macOS support followed
-(R3 on Metal, R16's macOS picker, the platform audit, the macOS CI job). Open: backdrop blur
-is fork patch R2.
+- **Port against upstream's own output.** The theme export writes each shipped theme's
+  `defineTheme` input (`spec/theme-definitions`) and each palette's generator request
+  (`spec/palettes`); `define_theme` and the generator are checked against the resolved
+  themes and palettes exactly, and helpers compared each module with upstream's built
+  `dist` under Node on thousands of inputs.
+- **JavaScript's number rules live in `authoring::js`** (`Math.round`, `toFixed`,
+  `String(n)`): Rust's formatting rounds ties and picks digits differently, and a token
+  value must be upstream's string.
+- **Key order matters for rules.** A later component rule wins, so definitions are
+  exported in upstream's key order and `astryx-theme`'s JSON reader keeps it
+  (`serde_json/preserve_order`).
 
-M12 builds theme authoring (see `PLAN.md`): a Rust `defineTheme` with type, radius and
-motion scale expansion (including the motion tempo the animator already reads), the OKLCH
-palette engine, the HCT generator, status-role derivation, contrast, `onDark`/`onLight`,
-adaptations and per-theme icons. Start with upstream's `theme/` and `palette/` sources.
+## Next: M13 Charts & lab
+
+M12 (Theme authoring parity) is done: `astryx_theme::authoring` defines themes the way
+upstream's `defineTheme` does, with the OKLCH palette engine, HCT, contrast, status roles,
+adaptations, Dynamic Type, icons and the motion tempo, and all 110 core components are
+ported. M13 builds `astryx-charts` (d3-scale and d3-shape essentials and the marks) and
+`astryx-lab` (all 31 lab components, with Chat's lab parts carried from M10). Start with
+upstream's `packages/charts` and `packages/lab`.

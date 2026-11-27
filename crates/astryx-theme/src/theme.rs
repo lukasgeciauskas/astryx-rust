@@ -7,16 +7,20 @@
 //! call [`current`] in their render.
 
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use astryx_primitives::{Provider, provide, use_context};
 use gpui::{
     AbsoluteLength, App, DefiniteLength, Fill, FontFallbacks, Global, IntoElement, SharedString,
-    StyleRefinement, Window, WindowAppearance,
+    StyleRefinement, Window, WindowAppearance, WindowId,
 };
 
+use crate::authoring::dynamic_type::{
+    TextSizeCategory, reader_text_size_tokens, system_text_size_category,
+};
+use crate::authoring::theme_motion::MOTION_TEMPO_PROPERTY;
 use crate::fonts;
 use crate::generated::{default_theme, tokens::Tokens};
 use crate::types::*;
@@ -38,6 +42,11 @@ pub struct Theme {
     pub icons: Cow<'static, [(Cow<'static, str>, Cow<'static, str>)]>,
     /// TTF/OTF files the theme's font families need.
     pub fonts: Cow<'static, [&'static [u8]]>,
+    /// The tempo the theme's motion plays at (upstream's `--_astryx-motion-tempo` at
+    /// the theme's root, which the animator reads): 1 is Astryx's own, 0.75 the
+    /// quickest and 1.5 the slowest. A theme that sets no `tempo`, or a duration
+    /// scale alone, plays at 1.
+    pub motion_tempo: f64,
 }
 
 impl Default for Theme {
@@ -54,6 +63,7 @@ impl Default for Theme {
             on_light: None,
             icons: Cow::Borrowed(&[]),
             fonts: Cow::Borrowed(&[]),
+            motion_tempo: 1.0,
         }
     }
 }
@@ -132,37 +142,119 @@ impl ThemeMode {
 }
 
 /// A theme resolved for drawing: one appearance, with adaptations and any
-/// scoped token overrides already applied.
+/// scoped token overrides already applied, its font sizes at the reader's text size.
 #[derive(Clone, Debug)]
 pub struct ResolvedTheme {
     pub theme: Arc<Theme>,
     pub appearance: Appearance,
+    text_size: TextSizeCategory,
+    motion_tempo: f64,
     tokens: Arc<Tokens>,
+}
+
+/// The tempo `theme`'s motion plays at in `appearance` for the window's width and
+/// pointer: the last `--_astryx-motion-tempo` its applying adaptations write, else its
+/// root [`Theme::motion_tempo`] (upstream `themeTempo`, which reads the property where
+/// the element is), as upstream writes the property at the theme's root and in its
+/// adaptation rules.
+fn theme_motion_tempo(theme: &Theme, appearance: Appearance, width: f32, pointer: Pointer) -> f64 {
+    let mut tempo = Some(theme.motion_tempo);
+    for adaptation in theme.adaptations.iter() {
+        if !adaptation.applies(width, pointer) {
+            continue;
+        }
+        let overrides = match appearance {
+            Appearance::Light => &adaptation.light,
+            Appearance::Dark => &adaptation.dark,
+        };
+        for (name, value) in overrides.iter() {
+            if name == MOTION_TEMPO_PROPERTY
+                && let TokenValue::Number(value) = value
+            {
+                tempo = Some(f64::from(*value));
+            }
+        }
+    }
+    astryx_primitives::motion::theme_tempo(tempo)
+}
+
+/// `theme`'s tokens in `appearance`: the adaptations that hold for the window's
+/// width and pointer, then a surface's overrides, then the font sizes at the
+/// reader's text size `category`, as upstream scales the sizes a theme's root, its
+/// adaptation rules and its media surfaces write.
+fn resolve_tokens(
+    theme: &Theme,
+    appearance: Appearance,
+    width: f32,
+    pointer: Pointer,
+    surface: Option<&SurfaceOverride>,
+    category: TextSizeCategory,
+) -> Tokens {
+    let mut tokens = theme.tokens(appearance).clone();
+    for adaptation in theme.adaptations.iter() {
+        if adaptation.applies(width, pointer) {
+            let overrides = match appearance {
+                Appearance::Light => &adaptation.light,
+                Appearance::Dark => &adaptation.dark,
+            };
+            apply_tokens(&mut tokens, overrides.iter().map(|(n, v)| (n.as_ref(), v)));
+        }
+    }
+    if let Some(surface) = surface {
+        apply_tokens(
+            &mut tokens,
+            surface.tokens.iter().map(|(n, v)| (n.as_ref(), v)),
+        );
+    }
+    reader_text_size_tokens(&mut tokens, category);
+    tokens
 }
 
 impl ResolvedTheme {
     /// Resolves `theme` in `appearance`, applying the adaptations that hold
-    /// for the window's width and pointer.
+    /// for the window's width and pointer, at the default text size (Large: the
+    /// theme's own font sizes).
     pub fn new(theme: Arc<Theme>, appearance: Appearance, width: f32, pointer: Pointer) -> Self {
-        let mut tokens = theme.tokens(appearance).clone();
-        for adaptation in theme.adaptations.iter() {
-            if adaptation.applies(width, pointer) {
-                let overrides = match appearance {
-                    Appearance::Light => &adaptation.light,
-                    Appearance::Dark => &adaptation.dark,
-                };
-                apply_tokens(&mut tokens, overrides.iter().map(|(n, v)| (n.as_ref(), v)));
-            }
-        }
+        Self::at_text_size(theme, appearance, width, pointer, TextSizeCategory::L)
+    }
+
+    /// [`ResolvedTheme::new`] at the reader's text size `category`: every font size
+    /// scaled on its UIKit curve
+    /// ([`reader_text_size_tokens`](crate::authoring::dynamic_type::reader_text_size_tokens)).
+    /// [`current`] resolves the app's theme at the app's category
+    /// ([`text_size_category`](crate::authoring::dynamic_type::text_size_category)).
+    pub fn at_text_size(
+        theme: Arc<Theme>,
+        appearance: Appearance,
+        width: f32,
+        pointer: Pointer,
+        category: TextSizeCategory,
+    ) -> Self {
+        let tokens = resolve_tokens(&theme, appearance, width, pointer, None, category);
         ResolvedTheme {
+            motion_tempo: theme_motion_tempo(&theme, appearance, width, pointer),
             theme,
             appearance,
+            text_size: category,
             tokens: Arc::new(tokens),
         }
     }
 
     pub fn tokens(&self) -> &Tokens {
         &self.tokens
+    }
+
+    /// The reader's text size category the font sizes are drawn at.
+    pub fn text_size_category(&self) -> TextSizeCategory {
+        self.text_size
+    }
+
+    /// The tempo the theme's springs and timed motion play at (upstream
+    /// `themeTempo`, which reads `--_astryx-motion-tempo`): the one the theme or an
+    /// applying adaptation writes, else 1. A motion engine takes it with
+    /// `MotionEngine::set_tempo`; every shipped theme plays at 1.
+    pub fn motion_tempo(&self) -> f64 {
+        self.motion_tempo
     }
 
     /// The same theme with `overrides` re-defining tokens, as a theme's
@@ -176,19 +268,31 @@ impl ResolvedTheme {
         ResolvedTheme {
             theme: self.theme.clone(),
             appearance: self.appearance,
+            text_size: self.text_size,
+            motion_tempo: self.motion_tempo,
             tokens: Arc::new(tokens),
         }
     }
 
     /// The theme as content on an inverted surface (`MediaTheme`): the
-    /// surface's appearance plus the theme's `onDark`/`onLight` overrides.
+    /// surface's appearance plus the theme's `onDark`/`onLight` overrides, at
+    /// this theme's text size (the surface's font sizes scale too).
     pub fn on_surface(&self, appearance: Appearance, width: f32, pointer: Pointer) -> Self {
-        let resolved = ResolvedTheme::new(self.theme.clone(), appearance, width, pointer);
-        match self.theme.surface(appearance) {
-            Some(surface) => {
-                resolved.with_tokens(surface.tokens.iter().map(|(n, v)| (n.as_ref(), v)))
-            }
-            None => resolved,
+        let surface = self.theme.surface(appearance);
+        let tokens = resolve_tokens(
+            &self.theme,
+            appearance,
+            width,
+            pointer,
+            surface,
+            self.text_size,
+        );
+        ResolvedTheme {
+            theme: self.theme.clone(),
+            appearance,
+            text_size: self.text_size,
+            motion_tempo: theme_motion_tempo(&self.theme, appearance, width, pointer),
+            tokens: Arc::new(tokens),
         }
     }
 
@@ -331,6 +435,59 @@ struct ThemeState {
     mode: ThemeMode,
     cache: RefCell<HashMap<(Appearance, u32, bool), ResolvedTheme>>,
     registered_fonts: RefCell<HashSet<String>>,
+    /// The reader's text size category the app set, which wins over the system's.
+    app_text_size: Option<TextSizeCategory>,
+    /// The category the system's text size names, as last read; `None` where the
+    /// platform reports none.
+    system_text_size: Cell<Option<TextSizeCategory>>,
+    /// Whether the system's text size is read: on a platform that reports one, and
+    /// not under GPUI's test platform, whose windows would read the machine's.
+    reads_system_text_size: bool,
+    /// The window last seen active, so a window that gains focus reads the system's
+    /// text size again.
+    active_window: Cell<Option<WindowId>>,
+}
+
+impl ThemeState {
+    /// The category every font size is drawn at: the app's, else the system's,
+    /// else Large.
+    fn text_size(&self) -> TextSizeCategory {
+        self.app_text_size
+            .or(self.system_text_size.get())
+            .unwrap_or_default()
+    }
+
+    /// Reads the system's text size again, where it is read; true when the
+    /// category changed (the cache is cleared then).
+    fn read_system_text_size(&self) -> bool {
+        if !self.reads_system_text_size {
+            return false;
+        }
+        let read = system_text_size_category();
+        if read == self.system_text_size.get() {
+            return false;
+        }
+        self.system_text_size.set(read);
+        self.cache.borrow_mut().clear();
+        true
+    }
+
+    /// Reads the system's text size when `window` gains focus (GPUI redraws a window
+    /// whose focus changes, so its next `current` sees it).
+    fn follow_focus(&self, window: &Window) {
+        if !self.reads_system_text_size {
+            return;
+        }
+        let id = window.window_handle().window_id();
+        if window.is_window_active() {
+            if self.active_window.get() != Some(id) {
+                self.active_window.set(Some(id));
+                self.read_system_text_size();
+            }
+        } else if self.active_window.get() == Some(id) {
+            self.active_window.set(None);
+        }
+    }
 }
 
 impl Global for ThemeState {}
@@ -354,11 +511,20 @@ pub fn init(cx: &mut App) {
     }
     let mut theme = Theme::default();
     fonts::prepare_stacks(&mut theme, &fonts::available_families(cx));
+    let reads_system_text_size = !cx.background_executor().is_test();
     cx.set_global(ThemeState {
         theme: Arc::new(theme),
         mode: ThemeMode::System,
         cache: RefCell::default(),
         registered_fonts: RefCell::default(),
+        app_text_size: None,
+        system_text_size: Cell::new(
+            reads_system_text_size
+                .then(system_text_size_category)
+                .flatten(),
+        ),
+        reads_system_text_size,
+        active_window: Cell::new(None),
     });
 }
 
@@ -402,6 +568,35 @@ pub fn active(cx: &App) -> (Arc<Theme>, ThemeMode) {
     (state.theme.clone(), state.mode)
 }
 
+/// Sets (or, with `None`, drops) the app's text size category and redraws
+/// (`authoring::dynamic_type::set_text_size_category` and
+/// `follow_system_text_size`).
+pub(crate) fn set_app_text_size(category: Option<TextSizeCategory>, cx: &mut App) {
+    init(cx);
+    let state = cx.global_mut::<ThemeState>();
+    state.app_text_size = category;
+    state.cache.get_mut().clear();
+    cx.refresh_windows();
+}
+
+/// The text size category the app draws at (`authoring::dynamic_type::text_size_category`).
+pub(crate) fn text_size(cx: &App) -> TextSizeCategory {
+    cx.try_global::<ThemeState>()
+        .map_or(TextSizeCategory::L, ThemeState::text_size)
+}
+
+/// Reads the system's text size again and redraws when it changed
+/// (`authoring::dynamic_type::refresh_text_size_category`).
+pub(crate) fn refresh_system_text_size(cx: &mut App) {
+    init(cx);
+    let state = cx.global::<ThemeState>();
+    let before = state.text_size();
+    state.read_system_text_size();
+    if state.text_size() != before {
+        cx.refresh_windows();
+    }
+}
+
 /// Registers a theme's font files with the text system, once per theme.
 pub fn register_fonts(theme: &Theme, cx: &mut App) {
     if theme.fonts.is_empty() {
@@ -432,6 +627,7 @@ pub fn current(window: &Window, cx: &App) -> ResolvedTheme {
         return scoped;
     }
     let state = state(cx);
+    state.follow_focus(window);
     let appearance = state.mode.resolve(window);
     let width = f32::from(window.viewport_size().width);
     // Upstream `pointer: 'coarse'` adaptations hold under a finger (a coarse primary
@@ -453,7 +649,13 @@ pub fn current(window: &Window, cx: &App) -> ResolvedTheme {
     if let Some(hit) = state.cache.borrow().get(&key) {
         return hit.clone();
     }
-    let resolved = ResolvedTheme::new(state.theme.clone(), appearance, width, pointer);
+    let resolved = ResolvedTheme::at_text_size(
+        state.theme.clone(),
+        appearance,
+        width,
+        pointer,
+        state.text_size(),
+    );
     state.cache.borrow_mut().insert(key, resolved.clone());
     resolved
 }

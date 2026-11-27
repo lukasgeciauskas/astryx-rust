@@ -83,6 +83,8 @@ function exportTheme(source, resolveThemeTokens, warnings) {
       ),
     })),
     widthBreakpoints: theme?.__adaptations?.widthBreakpoints ?? null,
+    // The tempo the theme's motion plays at: its root `--_astryx-motion-tempo`.
+    motionTempo: Number(raw.light['--_astryx-motion-tempo'] ?? 1),
     onDark: theme?.__onDark ? surface(theme.__onDark, raw.dark, 'dark', name, warnings) : null,
     onLight: theme?.__onLight ? surface(theme.__onLight, raw.light, 'light', name, warnings) : null,
     icons: exportIcons(theme, name, warnings),

@@ -6720,6 +6720,7 @@
       "lucide": "Wrench"
     }
   },
+  "motionTempo": 1,
   "name": "butter",
   "onDark": {
     "colorScheme": "dark",

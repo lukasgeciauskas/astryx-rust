@@ -3,6 +3,7 @@
   "components": [],
   "fonts": [],
   "icons": {},
+  "motionTempo": 1,
   "name": "default",
   "onDark": null,
   "onLight": null,

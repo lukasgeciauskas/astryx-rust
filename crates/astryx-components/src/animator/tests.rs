@@ -218,3 +218,53 @@ fn rotate_turns_the_element_and_its_hit_area(cx: &mut TestAppContext) {
     click(cx, f32::from(center.x) + 34., f32::from(center.y));
     assert_eq!(*clicks.borrow(), 1, "where it was laid out, nothing is hit");
 }
+
+/// How long a call to `to` takes to arrive, in 16 ms frames.
+fn arrival_ms(cx: &mut VisualTestContext, handle: &AnimatorHandle, to: f64) -> u64 {
+    let call =
+        cx.update(|_, cx| handle.animate(AnimatorValues::new().x(to), Default::default(), cx));
+    let mut ms = 0;
+    while !call.is_done() && ms < 10_000 {
+        frames(cx, 16);
+        ms += 16;
+    }
+    ms
+}
+
+// Upstream: the animator reads `--_astryx-motion-tempo` where the element is, and a
+// theme that sets `tempo` writes it (spec:AST-108 FR5). At 1.5 the same spring keeps
+// its shape and takes 1.5 times as long.
+#[gpui::test]
+fn a_themes_motion_tempo_of_one_and_a_half_makes_a_spring_take_half_as_long_again(
+    cx: &mut TestAppContext,
+) {
+    use astryx_theme::authoring::define::{DefineThemeInput, define_theme};
+    use astryx_theme::authoring::theme_motion::ThemeMotionConfig;
+
+    let slot: Slot = Rc::default();
+    let cx = page(cx, slot.clone());
+    let handle = slot.borrow().clone().unwrap();
+    let normal = arrival_ms(cx, &handle, 200.);
+
+    let slow = define_theme(&DefineThemeInput {
+        motion: Some(ThemeMotionConfig {
+            tempo: Some(1.5),
+            ..ThemeMotionConfig::default()
+        }),
+        ..DefineThemeInput::new("slow-motion")
+    })
+    .unwrap();
+    cx.update(|_, cx| astryx_theme::set_theme(slow.to_theme(), cx));
+    settle(cx);
+    assert_eq!(
+        cx.update(|window, cx| astryx_theme::current(window, cx).motion_tempo()),
+        1.5
+    );
+    let handle = slot.borrow().clone().unwrap();
+    let slower = arrival_ms(cx, &handle, 0.);
+    let ratio = slower as f64 / normal as f64;
+    assert!(
+        (ratio - 1.5).abs() < 0.1,
+        "{normal} ms at tempo 1, {slower} ms at 1.5"
+    );
+}

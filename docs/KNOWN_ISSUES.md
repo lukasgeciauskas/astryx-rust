@@ -353,6 +353,28 @@
   (panel and content) is centered at the content width. Without panels the content keeps
   its own box and aligns its children through its padding, as upstream does.
 
+- **Theme authoring makes typed themes, not CSS (M12).** `define_theme` and `to_theme`
+  give the same tokens, rules, surfaces and adaptations upstream's runtime resolves
+  (checked against all seven shipped themes), but upstream's stylesheet compiler
+  (`generateThemeRules`, `generateThemeCSS`) has no counterpart: GPUI reads typed values.
+  `define_theme` registers nothing without an `App`; `define_theme_in` defines and
+  registers, as upstream's `defineTheme` does.
+- **Adaptation rules on contrast or reduced motion apply nowhere yet (M12).** The typed
+  theme has no environment reading for them until M15 reads the system's contrast and
+  Reduce Motion settings, so such a rule (no shipped theme has one) is left out rather
+  than applied everywhere.
+- **MediaTheme's `auto` reads the surface it is given (M12).** Upstream measures the
+  painted surface; GPUI cannot read a parent's paint, so `MediaTheme::surface(color)`
+  names it (usually the token the parent paints), and without one `auto` takes its
+  fallback.
+- **Component icons are the app's (M12).** Upstream scopes a theme's `componentIcons` to
+  its `Theme`; here the slots are an app-wide table (`set_component_icon`), and
+  `theming::apply_component_icons` copies a defined theme's into it.
+- **Dynamic Type follows the system on Windows only (M12).** The reader's text size
+  category is the app's to set (`set_text_size_category`); Windows also follows the
+  system's text size (`UISettings::TextScaleFactor`). Upstream reads it only in iOS
+  Safari and through `env(preferred-text-scale)`, which GPUI's platforms do not expose.
+
 ## Tooling
 
 - **True hot-patching needs our patched dx.** `cargo xtask dev --hot-patch` patches

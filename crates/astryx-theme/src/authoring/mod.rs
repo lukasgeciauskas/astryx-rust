@@ -4,11 +4,13 @@
 //! upstream's resolved output; these modules let an app define its own the way upstream
 //! does, and the parity tests check them against that output.
 
+pub mod adaptations;
 pub mod color;
 pub mod color_scale;
 pub mod contrast;
 pub mod css_values;
 pub mod define;
+pub mod dynamic_type;
 pub mod hct;
 pub(crate) mod js;
 pub mod local_tokens;
@@ -18,6 +20,7 @@ pub mod motion_scale;
 pub mod on_media;
 pub mod palette;
 pub mod radius_scale;
+pub mod registry;
 pub mod resolve_values;
 pub mod status_color;
 pub mod status_roles;

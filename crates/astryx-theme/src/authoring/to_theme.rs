@@ -22,15 +22,28 @@
 //!   mode cannot convert, or one GPUI has no style for, is left out.
 //! - `onDark` and `onLight`: the surface's `color-scheme` and its tokens, read
 //!   against the theme's tokens in the surface's mode.
+//! - Adaptations: one per resolved rule ([`DefinedTheme::adaptation_rules`]),
+//!   in order: its pointer, its width edges at the theme's width points (at
+//!   least `from`, below `below`), and the tokens it writes typed in each mode,
+//!   `var()`s read against the theme's tokens with the rule's own on top. The
+//!   typed [`Adaptation`] holds no contrast or reduced-motion condition, so a
+//!   rule with one is left out rather than applied everywhere.
+//! - Width points: the theme's effective ones
+//!   ([`DefinedTheme::adaptations`]), the defaults for none.
 //!
-//! Declarations and surface tokens are in key order, as the export's sorted
-//! JSON lists them; rules are in the theme's order. Icons, fonts, width points
-//! and adaptations are [`Theme::default`]'s.
+//! Declarations and surface and adaptation tokens are in key order, as the
+//! export's sorted JSON lists them; rules are in the theme's order. Fonts are
+//! [`Theme::default`]'s. Icons go where the Icon component looks them up: each
+//! entry's artwork under its name, and a by-variant entry's under `name:variant`
+//! for each variant it can receive. The motion tempo the theme writes to
+//! `--_astryx-motion-tempo` goes first among the adaptations, as one that always
+//! applies, since [`Theme`] has no field for it.
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
+use super::adaptations::{ResolvedThemeAdaptationRule, WidthBreakpoints};
 use super::css_values::{
     EdgeLengths, Typed, TypedContext, ValueKind, property_kind, substitute_vars, to_points,
     token_kind, typed, value_for_mode,
@@ -43,7 +56,8 @@ use super::theme_tokens::resolve_theme_tokens;
 use super::token_values::ResolvedThemeMode;
 use crate::Theme;
 use crate::types::{
-    Appearance, ComponentRule, Declaration, RuleState, StyleProp, SurfaceOverride, TokenValue,
+    Adaptation, Appearance, ComponentRule, Declaration, Pointer, RuleState, StyleProp,
+    SurfaceOverride, TokenValue,
 };
 
 /// The modes, light then dark, as the export lists them.
@@ -339,6 +353,133 @@ fn component_rule(rule: ExportedRule) -> Option<ComponentRule> {
     })
 }
 
+/// A resolved rule as the typed [`Adaptation`] the export's JSON reads into
+/// (the export writes `when`, `query` and the rule's tokens converted in each
+/// mode against `{...raw[mode], ...rule.tokens}`), or `None` for a rule with a
+/// contrast or reduced-motion condition, which an [`Adaptation`] cannot hold.
+/// A width edge is the theme's point of that name, `points`.
+fn adaptation(
+    rule: &ResolvedThemeAdaptationRule,
+    raw: &[CssMap; 2],
+    points: Option<&WidthBreakpoints>,
+) -> Option<Adaptation> {
+    let when = &rule.when;
+    if when.contrast.is_some() || when.motion.is_some() {
+        return None;
+    }
+    let width = |name: Option<&String>| name.and_then(|name| points?.get(name)).map(|px| px as f32);
+    let range = when.width.as_ref();
+    let tokens = |index: usize, mode: ResolvedThemeMode| {
+        let scope: Vec<(&str, &str)> = raw[index]
+            .iter()
+            .chain(rule.tokens.iter())
+            .map(|(name, value)| (name, value.as_str()))
+            .collect();
+        let converted = convert_tokens(&rule.tokens, &scope, mode);
+        // A rule's tempo stays: `ResolvedTheme` reads it where the rule holds.
+        let tempo = converted.iter().find_map(|(name, value)| {
+            (name == super::theme_motion::MOTION_TEMPO_PROPERTY)
+                .then(|| match value {
+                    Typed::Token(TokenValue::Number(n)) => Some(*n),
+                    Typed::Token(TokenValue::Keyword(k)) => k.0.parse().ok(),
+                    _ => None,
+                })
+                .flatten()
+        });
+        let mut list = token_list(converted);
+        if let Some(tempo) = tempo {
+            list.push((
+                Cow::Borrowed(super::theme_motion::MOTION_TEMPO_PROPERTY),
+                TokenValue::Number(tempo),
+            ));
+        }
+        Cow::Owned(list)
+    };
+    Some(Adaptation {
+        pointer: match when.pointer.as_deref() {
+            Some("coarse") => Some(Pointer::Coarse),
+            Some("fine") => Some(Pointer::Fine),
+            _ => None,
+        },
+        width_below: width(range.and_then(|range| range.below.as_ref())),
+        width_at_least: width(range.and_then(|range| range.from.as_ref())),
+        light: tokens(0, ResolvedThemeMode::Light),
+        dark: tokens(1, ResolvedThemeMode::Dark),
+    })
+}
+
+/// A theme's width points as the typed theme holds them.
+fn width_breakpoints(points: &WidthBreakpoints) -> crate::types::WidthBreakpoints {
+    crate::types::WidthBreakpoints {
+        sm: points.sm as f32,
+        md: points.md as f32,
+        lg: points.lg as f32,
+        xl: points.xl as f32,
+        xl2: points.xl2 as f32,
+    }
+}
+
+/// The theme's icons as the Icon component looks them up (`name`, then
+/// `name:variant` for a requested variant): each entry's artwork under its name, and
+/// a by-variant entry's under `name:variant` for each variant it can receive, one
+/// the theme lists and, for an inherited entry, the theme that defined it lists too
+/// (upstream `selectIconEntry` and `readIconEntry`). A fallback entry writes
+/// nothing, so the built-in icon draws.
+fn theme_icons(theme: &DefinedTheme) -> Vec<(Cow<'static, str>, Cow<'static, str>)> {
+    use super::define::ThemeIconEntry;
+    let active = theme.icon_variants.as_ref();
+    let mut out = Vec::new();
+    for (name, entry) in theme.icons.iter().flat_map(|icons| icons.iter()) {
+        match entry {
+            ThemeIconEntry::Fallback => {}
+            ThemeIconEntry::Icon(path) => {
+                out.push((Cow::Owned(name.to_string()), Cow::Owned(path.clone())));
+            }
+            ThemeIconEntry::Variants { icon, variants } => {
+                out.push((Cow::Owned(name.to_string()), Cow::Owned(icon.clone())));
+                let defining = match theme
+                    .icon_entry_variants
+                    .as_ref()
+                    .and_then(|record| record.get(name))
+                {
+                    Some(list) => list.as_ref(),
+                    None => active,
+                };
+                let lists = [active, defining];
+                for (variant, path) in variants.iter() {
+                    let receivable = lists
+                        .iter()
+                        .all(|list| list.is_some_and(|list| list.iter().any(|v| v == variant)));
+                    if receivable {
+                        out.push((
+                            Cow::Owned(format!("{name}:{variant}")),
+                            Cow::Owned(path.clone()),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+impl DefinedTheme {
+    /// The tempo the theme's motion plays at: what it writes to
+    /// `--_astryx-motion-tempo` (upstream `themeTempo` reads it; a duration scale alone
+    /// writes 1), else 1, and whether it sets `tempo` itself
+    /// (`ResolvedMotionKnobs::tempo_is_set` of its effective motion).
+    pub fn motion_tempo(&self) -> crate::types::MotionTempo {
+        use super::theme_motion::{MOTION_TEMPO_PROPERTY, resolve_motion_knobs};
+        let knobs = resolve_motion_knobs(self.axes.as_ref().and_then(|axes| axes.motion.as_ref()));
+        crate::types::MotionTempo {
+            tempo: self.tokens.get(MOTION_TEMPO_PROPERTY).map_or(1.0, |text| {
+                astryx_primitives::motion::theme_tempo::theme_tempo_from_text(text)
+            }),
+            is_set: knobs.tempo_is_set,
+        }
+    }
+}
+
 /// A defined theme as a typed [`Theme`], or core's default theme for none,
 /// with the values the theme export and `crate::spec` give it (see the
 /// module docs). The name loses an `astryx-` prefix, as the export's file names
@@ -386,6 +527,23 @@ pub fn to_theme(theme: Option<&DefinedTheme>) -> Theme {
         .on_light
         .as_ref()
         .map(|spec| surface(spec, &raw[0], ResolvedThemeMode::Light));
+    let points = theme
+        .adaptations
+        .as_ref()
+        .map(|adaptations| &adaptations.width_breakpoints);
+    out.adaptations = Cow::Owned(
+        theme
+            .adaptation_rules
+            .iter()
+            .flatten()
+            .filter_map(|rule| adaptation(rule, &raw, points))
+            .collect(),
+    );
+    if let Some(points) = points {
+        out.width_breakpoints = width_breakpoints(points);
+    }
+    out.icons = Cow::Owned(theme_icons(theme));
+    out.motion_tempo = theme.motion_tempo().tempo;
     out
 }
 
@@ -635,6 +793,129 @@ mod tests {
     }
 
     #[test]
+    fn adaptations_carry_their_pointer_width_edges_and_tokens_typed_per_mode() {
+        use super::super::adaptations::{
+            ThemeAdaptationCondition, ThemeAdaptationRule, ThemeAdaptationValue,
+            ThemeAdaptationWidthCondition, ThemeAdaptations,
+        };
+        let condition = |pointer: Option<&str>, from: Option<&str>, below: Option<&str>| {
+            ThemeAdaptationCondition {
+                pointer: pointer.map(str::to_string),
+                width: (from.is_some() || below.is_some()).then(|| ThemeAdaptationWidthCondition {
+                    from: from.map(str::to_string),
+                    below: below.map(str::to_string),
+                }),
+                ..ThemeAdaptationCondition::default()
+            }
+        };
+        let writes =
+            |when: ThemeAdaptationCondition, tokens: &[(&str, &str)]| ThemeAdaptationRule {
+                when,
+                value: ThemeAdaptationValue {
+                    tokens: Some(
+                        tokens
+                            .iter()
+                            .map(|(name, value)| (*name, TokenInput::Css(value.to_string())))
+                            .collect(),
+                    ),
+                    ..ThemeAdaptationValue::default()
+                },
+            };
+        let input = DefineThemeInput {
+            tokens: Some(
+                [(
+                    "--color-accent",
+                    TokenInput::Pair("#112233".into(), "#445566".into()),
+                )]
+                .into(),
+            ),
+            adaptations: Some(ThemeAdaptations {
+                width_breakpoints: Some([("md", 800.0)].into()),
+                rules: Some(vec![
+                    // A var() reads the theme's tokens with the rule's own on top.
+                    writes(
+                        condition(Some("coarse"), None, Some("lg")),
+                        &[
+                            ("--color-border", "var(--color-accent)"),
+                            ("--_private", "1px"),
+                        ],
+                    ),
+                    writes(
+                        condition(None, Some("md"), None),
+                        &[
+                            ("--color-accent", "#abcdef"),
+                            ("--color-border", "var(--color-accent)"),
+                        ],
+                    ),
+                    // The typed adaptation has no contrast condition.
+                    writes(
+                        ThemeAdaptationCondition {
+                            contrast: Some("more".into()),
+                            ..ThemeAdaptationCondition::default()
+                        },
+                        &[("--color-border", "#000000")],
+                    ),
+                ]),
+            }),
+            ..DefineThemeInput::new("adaptive")
+        };
+        let theme = define_theme(&input).unwrap().to_theme();
+        assert_eq!(theme.width_breakpoints.md, 800.0);
+        assert_eq!(theme.width_breakpoints.lg, 1024.0);
+        let described: Vec<_> = theme
+            .adaptations
+            .iter()
+            .map(|adaptation| {
+                let tokens = |tokens: &[(Cow<'static, str>, TokenValue)]| {
+                    tokens
+                        .iter()
+                        .map(|(name, value)| format!("{name}: {value}"))
+                        .collect::<Vec<_>>()
+                };
+                (
+                    adaptation.pointer,
+                    adaptation.width_below,
+                    adaptation.width_at_least,
+                    tokens(&adaptation.light),
+                    tokens(&adaptation.dark),
+                )
+            })
+            .collect();
+        assert_eq!(
+            described,
+            [
+                (
+                    Some(Pointer::Coarse),
+                    Some(1024.0),
+                    None,
+                    vec!["--color-border: #112233".to_string()],
+                    vec!["--color-border: #445566".to_string()],
+                ),
+                (
+                    None,
+                    None,
+                    Some(800.0),
+                    vec![
+                        "--color-accent: #ABCDEF".to_string(),
+                        "--color-border: #ABCDEF".to_string()
+                    ],
+                    vec![
+                        "--color-accent: #ABCDEF".to_string(),
+                        "--color-border: #ABCDEF".to_string()
+                    ],
+                ),
+            ]
+        );
+        // No theme has the default width points and no adaptations.
+        let none = to_theme(None);
+        assert!(none.adaptations.is_empty());
+        assert_eq!(
+            none.width_breakpoints,
+            crate::types::WidthBreakpoints::DEFAULT
+        );
+    }
+
+    #[test]
     fn no_theme_is_cores_default() {
         let theme = to_theme(None);
         assert_eq!(theme.name, "default");
@@ -657,5 +938,221 @@ mod tests {
         assert_eq!(js_key_order("\u{ff5e}", "\u{1f600}"), Ordering::Greater);
         assert_eq!(js_key_order("--a", "--b"), Ordering::Less);
         assert_eq!(js_key_order("Z", "a"), Ordering::Less);
+    }
+}
+
+#[cfg(test)]
+mod icon_and_tempo_tests {
+    use std::sync::Arc;
+
+    use super::super::define::{DefineThemeInput, ThemeIconEntry, define_theme};
+    use super::super::theme_motion::ThemeMotionConfig;
+    use super::*;
+    use crate::types::{MotionTempo, Pointer};
+
+    fn define(input: DefineThemeInput) -> Arc<DefinedTheme> {
+        Arc::new(define_theme(&input).unwrap())
+    }
+
+    fn listed(names: &[&str]) -> Option<Vec<String>> {
+        Some(names.iter().map(|name| name.to_string()).collect())
+    }
+
+    fn icons_of(theme: &Theme) -> Vec<(&str, &str)> {
+        theme
+            .icons
+            .iter()
+            .map(|(name, path)| (name.as_ref(), path.as_ref()))
+            .collect()
+    }
+
+    fn by_variant(icon: &str, variants: &[(&str, &str)]) -> ThemeIconEntry {
+        ThemeIconEntry::Variants {
+            icon: icon.to_string(),
+            variants: variants
+                .iter()
+                .map(|(variant, path)| (*variant, path.to_string()))
+                .collect(),
+        }
+    }
+
+    // The icons go to `Theme::icons` as the Icon component reads them: a name's
+    // artwork, a fallback entry nothing, and a by-variant entry's variants under
+    // `name:variant` only for the variants the theme lists (upstream `readIconEntry`
+    // passes no other variant).
+    #[test]
+    fn writes_the_icons_the_icon_component_looks_up() {
+        let theme = define(DefineThemeInput {
+            icon_variants: listed(&["outline", "filled"]),
+            icons: Some(
+                [
+                    ("close", ThemeIconEntry::from("icons/lucide/x.svg")),
+                    ("menu", ThemeIconEntry::Fallback),
+                    (
+                        "info",
+                        by_variant(
+                            "icons/lucide/info.svg",
+                            &[
+                                ("outline", "icons/lucide/circle-help.svg"),
+                                ("bold", "icons/lucide/badge-info.svg"),
+                            ],
+                        ),
+                    ),
+                ]
+                .into(),
+            ),
+            ..DefineThemeInput::new("icons")
+        });
+        let out = theme.to_theme();
+        assert_eq!(
+            icons_of(&out),
+            [
+                ("close", "icons/lucide/x.svg"),
+                ("info", "icons/lucide/info.svg"),
+                ("info:outline", "icons/lucide/circle-help.svg"),
+            ]
+        );
+        assert_eq!(out.icon("close"), Some("icons/lucide/x.svg"));
+        assert_eq!(out.icon("menu"), None);
+        assert_eq!(out.icon("info:bold"), None);
+        // No list, no variant.
+        let unlisted = define(DefineThemeInput {
+            icons: Some([("info", by_variant("i.svg", &[("outline", "o.svg")]))].into()),
+            ..DefineThemeInput::new("unlisted")
+        });
+        assert_eq!(icons_of(&unlisted.to_theme()), [("info", "i.svg")]);
+        assert!(to_theme(None).icons.is_empty());
+    }
+
+    // An inherited by-variant entry receives a variant only when both its defining
+    // theme's list and the child's list contain it (upstream `selectIconEntry`'s
+    // `variantLists`).
+    #[test]
+    fn an_inherited_entry_receives_only_variants_both_lists_hold() {
+        let base = define(DefineThemeInput {
+            icon_variants: listed(&["outline", "filled"]),
+            icons: Some(
+                [(
+                    "info",
+                    by_variant("i.svg", &[("outline", "o.svg"), ("filled", "f.svg")]),
+                )]
+                .into(),
+            ),
+            ..DefineThemeInput::new("base")
+        });
+        let child = define(DefineThemeInput {
+            extends: Some(base.clone()),
+            icon_variants: listed(&["outline", "bold"]),
+            ..DefineThemeInput::new("child")
+        });
+        assert_eq!(
+            icons_of(&child.to_theme()),
+            [("info", "i.svg"), ("info:outline", "o.svg")]
+        );
+        assert_eq!(
+            icons_of(&base.to_theme()),
+            [
+                ("info", "i.svg"),
+                ("info:outline", "o.svg"),
+                ("info:filled", "f.svg")
+            ]
+        );
+    }
+
+    fn motion(tempo: Option<f64>, scale: bool) -> Option<ThemeMotionConfig> {
+        Some(ThemeMotionConfig {
+            tempo,
+            fast: scale.then_some(125.0),
+            medium: scale.then_some(300.0),
+            ratio: scale.then_some(0.75),
+            ..ThemeMotionConfig::default()
+        })
+    }
+
+    /// The tempo a resolved theme plays at, as the animator reads it.
+    fn played(theme: &DefinedTheme) -> f64 {
+        crate::ResolvedTheme::new(
+            Arc::new(theme.to_theme()),
+            Appearance::Dark,
+            1280.0,
+            Pointer::Fine,
+        )
+        .motion_tempo()
+    }
+
+    // The motion tempo: the `--_astryx-motion-tempo` the theme writes, which a
+    // duration scale alone writes as 1 (upstream `resolveThemeValues`), and whether
+    // the theme sets `tempo` (FR5: springs follow the tempo only when it does).
+    #[test]
+    fn carries_the_motion_tempo_the_theme_writes() {
+        assert_eq!(
+            define(DefineThemeInput::new("plain")).motion_tempo(),
+            MotionTempo::DEFAULT
+        );
+        let slow = define(DefineThemeInput {
+            motion: motion(Some(1.5), false),
+            ..DefineThemeInput::new("slow")
+        });
+        assert_eq!(
+            slow.motion_tempo(),
+            MotionTempo {
+                tempo: 1.5,
+                is_set: true
+            }
+        );
+        assert_eq!(played(&slow), 1.5);
+        // Clamped to 0.75–1.5.
+        let clamped = define(DefineThemeInput {
+            motion: motion(Some(3.0), false),
+            ..DefineThemeInput::new("clamped")
+        });
+        assert_eq!(clamped.motion_tempo().tempo, 1.5);
+        // A duration scale alone plays its springs at 1.
+        let scaled = define(DefineThemeInput {
+            motion: motion(None, true),
+            ..DefineThemeInput::new("scaled")
+        });
+        assert_eq!(
+            scaled
+                .tokens
+                .get("--_astryx-motion-tempo")
+                .map(String::as_str),
+            Some("1")
+        );
+        assert_eq!(scaled.motion_tempo(), MotionTempo::DEFAULT);
+        assert!(scaled.to_theme().adaptations.is_empty());
+        assert_eq!(slow.to_theme().motion_tempo, 1.5);
+        assert_eq!(played(&scaled), 1.0);
+        // A child inherits its base's tempo, and can set it back to 1.
+        let child = define(DefineThemeInput {
+            extends: Some(slow.clone()),
+            ..DefineThemeInput::new("child")
+        });
+        assert_eq!(child.motion_tempo(), slow.motion_tempo());
+        assert_eq!(played(&child), 1.5);
+        let reset = define(DefineThemeInput {
+            extends: Some(slow),
+            motion: motion(Some(1.0), false),
+            ..DefineThemeInput::new("reset")
+        });
+        assert_eq!(
+            reset.motion_tempo(),
+            MotionTempo {
+                tempo: 1.0,
+                is_set: true
+            }
+        );
+        assert_eq!(played(&reset), 1.0);
+        // Core's default theme plays at 1.
+        assert_eq!(
+            crate::ResolvedTheme::new(
+                Arc::new(to_theme(None)),
+                Appearance::Light,
+                1280.0,
+                Pointer::Fine
+            )
+            .motion_tempo(),
+            1.0
+        );
     }
 }

@@ -64,7 +64,10 @@ pub fn resolve_theme_tokens(theme: Option<&DefinedTheme>, mode: ResolvedThemeMod
     }
 
     // Status roles the theme leaves unset resolve as its generated root CSS
-    // declares them (architecture:theme-compilation INV16 and INV17).
+    // declares them (architecture:theme-compilation INV16 and INV17). Upstream
+    // passes no adaptation rules here: script reads the root's values, and the
+    // rules' token writes reach the role defaults only in the stylesheet
+    // compiler (`adaptations::adaptation_token_writes`).
     for (key, value) in generated_scoped_status_role_defaults(&theme.tokens, local_tokens, &[]) {
         let value = resolve_xds_token_value(&value, mode).to_string();
         resolved.insert(key, value);

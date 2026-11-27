@@ -2109,6 +2109,7 @@
       "lucide": "Wrench"
     }
   },
+  "motionTempo": 1,
   "name": "chocolate",
   "onDark": {
     "colorScheme": "dark",
