@@ -142,6 +142,30 @@ impl ChoiceRow {
                 .relative()
                 .child(press.probe().absolute().top_0().left_0().size_full());
         }
+        // Under a coarse pointer the row's target grows toward 44 px (upstream
+        // `useTouchHitArea` on CheckboxInput's, RadioListItem's and Switch's rows).
+        let toggle_for_area = self
+            .on_toggle
+            .clone()
+            .filter(|_| !(self.disabled || self.inert));
+        row = row
+            .relative()
+            .children(crate::gestures::touch_hit_area::hit_area_with(
+                &self.id,
+                toggle_for_area.is_some(),
+                toggle_for_area.map(|toggle| {
+                    Rc::new(move |window: &mut Window, cx: &mut App| toggle(window, cx))
+                        as crate::gestures::touch_hit_area::ActivateFn
+                }),
+                None,
+                // A finger on the grown area shows the row's press paint.
+                crate::gestures::touch_hit_area::HitLinks {
+                    gestures: None,
+                    press: self.press.as_ref(),
+                },
+                window,
+                cx,
+            ));
         match (self.disabled || self.inert, self.on_toggle) {
             (false, Some(toggle)) => {
                 row = row.cursor_pointer().on_click(move |event, window, cx| {

@@ -711,3 +711,40 @@ fn fr7_a_cancelled_finger_picks_nothing(cx: &mut TestAppContext) {
     assert!(logged(&setup).is_empty());
     assert!(is_open(cx));
 }
+
+#[gpui::test]
+fn fr4_a_sheet_that_closes_after_the_pointer_turned_fine_plays_its_exit(cx: &mut TestAppContext) {
+    let (cx, _) = host(cx, fruits(), None, |s| {
+        s.presentation(PopoverPresentation::Adaptive)
+    });
+    // A phone: a finger and a compact window.
+    cx.update(|_, cx| astryx_primitives::modality::set_primary_pointer_coarse(Some(true), cx));
+    cx.simulate_resize(gpui::size(px(393.), px(852.)));
+    focus_trigger(cx);
+    press(cx, "enter");
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    let sheet = gpui::ElementId::Name("s-sheet".into());
+    assert!(
+        crate::overlay::is_sheet_presented(&sheet),
+        "it opened as a sheet"
+    );
+    // A trackpad docks, then the sheet closes: it slides away as the sheet it is.
+    cx.update(|_, cx| astryx_primitives::modality::set_primary_pointer_coarse(Some(false), cx));
+    press(cx, "escape");
+    assert!(
+        crate::overlay::is_sheet_presented(&sheet),
+        "the closing sheet stays through its exit"
+    );
+    cx.executor()
+        .advance_clock(std::time::Duration::from_secs(1));
+    for _ in 0..3 {
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+    }
+    assert!(
+        !crate::overlay::is_sheet_presented(&sheet),
+        "then it is gone"
+    );
+}

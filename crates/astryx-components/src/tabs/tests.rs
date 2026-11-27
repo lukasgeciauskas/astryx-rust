@@ -70,3 +70,29 @@ fn a_tab_menu_opens_its_options_and_selects_through_the_tab_list(cx: &mut TestAp
         "the second option"
     );
 }
+
+#[test]
+fn fades_out_at_the_strips_own_edge_not_at_the_bleed_edge() {
+    use gpui::{MaskStop, px};
+    // Nothing hidden: no mask.
+    assert!(super::strip_fade(false, false, px(4.), px(32.), false).is_none());
+    // Both edges hide tabs: transparent at the bleed, opaque a fade's width further in.
+    let both = super::strip_fade(true, true, px(4.), px(32.), false).unwrap();
+    assert_eq!(both.angle, 90.);
+    assert_eq!(
+        both.stops,
+        vec![
+            MaskStop::px(px(4.), 0.),
+            MaskStop::px(px(36.), 1.),
+            MaskStop::from_end(px(36.), 1.),
+            MaskStop::from_end(px(4.), 0.),
+        ]
+    );
+    // Only the end hides tabs: the start shows in full.
+    let end = super::strip_fade(false, true, px(4.), px(32.), false).unwrap();
+    assert_eq!(end.stops[0], MaskStop::px(px(0.), 1.));
+    // Right to left, the start is the right edge.
+    let rtl = super::strip_fade(true, false, px(4.), px(32.), true).unwrap();
+    assert_eq!(rtl.angle, 270.);
+    assert_eq!(rtl.stops[0], MaskStop::px(px(4.), 0.));
+}

@@ -24,7 +24,7 @@
 //! A component's own props (BottomSheet's `snap_points`, Carousel's `snap`) stay the
 //! component path to the same behavior (FR4).
 
-mod compositor_settle;
+pub(crate) mod compositor_settle;
 pub mod examples;
 pub(crate) mod snap_drag;
 
@@ -120,6 +120,14 @@ impl AttachedSnapDrag {
         window: &mut Window,
         cx: &mut App,
     ) -> AnyElement {
+        self.advance(window, cx);
+        let drawn = self.snap.element.draw(child);
+        self.wrap(drawn)
+    }
+
+    /// Moves the drag on to this frame: the engine's environment, its frame, the
+    /// frames it needs next, and the `on_settle` calls it owes, after the frame.
+    pub(crate) fn advance(&self, window: &mut Window, cx: &mut App) {
         let engine = &self.snap.animator;
         engine.set_reduced_motion(prefers_reduced_motion(cx));
         engine.set_coarse_pointer(coarse_primary_pointer(window, cx));
@@ -139,15 +147,18 @@ impl AttachedSnapDrag {
                 }
             });
         }
-        let drawn = self.snap.element.draw(child);
+    }
+
+    /// Wraps `child` in the pan's area, while the pan lasts.
+    pub(crate) fn wrap(&self, child: impl IntoElement) -> AnyElement {
         if self.pan.is_destroyed() {
-            drawn.into_any_element()
+            child.into_any_element()
         } else {
-            self.pan.area(drawn).into_any_element()
+            self.pan.area(child).into_any_element()
         }
     }
 
-    fn destroy(&self) {
+    pub(crate) fn destroy(&self) {
         // Destroyed first, so the pan's cancel moves nothing.
         self.snap.destroy();
         self.pan.destroy();

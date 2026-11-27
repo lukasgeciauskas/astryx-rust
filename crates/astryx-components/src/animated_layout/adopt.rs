@@ -36,7 +36,8 @@ pub(crate) fn reveal_content(
     let shown = reveal.shown();
     let content = div()
         .relative()
-        .when(fade, |el| el.opacity(shown.clamp(0., 1.)))
+        // As one group, as CSS `opacity` fades it (fork patch R3).
+        .when(fade, |el| el.layer_opacity(shown.clamp(0., 1.)))
         .child(content)
         .inert(inert);
     reveal.wrap(content)

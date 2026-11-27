@@ -62,6 +62,18 @@ pub(crate) struct SideNavShell {
     /// content column's glide. An `auto` shell clips its side region, so there the rail's
     /// own box follows its edge.
     pub rides: bool,
+    /// The rail's change this frame, for AppShell's content swap; written as the rail
+    /// renders.
+    pub swap: Rc<std::cell::Cell<Option<RailSwap>>>,
+}
+
+/// A rail change in progress, as AppShell's content swap reads it (AppShell FR17).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct RailSwap {
+    /// The change's progress, 0 to 1.
+    pub progress: f32,
+    /// Reduce Motion under a coarse pointer: nothing glides, the wraps cross-fade.
+    pub cross_fade: bool,
 }
 
 /// A SideNavItem's nesting depth.

@@ -384,7 +384,13 @@ impl Element for EditorElement {
         let font_size = text_style.font_size.to_pixels(window.rem_size());
         let line_height = window.line_height();
         let wrap = self.style.multiline.then_some(bounds.size.width);
-        let focused = gpui::Focusable::focus_handle(self.state.read(cx), cx).is_focused(window);
+        let focus = gpui::Focusable::focus_handle(self.state.read(cx), cx);
+        let focused = focus.is_focused(window);
+        // Every Core field registers with the keyboard module where it is drawn, so the
+        // keyboard's surfaces find it (AST-099 FR9: no prop turns this on).
+        let kind = self.state.read(cx).keyboard_field_kind();
+        let drawn = window.element_transform().apply_bounds(bounds);
+        crate::keyboard::register_field(&focus, kind, drawn, true, window, cx);
         let misspelled = self
             .state
             .update(cx, |state, cx| state.spelling_errors(focused, cx));

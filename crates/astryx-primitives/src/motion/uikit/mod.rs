@@ -3,7 +3,8 @@
 //! motion roles among them register in [`crate::motion::roles`].
 //!
 //! Component tables that no motion role reads (alert, datePicker,
-//! popover, reorder, slider) arrive with their components; the sheet's
+//! popover, slider) arrive with their components (the swipe-action row's is
+//! [`swipe_actions`], the reorder control's claim [`reorder`]); the sheet's
 //! release constants are in [`sheet`] and the gesture recognizers'
 //! thresholds in [`gestures`].
 
@@ -12,10 +13,12 @@ pub mod navigation;
 pub mod paging;
 pub mod picker;
 pub mod progress_bar;
+pub mod reorder;
 pub mod scroll;
 pub mod segmented;
 pub mod sheet;
 pub mod springs;
+pub mod swipe_actions;
 pub mod switch_control;
 pub mod timing;
 pub mod zoom_media;

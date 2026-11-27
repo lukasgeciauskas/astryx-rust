@@ -24,6 +24,45 @@ use crate::overlay::{
 use crate::search::{SearchItem, static_source};
 use crate::text::{Text, TextType};
 
+/// The touch presentations, shown by declaring a coarse primary pointer.
+fn touch_presentations(window: &mut Window, cx: &mut App) -> AnyElement {
+    let declared = astryx_primitives::modality::declared_primary_pointer(cx) == Some(true);
+    let pinned = window.use_keyed_state("touch-pinned", cx, |_, _| true);
+    let pinned_value = *pinned.read(cx);
+    Stack::horizontal()
+        .gap(SpacingStep::S3)
+        .child(
+            Switch::new("touch-declared", "Present as under a finger", declared).on_change(
+                |on, _, cx| {
+                    astryx_primitives::modality::set_primary_pointer_coarse(on.then_some(true), cx);
+                },
+            ),
+        )
+        .child(
+            DropdownMenu::new("touch-menu")
+                .button_label("Adaptive menu")
+                .presentation(PopoverPresentation::Adaptive)
+                .entry(
+                    MenuCheckboxItem::new("touch-pinned", "Pinned", pinned_value).on_change(
+                        move |on, window, cx| {
+                            pinned.update(cx, |p, _| *p = on);
+                            window.refresh();
+                        },
+                    ),
+                )
+                .entry(MenuItem::new("touch-rename", "Rename"))
+                .entry(MenuItem::new("touch-share", "Share")),
+        )
+        .child(
+            DropdownMenu::new("touch-pointer-menu")
+                .button_label("Pointer model (500 ms hold)")
+                .presentation(PopoverPresentation::Popover)
+                .entry(MenuItem::new("touch-copy", "Copy"))
+                .entry(MenuItem::new("touch-paste", "Paste")),
+        )
+        .into_any_element()
+}
+
 pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let archived = window.use_keyed_state("popover-archived", cx, |_, _| false);
     let shown_archived = *archived.read(cx);
@@ -43,6 +82,8 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
     let sheet_open = window.use_keyed_state("sheet-open", cx, |_, _| false);
     let (open_drawer, close_drawer) = (toggle(&drawer_open, true), toggle(&drawer_open, false));
     let (open_sheet, close_sheet) = (toggle(&sheet_open, true), toggle(&sheet_open, false));
+    let search_open = window.use_keyed_state("search-sheet-open", cx, |_, _| false);
+    let (open_search, close_search) = (toggle(&search_open, true), toggle(&search_open, false));
     let close_drawer_header = close_drawer.clone();
     let close_rename_cancel = close_rename.clone();
     let label = |text: &'static str| Text::new(text).text_type(TextType::Supporting);
@@ -203,6 +244,10 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                 }
             }),
         )
+        .child(label(
+            "Touch presentations: the gallery cannot fake a finger, so this switch declares one (set_primary_pointer_coarse). Under it menus open as a finger presses, their check and radio marks sit at the row's end, dialogs and drawers hold taps while they enter, the alert scales in, and in a compact window (narrower than md or shorter than 500) the adaptive menu and popover become bottom sheets",
+        ))
+        .child(touch_presentations(window, cx))
         .child(label("Drawer and BottomSheet"))
         .child(
             Stack::horizontal()
@@ -216,6 +261,11 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                     Button::new("sheet-button", "Share")
                         .variant(ButtonVariant::Secondary)
                         .on_click(move |_, window, cx| open_sheet(window, cx)),
+                )
+                .child(
+                    Button::new("search-sheet-button", "Find a place")
+                        .variant(ButtonVariant::Secondary)
+                        .on_click(move |_, window, cx| open_search(window, cx)),
                 )
                 .child(
                     Popover::new("sheet-popover", "Sort by")
@@ -301,6 +351,28 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                         ),
                 )
         })
+        .child(
+            // A Tall sheet keeps its focused field above a phone's on-screen keyboard: the
+            // keyboard's inset goes at the content's end, the field scrolls 48 px clear of
+            // the keyboard, and the content rides the keyboard's slide where the browser
+            // reports one.
+            BottomSheet::new("search-sheet", *search_open.read(cx), "Find a place")
+                .height(SheetHeight::Tall)
+                .on_open_change(move |open, window, cx| {
+                    if !open {
+                        close_search(window, cx)
+                    }
+                })
+                .child(
+                    Stack::vertical()
+                        .gap(SpacingStep::S2)
+                        .child(Text::new("Find a place").text_type(TextType::Label))
+                        .children((0..14).map(|i| {
+                            Text::new(format!("Nearby {}", i + 1)).text_type(TextType::Body)
+                        }))
+                        .child(TextInput::new("search-sheet-query", "Search places", "")),
+                ),
+        )
         .child(label("DropdownMenu, MoreMenu and ContextMenu"))
         .child(menus(window, cx))
         .child(label("Lightbox"))

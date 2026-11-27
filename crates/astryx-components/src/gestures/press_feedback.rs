@@ -66,6 +66,8 @@ struct SurfaceInfo {
     owns_box: bool,
     /// The device was touch-first as the surface was last drawn.
     touch_first: bool,
+    /// A group press tracker paints this surface's fingers (upstream's press-group item).
+    skip_fingers: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -516,26 +518,22 @@ pub fn painted_surfaces(window: &Window, cx: &mut App) -> Vec<(Bounds<Pixels>, P
         .collect()
 }
 
-/// A touch-first device's override (upstream reads `(pointer: coarse)`, the primary
-/// pointer, which a mouse or a trackpad on a tablet does not change).
-#[derive(Default)]
-struct PrimaryPointer(Option<bool>);
-
-impl Global for PrimaryPointer {}
-
 /// Declares the device's primary pointer coarse (a phone or a tablet) or fine, or with
 /// `None` leaves it to the platform and the window's last pointer. On a touch-first device
 /// the press controller paints a mouse's, a trackpad's and the Space key's presses, which
 /// GPUI's active state would paint elsewhere.
+///
+/// The same declaration as [`astryx_primitives::modality::set_primary_pointer_coarse`]
+/// (upstream reads `(pointer: coarse)`, the primary pointer, which a mouse or a trackpad
+/// on a tablet does not change).
 pub fn set_primary_pointer_coarse(coarse: Option<bool>, cx: &mut App) {
-    cx.set_global(PrimaryPointer(coarse));
-    cx.refresh_windows();
+    astryx_primitives::modality::set_primary_pointer_coarse(coarse, cx);
 }
 
 /// Whether the primary pointer is a finger: the app's declaration, else the browser's
 /// `(pointer: coarse)`, else the window's reading of its last pointer.
 pub fn touch_first_device(window: &Window, cx: &mut App) -> bool {
-    if let Some(coarse) = cx.try_global::<PrimaryPointer>().and_then(|p| p.0) {
+    if let Some(coarse) = astryx_primitives::modality::declared_primary_pointer(cx) {
         return coarse;
     }
     platform_coarse() || coarse_primary_pointer(window, cx)
@@ -576,6 +574,7 @@ pub struct PressFeedback {
     in_menu: bool,
     space: Option<FocusHandle>,
     owns_box: bool,
+    skip_fingers: bool,
 }
 
 /// Upstream `usePressFeedback`: the press of the surface `id` names.
@@ -606,6 +605,7 @@ pub fn use_press_feedback(
         in_menu: false,
         owns_box: false,
         space: None,
+        skip_fingers: false,
     }
 }
 
@@ -632,6 +632,11 @@ impl PressFeedback {
     pub fn space_activates(mut self, focus: &FocusHandle) -> Self {
         self.space = Some(focus.clone());
         self
+    }
+
+    /// The surface's key in the window's press controller (and its touch hit area).
+    pub(crate) fn key(&self) -> u64 {
+        self.key
     }
 
     /// What the surface paints now.
@@ -683,6 +688,13 @@ impl PressFeedback {
         self
     }
 
+    /// A group's press tracker paints a finger's press here (upstream's press-group item):
+    /// the controller takes no finger on this surface.
+    pub fn skip_fingers(mut self, skip: bool) -> Self {
+        self.skip_fingers = skip;
+        self
+    }
+
     /// Ends this surface's press and its paint at once (a press that started on a control
     /// inside it).
     pub fn cancel(&self, window: &mut Window) {
@@ -701,7 +713,25 @@ impl PressFeedback {
                 )
             },
             move |bounds, (hitbox, scroller), window, cx| {
-                paint.register(bounds, hitbox, scroller, window, cx)
+                paint.register(bounds, hitbox, scroller, true, window, cx)
+            },
+        )
+    }
+
+    /// The surface's grown touch area (a hit layer past its box, upstream
+    /// `touchHitAreaStyles.layer`): a finger that lands there presses this surface and
+    /// shows its paint. Absolute, the layer's full size; it notes no hit-area target.
+    pub(crate) fn grown_area_probe(&self) -> gpui::Canvas<(Hitbox, Option<Bounds<Pixels>>)> {
+        let paint = self.clone();
+        gpui::canvas(
+            |bounds, window, _| {
+                (
+                    window.insert_hitbox(bounds, HitboxBehavior::Normal),
+                    super::scroller::innermost_scroller(),
+                )
+            },
+            move |bounds, (hitbox, scroller), window, cx| {
+                paint.register(bounds, hitbox, scroller, false, window, cx)
             },
         )
     }
@@ -762,12 +792,22 @@ impl PressFeedback {
         bounds: Bounds<Pixels>,
         hitbox: Hitbox,
         scroller: Option<Bounds<Pixels>>,
+        note: bool,
         window: &mut Window,
         cx: &mut App,
     ) {
         // The device's primary pointer as the surface is drawn (and the window's reading of
         // it kept current, for a key press).
         let touch_first = touch_first_device(window, cx);
+        // Every pressable surface is a neighbour a touch hit area stops short of.
+        if note && coarse_primary_pointer(window, cx) {
+            super::touch_hit_area::note_target(
+                window,
+                self.key,
+                bounds,
+                cx.background_executor().now(),
+            );
+        }
         let theme = astryx_theme::current(window, cx);
         let info = SurfaceInfo {
             key: self.key,
@@ -780,13 +820,14 @@ impl PressFeedback {
             in_menu: self.in_menu,
             owns_box: self.owns_box,
             touch_first,
+            skip_fingers: self.skip_fingers,
         };
         let c = self.controller.clone();
         {
             let (c, hitbox) = (c.clone(), hitbox.clone());
             window.on_touch_event(move |event: &TouchEvent, window, cx| {
                 if event.phase == TouchPhase::Started {
-                    if hitbox.is_hovered_at(event.position, window) {
+                    if !info.skip_fingers && hitbox.is_hovered_at(event.position, window) {
                         let (x, y) = xy(event.position);
                         c.candidate(
                             info,
@@ -928,7 +969,8 @@ impl Element for PressSurface {
         cx: &mut App,
     ) {
         let (hitbox, scroller) = (prepaint.0.clone(), prepaint.1);
-        self.feedback.register(bounds, hitbox, scroller, window, cx);
+        self.feedback
+            .register(bounds, hitbox, scroller, true, window, cx);
         self.child.paint(window, cx);
     }
 }

@@ -134,8 +134,11 @@ impl RenderOnce for Drawer {
         } else {
             t.duration.medium
         };
-        let shown = match phase(&state, duration, duration, window, cx) {
+        let drawn = phase(&state, duration, duration, window, cx);
+        let hold_key = ElementId::Name(format!("{}-entrance-hold", self.id).into());
+        let shown = match drawn {
             Phase::Hidden => {
+                astryx_primitives::gestures::input_hold::release_input_hold(window, &hold_key, cx);
                 return div()
                     .id(self.id.clone())
                     .display_contents()
@@ -149,6 +152,41 @@ impl RenderOnce for Drawer {
         let viewport = window.viewport_size();
         let width = self.width.unwrap_or(px(400.).into());
         let mobile = viewport.width <= px(640.);
+        // Under a coarse primary pointer, a tap or a drag during the slide-in reaches
+        // nothing (upstream `holdEntranceInput`). A non-modal drawer holds only its
+        // panel, so its page stays live; keys and assistive technology stay live.
+        {
+            use astryx_primitives::gestures::input_hold::{
+                HoldScope, hold_entrance_progress, release_input_hold,
+            };
+            match drawn {
+                Phase::Open { progress } => {
+                    let scope = if self.scrim {
+                        HoldScope::Viewport
+                    } else {
+                        let w = match width {
+                            Length::Definite(gpui::DefiniteLength::Absolute(
+                                gpui::AbsoluteLength::Pixels(w),
+                            )) => w,
+                            _ => px(400.),
+                        };
+                        let w = match (mobile, self.full_width_on_mobile) {
+                            (true, true) => viewport.width,
+                            (true, false) => w.min(viewport.width - px(56.)),
+                            (false, _) => w,
+                        };
+                        let on_right = (self.side == DrawerSide::End) != dir.is_rtl();
+                        let x = if on_right { viewport.width - w } else { px(0.) };
+                        HoldScope::Surface(gpui::Bounds::new(
+                            gpui::point(x, px(0.)),
+                            gpui::size(w, viewport.height),
+                        ))
+                    };
+                    hold_entrance_progress(window, hold_key, scope, progress, duration, cx);
+                }
+                _ => release_input_hold(window, &hold_key, cx),
+            }
+        }
         let padding = self
             .padding
             .map_or(t.spacing.s4.to_pixels(rem), |s| s.token(t).to_pixels(rem));
@@ -243,6 +281,7 @@ impl RenderOnce for Drawer {
             ));
         let surface = surface
             .children(probes(&state, cx))
+            .child(astryx_primitives::gestures::input_hold::hold_probe())
             .child(crate::gestures::scroller::scroll_begin(
                 ElementId::Name(format!("{}-content", self.id).into()),
                 Some(&scroller_handle),

@@ -434,7 +434,13 @@ pub fn current(window: &Window, cx: &App) -> ResolvedTheme {
     let state = state(cx);
     let appearance = state.mode.resolve(window);
     let width = f32::from(window.viewport_size().width);
-    let pointer = Pointer::Fine;
+    // Upstream `pointer: 'coarse'` adaptations hold under a finger (a coarse primary
+    // pointer), as the browser's `(pointer: coarse)` media query does.
+    let pointer = if astryx_primitives::modality::coarse_primary_pointer_now(window, cx) {
+        Pointer::Coarse
+    } else {
+        Pointer::Fine
+    };
     // Adaptations only change at their breakpoints; key the cache on which
     // ones hold, not on the exact width.
     let mut mask = 0u32;

@@ -322,6 +322,9 @@ impl RenderOnce for SideNavItem {
                         &[("label", label.as_ref().into())],
                     ),
                 )
+                // Built on the popover runtime, not upstream's Popover component: no touch
+                // growth.
+                .touch_motion(Some(false))
                 .controller(flyout)
                 .placement(Placement::End)
                 .alignment(LayerAlign::Start)

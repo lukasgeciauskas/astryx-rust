@@ -355,6 +355,8 @@ mod updates {
         removed: Rc<RefCell<Vec<String>>>,
         /// The list shows through a viewport this tall.
         clip: Option<Pixels>,
+        /// Each row starts with a painted swatch.
+        painted: bool,
     }
 
     #[derive(IntoElement)]
@@ -375,6 +377,9 @@ mod updates {
                     .on_click(move |_, _, _| removed.borrow_mut().push(name.to_string()));
                 if self.0.keyed {
                     row = row.item_key(name);
+                }
+                if self.0.painted {
+                    row = row.start_content(div().size(px(8.)).bg(gpui::red()));
                 }
                 list = list.child(row);
             }
@@ -405,11 +410,20 @@ mod updates {
             keyed,
             removed: Rc::default(),
             clip: None,
+            painted: false,
         }
     }
 
     const LEAVING_B: &str = "l-leaving-Text(\"b\")";
     const LEAVING_C: &str = "l-leaving-Text(\"c\")";
+    const COPY_B: &str = "l-leaving-copy-Text(\"b\")";
+
+    /// Whether a removed row's exit draws: a snapshot of its last frame (fork patch R3),
+    /// or, where the row painted nothing the renderer keeps, what the List kept of it.
+    fn leaving(cx: &mut VisualTestContext, ghost: &'static str) -> bool {
+        let copy: &'static str = ghost.replacen("leaving-", "leaving-copy-", 1).leak();
+        cx.debug_bounds(ghost).is_some() || cx.debug_bounds(copy).is_some()
+    }
 
     #[gpui::test]
     fn fr12_a_collapsing_row_is_out_of_the_tab_order(cx: &mut TestAppContext) {
@@ -420,7 +434,7 @@ mod updates {
         rows.borrow_mut().retain(|r| *r != "b");
         settle(cx);
         frames(cx, 32);
-        assert!(cx.debug_bounds(LEAVING_B).is_some(), "b collapses in place");
+        assert!(leaving(cx, LEAVING_B), "b collapses in place");
         // From a, Tab skips the collapsing row to c.
         crate::segmented::tests::press(cx, "tab");
         crate::segmented::tests::press(cx, "enter");
@@ -438,15 +452,12 @@ mod updates {
         rows.borrow_mut().retain(|r| *r != "c");
         settle(cx);
         frames(cx, 32);
-        assert!(cx.debug_bounds(LEAVING_C).is_none(), "no exit out of view");
+        assert!(!leaving(cx, LEAVING_C), "no exit out of view");
         // In view, a removal plays its exit.
         rows.borrow_mut().retain(|r| *r != "a");
         settle(cx);
         frames(cx, 32);
-        assert!(
-            cx.debug_bounds("l-leaving-Text(\"a\")").is_some(),
-            "an exit in view"
-        );
+        assert!(leaving(cx, "l-leaving-Text(\"a\")"), "an exit in view");
     }
 
     fn frames(cx: &mut VisualTestContext, ms: u64) {
@@ -500,10 +511,43 @@ mod updates {
         assert!(clicks.borrow().is_empty(), "inert: {:?}", clicks.borrow());
         frames(cx, 600);
         assert_eq!(top(cx, "c"), b, "c in b's place");
+        assert!(!leaving(cx, LEAVING_B), "gone at rest");
+    }
+
+    #[gpui::test]
+    fn fr12_a_removed_rows_exit_draws_a_snapshot_of_its_last_frame(cx: &mut TestAppContext) {
+        let mut s = setup(true, true);
+        s.painted = true;
+        let rows = s.rows.clone();
+        let cx = page(cx, s);
+        let b = cx.debug_bounds("b").unwrap();
+        let kept = cx.update(|window, _| {
+            window.has_layer_snapshot(&gpui::ElementId::Name("l-row-copy-Text(\"b\")".into()))
+        });
+        assert!(kept, "each keyed row keeps its last frame");
+        rows.borrow_mut().retain(|r| *r != "b");
+        settle(cx);
+        let copy = cx
+            .debug_bounds(COPY_B)
+            .expect("the exit is the row's last frame, start and end content included");
+        assert_eq!(copy.size.height, b.size.height, "at the row's own height");
         assert!(
-            cx.debug_bounds("l-leaving-Text(\"b\")").is_none(),
-            "gone at rest"
+            cx.debug_bounds(LEAVING_B).is_none(),
+            "no text-only stand-in"
         );
+    }
+
+    #[gpui::test]
+    fn fr12_without_offscreen_layers_the_exit_draws_what_the_list_kept(cx: &mut TestAppContext) {
+        cx.set_offscreen_layers_supported(false);
+        let mut s = setup(true, true);
+        s.painted = true;
+        let rows = s.rows.clone();
+        let cx = page(cx, s);
+        rows.borrow_mut().retain(|r| *r != "b");
+        settle(cx);
+        assert!(cx.debug_bounds(LEAVING_B).is_some());
+        assert!(cx.debug_bounds(COPY_B).is_none());
     }
 
     #[gpui::test]

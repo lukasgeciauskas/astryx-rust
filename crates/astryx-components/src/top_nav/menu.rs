@@ -248,6 +248,9 @@ impl TopNavMenu {
         let (id, label) = (self.id.clone(), self.label.clone());
         let alignment = slot_alignment(frame.as_ref().map_or(TopNavSlot::Start, |f| f.slot));
         Popover::new(popover_id, self.label.clone())
+            // Built on the popover runtime, not upstream's Popover component: no touch
+            // growth.
+            .touch_motion(Some(false))
             .controller(controller)
             .enabled(false)
             .placement(Placement::Below)

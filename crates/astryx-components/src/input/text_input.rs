@@ -465,7 +465,11 @@ impl RenderOnce for TextInput {
             );
             let clear = change.clone();
             let focus = focus.clone();
-            control = control.child(
+            control = control.child(astryx_primitives::provide(
+                crate::gestures::touch_hit_area::FieldPartReach {
+                    start: true,
+                    end: status.is_some(),
+                },
                 IconButton::new(
                     "clear",
                     label,
@@ -482,7 +486,7 @@ impl RenderOnce for TextInput {
                     clear(SharedString::default(), window, cx);
                     window.focus(&focus, cx);
                 }),
-            );
+            ));
         }
         if let Some(status) = status
             && self.status_placement != StatusPlacement::Detached

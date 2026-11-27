@@ -249,12 +249,40 @@ impl RenderOnce for ChatPastedTextToken {
                     .child(self.text.clone()),
             )
             .child(footer);
-        HoverCard::new(self.id.clone())
+        let card = HoverCard::new(self.id.clone())
             .content(preview)
             .placement(Placement::Above)
             .alignment(LayerAlign::Start)
             .hover_indication(false)
-            .child(Badge::new(label).variant(BadgeVariant::Neutral))
+            .child(Badge::new(label).variant(BadgeVariant::Neutral));
+        // Upstream `useTapStop('mousedown')`: a tap on the token, by finger or pen, asks
+        // for its preview, so it stops there. Cancelling the press keeps the composer around
+        // the token from taking focus and the caret, which on a touch device raises the
+        // keyboard over the preview. The card's own trigger, inside, still sees the tap; a
+        // mouse press still places the caret, and hover opens the preview.
+        div()
+            .debug_selector({
+                let selector = format!("{}-tap-stop", self.id);
+                move || selector
+            })
+            .on_mouse_down(gpui::MouseButton::Left, |_, window, cx| {
+                if is_tap(window, cx) {
+                    window.prevent_default();
+                    cx.stop_propagation();
+                }
+            })
+            .child(card)
+    }
+}
+
+/// Whether the press now is a finger's or a pen's (upstream `TOUCH_POINTER_TYPES`): the
+/// gesture host hears the contact itself, never GPUI's taps synthesized from a touch.
+fn is_tap(window: &mut Window, cx: &mut App) -> bool {
+    use astryx_primitives::gestures::PointerKind;
+    let host = astryx_primitives::gestures::host::gesture_host(window, cx);
+    match host.last_pointer() {
+        Some(kind) => matches!(kind, PointerKind::Touch | PointerKind::Pen),
+        None => window.last_input_was_touch(),
     }
 }
 

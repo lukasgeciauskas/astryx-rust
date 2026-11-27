@@ -113,3 +113,28 @@ fn pressing_the_track_moves_the_thumb_there(cx: &mut TestAppContext) {
     cx.run_until_parked();
     assert_eq!(*log.borrow(), [SliderValue::Single(50.)]);
 }
+
+#[gpui::test]
+fn under_a_coarse_pointer_the_track_takes_at_least_24_px_across(cx: &mut TestAppContext) {
+    let build = || {
+        div()
+            .w(px(220.))
+            .child(
+                div()
+                    .debug_selector(|| "slider".into())
+                    .child(Slider::new("s", "Volume", 40.).label_hidden(true)),
+            )
+            .into_any_element()
+    };
+    let cx = host(cx, build);
+    let fine = cx.debug_bounds("slider").unwrap().size.height;
+    assert_eq!(fine, px(THUMB), "the thumb's 20 px under a fine pointer");
+    cx.update(|_, cx| astryx_primitives::modality::set_primary_pointer_coarse(Some(true), cx));
+    cx.run_until_parked();
+    let coarse = cx.debug_bounds("slider").unwrap().size.height;
+    assert_eq!(
+        coarse,
+        px(TOUCH_TRACK_MIN_BLOCK),
+        "TOUCH_TRACK_MIN_BLOCK under a finger"
+    );
+}

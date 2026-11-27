@@ -30,6 +30,10 @@ use crate::layout::Orientation;
 /// Upstream `TRACK_SIZE` and `THUMB_SIZE`.
 const TRACK: f32 = 4.;
 const THUMB: f32 = 20.;
+/// Upstream `TOUCH_TRACK_MIN_BLOCK`: the track's least block size under a coarse pointer.
+const TOUCH_TRACK_MIN_BLOCK: f32 = 24.;
+/// Upstream `MARK_LABEL_OFFSET`: a mark label's offset below the track's center line.
+const MARK_LABEL_OFFSET: f32 = 14.;
 
 /// Upstream `value`: one thumb, or a range of two.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -661,6 +665,25 @@ impl RenderOnce for Slider {
             false,
             container,
         );
+        // Under a coarse pointer the track takes at least 24 px across its axis (upstream
+        // `TOUCH_TRACK_MIN_BLOCK`, and a vertical slider's 24 px inline minimum), the
+        // thumb's 20 px centered in it.
+        let coarse = astryx_primitives::coarse_primary_pointer(window, cx);
+        let touch_pad = px((TOUCH_TRACK_MIN_BLOCK - THUMB) / 2.);
+        let container = match (coarse, vertical) {
+            (false, _) => container.into_any_element(),
+            (true, true) => div()
+                .flex_none()
+                .px(touch_pad)
+                .child(container)
+                .into_any_element(),
+            (true, false) => div()
+                .flex_1()
+                .w_full()
+                .py(touch_pad)
+                .child(container)
+                .into_any_element(),
+        };
 
         let text = (self.value_display == ValueDisplay::Text).then(|| {
             let shown: SharedString = match self.value {
@@ -695,7 +718,10 @@ impl RenderOnce for Slider {
         };
         if has_labels && !vertical {
             let line = t.text.supporting.size.to_pixels(rem) * t.text.supporting.leading;
-            row = row.pb(px(4.) + line);
+            // Upstream `MARK_LABEL_OFFSET` less half the track's box (the touch track's
+            // under a coarse pointer).
+            let half = if coarse { TOUCH_TRACK_MIN_BLOCK } else { THUMB } / 2.;
+            row = row.pb(px(MARK_LABEL_OFFSET - half) + line);
         }
         theme.refine(
             row.style(),

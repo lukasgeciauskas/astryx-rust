@@ -605,9 +605,50 @@ impl RenderOnce for Button {
         let ring_color = (variant == ButtonVariant::Destructive).then_some(t.color.error);
         let radius = t.radius.element.to_pixels(rem);
         let el = el.id(self.id.clone()).child(content).children(spinner);
+        // Inside a group that tracks a held finger across its members (ButtonGroup,
+        // ToggleButtonGroup, AlertDialog's actions), the group's tracker paints this
+        // button's finger press and runs it at the lift (upstream's press-group item). A
+        // menu trigger keeps its own press.
+        let press_group =
+            crate::gestures::action_group::PressGroup::current(cx).filter(|_| disclosure.is_none());
+        let group_key: SharedString = format!("{}", self.id).into();
+        let group_member = press_group.as_ref().map(|group| {
+            let activate = activate.clone();
+            group.member(
+                group_key.clone(),
+                !disabled && !busy,
+                Some(focus.clone()),
+                move |window, cx| {
+                    activate(
+                        &gpui::ClickEvent::Mouse(gpui::MouseClickEvent::default()),
+                        window,
+                        cx,
+                    )
+                },
+            )
+        });
+        let group_strength = press_group
+            .as_ref()
+            .map_or(0., |g| g.strength(&group_key, window, cx));
         let feedback = crate::gestures::use_press_feedback(self.id.clone(), window, cx)
             .disabled(disabled || busy)
-            .space_activates(&focus);
+            .space_activates(&focus)
+            .skip_fingers(press_group.is_some());
+        let layer_activate = activate.clone();
+        // A finger's own click on a member is the tracker's (it runs the member at the
+        // lift): the click a tap sends is taken, so the member runs once (upstream
+        // `swallowsNativeClick`).
+        let activate: ClickFn = if press_group.is_some() {
+            let inner = activate.clone();
+            Rc::new(move |event, window, cx| {
+                if !event.is_keyboard() && window.last_input_was_touch() {
+                    return;
+                }
+                inner(event, window, cx)
+            })
+        } else {
+            activate
+        };
         let el = apply_press(
             el,
             &focus,
@@ -626,6 +667,68 @@ impl RenderOnce for Button {
             window,
             cx,
         );
+        let el = if group_strength > 0. {
+            let pressed = t.color.overlay_pressed;
+            el.bg(astryx_theme::color::composite(
+                resting.unwrap_or(Hsla::transparent_black()),
+                Hsla {
+                    a: pressed.a * group_strength,
+                    ..pressed
+                },
+            ))
+        } else {
+            el
+        };
+        let el = el.children(group_member);
+        // Under a coarse primary pointer a small button's target grows toward 44 px
+        // through an invisible hit layer, each side stopping halfway to a neighbour
+        // (upstream `useTouchHitArea`). A ButtonGroup member grows through its group's
+        // tracking, and a disabled button takes no tap.
+        let el = if group.is_none()
+            && press_group.is_none()
+            && !disabled
+            && astryx_primitives::coarse_primary_pointer(window, cx)
+        {
+            let now = cx.background_executor().now();
+            let mut insets =
+                crate::gestures::touch_hit_area::hit_insets(window, feedback.key(), now);
+            if let Some(reach) = astryx_primitives::use_context::<
+                crate::gestures::touch_hit_area::FieldPartReach,
+            >(cx)
+            {
+                insets = reach.cap(insets, dir.is_rtl());
+            }
+            if insets == astryx_primitives::gestures::hit_area::NO_HIT_INSETS {
+                el
+            } else {
+                let on_layer = layer_activate.clone();
+                el.child(
+                    div()
+                        .id(ElementId::Name(format!("{}-hit-area", self.id).into()))
+                        .absolute()
+                        .top(px(-insets.top))
+                        .left(px(-insets.left))
+                        .right(px(-insets.right))
+                        .bottom(px(-insets.bottom))
+                        // A finger on the grown area presses the button and shows its
+                        // paint (upstream: the band is the button's own pseudo-element).
+                        .child(
+                            feedback
+                                .grown_area_probe()
+                                .absolute()
+                                .top_0()
+                                .left_0()
+                                .size_full(),
+                        )
+                        .on_click(move |event, window, cx| {
+                            cx.stop_propagation();
+                            on_layer(event, window, cx);
+                        }),
+                )
+            }
+        } else {
+            el
+        };
         let role = if self.href.is_some() && !disabled {
             Role::Link
         } else {
@@ -865,10 +968,24 @@ impl RenderOnce for ButtonGroup {
                 };
                 provide(member, provide(size, child))
             });
-        el.id(self.id)
-            .role(Role::Group)
-            .aria_label(self.label)
-            .children(children)
+        // Under the touch presentation a held finger or pen slides across the members
+        // (upstream `useGroupPressTracking`).
+        let tracks = !disabled && astryx_primitives::coarse_primary_pointer(window, cx);
+        let tracking = crate::gestures::action_group::use_group_press_tracking(
+            self.id.clone(),
+            tracks,
+            window,
+            cx,
+        );
+        tracking.group_with_hit_area(
+            el.id(self.id)
+                .relative()
+                .role(Role::Group)
+                .aria_label(self.label)
+                .children(children),
+            window,
+            cx,
+        )
     }
 }
 

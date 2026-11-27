@@ -1,9 +1,14 @@
 //! Item: the row layout lists, menus and choice lists build on. Upstream:
 //! `Item/`.
 //!
-//! This is Item's core: start content, a label over a description, end
-//! content, alignment, density, line clamps, and the interactive states.
-//! Swipe actions land with Swipe (M11 stage 5, with fork patch R3).
+//! Start content, a label over a description, end content, alignment, density,
+//! line clamps, the interactive states, and swipe actions (`swipe`, spec:AST-057):
+//! a row given a [`create_swipe`](crate::swipe::create_swipe) value moves aside
+//! under a finger, a pen or a trackpad's swipe and uncovers its panels, drawn into
+//! its own root. A verb reachable only by swipe is unreachable by keyboard and by
+//! mouse, so give every swipe action a second home in the row (a menu, or a button
+//! in the end content). The element containing the rows clips in the inline axis:
+//! List does; any other host sets `overflow_x_hidden` once (FR9).
 
 use std::rc::Rc;
 
@@ -17,6 +22,10 @@ use gpui::{
 
 use crate::doc::{ComponentDoc, PropMapping, RustApi};
 use crate::focus::focus_ring;
+use crate::swipe::{
+    ItemSwipeActions, ItemSwipeBehavior, Swipe, SwipeHost, SwipeId, SwipeRowFacts,
+    resolve_row_swipe, use_swipe_row,
+};
 
 /// Upstream `align`: how start and end content sit against the text.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -89,6 +98,9 @@ pub struct Item {
     bare: bool,
     delegate: Option<(FocusHandle, ActivateFn)>,
     touch_band: Option<(Option<Pixels>, Option<Pixels>)>,
+    swipe: Option<Rc<SwipeHost>>,
+    swipe_actions: Option<ItemSwipeActions>,
+    swipe_behavior: Option<ItemSwipeBehavior>,
     style: StyleRefinement,
 }
 
@@ -116,8 +128,42 @@ impl Item {
             bare: false,
             delegate: None,
             touch_band: None,
+            swipe: None,
+            swipe_actions: None,
+            swipe_behavior: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Upstream `swipe`: the row's swipe actions, one
+    /// [`create_swipe`](crate::swipe::create_swipe) value (spec:AST-057). A finger, a
+    /// pen or a trackpad's two-finger swipe drags the row aside and uncovers the side's
+    /// panel; a mouse drag and a mouse wheel's notches never do. An open row closes on a
+    /// touch tap on its own content (which activates nothing), a press elsewhere, a
+    /// scroll that moves it with focus outside its panel, and Escape. Served on a row
+    /// that is not disabled and not the enlarged target of a control inside it.
+    pub fn swipe<Id: SwipeId>(mut self, swipe: Swipe<Id>) -> Self {
+        self.swipe = Some(swipe.host);
+        self
+    }
+
+    /// Deprecated upstream `swipeActions`: use [`Self::swipe`]. Still works, with the
+    /// swipe's current behavior; ignored when `swipe` is set.
+    pub fn swipe_actions(mut self, actions: ItemSwipeActions) -> Self {
+        self.swipe_actions = Some(actions);
+        self
+    }
+
+    /// Deprecated upstream `swipeBehavior`: pass it in `CreateSwipeOptions`. Ignored
+    /// when `swipe` is set.
+    pub fn swipe_behavior(mut self, behavior: ItemSwipeBehavior) -> Self {
+        self.swipe_behavior = Some(behavior);
+        self
+    }
+
+    pub(crate) fn swipe_host(mut self, host: Option<Rc<SwipeHost>>) -> Self {
+        self.swipe = host;
+        self
     }
 
     /// Upstream `interactiveRef`: a control inside the row (a checkbox in
@@ -224,12 +270,29 @@ impl Styled for Item {
 }
 
 impl RenderOnce for Item {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
         let t = theme.tokens();
         let rem = window.rem_size();
         let dir = use_direction(cx);
         let interactive = self.is_interactive();
+        // Swipe actions, when they serve this row (spec:AST-057 DEC-3).
+        let swipe = resolve_row_swipe(
+            self.swipe.take(),
+            self.swipe_actions.as_ref(),
+            self.swipe_behavior,
+        )
+        .filter(|host| {
+            host.serves(SwipeRowFacts {
+                role: None,
+                disabled: self.disabled,
+                delegate: self.delegate.is_some(),
+                link_root: false,
+            })
+        })
+        .map(|host| use_swipe_row(&self.id, host, window, cx));
+        // An open row's root takes no press: a tap on its content only closes it.
+        let press_held = swipe.as_ref().is_some_and(|row| row.is_open());
 
         let clamp = |el: gpui::Div, lines: Option<usize>| match lines {
             Some(1) => el.overflow_hidden().text_ellipsis().whitespace_nowrap(),
@@ -339,9 +402,22 @@ impl RenderOnce for Item {
         el.style().refine(&self.style);
 
         let row_selector = self.id.to_string();
-        let el = el.id(self.id.clone()).debug_selector(move || row_selector);
+        let mut el = el.id(self.id.clone()).debug_selector(move || row_selector);
+        let radii = el.style().corner_radii.clone();
+        let finish = |el: gpui::Stateful<gpui::Div>,
+                      own: Option<FocusHandle>,
+                      window: &mut Window,
+                      cx: &mut App|
+         -> AnyElement {
+            match &swipe {
+                Some(row) => {
+                    crate::swipe::decorate(row, el, &self.id, radii.clone(), own, window, cx)
+                }
+                None => el.into_any_element(),
+            }
+        };
         if !interactive {
-            return el.into_any_element();
+            return finish(el, None, window, cx);
         }
         let touch = window.last_input_was_touch();
         let radius = t.radius.element.to_pixels(rem);
@@ -374,6 +450,7 @@ impl RenderOnce for Item {
                 },
             )
         };
+        let mut own_focus = None;
         let mut el = match &self.delegate {
             // A delegate row is a larger target for its control: no tab stop
             // of its own, its ring when the control has keyboard focus.
@@ -386,6 +463,7 @@ impl RenderOnce for Item {
             }
             None => {
                 let focus = control_focus(&self.id, window, cx);
+                own_focus = Some(focus.clone());
                 let mut el = el.track_focus(&focus);
                 if is_focus_visible(&focus, window) {
                     el = el.child(focus_ring(t, radius, rem));
@@ -400,7 +478,8 @@ impl RenderOnce for Item {
             if !self.bare && !self.selected && !touch {
                 el = el.hover(move |s| s.bg(hover));
             }
-            if !self.bare {
+            let mut row_press = None;
+            if !self.bare && !press_held {
                 // FR11: under a finger the press paints as UIKit tracks a row (at once
                 // outside a scroller, after the content-touch delay inside one) and its
                 // release fades on the exit motion (upstream `usePressFeedback`).
@@ -411,15 +490,13 @@ impl RenderOnce for Item {
                 } else {
                     gpui::transparent_black()
                 };
-                el = crate::press::touch_press(
-                    el,
+                let press = crate::gestures::use_press_feedback(
                     ElementId::Name(format!("{:?}-pressed", self.id).into()),
-                    false,
-                    base,
-                    pressed,
                     window,
                     cx,
                 );
+                el = crate::press::touch_press_with(el, &press, base, pressed, window, cx);
+                row_press = Some(press);
             }
             el = el.cursor_pointer().on_click({
                 let activate = activate.clone();
@@ -434,10 +511,25 @@ impl RenderOnce for Item {
                     |_, _| px(0.),
                 );
                 let need = ((px(TOUCH_TARGET) - *height.read(cx)) / 2.).max(px(0.));
+                // Past its list the band also stops halfway to any neighbour the window
+                // drew (upstream `useTouchHitArea`'s clamp against the page's controls).
+                let key = crate::gestures::touch_hit_area::key_of(&self.id);
+                let clamp = crate::gestures::touch_hit_area::hit_insets(
+                    window,
+                    key,
+                    cx.background_executor().now(),
+                );
+                let noted = crate::gestures::touch_hit_area::noted_rect(window, key).is_some();
                 let (top, bottom) = (
                     up.map_or(need, |u| need.min(u)),
                     down.map_or(need, |d| need.min(d)),
                 );
+                let (top, bottom) = if noted {
+                    (top.min(px(clamp.top)), bottom.min(px(clamp.bottom)))
+                } else {
+                    (top, bottom)
+                };
+                el = el.child(crate::gestures::touch_hit_area::target_probe(key));
                 el = el.child(
                     gpui::canvas(
                         move |bounds, _, cx| {
@@ -462,6 +554,10 @@ impl RenderOnce for Item {
                             .right_0()
                             .top(-top)
                             .bottom(-bottom)
+                            // A finger on the band presses the row and shows its paint.
+                            .children(row_press.as_ref().map(|p| {
+                                p.grown_area_probe().absolute().top_0().left_0().size_full()
+                            }))
                             .on_click(move |event, window, cx| activate(event, window, cx)),
                     );
                 }
@@ -478,7 +574,7 @@ impl RenderOnce for Item {
         } else {
             Role::Button
         };
-        el.role(role).into_any_element()
+        finish(el.role(role), own_focus, window, cx)
     }
 }
 
@@ -488,8 +584,6 @@ impl RenderOnce for Item {
 const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
-
-const SWIPE: &str = "swipe actions land with Swipe (M11 stage 5, fork patch R3)";
 
 pub const ITEM_DOC: ComponentDoc = ComponentDoc {
     name: "Item",
@@ -515,9 +609,15 @@ pub const ITEM_DOC: ComponentDoc = ComponentDoc {
         p("isHighlighted", RustApi::Method("highlighted")),
         p("isSelected", RustApi::Method("selected")),
         p("isDisabled", RustApi::Method("disabled")),
-        p("swipe", RustApi::Waived(SWIPE)),
-        p("swipeActions", RustApi::Waived(SWIPE)),
-        p("swipeBehavior", RustApi::Waived(SWIPE)),
+        p("swipe", RustApi::Method("swipe (a create_swipe value)")),
+        p(
+            "swipeActions",
+            RustApi::Method("swipe_actions (deprecated: use swipe)"),
+        ),
+        p(
+            "swipeBehavior",
+            RustApi::Method("swipe_behavior (deprecated: CreateSwipeOptions::swipe_behavior)"),
+        ),
     ],
     example: include_str!("../choice/examples.rs"),
 };

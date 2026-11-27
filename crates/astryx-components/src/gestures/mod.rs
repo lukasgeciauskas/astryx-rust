@@ -9,6 +9,7 @@
 //! - [`press_feedback`]: `use_press_feedback`, the touch press model's window controller
 //!   over the pure [`press_gesture`] machine.
 
+pub mod action_group;
 mod clock;
 pub mod examples;
 pub mod long_press;
@@ -17,6 +18,7 @@ pub mod pan;
 pub mod press_feedback;
 pub mod press_gesture;
 pub mod scroller;
+pub(crate) mod touch_hit_area;
 
 /// Work a gesture listener hands the window and the app (a pan's `on_pan` runs inside
 /// the input).

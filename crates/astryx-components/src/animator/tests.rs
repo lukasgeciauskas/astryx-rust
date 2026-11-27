@@ -12,6 +12,7 @@ use gpui::{
 
 use super::*;
 use crate::segmented::tests::host;
+use gpui::StatefulInteractiveElement as _;
 
 fn settle(cx: &mut VisualTestContext) {
     for _ in 0..3 {
@@ -154,4 +155,66 @@ fn only_rows_added_after_the_first_paint_enter(cx: &mut TestAppContext) {
         cx.debug_bounds("row-1-false").is_some(),
         "and comes to rest"
     );
+}
+
+#[derive(gpui::IntoElement)]
+struct Turned {
+    slot: Slot,
+    clicks: Rc<RefCell<usize>>,
+}
+
+impl gpui::RenderOnce for Turned {
+    fn render(self, window: &mut gpui::Window, cx: &mut gpui::App) -> impl IntoElement {
+        let animator = use_animator("turned", window, cx);
+        *self.slot.borrow_mut() = Some(animator.clone());
+        let clicks = self.clicks.clone();
+        animator.apply(
+            div()
+                .id("turned")
+                .debug_selector(|| "turned".into())
+                .w(px(80.))
+                .h(px(20.))
+                .on_click(move |_, _, _| *clicks.borrow_mut() += 1),
+            window,
+            cx,
+        )
+    }
+}
+
+#[gpui::test]
+fn rotate_turns_the_element_and_its_hit_area(cx: &mut TestAppContext) {
+    let slot: Slot = Rc::default();
+    let clicks = Rc::new(RefCell::new(0usize));
+    let (s, c) = (slot.clone(), clicks.clone());
+    let cx = host(cx, move || {
+        div()
+            .p(px(40.))
+            .child(Turned {
+                slot: s.clone(),
+                clicks: c.clone(),
+            })
+            .into_any_element()
+    });
+    settle(cx);
+    let handle = slot.borrow().clone().unwrap();
+    cx.update(|_, cx| handle.set(AnimatorValues::new().rotate(90.), cx));
+    settle(cx);
+    assert_eq!(cx.update(|_, cx| handle.get(cx).rotate), 90.);
+    // Laid out 80 by 20; a quarter turn about its center stands it 20 by 80.
+    let laid = cx.debug_bounds("turned").expect("drawn");
+    let center = laid.center();
+    let click = |cx: &mut VisualTestContext, x: f32, y: f32| {
+        cx.simulate_click(gpui::point(px(x), px(y)), gpui::Modifiers::default());
+        settle(cx);
+    };
+    // Inside the turned box, outside the laid-out one.
+    click(cx, f32::from(center.x), f32::from(center.y) + 30.);
+    assert_eq!(
+        *clicks.borrow(),
+        1,
+        "the press lands on the turned element (fork patch R3)"
+    );
+    // Inside the laid-out box, outside the turned one.
+    click(cx, f32::from(center.x) + 34., f32::from(center.y));
+    assert_eq!(*clicks.borrow(), 1, "where it was laid out, nothing is hit");
 }

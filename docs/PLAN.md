@@ -989,7 +989,34 @@ The remaining primitives:
     rules, release on the sheet springs, swipe to dismiss, the body's scroll handoff
     through nested scrollers, resize during a settle), stack (one scrim, recede, Escape on
     the top sheet, replace handoff), panel, switcher and edge tint.
-    - Carried to stage 6: a tall sheet riding the virtual keyboard.
+    - Its keyboard ride came with stage 6.
+  - Stage 5 (done): offscreen layers.
+    - Fork patch R3 (`598e0ca`): a subtree drawn to a pooled texture and composited with
+      rotation, scale, translation, group opacity, blur, brightness, grayscale and a linear
+      or painted mask, with hit testing through the transform, and kept snapshots of an
+      element's last look; DirectX and wgpu (Linux and the web), checked natively and by
+      headless pixel tests. Metal draws layers directly, without rotation, filters or masks.
+    - Swipe (`create_swipe`, the actions layer, UIKit's release rule) and Item and List
+      swipe actions; the animator's rotate channel and group opacity; the transient copies
+      as snapshots (SideNav's two rail layers, AppShell's held content, a List exit, a
+      dragged row's copy); real edge-fade masks (CodeBlock, Carousel, Table, Tokenizer,
+      the touch wheel, ChatLayout).
+  - Stage 6 (done): the on-screen keyboard (AST-099): `astryx_primitives::keyboard` (height
+    from the visual viewport or the platform's inset, the keyboard model and layout guide,
+    the ride, the reveal band, Android's timing), every text field kept clear of it with no
+    prop, anchored layers capped above it, BottomSheet's tall sheet riding it, ChatLayout's
+    lift, and ChatPastedTextToken's touch tap stop. Fork patch R24 (`d1d2962`) simulates
+    insets in tests.
+  - Stage 7 (done): coarse-pointer variants. Upstream's presentation rule (a sheet on a
+    coarse pointer in a compact window) for Popover, DropdownMenu, MoreMenu, ContextMenu,
+    Selector, MultiSelector, Tokenizer and PowerSearch, each keeping the surface it opened
+    with; the touch press model by default; theme pointer adaptations now applied;
+    entrance input holds for Dialog, Drawer, MobileNav, AlertDialog and menus; AlertDialog's
+    touch motion and the group press tracker (AlertDialog actions, ButtonGroup,
+    ToggleButtonGroup); Popover's grow-in from its trigger; 44 px hit areas that stop
+    halfway to registered neighbours, with press paint; the remaining coarse rules
+    (Slider, ProgressBar, Toast safe area, column resize, heading links); `any_pointer_coarse`.
+  - M11 done (2026-11-27).
 - **M12 Theme authoring parity:** a Rust `defineTheme` builder with type/radius/motion scale
   expansion (with the motion tempo the animator plays at, carried from M11), OKLCH palette engine (`palette/`), HCT generator (`theme/hct.ts`), status-role
   derivation, contrast, `onDark`/`onLight`, adaptations, per-theme icons.

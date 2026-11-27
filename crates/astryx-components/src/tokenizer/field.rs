@@ -482,7 +482,12 @@ impl<T: Searchable> RenderOnce for Tokenizer<T> {
         let engine = crate::typeahead::engine::engine_of::<T>(&id, window, cx);
         let value = self.value.clone();
         let at_limit = self.max_entries.is_some_and(|m| value.len() >= m);
-        if crate::overlay::presents_as_sheet(self.presentation, window) {
+        // An open sheet keeps its presentation until it closes (FR16): a phone turned to
+        // landscape does not swap the surface, or the trigger its focus returns to.
+        let sheet_open = super::sheet::draft_state::<T>(&self.base.id, window, cx)
+            .read(cx)
+            .open;
+        if sheet_open || crate::overlay::presents_as_sheet(self.presentation, window, cx) {
             return self.render_sheet_field(disabled, size, window, cx);
         }
 
@@ -1085,34 +1090,40 @@ impl<T: Searchable> Tokenizer<T> {
             }
         }
         let rem = window.rem_size();
-        let fades = scroll_edge_fades(
+        let mut fades = scroll_edge_fades(
             &format!("{id}-track"),
             area.state.inline,
             FadeScrollbar::Hidden,
             false,
             area.is_focus_visible(window),
             (false, false),
-            t.spacing.s6.to_pixels(rem),
+            // Upstream's clear band, so a fade never paints into a token's focus ring.
+            &astryx_effects::edge_fade_stops(
+                t.spacing.s1.to_pixels(rem) - px(1.),
+                t.spacing.s6.to_pixels(rem),
+            ),
             dir,
+            window.supports_offscreen_layers(),
             t,
         );
         let selector = format!("{id}-track");
-        area.viewport(
-            div()
-                .relative()
-                .flex()
-                .items_center()
-                .gap(t.spacing.s1)
-                .self_stretch()
-                .flex_1()
-                .min_w_0(),
-        )
-        .debug_selector(move || selector)
-        // A scrollbar would take most of the row; the fades show the overflow.
-        .scrollbar_none()
-        .children(lane)
-        .child(visible_box(area.scroll_handle()).children(fades))
-        .into_any_element()
+        let viewport = area
+            .viewport(
+                div()
+                    .relative()
+                    .flex()
+                    .items_center()
+                    .gap(t.spacing.s1)
+                    .self_stretch()
+                    .flex_1()
+                    .min_w_0(),
+            )
+            .debug_selector(move || selector)
+            // A scrollbar would take most of the row; the fades show the overflow.
+            .scrollbar_none()
+            .children(lane)
+            .child(visible_box(area.scroll_handle()).children(std::mem::take(&mut fades.edges)));
+        fades.mask(viewport).into_any_element()
     }
 
     /// FR16-FR17: the sheet presentation's field: a trigger showing the

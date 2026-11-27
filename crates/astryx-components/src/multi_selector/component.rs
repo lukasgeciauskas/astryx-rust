@@ -1255,7 +1255,7 @@ impl RenderOnce for MultiSelector {
             s.cells.resize(rows.len(), None);
         });
         let rows = Rc::new(rows);
-        let sheet_now = crate::overlay::presents_as_sheet(self.presentation, window);
+        let sheet_now = crate::overlay::presents_as_sheet(self.presentation, window, cx);
         let select_all_label = self
             .select_all_label
             .clone()
@@ -1329,7 +1329,18 @@ impl RenderOnce for MultiSelector {
                 s.sheet,
             )
         };
-        let sheet = if open { opened_sheet } else { sheet_now };
+        // The presentation an opening chose holds until its sheet has played its exit: a
+        // sheet that closes after the pointer turned fine still slides away (upstream
+        // `useSelectorPresentation`'s presentation holds).
+        let sheet = if open {
+            opened_sheet
+        } else {
+            (opened_sheet
+                && crate::overlay::is_sheet_presented(&ElementId::Name(
+                    format!("{}-sheet", self.id).into(),
+                )))
+                || sheet_now
+        };
         let popup_kind = if sheet {
             HasPopup::Dialog
         } else if grid {

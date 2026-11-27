@@ -380,13 +380,27 @@ impl RenderOnce for ToggleButtonGroup {
             None,
         );
         el.style().refine(&self.style);
-        el.id(self.id)
-            .role(Role::Group)
-            .aria_label(self.label)
-            .children(
-                self.children
-                    .into_iter()
-                    .map(move |child| provide(context.clone(), provide(size, child))),
-            )
+        // Under the touch presentation a held finger or pen slides across the members
+        // (upstream `useGroupPressTracking`).
+        let tracks = !self.disabled && astryx_primitives::coarse_primary_pointer(window, cx);
+        let tracking = crate::gestures::action_group::use_group_press_tracking(
+            self.id.clone(),
+            tracks,
+            window,
+            cx,
+        );
+        tracking.group_with_hit_area(
+            el.id(self.id)
+                .relative()
+                .role(Role::Group)
+                .aria_label(self.label)
+                .children(
+                    self.children
+                        .into_iter()
+                        .map(move |child| provide(context.clone(), provide(size, child))),
+                ),
+            window,
+            cx,
+        )
     }
 }

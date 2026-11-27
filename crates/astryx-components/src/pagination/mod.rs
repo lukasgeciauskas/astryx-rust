@@ -570,6 +570,19 @@ impl RenderOnce for Pagination {
                             t.color.neutral
                         })
                         .cursor_pointer()
+                        .children({
+                            // Upstream's dot `useTouchHitArea`: each dot's target grows toward
+                            // 44 px, clamped halfway to its neighbours.
+                            let go = go.clone();
+                            crate::gestures::touch_hit_area::hit_area(
+                                &ElementId::Name(format!("{:?}-dot-{i}", self.id).into()),
+                                !self.disabled,
+                                Some(std::rc::Rc::new(move |window, cx| go(i + 1, window, cx))),
+                                None,
+                                window,
+                                cx,
+                            )
+                        })
                         .on_click(move |_, window, cx| {
                             cx.stop_propagation();
                             go(i + 1, window, cx)

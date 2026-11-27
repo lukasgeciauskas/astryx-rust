@@ -342,3 +342,28 @@ fn ast025_fr22_pinned_columns_turn_their_edge_fades_off(cx: &mut TestAppContext)
     touch(cx);
     assert!(cx.debug_bounds("t-scroll-fade-end").is_none());
 }
+
+#[gpui::test]
+fn dec4_under_a_coarse_primary_pointer_the_boundary_takes_no_pointer(cx: &mut TestAppContext) {
+    let ends = Ends::default();
+    let cx = host(cx, 800., resizable(ends.clone(), true));
+    cx.update(|_, cx| astryx_primitives::modality::set_primary_pointer_coarse(Some(true), cx));
+    settle(cx);
+    let at = bounds(cx, "resize-resize-name").center();
+    cx.simulate_mouse_down(at, MouseButton::Left, Modifiers::none());
+    settle(cx);
+    cx.simulate_mouse_move(
+        at + point(px(30.), px(0.)),
+        Some(MouseButton::Left),
+        Modifiers::none(),
+    );
+    settle(cx);
+    cx.simulate_mouse_up(
+        at + point(px(30.), px(0.)),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    settle(cx);
+    assert!(ends.borrow().is_empty(), "no drag starts");
+    assert!((f32::from(bounds(cx, "t-header-name").size.width) - 200.).abs() < 1.);
+}

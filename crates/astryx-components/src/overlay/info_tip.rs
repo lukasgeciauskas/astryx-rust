@@ -88,6 +88,26 @@ impl RenderOnce for InfoTip {
 
         let content = self.content.clone();
         let press = tooltip.clone();
+        // Upstream InfoTip's `useTouchHitArea`: the small button's target grows toward 44 px.
+        let area_activate: crate::gestures::touch_hit_area::ActivateFn = {
+            let (press, content) = (tooltip.clone(), self.content.clone());
+            std::rc::Rc::new(move |window, cx| {
+                if press.is_pinned(cx) {
+                    press.hide(window, cx);
+                } else {
+                    press.show(window, cx);
+                    announce(content.clone(), Politeness::Polite, window, cx);
+                }
+            })
+        };
+        let area = crate::gestures::touch_hit_area::hit_area(
+            &ElementId::Name(format!("{}-button", self.id).into()),
+            true,
+            Some(area_activate),
+            None,
+            window,
+            cx,
+        );
         let mut button = div()
             .id(ElementId::Name(format!("{}-button", self.id).into()))
             .track_focus(&focus)
@@ -114,7 +134,8 @@ impl RenderOnce for InfoTip {
                     announce(content.clone(), Politeness::Polite, window, cx);
                 }
             })
-            .child(Icon::new("info").size(self.size));
+            .child(Icon::new("info").size(self.size))
+            .children(area);
         let focus_visible = is_focus_visible(&focus, window);
         if focus_visible {
             button = button.child(focus_ring(t, px(999.), rem));

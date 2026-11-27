@@ -1180,7 +1180,18 @@ impl RenderOnce for Wheel {
             (first.max(0), last.min(column_count - 1))
         };
         let id = self.id.clone();
+        let layers = window.supports_offscreen_layers();
         let mut strip = div().absolute().inset_0();
+        if touch && layers {
+            // Upstream's static mask: the rows fade toward the column's edges, to
+            // `FADE_FLOOR` (fork patch R3).
+            strip = strip.mask_linear(
+                gpui::LinearMask::new(180.)
+                    .stop(gpui::MaskStop::new(0., FADE_FLOOR))
+                    .stop(gpui::MaskStop::new(0.5, 1.))
+                    .stop(gpui::MaskStop::new(1., FADE_FLOOR)),
+            );
+        }
         if let Some(opacity) = fade_opacity {
             strip = strip.opacity(opacity);
         }
@@ -1229,8 +1240,11 @@ impl RenderOnce for Wheel {
                 .text_color(color)
                 .child(option.label.clone());
             if touch {
-                // The touch column's rows are flat, under a fade mask.
-                row = row.opacity(1. - (1. - FADE_FLOOR) * distance);
+                // The touch column's rows are flat, under the column's fade mask; a
+                // renderer without offscreen layers fades each row by its distance.
+                if !layers {
+                    row = row.opacity(1. - (1. - FADE_FLOOR) * distance);
+                }
             } else {
                 // The scrolling column's cylinder (`tip`): a row tips away
                 // from the band, rotateX up to 52° and scale 0.86 at the

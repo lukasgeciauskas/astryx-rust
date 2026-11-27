@@ -16,6 +16,7 @@ mod menu;
 pub(crate) mod modal;
 mod motion;
 mod popover;
+mod presentation;
 mod scrim;
 mod sheet;
 mod toast;
@@ -34,6 +35,8 @@ mod palette_tests;
 mod popover_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod touch_tests;
 
 pub use alert_dialog::{AlertDialog, AlertDialogController, AlertOptions};
 pub use command_palette::{
@@ -65,9 +68,15 @@ pub use menu::{
     SubmenuPresentation,
 };
 pub(crate) use motion::{clearance, entrance, gutter, viewport_cap};
-pub(crate) use popover::presents_as_sheet;
 pub use popover::{Popover, PopoverController, PopoverPresentation, PopoverRole};
+pub(crate) use presentation::presents_as_sheet;
+pub use presentation::{
+    COMPACT_HEIGHT_BELOW, CompactDefinition, PresentationDefault, PresentationHold,
+    PresentationSurface, ResolvedPresentation, TouchPresentation, adaptive_presentation,
+    compact_definition, compact_touch, read_presentation, resolve_presentation, touch_presentation,
+};
 pub use scrim::{Overlay, OverlayAlign, OverlayPosition, OverlayScrim, OverlayShowOn};
+pub(crate) use sheet::is_sheet_presented;
 pub use sheet::{BottomSheet, BottomSheetSwitcher, SheetHeight, SnapPoint};
 pub use toast::{
     Toast, ToastCollision, ToastDismissReason, ToastHandle, ToastOptions, ToastPosition, ToastType,

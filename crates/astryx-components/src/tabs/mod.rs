@@ -1,7 +1,7 @@
 //! TabList and Tab. Upstream: `TabList/`.
 //!
 //! A strip of tabs that scrolls when it is wider than its container, with
-//! round arrows at the overflowing edges. A TabMenu is a tab that opens a
+//! round arrows and edge fades (an alpha mask, fork patch R3) at the overflowing edges. A TabMenu is a tab that opens a
 //! menu of more tabs: it shows the selected one's label, and selects through
 //! the TabList's `onChange`.
 
@@ -659,6 +659,18 @@ impl RenderOnce for TabList {
         };
         let at_start = scrolls && offset < px(-0.5);
         let at_end = scrolls && offset > -max + px(0.5);
+        // The edges with hidden tabs fade (upstream's `mask-image`, fork patch R3).
+        if window.supports_offscreen_layers()
+            && let Some(mask) = strip_fade(
+                at_start,
+                at_end,
+                t.focus.outline_width.to_pixels(rem) + t.focus.outline_offset.to_pixels(rem),
+                t.spacing.s8.to_pixels(rem),
+                dir.is_rtl(),
+            )
+        {
+            strip = strip.mask_linear(mask);
+        }
 
         let mut el = div()
             .relative()
@@ -701,6 +713,34 @@ impl RenderOnce for TabList {
             .when(at_start, |el| el.child(arrow(-1., "chevronLeft")))
             .when(at_end, |el| el.child(arrow(1., "chevronRight")))
     }
+}
+
+/// The strip's edge fade (upstream `fadeStart`, `fadeEnd`, `fadeBoth`): each edge that
+/// hides tabs fades from transparent at the strip's own edge (`bleed` in from the scroll
+/// box, so tabs never paint past the TabList's box or the arrow that caps the edge) to
+/// opaque `fade` further in, wide enough to sit under an arrow. `None` when no edge
+/// hides tabs.
+pub(crate) fn strip_fade(
+    overflow_start: bool,
+    overflow_end: bool,
+    bleed: gpui::Pixels,
+    fade: gpui::Pixels,
+    rtl: bool,
+) -> Option<gpui::LinearMask> {
+    if !overflow_start && !overflow_end {
+        return None;
+    }
+    let stops = astryx_effects::edge_fade_stops(bleed, fade);
+    let axis = if rtl {
+        astryx_effects::MaskAxis::RightToLeft
+    } else {
+        astryx_effects::MaskAxis::LeftToRight
+    };
+    Some(astryx_effects::edge_mask(
+        axis,
+        overflow_start.then_some(&stops[..]),
+        overflow_end.then_some(&stops[..]),
+    ))
 }
 
 // ----------------------------------------------------------------------------

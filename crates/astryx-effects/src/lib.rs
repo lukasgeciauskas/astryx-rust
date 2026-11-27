@@ -11,6 +11,8 @@ pub mod fade;
 pub mod gradient;
 pub mod shape;
 
-pub use fade::{FadeEdge, SCROLL_FADE, edge_fade};
+pub use fade::{
+    EdgeStop, FadeEdge, MaskAxis, SCROLL_FADE, edge_fade, edge_fade_stops, edge_mask, edge_stop,
+};
 pub use gradient::{Gradient, GradientDirection, GradientStop, StopPosition, gradient, stop};
 pub use shape::{Pointing, Shape, polygon, triangle};

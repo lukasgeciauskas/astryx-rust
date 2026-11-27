@@ -783,6 +783,9 @@ impl<V: Clone + 'static> RenderOnce for ComplexSelector<V> {
         let report = self.on_open_change.clone();
         let return_to = trigger.clone();
         let popover = Popover::new(popup_id(&self.id), self.label.clone())
+            // Built on the popover runtime, not upstream's Popover component: no touch
+            // growth.
+            .touch_motion(Some(false))
             .controller(controller.popover.clone())
             .enabled(false)
             .close_button(false)

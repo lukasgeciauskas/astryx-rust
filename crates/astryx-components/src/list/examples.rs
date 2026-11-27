@@ -86,6 +86,8 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
                         ])),
                 ),
         )
+        // Swipe actions: a finger, a pen or a trackpad's swipe uncovers a row's verbs.
+        .child(crate::swipe::examples::examples(window, cx))
         .child(label(
             "Edge treatments in a Card: padded, flush, outset, bleed",
         ))

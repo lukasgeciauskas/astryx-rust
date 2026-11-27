@@ -195,3 +195,116 @@ fn an_item_runs_its_click(cx: &mut TestAppContext) {
     settle(cx);
     assert_eq!(*log.borrow(), ["home"]);
 }
+
+#[gpui::test]
+fn fr6_a_collapse_cross_fades_a_snapshot_of_the_old_rail_over_the_last_30_percent(
+    cx: &mut TestAppContext,
+) {
+    let cx = side_nav(cx, false, Log::default());
+    toggle(cx);
+    assert!(
+        cx.debug_bounds("plain").is_some(),
+        "until 70% the rail itself presents its old state"
+    );
+    let mut copied = false;
+    for _ in 0..50 {
+        frames(cx, 16);
+        if cx.debug_bounds("plain").is_none() {
+            copied = cx.debug_bounds("nav-rail-copy").is_some();
+            break;
+        }
+    }
+    assert!(
+        copied,
+        "past 70%, the real collapsed rail over the old rail's copy, a snapshot of its last frame (fork patch R3)"
+    );
+    let copy = cx.debug_bounds("nav-rail-copy").unwrap();
+    assert_eq!(
+        copy.size.width,
+        px(260.),
+        "the copy keeps the old rail's width under the clip"
+    );
+    frames(cx, 700);
+    assert!(
+        cx.debug_bounds("nav-rail-copy").is_none(),
+        "removed when the motion ends"
+    );
+}
+
+#[gpui::test]
+fn fr6_an_expand_draws_the_old_collapsed_rail_over_the_real_one_until_it_fades(
+    cx: &mut TestAppContext,
+) {
+    let cx = side_nav(cx, true, Log::default());
+    toggle(cx);
+    frames(cx, 16);
+    let copy = cx
+        .debug_bounds("nav-rail-copy")
+        .expect("the old, collapsed rail's copy");
+    assert_eq!(copy.size.width, px(48.));
+    let kept = cx.update(|window, _| {
+        window.has_layer_snapshot(&gpui::ElementId::Name("nav-rail-copy".into()))
+    });
+    assert!(
+        kept,
+        "a snapshot of the rail's frame before the toggle (fork patch R3)"
+    );
+    assert!(
+        cx.debug_bounds("plain").is_some(),
+        "the real, expanded rail under it"
+    );
+    frames(cx, 700);
+    assert!(cx.debug_bounds("nav-rail-copy").is_none());
+}
+
+#[gpui::test]
+fn fr6_a_controlled_change_also_draws_the_old_rail_as_a_copy(cx: &mut TestAppContext) {
+    cx.update(astryx_primitives::storage::use_memory_storage);
+    let collapsed = Rc::new(std::cell::Cell::new(true));
+    let c = collapsed.clone();
+    let cx = host(cx, move || {
+        div()
+            .h(px(500.))
+            .flex()
+            .child(
+                SideNav::new("nav")
+                    .collapsible_config(SideNavCollapseConfig {
+                        is_collapsed: Some(c.get()),
+                        ..Default::default()
+                    })
+                    .child(SideNavItem::new("home", "Home").icon("info"))
+                    .child(SideNavItem::new("plain", "No icon")),
+            )
+            .into_any_element()
+    });
+    settle(cx);
+    assert!(cx.debug_bounds("plain").is_none());
+    // The app expands the rail; the change lands in the next frame, with no toggle.
+    collapsed.set(false);
+    settle(cx);
+    frames(cx, 32);
+    let copy = cx
+        .debug_bounds("nav-rail-copy")
+        .expect("the old, collapsed rail's copy");
+    assert_eq!(copy.size.width, px(48.));
+    assert!(
+        cx.debug_bounds("plain").is_some(),
+        "the real, expanded rail under it"
+    );
+    frames(cx, 700);
+    assert!(cx.debug_bounds("nav-rail-copy").is_none());
+}
+
+#[gpui::test]
+fn fr6_the_toggle_changes_the_rail_at_once(cx: &mut TestAppContext) {
+    let cx = side_nav(cx, true, Log::default());
+    let at = cx.debug_bounds("side-nav-collapse").unwrap().center();
+    cx.simulate_click(at, gpui::Modifiers::default());
+    cx.run_until_parked();
+    cx.update(|window, _| window.refresh());
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("plain").is_some(),
+        "no frame waits for a capture"
+    );
+}

@@ -507,6 +507,17 @@ impl TextEditState {
         !self.settings.disabled && !self.settings.read_only
     }
 
+    /// What focusing the field does to the on-screen keyboard (upstream
+    /// `isTextEntryControl`): an editable field brings one up, unless its input mode is
+    /// `none`.
+    pub fn keyboard_field_kind(&self) -> crate::keyboard::FieldKind {
+        crate::keyboard::FieldKind {
+            text_entry: self.editable()
+                && self.settings.keyboard.input_mode != Some(gpui::TextInputMode::None),
+            ..Default::default()
+        }
+    }
+
     fn touched(&mut self, now: Instant, window: &Window, cx: &mut Context<Self>) {
         self.caret_since = Some(now);
         window.notify_text_selection_changed(&self.focus);

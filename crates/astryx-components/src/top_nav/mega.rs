@@ -126,7 +126,10 @@ fn panel_entrance(
     cx: &App,
 ) -> gpui::Stateful<gpui::Div> {
     let reduced = prefers_reduced_motion(cx);
-    let (duration, ease) = match (reduced, window.last_input_was_touch()) {
+    let (duration, ease) = match (
+        reduced,
+        astryx_primitives::modality::coarse_primary_pointer_now(window, cx),
+    ) {
         (false, _) => (t.duration.medium_min, t.ease.standard),
         (true, true) => (
             Duration::from_millis(200),

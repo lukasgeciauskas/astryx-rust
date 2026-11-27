@@ -145,10 +145,13 @@ impl AnimatorHandle {
         })
     }
 
-    /// Draws the element at its animated values: x and y translate it, `scale` scales it
-    /// about its transform origin and `opacity` fades it (fork patch R1). Frames are
-    /// requested while anything moves. The `rotate` channel is kept but drawn only once
-    /// rotation reaches the renderer (M11's offscreen layers).
+    /// Draws the element at its animated values, as upstream writes them on the element's
+    /// style: x and y translate it, `scale` scales it about its transform origin (fork
+    /// patch R1), `rotate` turns it clockwise about the same origin, in degrees, and
+    /// `opacity` fades it as one group, as CSS `opacity` does. A rotation or a fade draws
+    /// the element through an offscreen layer (fork patch R3), and hit testing follows the
+    /// rotation; a renderer without offscreen layers (Metal) draws it unrotated and fades
+    /// each primitive. Frames are requested while anything moves.
     pub fn apply<E: Styled>(&self, el: E, window: &mut Window, cx: &App) -> E {
         let now = self.now(cx);
         let engine = self.animator.engine();
@@ -165,8 +168,11 @@ impl AnimatorHandle {
         if v.scale != 1. {
             el = el.scale(v.scale as f32);
         }
+        if v.rotate != 0. {
+            el = el.rotate_degrees(v.rotate as f32);
+        }
         if v.opacity != 1. {
-            el = el.opacity(v.opacity.clamp(0., 1.) as f32);
+            el = el.layer_opacity(v.opacity.clamp(0., 1.) as f32);
         }
         el
     }

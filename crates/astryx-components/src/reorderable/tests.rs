@@ -816,3 +816,177 @@ fn fr9_a_row_held_still_before_the_drop_settles_from_rest(cx: &mut TestAppContex
         "no overshoot from rest: {shown:?} in {lo:?}..{hi:?}"
     );
 }
+
+#[gpui::test]
+fn the_dragged_row_dims_in_place_and_a_copy_of_it_follows_the_pointer(cx: &mut TestAppContext) {
+    let (cx, _) = host(cx, &FOUR, |_| {});
+    let place = cx.debug_bounds("Eggs").unwrap();
+    let from = handle(cx, "Eggs").center();
+    let row = handle(cx, "Milk").center().y - from.y;
+    drag(cx, from, point(from.x, from.y + row * 2.));
+    // The row itself stays where it was, dimmed (fork patch R3 keeps its frame).
+    assert_eq!(cx.debug_bounds("Eggs").unwrap().origin, place.origin);
+    assert!(
+        !shown(cx, "Eggs-reorder-source"),
+        "no text-only stand-in at its place"
+    );
+    let copy = cx
+        .debug_bounds("reorder-preview-copy")
+        .expect("a copy of the row, its last frame, at the pointer");
+    assert_eq!(copy.size, place.size);
+    assert!(
+        copy.origin.y > place.origin.y + row,
+        "it follows the pointer"
+    );
+    cx.simulate_mouse_up(
+        point(from.x, from.y + row * 2.),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    settle(cx);
+    assert!(cx.debug_bounds("reorder-preview-copy").is_none());
+}
+
+// ---- Under a finger: UIKit's reorder control (motion/uikit/reorder.ts) ---------
+
+fn finger(cx: &mut VisualTestContext, id: u64, phase: gpui::TouchPhase, at: Point<gpui::Pixels>) {
+    cx.simulate_event(gpui::TouchEvent {
+        id: gpui::TouchId(id),
+        phase,
+        position: at,
+        predicted_position: None,
+        force: None,
+    });
+    cx.run_until_parked();
+}
+
+/// A finger moved from `from` to `to` in steps of 16 ms.
+fn finger_move(cx: &mut VisualTestContext, from: Point<gpui::Pixels>, to: Point<gpui::Pixels>) {
+    for i in 1..=8 {
+        cx.executor().advance_clock(Duration::from_millis(16));
+        let t = i as f32 / 8.;
+        let at = point(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t);
+        finger(cx, 1, gpui::TouchPhase::Moved, at);
+        settle(cx);
+    }
+}
+
+#[gpui::test]
+fn a_finger_held_on_the_handle_for_the_content_touch_delay_picks_the_row_up(
+    cx: &mut TestAppContext,
+) {
+    let (cx, s) = host(cx, &FOUR, |_| {});
+    let from = handle(cx, "Eggs").center();
+    let row = handle(cx, "Milk").center().y - from.y;
+    finger(cx, 1, gpui::TouchPhase::Started, from);
+    wait(cx, 100);
+    assert!(
+        !shown(cx, "reorder-preview-copy") && !said(cx).contains("Picked up"),
+        "before 150 ms nothing is claimed"
+    );
+    wait(cx, 60);
+    settle(cx);
+    let to = point(from.x, from.y + row * 2.);
+    finger_move(cx, from, to);
+    assert_said(cx, "Picked up, position 1 of 4.");
+    assert!(
+        shown(cx, "reorder-preview-copy"),
+        "the row follows the finger"
+    );
+    assert!(s.log.borrow().is_empty(), "nothing reported while dragging");
+    finger(cx, 1, gpui::TouchPhase::Ended, to);
+    settle(cx);
+    assert_eq!(moves(&s.log), [("Text(\"Eggs\")".to_string(), 2)]);
+    assert_eq!(*s.items.borrow(), ["Milk", "Bread", "Eggs", "Jam"]);
+}
+
+#[gpui::test]
+fn a_finger_that_travels_before_the_claim_leaves_the_touch_to_the_scroller(
+    cx: &mut TestAppContext,
+) {
+    let names: Vec<&'static str> = (0..30)
+        .map(|i| &*Box::leak(format!("Item {i}").into_boxed_str()))
+        .collect();
+    let (cx, s) = host(cx, &names, |h| h.height = 200.);
+    let from = handle(cx, "Item 2").center();
+    finger(cx, 1, gpui::TouchPhase::Started, from);
+    // A flick: 60 px up within 50 ms, well before the 150 ms claim.
+    let to = point(from.x, from.y - px(60.));
+    for i in 1..=3 {
+        cx.executor().advance_clock(Duration::from_millis(16));
+        finger(
+            cx,
+            1,
+            gpui::TouchPhase::Moved,
+            point(from.x, from.y - px(20. * i as f32)),
+        );
+    }
+    wait(cx, 200);
+    finger(cx, 1, gpui::TouchPhase::Ended, to);
+    settle(cx);
+    assert!(!said(cx).contains("Picked up"), "the row never moved");
+    assert!(s.log.borrow().is_empty());
+    assert!(
+        f32::from(s.scroll.offset().y) < -1.,
+        "the list scrolled instead: {:?}",
+        s.scroll.offset()
+    );
+}
+
+#[gpui::test]
+fn a_second_finger_before_the_claim_is_the_pages_pinch(cx: &mut TestAppContext) {
+    let (cx, s) = host(cx, &FOUR, |_| {});
+    let from = handle(cx, "Eggs").center();
+    finger(cx, 1, gpui::TouchPhase::Started, from);
+    wait(cx, 50);
+    finger(cx, 2, gpui::TouchPhase::Started, point(px(300.), px(300.)));
+    wait(cx, 200);
+    assert!(
+        !said(cx).contains("Picked up"),
+        "two fingers never pick a row up"
+    );
+    finger(cx, 2, gpui::TouchPhase::Ended, point(px(300.), px(300.)));
+    finger(cx, 1, gpui::TouchPhase::Ended, from);
+    settle(cx);
+    assert!(s.log.borrow().is_empty());
+}
+
+#[gpui::test]
+fn a_tap_on_the_handle_toggles_reorder_mode(cx: &mut TestAppContext) {
+    let (cx, _) = host(cx, &FOUR, |_| {});
+    let from = handle(cx, "Milk").center();
+    finger(cx, 1, gpui::TouchPhase::Started, from);
+    wait(cx, 40);
+    finger(cx, 1, gpui::TouchPhase::Ended, from);
+    settle(cx);
+    assert!(
+        shown(cx, "groceries-hint-down"),
+        "the tap is the handle's click: reorder mode, with its hint"
+    );
+}
+
+#[gpui::test]
+fn a_held_finger_near_the_scroll_edge_autoscrolls(cx: &mut TestAppContext) {
+    let names: Vec<&'static str> = (0..30)
+        .map(|i| &*Box::leak(format!("Item {i}").into_boxed_str()))
+        .collect();
+    let (cx, s) = host(cx, &names, |h| h.height = 200.);
+    let from = handle(cx, "Item 1").center();
+    finger(cx, 1, gpui::TouchPhase::Started, from);
+    wait(cx, 160);
+    let to = point(from.x, px(215.));
+    finger_move(cx, from, to);
+    for _ in 0..10 {
+        cx.executor().advance_clock(Duration::from_millis(20));
+        settle(cx);
+    }
+    assert!(
+        f32::from(s.scroll.offset().y) < -10.,
+        "scrolled on UIKit's 20 ms clock: {:?}",
+        s.scroll.offset()
+    );
+    finger(cx, 1, gpui::TouchPhase::Ended, to);
+    settle(cx);
+    let to = s.log.borrow()[0].to;
+    assert!(to > 4, "dropped further down the scrolled list: {to}");
+}

@@ -880,7 +880,7 @@ impl RenderOnce for Selector {
         }
         state.update(cx, |s, _| s.rows.resize(shown.len(), None));
 
-        let sheet_now = crate::overlay::presents_as_sheet(self.presentation, window);
+        let sheet_now = crate::overlay::presents_as_sheet(self.presentation, window, cx);
         let press = use_menu_press(
             ElementId::Name(format!("{}-listbox-press", self.id).into()),
             MenuPressOptions::default(),
@@ -985,7 +985,18 @@ impl RenderOnce for Selector {
                 s.ring_suppressed,
             )
         };
-        let sheet = if open { opened_sheet } else { sheet_now };
+        // The presentation an opening chose holds until its sheet has played its exit: a
+        // sheet that closes after the pointer turned fine still slides away (upstream
+        // `useSelectorPresentation`'s presentation holds).
+        let sheet = if open {
+            opened_sheet
+        } else {
+            (opened_sheet
+                && crate::overlay::is_sheet_presented(&ElementId::Name(
+                    format!("{}-sheet", self.id).into(),
+                )))
+                || sheet_now
+        };
         let selected = value
             .as_ref()
             .and_then(|v| items.iter().find(|i| &i.value == v))

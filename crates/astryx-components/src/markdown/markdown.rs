@@ -1344,11 +1344,21 @@ impl RenderOnce for HeadingLinksRow {
         let style = heading_text(self.level, t);
         let line = style.size.to_pixels(rem) * style.leading;
         let permalink = self.permalink.clone();
+        // Upstream `COARSE_TARGET`: with a touch screen present the slot and the button take
+        // 24 px, the WCAG minimum, in place of the small element size.
+        // Upstream keys this on `(any-pointer: coarse)`: any touch screen.
+        let coarse = astryx_primitives::modality::any_pointer_coarse(window, app);
+        let slot_w: gpui::Length = if coarse {
+            px(COARSE_TARGET).into()
+        } else {
+            t.size.element_sm.into()
+        };
         let button = Button::new(ElementId::Name(format!("{}-copy", self.id).into()), name)
             .variant(ButtonVariant::Ghost)
             .size(ElementSize::Sm)
             .icon_only(true)
             .icon(glyph)
+            .when(coarse, |b| b.w(px(COARSE_TARGET)).h(px(COARSE_TARGET)))
             .on_click(move |event, _, cx| {
                 // An unmodified primary activation only.
                 if event.modifiers().modified() {
@@ -1369,7 +1379,7 @@ impl RenderOnce for HeadingLinksRow {
                 div()
                     .relative()
                     .flex_none()
-                    .w(t.size.element_sm)
+                    .w(slot_w)
                     .h(line)
                     .ml(t.spacing.s1_5)
                     .text_color(t.color.text_secondary)
@@ -1393,6 +1403,9 @@ impl RenderOnce for HeadingLinksRow {
             )
     }
 }
+
+/// Upstream `COARSE_TARGET`: the heading link's target under a coarse pointer, px.
+const COARSE_TARGET: f32 = 24.;
 
 /// A heading level's type style, as the Heading component draws it.
 fn heading_text(level: HeadingLevel, t: &astryx_theme::Tokens) -> &astryx_theme::TextStyleTokens {

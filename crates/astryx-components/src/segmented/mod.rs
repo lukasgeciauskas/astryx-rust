@@ -578,22 +578,55 @@ impl RenderOnce for SegmentedControl {
                 if item_disabled {
                     seg = seg.on_click(|_, _, cx| cx.stop_propagation());
                 } else {
+                    let mut seg_press = None;
                     if !is_selected {
                         // FR11: a held segment paints the pressed overlay under a finger as under
                         // a mouse; a drag from elsewhere lights the segment it would commit.
                         seg = seg.hover(move |s| s.bg(hover));
-                        seg = crate::press::touch_press(
-                            seg,
+                        let press = crate::gestures::use_press_feedback(
                             ElementId::Name(format!("{:?}-{}-press", self.id, item.value).into()),
-                            false,
+                            window,
+                            cx,
+                        );
+                        seg = crate::press::touch_press_with(
+                            seg,
+                            &press,
                             gpui::transparent_black(),
                             pressed,
                             window,
                             cx,
                         );
+                        seg_press = Some(press);
                         if drag_target == Some(i) {
                             seg = seg.bg(pressed);
                         }
+                    }
+                    // Upstream SegmentedControlItem's `useTouchHitArea`.
+                    {
+                        let (select, value) = (self.on_change.clone(), item.value.clone());
+                        let stray = lens_state.clone();
+                        seg = seg.relative().children(
+                            crate::gestures::touch_hit_area::hit_area_with(
+                                &ElementId::Name(format!("{:?}-{}", self.id, item.value).into()),
+                                true,
+                                Some(std::rc::Rc::new(move |window, cx| {
+                                    // The lift already answered this press (a drag, or a cancel).
+                                    if lens::take_stray_click(&stray, cx) {
+                                        return;
+                                    }
+                                    if !is_selected && let Some(f) = &select {
+                                        f(value.clone(), window, cx);
+                                    }
+                                })),
+                                None,
+                                crate::gestures::touch_hit_area::HitLinks {
+                                    gestures: None,
+                                    press: seg_press.as_ref(),
+                                },
+                                window,
+                                cx,
+                            ),
+                        );
                     }
                     let select = self.on_change.clone();
                     let value = item.value.clone();

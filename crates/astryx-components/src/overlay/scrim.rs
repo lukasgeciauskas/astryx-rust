@@ -280,7 +280,11 @@ impl RenderOnce for Overlay {
             .on_hover({
                 let state = state.clone();
                 move |hovered, window, cx| {
-                    if window.last_input_was_touch() {
+                    // A touch device (upstream `(hover: none)`) has no hover: a finger's
+                    // input, or a device declared touch-first.
+                    if window.last_input_was_touch()
+                        || astryx_primitives::modality::declared_primary_pointer(cx) == Some(true)
+                    {
                         return;
                     }
                     state.update(cx, |s, _| s.hovered = *hovered);
@@ -293,7 +297,9 @@ impl RenderOnce for Overlay {
             root = root.on_click({
                 let state = state.clone();
                 move |_, window, cx| {
-                    if window.last_input_was_touch() {
+                    if window.last_input_was_touch()
+                        || astryx_primitives::modality::declared_primary_pointer(cx) == Some(true)
+                    {
                         state.update(cx, |s, _| s.touch_open = !s.touch_open);
                         window.refresh();
                     }

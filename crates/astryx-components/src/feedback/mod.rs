@@ -224,6 +224,10 @@ impl RenderOnce for ProgressBar {
             None,
         );
 
+        // The share of the track the fill draws: under a finger at least its 16 px
+        // minimum, so a mark it covers there sits on the fill (upstream
+        // `drawnPercentage`).
+        let mut drawn_share = fraction;
         let fill = if self.indeterminate {
             if prefers_reduced_motion(cx) {
                 // Pulses in place, full width.
@@ -249,12 +253,107 @@ impl RenderOnce for ProgressBar {
                     .bg(fill_color)
                     .translate_x(relative(offset))
             }
+        } else if astryx_primitives::coarse_primary_pointer(window, cx) {
+            // Under a finger the fill moves as UIProgressView's setProgress(animated:)
+            // does (upstream `ProgressBarTouch`): linearly from where it is drawn, for
+            // `progress.fillTrackMs` times the share of the track the value moved (at once
+            // under Reduce Motion). Above zero it never draws shorter than two track
+            // heights (16 px); at zero it paints nothing.
+            use astryx_primitives::motion::uikit::progress_bar::{
+                FILL_TRACK_MS, MINIMUM_FILL_HEIGHTS,
+            };
+            let now = cx.background_executor().now();
+            let motion = window.use_keyed_state(
+                ElementId::Name(format!("{}-touch-fill", self.id).into()),
+                cx,
+                |_, _| (fraction, fraction, None::<web_time::Instant>),
+            );
+            let reduced = prefers_reduced_motion(cx);
+            // Where the fill is drawn at `now` on a move from `from` to `to` begun at
+            // `since`, and whether the move has ended.
+            let at = |from: f64, to: f64, since: Option<web_time::Instant>| match since {
+                Some(started) => {
+                    let ms = FILL_TRACK_MS * (to - from).abs();
+                    let p = if ms <= 0. {
+                        1.
+                    } else {
+                        (now.saturating_duration_since(started).as_secs_f64() * 1000. / ms).min(1.)
+                    };
+                    (from + (to - from) * p, p >= 1.)
+                }
+                None => (to, true),
+            };
+            let drawn = motion.update(cx, |(from, to, since), _| {
+                if (fraction - *to).abs() > f64::EPSILON {
+                    *from = at(*from, *to, *since).0;
+                    *to = fraction;
+                    *since = (!reduced).then_some(now);
+                }
+                let (shown, done) = at(*from, *to, *since);
+                if done {
+                    *since = None;
+                }
+                shown
+            });
+            if (drawn - fraction).abs() > f64::EPSILON {
+                window.request_animation_frame();
+            }
+            let min_fill = MINIMUM_FILL_HEIGHTS * 8.;
+            if !self.marks.is_empty() {
+                // Only layout knows the track's width: measured under a finger with marks.
+                let width = window.use_keyed_state(
+                    ElementId::Name(format!("{}-track-width", self.id).into()),
+                    cx,
+                    |_, _| 0f64,
+                );
+                let w = *width.read(cx);
+                drawn_share = if drawn <= 0. {
+                    0.
+                } else if w > 0. {
+                    ((drawn * w).max(min_fill) / w).min(1.)
+                } else {
+                    drawn
+                };
+                track = track.child(
+                    gpui::canvas(
+                        move |bounds, _, cx| {
+                            let measured = f64::from(f32::from(bounds.size.width));
+                            if (*width.read(cx) - measured).abs() > 0.5 {
+                                width.update(cx, |w, _| *w = measured);
+                            }
+                        },
+                        |_, _, _, _| {},
+                    )
+                    .absolute()
+                    .size_full(),
+                );
+            } else {
+                drawn_share = drawn;
+            }
+            div()
+                .absolute()
+                .top_0()
+                .h_full()
+                .w(relative(drawn as f32))
+                .min_w(px(min_fill as f32))
+                .debug_selector({
+                    let s = format!("{}-fill", self.id);
+                    move || s
+                })
+                .inset_start(dir, px(0.))
+                .rounded(t.radius.full)
+                .bg(fill_color)
+                .when(drawn <= 0., |el| el.opacity(0.))
         } else {
             div()
                 .absolute()
                 .top_0()
                 .h_full()
                 .w(relative(fraction as f32))
+                .debug_selector({
+                    let s = format!("{}-fill", self.id);
+                    move || s
+                })
                 .inset_start(dir, px(0.))
                 .rounded(t.radius.full)
                 .bg(fill_color)
@@ -267,7 +366,7 @@ impl RenderOnce for ProgressBar {
             } else {
                 0.
             };
-            let on_fill = !self.indeterminate && at <= fraction;
+            let on_fill = !self.indeterminate && at <= drawn_share;
             let tick = div()
                 .absolute()
                 .top(relative(0.5))
@@ -750,6 +849,61 @@ mod tests {
         assert_eq!(bar(150., 100.).fraction(), 1.);
         assert_eq!(bar(-5., 100.).fraction(), 0.);
         assert_eq!(bar(5., 0.).fraction(), 0.);
+    }
+
+    struct Host(std::rc::Rc<std::cell::Cell<f64>>);
+
+    impl gpui::Render for Host {
+        fn render(&mut self, _: &mut Window, _: &mut gpui::Context<Self>) -> impl IntoElement {
+            div()
+                .w(px(400.))
+                .child(
+                    ProgressBar::new("p", "Upload")
+                        .value(self.0.get())
+                        .marks([ProgressMark {
+                            value: 3.,
+                            label: "Start".into(),
+                        }]),
+                )
+        }
+    }
+
+    fn fill(cx: &mut gpui::VisualTestContext) -> gpui::Pixels {
+        cx.debug_bounds("p-fill").expect("the fill").size.width
+    }
+
+    #[gpui::test]
+    fn under_a_finger_the_fill_draws_at_least_16_px_and_moves_linearly_over_fill_track_ms(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        cx.update(|cx| {
+            astryx_theme::init(cx);
+            astryx_primitives::modality::set_primary_pointer_coarse(Some(true), cx);
+        });
+        let value = std::rc::Rc::new(std::cell::Cell::new(1.));
+        let (_, cx) = cx.add_window_view({
+            let value = value.clone();
+            move |_, _| Host(value)
+        });
+        cx.run_until_parked();
+        // 1% of a 400 px track is 4 px: the touch minimum draws 16.
+        assert_eq!(fill(cx), px(16.));
+        // A move of half the track takes half of fillTrackMs, linearly.
+        value.set(51.);
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        cx.executor().advance_clock(Duration::from_millis(250));
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        let half = f32::from(fill(cx));
+        assert!(
+            (half - 104.).abs() < 6.,
+            "a quarter of the way through the move: {half}"
+        );
+        cx.executor().advance_clock(Duration::from_millis(400));
+        cx.update(|window, _| window.refresh());
+        cx.run_until_parked();
+        assert_eq!(fill(cx), px(204.));
     }
 
     #[test]

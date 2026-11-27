@@ -13,6 +13,7 @@ pub mod editing;
 pub mod focus;
 pub mod gestures;
 pub mod hotkeys;
+pub mod keyboard;
 pub mod layer;
 pub mod link;
 pub mod list_focus;

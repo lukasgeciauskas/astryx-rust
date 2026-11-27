@@ -237,9 +237,20 @@ impl RenderOnce for CheckboxInput {
         .owns_box(true);
         let mouse_active = !feedback.paints_buttons(window, cx);
         let touch_overlay = feedback.overlay(overlay, window, cx);
-        let control = div().relative().child(indicator).when(
-            !self.disabled && !busy && !self.read_only,
-            |el| {
+        // Upstream `inputCoarse`: under a coarse pointer the box's target is at least
+        // 24 px square, the indicator centered in it.
+        let coarse = astryx_primitives::coarse_primary_pointer(window, cx);
+        let control = div()
+            .relative()
+            .when(coarse, |el| {
+                el.flex()
+                    .items_center()
+                    .justify_center()
+                    .min_w(px(24.))
+                    .min_h(px(24.))
+            })
+            .child(indicator)
+            .when(!self.disabled && !busy && !self.read_only, |el| {
                 let mut press = div()
                     .id("press")
                     .absolute()
@@ -254,8 +265,7 @@ impl RenderOnce for CheckboxInput {
                     press = press.bg(o);
                 }
                 el.child(press)
-            },
-        );
+            });
 
         let next = shown != IndicatorState::Checked;
         let change = optimistic.change(self.on_change, self.change_action);

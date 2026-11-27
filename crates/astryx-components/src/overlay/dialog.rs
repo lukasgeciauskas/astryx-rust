@@ -148,7 +148,19 @@ pub struct Dialog {
     label: Option<SharedString>,
     description: Option<SharedString>,
     alert: bool,
+    /// A caller-driven presentation (AlertDialog's touch motion) in place of the
+    /// theme's entrance.
+    motion: Option<SurfaceMotion>,
     style: StyleRefinement,
+}
+
+/// A frame of a caller-driven presentation: the surface's and the dimming's opacity,
+/// the surface's scale, and whether its content takes no input (a dismissal).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct SurfaceMotion {
+    pub opacity: f32,
+    pub scale: f32,
+    pub inert: bool,
 }
 
 impl Dialog {
@@ -169,8 +181,16 @@ impl Dialog {
             label: None,
             description: None,
             alert: false,
+            motion: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Drives the presentation from the caller, frame by frame (AlertDialog's touch
+    /// motion); its entrance hold is then the caller's too.
+    pub(crate) fn motion(mut self, motion: Option<SurfaceMotion>) -> Self {
+        self.motion = motion;
+        self
     }
 
     astryx_primitives::setters! {
@@ -271,6 +291,8 @@ impl RenderOnce for Dialog {
         let state = super::modal::modal_state(&self.id, window, cx);
         super::modal::sync_open(&state, self.open, window, cx);
         if !self.open {
+            // A close during the entrance ends its hold.
+            astryx_primitives::gestures::input_hold::release_input_hold(window, &self.id, cx);
             return div()
                 .id(self.id.clone())
                 .display_contents()
@@ -300,7 +322,7 @@ impl RenderOnce for Dialog {
         // full-screen dialogs fade. Under reduced motion, a finger gets a
         // fade and a pointer nothing.
         let reduced = prefers_reduced_motion(cx);
-        let touch = window.last_input_was_touch();
+        let touch = astryx_primitives::coarse_primary_pointer(window, cx);
         let duration = if reduced {
             std::time::Duration::from_millis(200)
         } else {
@@ -311,10 +333,34 @@ impl RenderOnce for Dialog {
         } else {
             (now.saturating_duration_since(since).as_secs_f32() / duration.as_secs_f32()).min(1.)
         };
-        if progress < 1. {
+        if progress < 1. && self.motion.is_none() {
             window.request_animation_frame();
         }
         let eased = t.ease.standard.ease(progress);
+        // Under a coarse primary pointer, a tap or a drag during the entrance reaches
+        // nothing; keys and assistive technology stay live (upstream
+        // `holdEntranceInput`). The hold ends with the entrance or a close.
+        if self.motion.is_none() {
+            let entering = if progress < 1. {
+                duration
+            } else {
+                std::time::Duration::ZERO
+            };
+            astryx_primitives::gestures::input_hold::hold_entrance_input(
+                window,
+                self.id.clone(),
+                astryx_primitives::gestures::input_hold::HoldScope::Viewport,
+                since,
+                entering,
+                None,
+                cx,
+            );
+        }
+        let (eased, motion_scale) = match self.motion {
+            Some(m) => (m.opacity, Some(m.scale)),
+            None => (eased, None),
+        };
+        let content_inert = self.motion.is_some_and(|m| m.inert);
 
         let gutter = t.spacing.s4.to_pixels(rem);
         let scroller_handle = crate::gestures::scroller::use_scroll_handle(
@@ -348,7 +394,9 @@ impl RenderOnce for Dialog {
                 .max_h(self.max_height.unwrap_or((viewport.height * 0.75).into()))
                 .rounded(t.radius.container)
                 .shadow_token(&t.shadow.high);
-            if !reduced {
+            if let Some(scale) = motion_scale {
+                surface = surface.scale(scale);
+            } else if !reduced {
                 let travel = 1. - eased;
                 surface = surface
                     .translate(direction.x * travel, direction.y * travel)
@@ -370,7 +418,10 @@ impl RenderOnce for Dialog {
         }
         theme.refine(surface.style(), "dialog", &[], None);
         surface.style().refine(&self.style);
-        let surface = surface.children(super::modal::probes(&state, cx));
+        let surface = surface
+            .inert(content_inert)
+            .children(super::modal::probes(&state, cx))
+            .child(astryx_primitives::gestures::input_hold::hold_probe());
         let corners = if fullscreen {
             crate::layout::ContainerCorners::default()
         } else {

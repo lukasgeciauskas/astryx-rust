@@ -12,6 +12,8 @@ pub(crate) mod text_area;
 mod text_input;
 
 #[cfg(test)]
+mod keyboard_tests;
+#[cfg(test)]
 mod tests;
 
 pub use file_input::{FileInput, FileInputMode, PickedFile, mime_for_extension};

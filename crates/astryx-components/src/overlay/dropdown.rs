@@ -137,7 +137,8 @@ pub struct DropdownMenu {
     button: Option<Box<dyn FnOnce(Button) -> Button>>,
     trigger: Option<AnyElement>,
     entries: Vec<MenuEntry>,
-    presentation: PopoverPresentation,
+    /// `None` when omitted: the anchored menu with the touch press model.
+    presentation: Option<PopoverPresentation>,
     open: Option<bool>,
     on_open_change: Option<OpenFn>,
     menu_width: Option<Length>,
@@ -165,7 +166,7 @@ impl DropdownMenu {
             button: None,
             trigger: None,
             entries: Vec::new(),
-            presentation: PopoverPresentation::Popover,
+            presentation: None,
             open: None,
             on_open_change: None,
             menu_width: None,
@@ -241,9 +242,15 @@ impl DropdownMenu {
         self
     }
 
-    /// Upstream `presentation`.
+    /// Upstream `presentation`: `Popover` stays anchored, `BottomSheet` always holds
+    /// the rows in a modal BottomSheet, and `Adaptive` uses the sheet on a compact touch
+    /// screen and stays anchored elsewhere. Omitted, the menu is anchored, and under a
+    /// finger or a pen its trigger opens as it is pressed (inside a scroller, after the
+    /// 150 ms content-touch delay) and the opening finger picks after moving 10 px; an
+    /// explicit `Popover` keeps the pointer behavior on every device, a 500 ms hold
+    /// included.
     pub fn presentation(mut self, presentation: PopoverPresentation) -> Self {
-        self.presentation = presentation;
+        self.presentation = Some(presentation);
         self
     }
 
@@ -341,7 +348,17 @@ impl RenderOnce for DropdownMenu {
         let root = menu_root(&self.id, window, cx);
         let open = self.open.unwrap_or_else(|| controller.is_open(cx));
         sync_root(&root, open, window, cx);
-        let sheet = presents_as_sheet(self.presentation, window);
+        let sheet = presents_as_sheet(
+            self.presentation.unwrap_or(PopoverPresentation::Popover),
+            window,
+            cx,
+        );
+        // Upstream `pressTouchModel`: an explicit `Popover` keeps the pointer model, the
+        // 500 ms hold before a finger opens it; otherwise a finger opens it as UIMenu does.
+        let pointer_model = self.presentation == Some(PopoverPresentation::Popover);
+        root.read(cx).press.set_long_press_delay(
+            pointer_model.then_some(crate::gestures::menu_press::MENU_PRESS_LONG_PRESS_MS),
+        );
         let regions = self.header.is_some() || self.footer.is_some();
         let close: MenuAction = {
             let controller = controller.clone();
@@ -368,6 +385,39 @@ impl RenderOnce for DropdownMenu {
             tree,
         );
 
+        // Under a finger, where the primary pointer is coarse, a tap or a drag during the
+        // entrance reaches nothing, as in UIMenu: the menu's own box is held (the page
+        // stays live) under the UIMenu touch model. Keys and assistive technology stay
+        // live (upstream `holdEntranceInput`).
+        {
+            use astryx_primitives::gestures::input_hold::{
+                HoldScope, hold_entrance_input, release_input_hold,
+            };
+            let hold_key = ElementId::Name(format!("{}-entrance-hold", self.id).into());
+            let (opened_at, surface) = {
+                let r = root.read(cx);
+                let surface = r
+                    .surfaces
+                    .iter()
+                    .find(|(depth, _)| *depth == 0)
+                    .map(|(_, b)| *b);
+                (r.opened_at, surface)
+            };
+            match (open && !sheet && !pointer_model, opened_at, surface) {
+                (true, Some(since), Some(bounds)) => {
+                    hold_entrance_input(
+                        window,
+                        hold_key,
+                        HoldScope::Surface(bounds),
+                        since,
+                        t.duration.fast_max,
+                        None,
+                        cx,
+                    );
+                }
+                _ => release_input_hold(window, &hold_key, cx),
+            }
+        }
         let drilled = root.read(cx).drilled > 0;
         let content = if sheet {
             let region = |el: AnyElement| div().px(t.spacing.s3).py(t.spacing.s2).child(el);
@@ -396,6 +446,7 @@ impl RenderOnce for DropdownMenu {
                 .flex()
                 .flex_col()
                 .child(surface_probe(&root, 0, true))
+                .child(astryx_primitives::gestures::input_hold::hold_probe())
                 .children(self.header.map(region))
                 .child(list)
                 .children(self.footer.map(region));
@@ -465,8 +516,15 @@ impl RenderOnce for DropdownMenu {
             .escape_dismiss(!drilled)
             .placement(self.placement)
             .alignment(self.alignment)
-            .presentation(self.presentation)
+            .presentation(if sheet {
+                PopoverPresentation::BottomSheet
+            } else {
+                PopoverPresentation::Popover
+            })
             .open(self.open)
+            // A finger's open grows the menu out of its trigger under the UIMenu model
+            // (upstream `surfaceMotion.present` with the touch open).
+            .touch_motion(Some(!pointer_model && window.last_input_was_touch()))
             .content(content)
             .child(trigger);
         if self.menu_width.is_some() {
@@ -493,7 +551,7 @@ pub struct MoreMenu {
     disabled: bool,
     placement: Placement,
     alignment: LayerAlign,
-    presentation: PopoverPresentation,
+    presentation: Option<PopoverPresentation>,
     open: Option<bool>,
     on_open_change: Option<OpenFn>,
     style: StyleRefinement,
@@ -512,7 +570,7 @@ impl MoreMenu {
             disabled: false,
             placement: Placement::Below,
             alignment: LayerAlign::Start,
-            presentation: PopoverPresentation::Popover,
+            presentation: None,
             open: None,
             on_open_change: None,
             style: StyleRefinement::default(),
@@ -532,8 +590,9 @@ impl MoreMenu {
         placement: Placement,
         /// Upstream `alignment`.
         alignment: LayerAlign,
-        /// Upstream `presentation`.
-        presentation: PopoverPresentation,
+        /// Upstream `presentation`, forwarded to DropdownMenu: omitted, the anchored
+        /// menu with the touch press model; `Popover` keeps the pointer model.
+        ?presentation: PopoverPresentation,
     }
 
     /// Upstream `icon`: instead of the three dots.
@@ -588,8 +647,10 @@ impl RenderOnce for MoreMenu {
             .items(self.entries)
             .placement(self.placement)
             .alignment(self.alignment)
-            .presentation(self.presentation)
             .open(self.open);
+        if let Some(presentation) = self.presentation {
+            menu = menu.presentation(presentation);
+        }
         if let Some(f) = self.on_open_change {
             menu = menu.on_open_change(move |open, window, cx| f(open, window, cx));
         }

@@ -1099,7 +1099,11 @@ impl RenderOnce for NumberInput {
                 &[("label", self.label.as_ref().into())],
             );
             let (ctx, focus) = (ctx.clone(), focus.clone());
-            control = control.child(
+            control = control.child(astryx_primitives::provide(
+                crate::gestures::touch_hit_area::FieldPartReach {
+                    start: true,
+                    end: status.is_some(),
+                },
                 IconButton::new(
                     "clear",
                     label,
@@ -1116,7 +1120,7 @@ impl RenderOnce for NumberInput {
                     ctx.end_draft(window, cx);
                     window.focus(&focus, cx);
                 }),
-            );
+            ));
         }
         if let Some(status) = status
             && self.status_placement != StatusPlacement::Detached

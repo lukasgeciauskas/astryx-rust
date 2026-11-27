@@ -5,11 +5,11 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-26, after M10 (Content)._
+_Last updated: 2026-11-27, after M11 (Motion & touch)._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8, M9 and M10. Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8, M9, M10 and M11. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
 - **Parity:** 105 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
@@ -21,7 +21,7 @@ _Last updated: 2026-11-26, after M10 (Content)._
   ubuntu, windows and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
-  `5bf80b680955ffad05565b5b1eeb2dcf4115794d` (patches R1 and R5 to R18; see
+  `d1d2962db9ddac49e8d518b4cd6170549c6f455c` (patches R1, R3 and R5 to R24; see
   [`gpui-fork.md`](gpui-fork.md)). The `[patch.crates-io]` block in
   `Cargo.toml` (async-task, calloop) is legitimate and stays.
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
@@ -42,12 +42,7 @@ _Last updated: 2026-11-26, after M10 (Content)._
 |---|---|
 | Lightbox video playback and `hasAutoPlay` (a video opens in the system player now) | MediaPlayer's decoder (M13) |
 | Backdrop blur (Lightbox, scrims, ChatLayout's frosted dock) | Fork patch R2 |
-| Item and List swipe actions | M11 stage 5 (with fork patch R3) |
-| Transient copies: SideNav's two rail layers (FR6), AppShell's held content (FR17, AST-105 FR8), a List exit's and a dragged row's start and end content | M11 stage 5 (fork patch R3 snapshots) |
-| A tall BottomSheet riding the virtual keyboard | M11 stage 6 (keyboard) |
-| ChatLayout's virtual-keyboard lift (`useChatKeyboard`) | Touch layer (M11) |
 | ChatTypingIndicator, ChatUnreadDivider, ChatVirtualizer, ChatEmojiPicker, ChatReactionBar (lab components) | Lab (M13) |
-| ChatPastedTextToken's touch tap-stop | Touch layer (M11) |
 | Native date and time pickers on macOS and Linux (`Native` shows the Astryx surface there) | Fork patch R16 built and checked on those platforms |
 
 ## The owner's standing instructions
@@ -69,8 +64,6 @@ _Last updated: 2026-11-26, after M10 (Content)._
   green, run `cargo xtask deploy --scope lamit`: it builds the browser gallery in release
   and publishes it to https://astryx-gallery.vercel.app (the `astryx-gallery` project of
   the "lamit" Vercel team) through the logged-in Vercel CLI.
-- **After M11:** the web gallery must let the browser's own context menu open on
-  right-click (so the page can be inspected); GPUI's web platform currently swallows it.
 - **Commits.** Each stage: run the gate, then commit and push to `main` with the
   global git identity. Messages end with the attribution lines the session
   supplies (`Co-Authored-By: ...`). Never commit a
@@ -198,21 +191,18 @@ time:
   "http://127.0.0.1:8080/?page=dates&backend=webgl"`, with a scratch
   `--user-data-dir`. The query picks the page, theme, mode and scroll.
 
-## Next: M11 Motion & touch
+## Next: M12 Theme authoring parity
 
-M10 (Content) is done: the syntax engine and SyntaxTheme; CodeBlock; Markdown on
-`astryx-markdown`, a port of upstream's own parser with its plugin system, incremental
-streaming parse and released shapes, every part checked against exported fixtures of
-upstream's output; Markdown's renderer with citations, math, inline plugins, code
-languages, heading links and streaming fade-in; `useStreamingText`, `useContainerReveal`
-and `useOutlineFromMarkdown`; and the Chat family: layout and stream scroll, messages, the
-composer (the editing engine now holds inline atomic tokens), tool calls and dictation
-behind a pluggable speech provider (the browser's own on the web). Its carried items are in
-the table below: motion and the virtual keyboard to M11, backdrop blur to fork patch R2, and
-the Chat family's lab parts to M13.
+M11 (Motion & touch) is done: the motion engine and `useAnimator`, animated layout (fork
+patches R19 glides and R20 inert) with every glide earlier milestones carried, gestures
+(R21 Windows touchscreens, R23 raw touch listeners) and the public gesture hooks adopted
+across core, drag-to-snap-points and BottomSheet's full gestures, offscreen layers (R3:
+rotation, group opacity, filters, masks, snapshots) with Swipe and the transient copies,
+the on-screen keyboard, and the coarse-pointer variants. R22 lets the web gallery's
+browser context menu (Inspect) open when the app takes no right click. Open: R3 on Metal
+needs a Mac to build and check; backdrop blur is fork patch R2.
 
-M11 builds the motion and touch layer (see `PLAN.md`): springs, decay, rubber-band, gesture
-recognizers, keyboard clearance and snap points, BottomSheet, Swipe and the coarse-pointer
-variants, and with them every animation earlier milestones carried (the table). Start with
-`cargo run -q -p astryx-cli -- docs effects` and the upstream motion sources.
-
+M12 builds theme authoring (see `PLAN.md`): a Rust `defineTheme` with type, radius and
+motion scale expansion (including the motion tempo the animator already reads), the OKLCH
+palette engine, the HCT generator, status-role derivation, contrast, `onDark`/`onLight`,
+adaptations and per-theme icons. Start with upstream's `theme/` and `palette/` sources.

@@ -133,6 +133,15 @@ impl RenderOnce for ChatLayout {
         )
         .with_messages(registry.clone());
         let news = use_chat_new_messages(self.id.clone(), window, cx);
+        // The composer sits on the software keyboard (upstream `useChatKeyboard`).
+        let keyboard = super::keyboard::use_chat_keyboard(
+            &self.id,
+            &scroll,
+            &handle,
+            self_scrolling,
+            window,
+            cx,
+        );
 
         let scroll_button = match self.scroll_button {
             Some(button) => button,
@@ -194,12 +203,16 @@ impl RenderOnce for ChatLayout {
             .mx_auto()
             .flex_grow(1.)
             .flex_shrink_0()
-            .pb(t.spacing.s6)
+            // The keyboard's lift adds to the end room, so the newest message clears it.
+            .pb(t.spacing.s6.to_pixels(window.rem_size()) + px(keyboard.lift))
             .w_full()
             .max_w_full()
             .px(area_pad);
         if let Some(max) = area_max {
             area = area.max_w(max);
+        }
+        if keyboard.messages_y != 0. {
+            area = area.translate(px(0.), px(keyboard.messages_y));
         }
         let area = if self.children.is_empty() && self.empty_state.is_some() {
             area.child(
@@ -220,25 +233,54 @@ impl RenderOnce for ChatLayout {
             dock_inner = dock_inner.max_w(max);
         }
         // The dock sticks to the scroller's bottom (fork patch R18). Its frosted layer is
-        // the blur's height; GPUI has no backdrop blur (carried to fork patch R2), so it
-        // paints nothing yet.
-        let dock = div()
+        // the blur's height, masked in from its top edge as upstream (fork patch R3's
+        // `mask_linear`); GPUI has no backdrop blur (carried to fork patch R2), so the
+        // layer paints nothing yet, and a layer that paints nothing costs nothing.
+        // The composer region is a keyboard target, and Done parks focus on it.
+        let composer = astryx_primitives::keyboard::provide_keyboard_target(
+            keyboard.target,
+            div()
+                .debug_selector({
+                    let selector = format!("{}-composer-region", self.id);
+                    move || selector
+                })
+                .track_focus(&keyboard.region)
+                .child(self.composer),
+            cx,
+        );
+        let mut dock = div()
             .debug_selector({
                 let selector = format!("{}-dock", self.id);
                 move || selector
             })
-            .sticky_bottom(px(0.))
+            // The dock rests above the keyboard: its sticky offset is the lift.
+            .sticky_bottom(px(keyboard.lift))
             .flex_shrink_0()
             .relative()
             .children(scroll_button)
-            .child(div().absolute().bottom_0().left_0().right_0().h(px(blur)))
+            .child(
+                div()
+                    .debug_selector({
+                        let selector = format!("{}-blur-layer", self.id);
+                        move || selector
+                    })
+                    .absolute()
+                    .bottom_0()
+                    .left_0()
+                    .right_0()
+                    .h(px(blur))
+                    .mask_linear(blur_mask(self.density)),
+            )
             .child(
                 div()
                     .relative()
                     .px(dock_inline)
                     .pb(dock_block)
-                    .child(dock_inner.child(self.composer)),
+                    .child(dock_inner.child(composer)),
             );
+        if keyboard.dock_y != 0. {
+            dock = dock.translate(px(0.), px(keyboard.dock_y));
+        }
 
         // After layout: the scroller is read, the spring steps, and a new last message
         // is noticed.
@@ -274,5 +316,41 @@ impl RenderOnce for ChatLayout {
             root.child(area)
         };
         provide(context, root.child(dock).child(observer))
+    }
+}
+
+/// The frosted layer's mask, upstream `linear-gradient(to bottom, transparent, black <n>)`:
+/// 24 px compact, 36 px balanced, 48 px spacious.
+pub(crate) fn blur_mask(density: ChatDensity) -> gpui::LinearMask {
+    let length = match density {
+        ChatDensity::Compact => 24.,
+        ChatDensity::Balanced => 36.,
+        ChatDensity::Spacious => 48.,
+    };
+    astryx_effects::edge_mask(
+        astryx_effects::MaskAxis::TopToBottom,
+        Some(&astryx_effects::edge_fade_stops(px(0.), px(length))),
+        None,
+    )
+}
+
+#[cfg(test)]
+mod blur_mask_tests {
+    use super::*;
+    use gpui::MaskStop;
+
+    #[test]
+    fn the_frosted_layer_fades_in_from_its_top_edge_by_density() {
+        for (density, length) in [
+            (ChatDensity::Compact, 24.),
+            (ChatDensity::Balanced, 36.),
+            (ChatDensity::Spacious, 48.),
+        ] {
+            let mask = blur_mask(density);
+            assert_eq!(mask.angle, 180., "to bottom");
+            assert_eq!(mask.stops[0], MaskStop::px(px(0.), 0.));
+            assert_eq!(mask.stops[1], MaskStop::px(px(length), 1.));
+            assert_eq!(mask.stops[2], MaskStop::from_end(px(0.), 1.));
+        }
     }
 }

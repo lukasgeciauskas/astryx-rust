@@ -6,6 +6,7 @@
 //! clock. Pure numbers in seconds, ms, px and px/s, with no GPUI types:
 //! components drive them frame by frame.
 
+pub mod android;
 pub mod animator;
 pub mod bezier;
 pub mod coast;

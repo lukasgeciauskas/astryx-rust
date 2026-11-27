@@ -655,6 +655,8 @@ pub(crate) struct MenuRoot {
     pub compact_touch: bool,
     /// Each drawn level's depth and bounds, this frame.
     pub surfaces: Vec<(usize, Bounds<Pixels>)>,
+    /// When the menu last opened: its entrance's start.
+    pub opened_at: Option<web_time::Instant>,
 }
 
 pub(crate) fn menu_root(id: &ElementId, window: &mut Window, cx: &mut App) -> Entity<MenuRoot> {
@@ -674,23 +676,30 @@ pub(crate) fn menu_root(id: &ElementId, window: &mut Window, cx: &mut App) -> En
             was_open: false,
             compact_touch: false,
             surfaces: Vec::new(),
+            opened_at: None,
         },
     )
 }
 
 /// Follows the menu opening and closing: a new opening starts fresh.
 pub(crate) fn sync_root(root: &Entity<MenuRoot>, open: bool, window: &Window, cx: &mut App) {
-    let compact = super::popover::compact_touch(window);
+    let compact = super::presentation::compact_touch(window, cx);
+    let now = cx.background_executor().now();
     root.update(cx, |r, _| {
         if open && !r.was_open {
+            r.opened_at = Some(now);
             r.generation += 1;
             r.drilled = 0;
             r.compact_touch = compact;
             // Opened from code: focus enters the list itself.
             r.initial.get_or_insert(Initial::Container);
         }
-        if !open {
+        // Only the close resets the press: a closed menu's trigger may hold a pending
+        // press (the pointer model's hold, the content-touch delay in a scroller).
+        if !open && r.was_open {
             r.press.reset();
+        }
+        if !open {
             r.opening_key = None;
             r.drilled = 0;
             r.surfaces.clear();
@@ -1230,6 +1239,7 @@ impl RenderOnce for MenuList {
             MenuSize::Sm => ChoiceSize::Sm,
             _ => ChoiceSize::Md,
         };
+        let marker_at_end = tree.touch || astryx_primitives::coarse_primary_pointer(window, cx);
         let link_handler = use_link_handler(cx);
         let gap = if tree.touch {
             t.spacing.s1
@@ -1492,8 +1502,10 @@ impl RenderOnce for MenuList {
                         .size(marker_size)
                         .disabled(item.disabled);
                     let end = item.end_content.as_ref().map(|f| f(window, cx));
-                    // A coarse pointer puts the marker at the end.
-                    content = if tree.touch {
+                    // A coarse primary pointer puts the marker at the row's end, where
+                    // touch selection toggles sit (upstream CSS `order` under
+                    // `(pointer: coarse)`), in the anchored menu as in the sheet.
+                    content = if marker_at_end {
                         content.end_content(
                             div()
                                 .flex()
@@ -1540,7 +1552,7 @@ impl RenderOnce for MenuList {
                         .size(marker_size)
                         .disabled(item.disabled);
                     let end = item.end_content.as_ref().map(|f| f(window, cx));
-                    content = if tree.touch {
+                    content = if marker_at_end {
                         content.end_content(
                             div()
                                 .flex()

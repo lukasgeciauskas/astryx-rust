@@ -853,8 +853,9 @@ impl RenderOnce for CodeBlock {
             astryx_primitives::coarse_primary_pointer(window, cx),
             area.is_focus_visible(window),
             (false, false),
-            t.spacing.s4.to_pixels(rem),
+            &astryx_effects::edge_fade_stops(px(0.), t.spacing.s4.to_pixels(rem)),
             astryx_i18n::use_direction(cx),
+            window.supports_offscreen_layers(),
             &t,
         );
         let content = area.content(
@@ -878,6 +879,7 @@ impl RenderOnce for CodeBlock {
                 move || s
             })
             .child(content);
+        viewport = fades.mask(viewport);
         if let Some(max) = self.max_height {
             viewport = viewport.max_h(max);
         }
@@ -888,7 +890,7 @@ impl RenderOnce for CodeBlock {
             .min_w_0()
             .flex_1()
             .child(viewport)
-            .children(fades);
+            .children(fades.edges);
         // FR5: collapsed, the body stays mounted but out of reach.
         let region = format!("{}-region", self.id);
         let moving = body_height.is_moving();

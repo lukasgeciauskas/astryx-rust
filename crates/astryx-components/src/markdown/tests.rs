@@ -727,3 +727,40 @@ fn source_lines_reach_custom_renderers(cx: &mut TestAppContext) {
     });
     assert_eq!(seen, ["Some((1, 1))", "Some((3, 4))"]);
 }
+
+#[gpui::test]
+fn heading_links_take_24_px_where_any_pointer_is_coarse(cx: &mut TestAppContext) {
+    use astryx_markdown::plugins::{HeadingLinksOptions, create_markdown_heading_links};
+    let links = create_markdown_heading_links(HeadingLinksOptions {
+        permalink_base_url: Some("https://docs.example/page".into()),
+        ..Default::default()
+    })
+    .unwrap();
+    let cx = page(cx, Log::default(), move || {
+        Markdown::new("md", "# Intro").plugins([links.clone()])
+    });
+    // A fine device with no touch screen: the small element size.
+    cx.update(|_, cx| astryx_primitives::modality::set_primary_pointer_coarse(Some(false), cx));
+    settle(cx);
+    let fine = cx
+        .debug_bounds("md-block-0-heading-links-copy")
+        .unwrap()
+        .size
+        .width;
+    let small = cx.update(|window, cx| {
+        astryx_theme::current(window, cx)
+            .tokens()
+            .size
+            .element_sm
+            .to_pixels(window.rem_size())
+    });
+    assert_eq!(fine, small);
+    cx.update(|_, cx| astryx_primitives::modality::set_primary_pointer_coarse(Some(true), cx));
+    settle(cx);
+    let coarse = cx
+        .debug_bounds("md-block-0-heading-links-copy")
+        .unwrap()
+        .size
+        .width;
+    assert_eq!(coarse, px(24.), "COARSE_TARGET");
+}

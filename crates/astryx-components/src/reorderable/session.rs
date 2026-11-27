@@ -12,13 +12,22 @@
 //!
 //! The drag's look follows upstream: the other items stay still until the
 //! drop (or, with shift feedback, slide aside on `springs.settle` to open the
-//! gap, [`super::slide`]); the source dims in place, and the item itself,
-//! dimmed, follows the pointer as the preview (GPUI draws an element once a
-//! frame, so the place keeps a copy of the row's text); an accent line marks
+//! gap, [`super::slide`]); the source dims in place, and a copy of it, its
+//! last frame kept as an offscreen layer (fork patch R3), follows the pointer as
+//! the preview. A renderer without offscreen layers (Metal) keeps no frame: there
+//! the item itself, dimmed, follows the pointer, and its place keeps a copy of
+//! its text (the List's) or what an app gives; an accent line marks
 //! the candidate; and the scroller the collection sits in autoscrolls near its
 //! edges. Under shift feedback or a finger, a drop, a cancel and a reorder-mode
 //! move glide the rows into their new places; a mouse's drop behind the
 //! insertion line lands at once, as upstream's does.
+//!
+//! What picks an item up depends on the pointer, as upstream's: a mouse's press on
+//! the handle drags once it has travelled 4 px; a finger (and a pen where the primary
+//! pointer is coarse) must hold still on the handle for the scroll view's
+//! content-touch delay, 150 ms, within 10 px (UIKit's reorder control,
+//! `motion::uikit::reorder`). A finger that travels sooner scrolls the list, a second
+//! finger before the claim is the page's pinch, and a tap toggles reorder mode.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -149,6 +158,11 @@ pub(crate) struct ReorderCx {
     pub reorderable: Reorderable,
     pub id: ElementId,
     pub preview: Rc<RefCell<Option<AnyElement>>>,
+    /// The dragged item's place keeps it, dimmed, and the overlay draws a snapshot
+    /// of it at the pointer (fork patch R3), under this id.
+    pub preview_snapshot: Rc<RefCell<Option<ElementId>>>,
+    /// The renderer keeps offscreen layers for snapshots.
+    pub snapshots: bool,
 }
 
 impl std::fmt::Debug for ReorderCx {
@@ -212,6 +226,8 @@ pub(crate) fn begin(
         reorderable: reorderable.clone(),
         id: id.clone(),
         preview: Rc::new(RefCell::new(None)),
+        preview_snapshot: Rc::new(RefCell::new(None)),
+        snapshots: window.supports_offscreen_layers(),
     }
 }
 
@@ -1328,8 +1344,34 @@ pub(crate) fn handle_on(
                 }
             });
     }
+    // Under a finger the handle picks its item up after a hold.
+    let el: AnyElement = if disabled {
+        el.into_any_element()
+    } else {
+        let attachment = hold_of(&handle_id(rc, key), &session, key, &focus, window, cx);
+        // Upstream ListReorderHandle's `useTouchHitArea`: under a coarse pointer the grip's
+        // target grows toward 44 px, and a finger on the grown area holds the item too.
+        let toggle_area: crate::gestures::touch_hit_area::ActivateFn = {
+            let (session, key) = (session.clone(), key.clone());
+            std::rc::Rc::new(move |window, cx| toggle(&session, &key, window, cx))
+        };
+        let area = crate::gestures::touch_hit_area::hit_area_with(
+            &ElementId::Name(handle_id(rc, key).into()),
+            true,
+            Some(toggle_area),
+            None,
+            crate::gestures::touch_hit_area::HitLinks {
+                gestures: Some(&attachment),
+                press: None,
+            },
+            window,
+            cx,
+        );
+        astryx_primitives::gestures::host::gesture_area(&attachment, el.children(area))
+            .into_any_element()
+    };
     if !in_mode {
-        return el.into_any_element();
+        return el;
     }
     // The mode's hint, anchored below the handle's start (Core's keyboard
     // hint's layer and roles); its buttons do what the keys do.
@@ -1355,6 +1397,98 @@ pub(crate) fn handle_on(
 }
 
 type PressFn = Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// A handle's hold under a finger (upstream `ListReorderTouch.ts`'s `attachTouchHold`):
+/// a lone finger held still on the handle for the scroll view's content-touch delay
+/// picks its item up; travel before then leaves the touch to the scroller, and a
+/// second finger before then leaves it to the page's pinch. After the claim the item
+/// follows the finger, the scroller autoscrolls near its edges, and the lift drops it.
+/// A mouse keeps its own path (a press and 4 px of travel).
+struct HandleHold {
+    attachment: astryx_primitives::gestures::host::GestureAttachment,
+    _recognizer: astryx_primitives::gestures::LongPressGestureRecognizer,
+    target: Rc<RefCell<(Entity<Session>, ItemKey, FocusHandle)>>,
+}
+
+impl Drop for HandleHold {
+    fn drop(&mut self) {
+        self.attachment.detach();
+    }
+}
+
+fn hold_of(
+    id: &str,
+    session: &Entity<Session>,
+    key: &ItemKey,
+    focus: &FocusHandle,
+    window: &mut Window,
+    cx: &mut App,
+) -> astryx_primitives::gestures::host::GestureAttachment {
+    use astryx_primitives::gestures::host::{after_gesture, gesture_host};
+    use astryx_primitives::gestures::{
+        GestureState, LongPressGestureRecognizer, LongPressOptions, PointerKind, RecognizerOptions,
+    };
+    use astryx_primitives::motion::uikit::reorder as REORDER;
+    let host = gesture_host(window, cx);
+    // A finger holds, and a pen where the primary pointer is coarse.
+    let coarse = astryx_primitives::coarse_primary_pointer(window, cx);
+    let target = (session.clone(), key.clone(), focus.clone());
+    let hold = window.use_keyed_state(
+        ElementId::Name(format!("{id}-hold").into()),
+        cx,
+        move |_, _| {
+            let target = Rc::new(RefCell::new(target));
+            let fingers = host.clone();
+            let mut pointers = vec![PointerKind::Touch];
+            if coarse {
+                pointers.push(PointerKind::Pen);
+            }
+            let recognizer = LongPressGestureRecognizer::new(LongPressOptions {
+                base: RecognizerOptions {
+                    name: Some("List.reorder".into()),
+                    allowed_pointer_types: Some(pointers),
+                    // Only a lone finger: two are the page's pinch.
+                    should_begin: Some(Rc::new(move |_| fingers.fingers_down() <= 1)),
+                    ..Default::default()
+                },
+                minimum_press_duration: REORDER::CLAIM_DELAY_MS,
+                allowable_movement: REORDER::CLAIM_ALLOWABLE_MOVEMENT,
+                ..Default::default()
+            });
+            let on = target.clone();
+            recognizer.add_listener(move |r| {
+                let state = r.any().state();
+                let at = r.any().location();
+                let position = point(px(at.x as f32), px(at.y as f32));
+                let (session, key, focus) = on.borrow().clone();
+                after_gesture(move |window, cx| match state {
+                    GestureState::Began => {
+                        focus.focus(window, cx);
+                        session.update(cx, |s, _| {
+                            s.armed = None;
+                            s.dragged_press = false;
+                        });
+                        begin_drag(&session, key, position, window, cx);
+                    }
+                    GestureState::Changed => pointer_moved(&session, position, window, cx),
+                    GestureState::Ended => released(&session, window, cx),
+                    // The platform took the touch: the drag ends where it started.
+                    GestureState::Cancelled => cancel_drag(&session, window, cx),
+                    _ => {}
+                });
+            });
+            HandleHold {
+                attachment: host.attach(&[recognizer.any()]),
+                _recognizer: recognizer,
+                target,
+            }
+        },
+    );
+    hold.update(cx, |h, _| {
+        *h.target.borrow_mut() = (session.clone(), key.clone(), focus.clone());
+        h.attachment.clone()
+    })
+}
 
 /// Reorder mode's hint: the moves along the layout's axis and Done, as
 /// buttons that never take the focus from the handle.
@@ -1561,6 +1695,20 @@ impl RenderOnce for Overlay {
                         .bg(surface)
                         .child(item),
                 );
+            } else if let Some(id) = self.rc.preview_snapshot.borrow_mut().take() {
+                // A copy of the dragged item, its last frame, at the pointer.
+                layer = layer.child(
+                    div()
+                        .debug_selector(|| "reorder-preview-copy".into())
+                        .absolute()
+                        .left(px(at.0))
+                        .top(px(at.1))
+                        .w(px(own.w))
+                        .h(px(own.h))
+                        .layer_opacity(MOVING_OPACITY)
+                        .bg(surface)
+                        .child(gpui::layer_snapshot(id).size_full()),
+                );
             }
         } else {
             let s = session.read(cx);
@@ -1634,6 +1782,20 @@ pub(crate) fn place_item(
     cx: &App,
 ) -> AnyElement {
     if let Some((size, shift)) = drag_source(rc, key, cx) {
+        if rc.snapshots && !shift {
+            // As upstream: the item dims where it is, and a copy of it (its kept
+            // frame, fork patch R3) follows the pointer.
+            let id = ElementId::Name(format!("{}-reorder-preview-{}", rc.id, key_text(key)).into());
+            *rc.preview_snapshot.borrow_mut() = Some(id.clone());
+            return div()
+                .w(size.width)
+                .h(size.height)
+                .flex_none()
+                .retain_layer(id)
+                .layer_opacity(MOVING_OPACITY)
+                .child(element)
+                .into_any_element();
+        }
         *rc.preview.borrow_mut() = Some(element);
         let place = div().w(size.width).h(size.height).flex_none();
         return match (shift, copy()) {

@@ -10,11 +10,14 @@
 //! from its old place to its new one on the rail's one clock, the theme's move curve over
 //! `--duration-medium`, and never animates its width; on an expand the content surface
 //! reaches over the gap the narrower column leaves at its trailing edge until the rail's
-//! edge closes it. Upstream also holds the old content as one transient copy that fades out
-//! as the new content fades in (AST-105 FR8's swap); that copy waits for a snapshot of
-//! main's last frame, fork patch R3's offscreen layers in M11 stage 5, so the content
-//! plays upstream's no-copy path for now. Under Reduce Motion it cross-fades with a coarse pointer and lands at
-//! once with a fine one.
+//! edge closes it. The content swaps its old wrap for its new one in place (AST-105 FR8):
+//! the old wrap is one transient copy, a snapshot of main's look when the change began
+//! (fork patch R3's kept offscreen layers: the change's first frame lays main out at its
+//! old size and keeps it), riding the column's glide and fading out as the new content
+//! fades in. A change during a running swap starts its cross-fade from what the content
+//! shows. A renderer without offscreen layers (Metal) plays upstream's no-copy path.
+//! Under Reduce Motion it cross-fades with a coarse pointer and lands at once with a fine
+//! one.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -146,6 +149,8 @@ struct ShellState {
     /// The header region's height, measured in `auto` (FR6).
     header_height: Rc<Cell<Pixels>>,
     opener: Rc<Cell<Option<Bounds<Pixels>>>>,
+    /// The content's swap across frames (FR17, AST-105 FR8).
+    swap: Rc<std::cell::RefCell<SwapTrack>>,
 }
 
 /// Upstream `AppShell`.
@@ -249,6 +254,7 @@ impl RenderOnce for AppShell {
                 skipped: false,
                 header_height: Rc::new(Cell::new(px(0.))),
                 opener: Rc::default(),
+                swap: Rc::default(),
             },
         );
         let config = match &self.mobile_nav {
@@ -422,6 +428,7 @@ impl RenderOnce for AppShell {
             layout: content_layout.clone(),
             cover: Rc::new(Cell::new(px(0.))),
             rides: !is_auto,
+            swap: Rc::new(Cell::new(None)),
         };
         // FR6, FR7: the inline side region; sticky below the header in auto.
         let side_inline = (has_side && !is_mobile).then(|| {
@@ -513,6 +520,12 @@ impl RenderOnce for AppShell {
         if skipped && !main_focus.is_focused(window) {
             state.update(cx, |s, _| s.skipped = false);
         }
+        // FR17, AST-105 FR8: the content swaps its old wrap for its new one in place. Its
+        // old wrap is one transient copy, a snapshot of main's last frame before the
+        // rail's change (fork patch R3), that rides the column's glide and fades out as
+        // the new content fades in; inert and out of the accessibility tree.
+        let copy_id = ElementId::Name(format!("{}-main-copy", self.id).into());
+        let track = state.read(cx).swap.clone();
         let elevated =
             self.variant == AppShellVariant::Elevated && has_top && side_inline.is_some();
         let page_radius = t.radius.page;
@@ -541,6 +554,13 @@ impl RenderOnce for AppShell {
             color,
             rtl: astryx_i18n::use_direction(cx).is_rtl(),
         });
+        let held = MainCopy {
+            id: copy_id.clone(),
+            swap: side_shell.swap.clone(),
+            track: track.clone(),
+            surface: cover_color,
+            rtl: astryx_i18n::use_direction(cx).is_rtl(),
+        };
         // FR16: elevated, the content area is a raised surface with the page's corner.
         let content = if elevated {
             div()
@@ -556,7 +576,13 @@ impl RenderOnce for AppShell {
                         .bg(surface)
                         .rounded_tl(page_radius),
                 )
-                .child(main)
+                .child(MainSwap {
+                    main,
+                    swap: side_shell.swap.clone(),
+                    track: track.clone(),
+                    id: copy_id.clone(),
+                })
+                .child(held)
                 .children(cover)
                 .into_any_element()
         } else {
@@ -568,7 +594,13 @@ impl RenderOnce for AppShell {
                 .flex_1()
                 .min_h_0()
                 .size_full()
-                .child(main.when_some(bg, |el, bg| el.bg(bg)))
+                .child(MainSwap {
+                    main: main.when_some(bg, |el, bg| el.bg(bg)),
+                    swap: side_shell.swap.clone(),
+                    track: track.clone(),
+                    id: copy_id.clone(),
+                })
+                .child(held)
                 .children(cover)
                 .into_any_element()
         };
@@ -709,5 +741,162 @@ impl RenderOnce for ContentCover {
         } else {
             el.right(-gap)
         }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Each swap's starting opacities (held copy, entering content), for tests.
+    pub(super) static SWAP_STARTS: std::cell::RefCell<Vec<(f32, f32)>> = std::cell::RefCell::default();
+}
+
+/// Where the content's swap stands across frames (FR17, AST-105 FR8).
+#[derive(Default)]
+struct SwapTrack {
+    /// The running swap's progress last frame; `None` at rest.
+    last_progress: Option<f32>,
+    /// The opacities the held copy and the entering wrap start from.
+    held: f32,
+    entering: f32,
+    /// This frame keeps main's look for the copy.
+    capturing: bool,
+    /// The previous swap's copy while a new change captures over it: its opacity.
+    previous_copy: Option<f32>,
+    /// A copy of main is kept.
+    kept: bool,
+    /// Main's size, last frame.
+    main_size: Option<gpui::Size<Pixels>>,
+}
+
+/// Main while the rail's change swaps the content (FR17, AST-105 FR8): rendered after the
+/// rail, which writes the change. The first frame of a change lays main out at its old
+/// size and keeps that look for the copy (fork patch R3); at that moment upstream's copy
+/// covers the content in full, so the frame looks the same. From the next frame the
+/// entering content fades in. A change during a running swap starts its cross-fade from
+/// what the content shows, as upstream's does.
+#[derive(IntoElement)]
+struct MainSwap {
+    main: gpui::Stateful<gpui::Div>,
+    swap: Rc<Cell<Option<crate::side_nav::RailSwap>>>,
+    track: Rc<std::cell::RefCell<SwapTrack>>,
+    id: ElementId,
+}
+
+impl RenderOnce for MainSwap {
+    fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
+        let swap = self
+            .swap
+            .get()
+            .filter(|s| s.progress < 1. && window.supports_offscreen_layers());
+        let mut main = self.main;
+        {
+            let mut tr = self.track.borrow_mut();
+            match swap {
+                None => {
+                    tr.last_progress = None;
+                    tr.capturing = false;
+                    tr.previous_copy = None;
+                    if std::mem::take(&mut tr.kept) {
+                        window.release_layer_snapshot(&self.id);
+                    }
+                }
+                Some(swap) => {
+                    let fresh = tr.last_progress.is_none_or(|p| swap.progress + 1e-4 < p);
+                    if fresh {
+                        // At rest the copy starts opaque and the entering wrap unseen;
+                        // mid-swap each starts at what it shows.
+                        let (held, entering, previous) = match tr.last_progress {
+                            Some(p) if tr.kept => (
+                                tr.entering + (1. - tr.entering) * p,
+                                tr.held * (1. - p),
+                                Some(tr.held * (1. - p)),
+                            ),
+                            _ => (1., 0., None),
+                        };
+                        tr.held = held;
+                        tr.entering = entering;
+                        tr.previous_copy = previous;
+                        #[cfg(test)]
+                        SWAP_STARTS.with(|s| s.borrow_mut().push((held, entering)));
+                        tr.capturing = true;
+                    } else {
+                        tr.capturing = false;
+                        tr.previous_copy = None;
+                    }
+                    tr.last_progress = Some(swap.progress);
+                    if tr.capturing {
+                        if let Some(size) = tr.main_size {
+                            main = main.flex_none().w(size.width).h(size.height);
+                        }
+                        main = main.retain_layer(self.id.clone());
+                        if tr.held < 1. {
+                            main = main.layer_opacity(tr.held);
+                        }
+                        tr.kept = true;
+                    } else {
+                        let e = tr.entering;
+                        main = main.layer_opacity(e + (1. - e) * swap.progress);
+                    }
+                }
+            }
+        }
+        let track = self.track.clone();
+        main.child(
+            canvas(
+                move |bounds, _, _| track.borrow_mut().main_size = Some(bounds.size),
+                |_, _, _, _| {},
+            )
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full(),
+        )
+    }
+}
+
+/// The content's old wrap while the rail's change swaps it: a snapshot of main's look
+/// when the change began, at main's old place and size, fading out on the rail's clock.
+#[derive(IntoElement)]
+struct MainCopy {
+    id: ElementId,
+    swap: Rc<Cell<Option<crate::side_nav::RailSwap>>>,
+    track: Rc<std::cell::RefCell<SwapTrack>>,
+    surface: Option<gpui::Hsla>,
+    rtl: bool,
+}
+
+impl RenderOnce for MainCopy {
+    fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
+        let swap = self.swap.get().filter(|s| s.progress < 1.);
+        let bounds = window.layer_snapshot_bounds(&self.id);
+        let opacity = {
+            let tr = self.track.borrow();
+            if tr.capturing {
+                // The previous swap's copy, as it showed, while this frame keeps the new.
+                tr.previous_copy
+            } else {
+                swap.map(|s| tr.held * (1. - s.progress))
+            }
+        };
+        let (Some(swap), Some(bounds), Some(opacity)) = (swap, bounds, opacity) else {
+            return div().into_any_element();
+        };
+        let mut el = div()
+            .debug_selector(|| "app-shell-content-copy".into())
+            .absolute()
+            .top_0()
+            .w(bounds.size.width)
+            .h(bounds.size.height)
+            .layer_opacity(opacity);
+        el = if self.rtl { el.right_0() } else { el.left_0() };
+        // Under Reduce Motion nothing glides: the copy paints the surface it sat on, so
+        // that surface fades out with it.
+        if swap.cross_fade
+            && let Some(surface) = self.surface
+        {
+            el = el.bg(surface);
+        }
+        el.child(gpui::layer_snapshot(self.id).size_full())
+            .into_any_element()
     }
 }

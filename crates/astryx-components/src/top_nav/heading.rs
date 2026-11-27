@@ -582,6 +582,9 @@ impl RenderOnce for TopNavHeading {
         let popover_heading = Rc::new(std::cell::RefCell::new(Some(popover_heading)));
         let close = hover.close_action();
         Popover::new(popover_id, i18n.t("@astryx.topNav.heading.dialogLabel"))
+            // Built on the popover runtime, not upstream's Popover component: no touch
+            // growth.
+            .touch_motion(Some(false))
             .controller(controller)
             .enabled(false)
             .placement(Placement::Below)

@@ -367,6 +367,12 @@ impl MenuPress {
         *self.0.options.borrow_mut() = options;
     }
 
+    /// Upstream `longPressDelayMs`, set by the owner as it renders: `None` is the UIMenu
+    /// touch model, a delay the pointer model.
+    pub(crate) fn set_long_press_delay(&self, ms: Option<f64>) {
+        self.0.options.borrow_mut().long_press_delay_ms = ms;
+    }
+
     /// The owner's half of the options: what a trigger press opens.
     pub(crate) fn set_trigger_press(
         &self,

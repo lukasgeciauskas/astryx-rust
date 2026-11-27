@@ -209,6 +209,10 @@ pub struct LayerState(Rc<Entry>);
 struct Measured {
     entry: Rc<Entry>,
     child: AnyElement,
+    /// The block size the software keyboard caps an anchored layer to (upstream
+    /// `useLayerKeyboardClearance`'s `keyboardCap`): the surface lays out in a column of
+    /// at most this height, so a surface that scrolls shrinks to it.
+    cap: Option<Pixels>,
 }
 
 impl Element for Measured {
@@ -230,7 +234,17 @@ impl Element for Measured {
         window: &mut Window,
         cx: &mut App,
     ) -> (LayoutId, ()) {
-        (self.child.request_layout(window, cx), ())
+        let child = self.child.request_layout(window, cx);
+        let Some(cap) = self.cap else {
+            return (child, ());
+        };
+        let mut style = gpui::Style {
+            display: gpui::Display::Flex,
+            flex_direction: gpui::FlexDirection::Column,
+            ..Default::default()
+        };
+        style.max_size.height = gpui::Length::Definite(cap.into());
+        (window.request_layout(style, [child], cx), ())
     }
 
     fn prepaint(
@@ -311,6 +325,7 @@ impl Element for Layer {
         let surface = Measured {
             entry,
             child: content,
+            cap: None,
         };
         let placed = match self.anchor {
             Some((position, corner)) => anchored()
@@ -401,11 +416,15 @@ pub struct AnchoredLayer {
     surface: Option<(AnyElement, Dismiss, LayerOptions)>,
     escape: EscapeBehavior,
     on_placed: Option<PlacedFn>,
+    on_geometry: Option<GeometryFn>,
     position: Option<PositionFn>,
     depth: usize,
     light_dismiss: bool,
     match_anchor_width: bool,
 }
+
+/// Told the trigger's and the placed layer's boxes each frame, in window px.
+type GeometryFn = Rc<dyn Fn(Bounds<Pixels>, Bounds<Pixels>, &mut Window, &mut App)>;
 
 /// Wraps `trigger` without changing its layout: it is laid out as if
 /// unwrapped, and its bounds anchor the layer [`AnchoredLayer::surface`]
@@ -418,6 +437,7 @@ pub fn anchored_layer(id: impl Into<ElementId>, trigger: impl IntoElement) -> An
         surface: None,
         escape: EscapeBehavior::Close,
         on_placed: None,
+        on_geometry: None,
         position: None,
         depth: 0,
         light_dismiss: true,
@@ -468,6 +488,16 @@ impl AnchoredLayer {
         self
     }
 
+    /// Told the trigger's box and the placed layer's box each frame, in window px (a
+    /// touch presentation grows the layer out of its trigger).
+    pub fn on_geometry(
+        mut self,
+        f: impl Fn(Bounds<Pixels>, Bounds<Pixels>, &mut Window, &mut App) + 'static,
+    ) -> Self {
+        self.on_geometry = Some(Rc::new(f));
+        self
+    }
+
     /// Told where the layer landed each frame (the side, after any flip).
     pub fn on_placed(mut self, f: impl Fn(LayerPosition, &mut Window, &mut App) + 'static) -> Self {
         self.on_placed = Some(Rc::new(f));
@@ -478,6 +508,7 @@ impl AnchoredLayer {
 /// What an anchored layer keeps from layout to prepaint.
 pub struct AnchoredState {
     surface: Option<(AnyElement, Rc<Entry>, LayerOptions)>,
+    clearance: Option<KeyboardClearance>,
 }
 
 impl Element for AnchoredLayer {
@@ -502,7 +533,13 @@ impl Element for AnchoredLayer {
         // Transparent: the trigger's node stands in the parent's layout.
         let layout_id = self.trigger.request_layout(window, cx);
         let Some((content, dismiss, options)) = self.surface.take() else {
-            return (layout_id, AnchoredState { surface: None });
+            return (
+                layout_id,
+                AnchoredState {
+                    surface: None,
+                    clearance: None,
+                },
+            );
         };
         self.depth = use_context::<LayerDepth>(cx).map_or(1, |d| d.0 + 1);
         let id = id.expect("anchored layers have an element id");
@@ -529,11 +566,20 @@ impl Element for AnchoredLayer {
             *entry.dismiss.borrow_mut() = dismiss.clone();
             (entry, registration)
         });
+        // The software keyboard's cap, from the frame that measured it (upstream
+        // `useLayerKeyboardClearance`).
+        let clearance = window.with_element_state::<KeyboardClearance, _>(id, |state, window| {
+            let state = state.unwrap_or_else(|| KeyboardClearance::open(window, cx));
+            (state.clone(), state)
+        });
+        // The keyboard module samples after each frame a reader draws.
+        crate::keyboard::keyboard_probe(window, cx);
         let surface = provide(
             LayerDepth(depth),
             Measured {
                 entry: entry.clone(),
                 child: content,
+                cap: clearance.0.cap.get(),
             },
         )
         .into_any_element();
@@ -541,6 +587,7 @@ impl Element for AnchoredLayer {
             layout_id,
             AnchoredState {
                 surface: Some((surface, entry, options)),
+                clearance: Some(clearance),
             },
         )
     }
@@ -573,12 +620,19 @@ impl Element for AnchoredLayer {
             cx,
         );
         let viewport = Bounds::new(Point::default(), window.viewport_size());
-        let position = match &self.position {
+        let mut position = match &self.position {
             Some(place) => place(bounds, measured, viewport, &options),
             None => position_layer(bounds, measured, viewport, &options),
         };
+        if let Some(clearance) = state.clearance.as_ref() {
+            position = clearance.place(position, measured, viewport, window);
+        }
         if let Some(f) = &self.on_placed {
             f(position, window, cx);
+        }
+        if let Some(f) = &self.on_geometry {
+            let anchor = window.element_transform().apply_bounds(bounds);
+            f(anchor, Bounds::new(position.origin, measured), window, cx);
         }
         window.defer_draw(
             surface,
@@ -634,4 +688,149 @@ fn dismiss_on_outside_press(entry: &Rc<Entry>, window: &mut Window, cx: &mut App
         let dismiss = entry.dismiss.borrow().clone();
         dismiss(window, cx);
     });
+}
+
+// ----------------------------------------------------------------------------
+// The software keyboard's clearance (upstream `Layer/useLayerKeyboardClearance.ts` and
+// `layerKeyboardClearance.ts`)
+
+/// Upstream `LAYER_KEYBOARD_CLEARANCE_PX`: how far above the software keyboard a capped
+/// layer ends, px: the clearance UIKit keeps under a popover the keyboard would cover
+/// (measured in a UIKit lab on the iOS 26.2 simulator).
+pub const LAYER_KEYBOARD_CLEARANCE_PX: f64 = 10.;
+
+/// Upstream `keyboardClearanceCap`: the block size that keeps a layer
+/// [`LAYER_KEYBOARD_CLEARANCE_PX`] above a keyboard covering `inset` px of the layout
+/// viewport's bottom, or `None` when the layer, at its own size, is already clear.
+pub fn keyboard_clearance_cap(
+    top: f64,
+    bottom: f64,
+    viewport_height: f64,
+    inset: f64,
+) -> Option<f64> {
+    if inset <= 0. {
+        return None;
+    }
+    let limit = viewport_height - inset - LAYER_KEYBOARD_CLEARANCE_PX;
+    if bottom <= limit {
+        return None;
+    }
+    Some((limit - top).max(0.))
+}
+
+struct ClearanceInner {
+    /// The keyboard the cap measures against, once its transition has arrived.
+    keyboard: Cell<f64>,
+    cap: Cell<Option<Pixels>>,
+    /// The block-start edge the layer had when the cap landed (upstream's `lift`), and
+    /// its own block size then.
+    top: Cell<Option<Pixels>>,
+    natural: Cell<Option<Pixels>>,
+    _guide: RefCell<Option<crate::keyboard::GuideSubscription>>,
+    pending: RefCell<Option<gpui::Task<()>>>,
+}
+
+/// An open anchored layer's keyboard clearance. While a software keyboard covers the
+/// bottom of the viewport, a layer that would run under it keeps its block-start edge and
+/// its block size is capped to end [`LAYER_KEYBOARD_CLEARANCE_PX`] above the keyboard.
+/// A rising keyboard caps it once, when the keyboard arrives; a falling one at once. A
+/// layer placed above its trigger holds its bottom edge, which a shorter box cannot lift:
+/// it is left as it is. Closing drops the state, so a layer reopens at its own size.
+#[derive(Clone)]
+struct KeyboardClearance(Rc<ClearanceInner>);
+
+impl KeyboardClearance {
+    fn open(window: &mut Window, cx: &mut App) -> Self {
+        let keyboard = crate::keyboard::get_keyboard_height(window, cx);
+        let inner = Rc::new(ClearanceInner {
+            keyboard: Cell::new(keyboard),
+            cap: Cell::new(None),
+            top: Cell::new(None),
+            natural: Cell::new(None),
+            _guide: RefCell::new(None),
+            pending: RefCell::new(None),
+        });
+        let guide = crate::keyboard::keyboard_layout_guide(window, cx);
+        let weak = Rc::downgrade(&inner);
+        let profile = guide.profile();
+        let subscription = guide.subscribe(window, cx, move |transition, window, cx| {
+            let Some(inner) = weak.upgrade() else { return };
+            inner.pending.borrow_mut().take();
+            let to = transition.to;
+            if transition.animated && transition.to > transition.from {
+                // Rising: a box's height cannot change on the compositor, so the cap
+                // changes once, when the keyboard arrives: Gboard's slide in Chrome, UIKit's
+                // notification duration elsewhere.
+                let length = match (profile, transition.curve) {
+                    (Some(_), Some(curve)) => curve.duration_ms,
+                    _ => crate::motion::uikit::timing::KEYBOARD_NOTIFICATION_MS,
+                };
+                let wait = (transition.start + length - crate::keyboard::keyboard_now(cx)).max(0.);
+                let weak = Rc::downgrade(&inner);
+                let task = window.spawn(cx, async move |cx| {
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_secs_f64(wait / 1000.))
+                        .await;
+                    cx.update(|window, _| {
+                        if let Some(inner) = weak.upgrade() {
+                            inner.keyboard.set(to);
+                            window.refresh();
+                        }
+                    })
+                    .ok();
+                });
+                *inner.pending.borrow_mut() = Some(task);
+                return;
+            }
+            // Falling, or at once.
+            inner.keyboard.set(to);
+            window.refresh();
+        });
+        *inner._guide.borrow_mut() = Some(subscription);
+        KeyboardClearance(inner)
+    }
+
+    /// Where the layer goes this frame, and its cap for the next.
+    fn place(
+        &self,
+        position: LayerPosition,
+        measured: gpui::Size<Pixels>,
+        viewport: Bounds<Pixels>,
+        window: &mut Window,
+    ) -> LayerPosition {
+        let inner = &self.0;
+        let keyboard = inner.keyboard.get();
+        let viewport_height = f64::from(viewport.size.height);
+        let mut position = position;
+        let capped = inner.cap.get().is_some();
+        // Capped, the layer keeps the block-start edge it had when the cap landed, and is
+        // measured at the size it had then.
+        let natural = match (capped, inner.natural.get()) {
+            (true, Some(natural)) => natural,
+            _ => measured.height,
+        };
+        if capped && let Some(top) = inner.top.get() {
+            position.origin.y = top;
+        }
+        let top = f64::from(position.origin.y);
+        let next = if keyboard <= 0. || position.side == crate::Placement::Above {
+            None
+        } else {
+            keyboard_clearance_cap(top, top + f64::from(natural), viewport_height, keyboard)
+        }
+        .map(|cap| gpui::px(cap as f32));
+        if next != inner.cap.get() {
+            if !capped {
+                inner.top.set(Some(position.origin.y));
+                inner.natural.set(Some(natural));
+            }
+            if next.is_none() {
+                inner.top.set(None);
+                inner.natural.set(None);
+            }
+            inner.cap.set(next);
+            window.refresh();
+        }
+        position
+    }
 }

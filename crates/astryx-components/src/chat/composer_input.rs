@@ -12,8 +12,10 @@
 //! DOM selection helpers of `chatComposerSelection.ts` become buffer offsets.
 //!
 //! Upstream's `keyboardSurface.ts` only changes how a touch focus reveals the field in a
-//! mobile browser; GPUI has no page to scroll, so focus here is a plain focus. The
-//! virtual-keyboard lift (`useChatKeyboard`) is carried to the touch milestone (M11).
+//! mobile browser; GPUI has no page to scroll (its web build focuses its hidden input with
+//! `preventScroll`), so focus here is a plain focus. The composer region is ChatLayout's
+//! keyboard target, and the virtual-keyboard lift is `chat/keyboard.rs`
+//! (`useChatKeyboard`).
 
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;

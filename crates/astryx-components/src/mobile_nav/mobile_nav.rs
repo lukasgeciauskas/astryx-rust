@@ -28,6 +28,8 @@ use crate::text::{Heading, HeadingLevel};
 
 /// FR5: the dialog closes no later than this after a close request.
 const CLOSE_BY: Duration = Duration::from_millis(250);
+/// Upstream `MAX_EXIT_MS`: the longest the slide-in's input hold lasts.
+const MAX_EXIT_MS: u64 = 550;
 
 /// Upstream `side`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -182,7 +184,34 @@ impl RenderOnce for MobileNav {
         } else {
             t.duration.medium
         };
-        let (shown, inert) = match phase(&state, duration, duration, window, cx) {
+        let drawn = phase(&state, duration, duration, window, cx);
+        // Under a coarse primary pointer nothing takes a touch until the slide-in ends,
+        // at most MAX_EXIT_MS in; a close holds nothing (upstream `holdEntranceInput`).
+        {
+            use astryx_primitives::gestures::input_hold::{
+                HoldScope, hold_entrance_input, release_input_hold,
+            };
+            let hold_key = ElementId::Name(format!("{}-entrance-hold", self.id).into());
+            match drawn {
+                Phase::Open { progress } => {
+                    let now = cx.background_executor().now();
+                    let since = now
+                        .checked_sub(duration.mul_f32(progress.clamp(0., 1.)))
+                        .unwrap_or(now);
+                    hold_entrance_input(
+                        window,
+                        hold_key,
+                        HoldScope::Viewport,
+                        since,
+                        duration,
+                        Some(Duration::from_millis(MAX_EXIT_MS)),
+                        cx,
+                    );
+                }
+                _ => release_input_hold(window, &hold_key, cx),
+            }
+        }
+        let (shown, inert) = match drawn {
             Phase::Hidden => {
                 return div()
                     .id(self.id.clone())
@@ -332,7 +361,8 @@ impl RenderOnce for MobileNav {
                 probes(&state, cx)
             })
             .child(header)
-            .child(content);
+            .child(content)
+            .child(astryx_primitives::gestures::input_hold::hold_probe());
         // FR13: the theme's overlay dim, unblurred.
         let dim = faded(t.color.overlay, shown);
         if inert {

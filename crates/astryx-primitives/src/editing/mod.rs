@@ -173,4 +173,10 @@ pub fn text_editor(
         state: state.clone(),
         style,
     })
+    // A text field is a neighbour every touch hit area stops halfway to (upstream
+    // `INTERACTIVE_SELECTOR`'s inputs and textareas).
+    .relative()
+    .child(crate::gestures::hit_area::target_probe(
+        state.entity_id().as_u64(),
+    ))
 }

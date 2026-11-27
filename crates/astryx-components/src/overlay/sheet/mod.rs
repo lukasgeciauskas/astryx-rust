@@ -26,6 +26,7 @@
 //!   drag's dismissal cross-fades within 200 ms, and anything else changes at once.
 
 pub(crate) mod gestures;
+mod keyboard;
 pub(crate) mod snap_offsets;
 pub(crate) mod stack;
 mod switcher;
@@ -1190,7 +1191,8 @@ fn render_sheet(sheet: BottomSheet, window: &mut Window, cx: &mut App) -> AnyEle
         || sheet.style.max_size.height.is_some();
     // Only a finger stretches the sheet past the smallest reserve, so a fine pointer
     // keeps it; so does a sheet the caller sizes, whose stretch stops there.
-    let touch_device = coarse;
+    // Upstream `(any-pointer: coarse)`: a device with a touch screen.
+    let touch_device = astryx_primitives::modality::any_pointer_coarse(window, cx);
     let reserve = sheet_reserve(vh, touch_device && !sized_by_caller);
     let budget = match sheet.height {
         SheetHeight::Hug | SheetHeight::Tall => vh * 0.92,
@@ -1485,13 +1487,33 @@ fn render_sheet(sheet: BottomSheet, window: &mut Window, cx: &mut App) -> AnyEle
         block_end: padding,
     };
     let inset = gestures_view.scroll_preservation_inset as f32;
+    // A presented Tall sheet rides the keyboard: its inset at the content's end, the
+    // focused field revealed in the body, the content on the keyboard's slide (AST-099).
+    let tall = sheet.height == SheetHeight::Tall;
+    let keyboard = keyboard::use_sheet_keyboard(
+        &sheet.id,
+        &scroll,
+        &surface_focus,
+        keyboard::SheetKeyboardOptions {
+            enabled: tall && open,
+            expanded: gestures_view.settled_offset.abs() < 0.5,
+            touch: coarse,
+        },
+        window,
+        cx,
+    );
     let focus_scope = modal.read(cx).focus.clone();
     let host_key = key.clone();
-    let content = div()
+    let mut content = div()
         .pt(block_start)
         .px(padding)
-        .pb(padding + px(inset))
-        .child(provide(
+        .pb(padding + px(inset) + px(keyboard.inset));
+    if keyboard.content_y != 0. {
+        content = content.translate(px(0.), px(keyboard.content_y));
+    }
+    let content = content.child(astryx_primitives::keyboard::provide_keyboard_target(
+        keyboard.target,
+        provide(
             SheetHost {
                 key: host_key,
                 open,
@@ -1516,7 +1538,9 @@ fn render_sheet(sheet: BottomSheet, window: &mut Window, cx: &mut App) -> AnyEle
                     ),
                 ),
             ),
-        ));
+        ),
+        cx,
+    ));
     let measure = {
         let cell = content_cell.clone();
         gpui::canvas(
@@ -1764,6 +1788,7 @@ fn render_sheet(sheet: BottomSheet, window: &mut Window, cx: &mut App) -> AnyEle
     let positioner = positioner.child(panel).child(edge_tint(&t, viewport));
 
     let info = sheet.purpose == DialogPurpose::Info;
+    PRESENTED.with(|p| p.borrow_mut().insert(key.to_string()));
     #[cfg(test)]
     probe::record(
         &key,
@@ -1855,6 +1880,19 @@ fn recede_at(
     from + (to - from) * p
 }
 
+thread_local! {
+    /// The sheets drawn on screen (presented or playing their exit), by key.
+    static PRESENTED: std::cell::RefCell<std::collections::HashSet<String>> =
+        std::cell::RefCell::default();
+}
+
+/// Whether the sheet `id` is on screen: open, or playing its exit (upstream's sheet
+/// presentation hold, until its dialog has closed).
+pub(crate) fn is_sheet_presented(id: &ElementId) -> bool {
+    let key = format!("{id:?}");
+    PRESENTED.with(|p| p.borrow().contains(&key))
+}
+
 /// A hidden sheet: it leaves the stack, and focus returns where the stack says.
 fn hide(
     id: &ElementId,
@@ -1869,6 +1907,7 @@ fn hide(
         let s = state.read(cx);
         (s.presented, s.body_key)
     };
+    PRESENTED.with(|p| p.borrow_mut().remove(key));
     #[cfg(test)]
     probe::forget(key);
     if presented {

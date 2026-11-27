@@ -21,8 +21,6 @@ const fn p(prop: &'static str, rust: RustApi) -> PropMapping {
     PropMapping { prop, rust }
 }
 
-const SWIPE: &str = "not yet: swipe actions land with the touch layer (M11)";
-
 pub const LIST_DOC: ComponentDoc = ComponentDoc {
     name: "List",
     rust_type: "astryx::components::list::List",
@@ -68,9 +66,18 @@ pub const LIST_ITEM_DOC: ComponentDoc = ComponentDoc {
         p("isDisabled", RustApi::Method("disabled")),
         p("isSelected", RustApi::Method("selected")),
         p("itemKey", RustApi::Method("item_key")),
-        p("swipe", RustApi::Waived(SWIPE)),
-        p("swipeActions", RustApi::Waived(SWIPE)),
-        p("swipeBehavior", RustApi::Waived(SWIPE)),
+        p(
+            "swipe",
+            RustApi::Method("swipe (a create_swipe value; on_activate gets the item_key)"),
+        ),
+        p(
+            "swipeActions",
+            RustApi::Method("swipe_actions (deprecated: use swipe)"),
+        ),
+        p(
+            "swipeBehavior",
+            RustApi::Method("swipe_behavior (deprecated: CreateSwipeOptions::swipe_behavior)"),
+        ),
     ],
     example: include_str!("examples.rs"),
 };

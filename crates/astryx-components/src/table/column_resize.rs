@@ -354,7 +354,8 @@ impl<T: 'static> RenderOnce for Handle<T> {
                 _ => None,
             };
             let quiet = r.quiet_until.is_some_and(|until| now < until);
-            let touch = window.last_input_was_touch();
+            // Upstream DEC-4: under a coarse primary pointer the hairline takes no pointer.
+            let touch = astryx_primitives::modality::coarse_primary_pointer_now(window, cx);
             let pointer_ok = !quiet && !touch;
             (
                 cell.map(|b| f32::from(b.size.width).round()),
@@ -438,8 +439,11 @@ impl<T: 'static> RenderOnce for Handle<T> {
                 window.refresh();
             })
             .on_mouse_down(MouseButton::Left, move |event, window, cx| {
-                // Dragging a hairline by finger is not offered (DEC-4).
-                if window.last_input_was_touch() {
+                // Dragging a hairline by finger is not offered (DEC-4): under a coarse
+                // primary pointer the handle takes no pointer at all.
+                if window.last_input_was_touch()
+                    || astryx_primitives::coarse_primary_pointer(window, cx)
+                {
                     return;
                 }
                 window.prevent_default();

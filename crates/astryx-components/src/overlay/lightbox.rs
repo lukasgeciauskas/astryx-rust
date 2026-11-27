@@ -572,7 +572,10 @@ impl RenderOnce for Lightbox {
         let count = self.media.len();
         let modal = modal_state(&self.id, window, cx);
         sync_open(&modal, self.open && count > 0, window, cx);
-        let exit = if window.last_input_was_touch() && !prefers_reduced_motion(cx) {
+        // The touch presentation's exit: under a coarse primary pointer.
+        let exit = if astryx_primitives::coarse_primary_pointer(window, cx)
+            && !prefers_reduced_motion(cx)
+        {
             TOUCH_EXIT
         } else {
             Duration::ZERO
@@ -1698,6 +1701,22 @@ fn caption_band(
         } else {
             i18n(cx).t("@astryx.lightbox.captionMore")
         };
+        // Upstream's caption toggle `useTouchHitArea`: under a coarse pointer it takes
+        // taps out toward 44 px.
+        let area = {
+            let state = state.clone();
+            crate::gestures::touch_hit_area::hit_area(
+                &ElementId::Name(format!("{id}-caption-toggle").into()),
+                true,
+                Some(std::rc::Rc::new(move |window, cx| {
+                    state.update(cx, |s, _| s.caption_open = !s.caption_open);
+                    window.refresh();
+                })),
+                None,
+                window,
+                cx,
+            )
+        };
         div()
             .absolute()
             .right(t.spacing.s3)
@@ -1712,6 +1731,7 @@ fn caption_band(
                     window.refresh();
                 }),
             )
+            .children(area)
     });
     let text = div()
         .pt(t.spacing.s2)

@@ -570,7 +570,7 @@ impl RenderOnce for PowerSearch {
         // FR10: adaptive resolves to the sheet on compact touch screens; an
         // open flow keeps it until it closes.
         let sheet_state = super::sheet::flow_state(&self.id, window, cx);
-        let sheet = crate::overlay::presents_as_sheet(self.presentation, window)
+        let sheet = crate::overlay::presents_as_sheet(self.presentation, window, cx)
             || sheet_state.read(cx).open;
 
         // Opening and closing the editor.
@@ -1351,6 +1351,9 @@ impl RenderOnce for PowerSearch {
         });
         let set_idle = set_editing.clone();
         Popover::new(popover_id, dialog_label)
+            // Built on the popover runtime, not upstream's Popover component: no touch
+            // growth.
+            .touch_motion(Some(false))
             .controller(popover)
             .enabled(false)
             .close_button(false)

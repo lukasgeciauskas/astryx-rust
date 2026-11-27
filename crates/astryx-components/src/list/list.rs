@@ -471,9 +471,12 @@ impl RenderOnce for List {
                             } else {
                                 content
                             };
+                            // Each keyed row keeps its last frame (fork patch R3), so its
+                            // exit can draw a faithful copy once it is gone.
                             out.push(
                                 div()
                                     .id(row_id(&self.id, &key))
+                                    .retain_layer(motion::row_copy_id(&self.id, &key))
                                     .child(content)
                                     .into_any_element(),
                             );
@@ -482,18 +485,34 @@ impl RenderOnce for List {
                             let Some((exit, reveal)) = m.exits[j].take() else {
                                 continue;
                             };
-                            let ghost = provide(
-                                ListRow {
-                                    first: false,
-                                    last: exit.ghost.last,
-                                    number: 0,
-                                    corners: RowCorners::default(),
-                                    index: usize::MAX,
-                                },
-                                exit.ghost.row(ElementId::Name(
-                                    format!("{}-leaving-{:?}", self.id, exit.key).into(),
-                                )),
-                            );
+                            // The removed row's exit draws its last frame, start and end
+                            // content included; a renderer without offscreen layers keeps
+                            // no frame, and draws what the List kept of the row.
+                            let copy_id = motion::row_copy_id(&self.id, &exit.key);
+                            let ghost = match window.layer_snapshot_bounds(&copy_id) {
+                                Some(bounds) => div()
+                                    .debug_selector({
+                                        let s = format!("{}-leaving-copy-{:?}", self.id, exit.key);
+                                        move || s
+                                    })
+                                    .w_full()
+                                    .h(bounds.size.height)
+                                    .child(gpui::layer_snapshot(copy_id).size_full())
+                                    .into_any_element(),
+                                None => provide(
+                                    ListRow {
+                                        first: false,
+                                        last: exit.ghost.last,
+                                        number: 0,
+                                        corners: RowCorners::default(),
+                                        index: usize::MAX,
+                                    },
+                                    exit.ghost.row(ElementId::Name(
+                                        format!("{}-leaving-{:?}", self.id, exit.key).into(),
+                                    )),
+                                )
+                                .into_any_element(),
+                            };
                             let content = reveal_content(reveal, ghost, true, window, cx);
                             out.push(
                                 div()

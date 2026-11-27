@@ -800,6 +800,9 @@ fn menu_press_the_opening_finger_picks_after_the_handoff_travel(cx: &mut TestApp
     let cx = host(cx, &log, menu(&log));
     finger(cx, 1, gpui::TouchPhase::Started, at(TRIGGER.0, TRIGGER.1));
     let oldest = row(cx, "m-list-oldest").expect("the press opened the menu");
+    // The finger's open grows the menu out of its trigger; its rows take the finger
+    // where they settle.
+    wait(cx, 300);
     // The first sample is where the handoff counts from.
     finger(
         cx,
@@ -810,6 +813,8 @@ fn menu_press_the_opening_finger_picks_after_the_handoff_travel(cx: &mut TestApp
     finger(cx, 1, gpui::TouchPhase::Moved, oldest);
     finger(cx, 1, gpui::TouchPhase::Ended, oldest);
     assert_eq!(logged(&log), ["oldest"]);
+    // It shrinks back into its trigger, then is gone.
+    wait(cx, 300);
     assert!(!open(cx), "picking closes the menu");
 }
 

@@ -111,6 +111,7 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::gestures::USE_PRESS_FEEDBACK_DOC,
     crate::drag_to_snap_points::CREATE_DRAG_TO_SNAP_POINTS_DOC,
     crate::drag_to_snap_points::USE_DRAG_TO_SNAP_POINTS_DOC,
+    crate::swipe::CREATE_SWIPE_DOC,
     crate::animated_layout::USE_ANIMATED_LAYOUT_DOC,
     crate::top_nav::TOP_NAV_DOC,
     crate::top_nav::TOP_NAV_HEADING_DOC,

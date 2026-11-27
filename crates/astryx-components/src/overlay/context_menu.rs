@@ -323,7 +323,7 @@ pub(crate) fn with_context_menu(
         .label
         .clone()
         .unwrap_or_else(|| i18n(cx).t("@astryx.contextMenu.label"));
-    let sheet = presents_as_sheet(spec.presentation, window);
+    let sheet = presents_as_sheet(spec.presentation, window, cx);
 
     // The area's bounds: the keyboard invocation opens at its corner.
     {

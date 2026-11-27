@@ -7,12 +7,12 @@
 //! content (fork patch R19), so the two never part, also when a change interrupts a
 //! running one. A reversal starts from what the element shows.
 //!
-//! The old state is held for the motion (FR8's transient copy): GPUI draws an element
-//! once a frame and cannot copy a subtree, so the element itself presents its old state
-//! for the part of the motion where upstream's copy covers it ([`EdgeMotion::presents_old`])
-//! and its new state after; the caller's own fades (the rail's labels and icons) play on
-//! [`EdgeMotion::progress`]. A real copy needs a snapshot of the element's last frame,
-//! which comes with fork patch R3 (offscreen layers) in M11 stage 5. Under Reduce Motion
+//! The old state is held for the motion (FR8's transient copy): the element presents its
+//! old state for the part of the motion where upstream's copy covers it
+//! ([`EdgeMotion::presents_old`]), and the caller draws the copy itself where the two
+//! cross-fade, as a snapshot of the element's last frame of the old state (fork patch R3's
+//! kept offscreen layers; SideNav's rail keeps its frames for it). The caller's own fades
+//! (the rail's labels and icons) play on [`EdgeMotion::progress`]. Under Reduce Motion
 //! with a coarse primary pointer nothing travels and only opacity changes (DR2); with a
 //! fine one the change lands at once (DR3).
 

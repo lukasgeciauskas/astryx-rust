@@ -28,13 +28,8 @@
 
 ## Components
 
-- **A dragged row's place shows its text, not a copy of the row.** GPUI draws an element
-  once a frame, so while a row is dragged the row itself (dimmed) rides the pointer as
-  the preview, and its place shows its label, description, grip and divider, dimmed;
-  start content and custom end content are not there until fork patch R3's snapshots (M11
-  stage 5). Upstream dims the row in place and draws a copy at the pointer. GPUI also reports no pointer type, so a finger's drag
-  starts like a mouse's (4px of travel), without upstream's hold; and Escape cancels a
-  drag, which upstream's mouse drag has no key for.
+- **A reorder drag: Escape cancels it.** A mouse drag is cancelled by Escape, which
+  upstream's mouse drag has no key for.
 
 - **Table: what GPUI's layout and AccessKit change.** An unknown row total (ARIA's `aria-rowcount=-1`, while more rows may load) has no
   AccessKit form, so no count is exposed then. A composed table's columns fit their
@@ -248,10 +243,6 @@
 - **A named scroll viewport keeps its own tab stop (M9).** Upstream's
   `contentOrViewport` hands forward Tab entry to a lone leading native button or link
   inside; GPUI's focus handles carry no element kind, so the viewport stays a stop.
-- **Scroll-edge fades blend into the body background (M9).** GPUI cannot mask by alpha, so
-  Table's and Tokenizer's fades (AST-025 FR22) are gradient overlays in
-  `background-body`; on another surface that color shows at the edge.
-
 - **No safe-area insets, ids or `aria-controls` in AppShell (M9).** GPUI reports no
   display cutouts, so AppShell's `env(safe-area-inset-*)` padding is zero; and GPUI
   elements have no DOM ids, so the main region's id, the drawer id and the toggle's
@@ -318,16 +309,18 @@
   element's bounds from its focus handle, so a drawer opened by a pointer uses the
   pointer's half, one opened from the keyboard uses AppShell's toggle, and otherwise it
   keeps its last side, as upstream does when nothing is focused.
-- **No transient copies yet (until M11 stage 5).** Upstream holds an element's old look as
-  an inert copy while the new one enters: SideNav's rail cross-fades its expanded and
-  collapsed layers over the last 30% of a collapse (SideNav FR6), AppShell's content area
-  holds its old wrap (AppShell FR17, AST-105 FR8), and a List row's exit copy shows its
-  start and end content. GPUI keeps no element from one frame to the next, so the rail
-  shows its old state until 70% and then its new one, AppShell plays upstream's no-copy
-  path, and a List exit copy draws the row's label, description and divider only. Fork
-  patch R3 (offscreen layers, M11 stage 5) snapshots an element's last frame for these.
-  Outside AppShell, or in an `auto`-height AppShell, the SideNav rail's own width follows
-  its edge and its neighbours reflow.
+- **Kept layers draw text without subpixel antialiasing.** A snapshot (fork patch R3) keeps
+  an element's look as a texture, so its text is grayscale-antialiased. A List given an
+  animated layout keeps each keyed row's last look for its exit copy, so its rows draw
+  that way. Outside AppShell, or in an `auto`-height AppShell, the SideNav rail's own
+  width follows its edge and its neighbours reflow.
+- **macOS draws offscreen layers directly.** Fork patch R3 is built for DirectX and wgpu
+  (Linux, the web); on Metal a layer's content is painted as it is, so rotation, filters,
+  masks and snapshots are left out and opacity applies per piece, until the Metal path is
+  built and checked on a Mac.
+- **App-owned docked bars don't ride the on-screen keyboard (AST-099 FR9).** GPUI has no
+  `position: fixed`, so an app's own bottom bar cannot be told apart from other layout;
+  Astryx's own docks (ChatLayout, BottomSheet) ride it.
 - **Animated layout keys elements without ids by where they were built (fork patch R19).**
   Upstream's glide follows DOM nodes. GPUI elements do not outlive a frame, so a `div`
   without an id is known from frame to frame by the source place that built it and how
@@ -340,7 +333,8 @@
   after it follows by layout, frame by frame, rather than by a transform.
 - **Gestures: what GPUI's input reports.** GPUI has no pen pointer type, so a pen
   drives gestures as a mouse does (the recognizers' pen rules are tested but never
-  reached). It has no `scrollend`, so a finger's scroll counts as ended after 150 ms
+  reached). GPUI delivers input in order, so upstream's windows for late presses are not
+  needed and not ported. It has no `scrollend`, so a finger's scroll counts as ended after 150 ms
   without movement. A finger that no gesture takes scrolls the window on UIKit's
   deceleration, since GPUI's own scroll physics is private. Scrollers inside a cached
   view are not followed.

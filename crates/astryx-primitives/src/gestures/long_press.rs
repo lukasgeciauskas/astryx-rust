@@ -32,6 +32,13 @@ pub struct LongPressOptions {
     pub number_of_taps_required: u32,
     /// @default 1
     pub number_of_touches_required: usize,
+    /// A second finger after the press began cancels it, nothing acting (upstream
+    /// `ActionGroupPress`); a plain long press ignores it. @default false
+    pub cancels_on_extra_touch: bool,
+    /// The press's clock inside a scroller (upstream `receiveTouch`): a finger's or a
+    /// pen's press that lands in one waits this duration and fails past this movement, so
+    /// the scroller takes a flick. @default none
+    pub scroller_press: Option<(f64, f64)>,
 }
 
 impl Default for LongPressOptions {
@@ -42,6 +49,8 @@ impl Default for LongPressOptions {
             allowable_movement: LONG_PRESS::ALLOWABLE_MOVEMENT,
             number_of_taps_required: 0,
             number_of_touches_required: 1,
+            cancels_on_extra_touch: false,
+            scroller_press: None,
         }
     }
 }
@@ -68,6 +77,10 @@ pub struct LongPress {
     is_press_timer_armed: bool,
     /// When the gesture began, on the event clock.
     pub began_at: Option<f64>,
+    pub cancels_on_extra_touch: bool,
+    pub scroller_press: Option<(f64, f64)>,
+    /// The duration and movement outside a scroller.
+    pub plain_press: (f64, f64),
 }
 
 /// `LongPressGestureRecognizer`.
@@ -91,6 +104,9 @@ impl Recognizer<LongPress> {
             tap_most_touches: 0,
             is_press_timer_armed: false,
             began_at: None,
+            cancels_on_extra_touch: options.cancels_on_extra_touch,
+            scroller_press: options.scroller_press,
+            plain_press: (options.minimum_press_duration, options.allowable_movement),
         };
         Self::with_behavior(base, behavior, "LongPressGestureRecognizer")
     }
@@ -113,9 +129,11 @@ impl RecognizerBehavior for LongPress {
     }
 
     fn accepts_touch(&self, r: &AnyRecognizer, touch: &GestureTouch) -> bool {
-        // Extra fingers after the press began do not end or move it.
+        // Extra fingers after the press began do not end or move it, unless they cancel it.
         if r.state().is_active() {
-            return false;
+            // The extra finger is taken, so its tap acts on nothing, and it cancels the
+            // press as it lands (touches_began).
+            return self.cancels_on_extra_touch;
         }
         r.base_accepts_touch(touch)
     }
@@ -123,10 +141,27 @@ impl RecognizerBehavior for LongPress {
     fn touches_began(
         &mut self,
         r: &AnyRecognizer,
-        _touches: &[GestureTouch],
+        touches: &[GestureTouch],
         event: &GestureEventContext,
     ) {
         let count = r.number_of_touches();
+        if self.cancels_on_extra_touch && r.state().is_active() && count > 1 {
+            r.set_state(GestureState::Cancelled);
+            return;
+        }
+        if let (Some((delay, slop)), Some(first)) = (self.scroller_press, touches.first())
+            && count == touches.len()
+        {
+            let inside = first.pointer_type() != super::types::PointerKind::Mouse
+                && first
+                    .scroll()
+                    .is_some_and(|probe| probe.is_inside_scroller());
+            (self.minimum_press_duration, self.allowable_movement) = if inside {
+                (delay, slop)
+            } else {
+                self.plain_press
+            };
+        }
         if count > self.number_of_touches_required {
             r.set_state(GestureState::Failed);
             return;

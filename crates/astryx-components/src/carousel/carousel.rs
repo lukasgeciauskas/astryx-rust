@@ -609,12 +609,18 @@ impl RenderOnce for Carousel {
                 false,
                 false,
                 (false, false),
-                t.spacing.s1.to_pixels(rem),
+                // Upstream's own: clear at the edge, 30% at 2px, shown from spacing-1.
+                &[
+                    astryx_effects::edge_stop(px(0.), 0.),
+                    astryx_effects::edge_stop(px(2.), 0.3),
+                    astryx_effects::edge_stop(t.spacing.s1.to_pixels(rem), 1.),
+                ],
                 dir,
+                window.supports_offscreen_layers(),
                 &t,
             )
         } else {
-            Vec::new()
+            Default::default()
         };
 
         // FR1, FR4: the edge buttons; one that ran out is hidden and takes no tab stop.
@@ -709,9 +715,9 @@ impl RenderOnce for Carousel {
             .overflow_hidden()
             .role(Role::Region)
             .aria_label(label)
-            .child(scroller)
+            .child(fades.mask(scroller))
             .child(capture)
-            .children(fades)
+            .children(fades.edges)
             .children(buttons);
         theme.refine(root.style(), "carousel", &[], None);
         root.style().refine(&self.style);

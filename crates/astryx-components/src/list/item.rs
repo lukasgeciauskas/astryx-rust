@@ -29,6 +29,9 @@ use crate::item::{Item, ItemAlign, ItemDensity};
 use crate::overlay::MenuEntry;
 use crate::reorderable::ItemKey;
 use crate::reorderable::session::{self as reorder, Registration};
+use crate::swipe::{
+    ItemSwipeActions, ItemSwipeBehavior, Swipe, SwipeHost, SwipeId, swipe_with_item_key,
+};
 
 type ClickFn = Rc<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
 type ActivateFn = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -58,6 +61,9 @@ pub struct ListItem {
     selected: bool,
     item_key: Option<ItemKey>,
     menu: Option<Vec<MenuEntry>>,
+    swipe: Option<Rc<SwipeHost>>,
+    swipe_actions: Option<ItemSwipeActions>,
+    swipe_behavior: Option<ItemSwipeBehavior>,
     style: StyleRefinement,
 }
 
@@ -90,8 +96,31 @@ impl ListItem {
             selected: false,
             item_key: None,
             menu: None,
+            swipe: None,
+            swipe_actions: None,
+            swipe_behavior: None,
             style: StyleRefinement::default(),
         }
+    }
+
+    /// Upstream `swipe`: the row's swipe actions (see [`Item::swipe`]), handed to its
+    /// Item with only the row's `item_key` added, which each action's `on_activate`
+    /// receives. The same value and key hand the row the same value.
+    pub fn swipe<Id: SwipeId>(mut self, swipe: Swipe<Id>) -> Self {
+        self.swipe = Some(swipe.host);
+        self
+    }
+
+    /// Deprecated upstream `swipeActions`, passed to the Item unchanged.
+    pub fn swipe_actions(mut self, actions: ItemSwipeActions) -> Self {
+        self.swipe_actions = Some(actions);
+        self
+    }
+
+    /// Deprecated upstream `swipeBehavior`, passed to the Item unchanged.
+    pub fn swipe_behavior(mut self, behavior: ItemSwipeBehavior) -> Self {
+        self.swipe_behavior = Some(behavior);
+        self
     }
 
     astryx_primitives::setters! {
@@ -170,10 +199,10 @@ impl ListItem {
     }
 }
 
-/// What a List keeps of a keyed row to draw its exit once it is gone (List FR12): GPUI
-/// keeps no element from one frame to the next. Its start and end content are not kept; a
-/// faithful copy needs a snapshot of the row's last frame, which comes with fork patch R3
-/// (offscreen layers) in M11 stage 5.
+/// What a List keeps of a keyed row to draw its exit once it is gone (List FR12), where
+/// the renderer keeps no snapshot of the row's last frame (fork patch R3's offscreen
+/// layers are missing on Metal): its text and selection; its start and end content are
+/// not kept.
 #[derive(Clone, Default)]
 pub(super) struct RowGhost {
     label: Option<SharedString>,
@@ -227,7 +256,7 @@ impl Styled for ListItem {
 }
 
 impl RenderOnce for ListItem {
-    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+    fn render(mut self, window: &mut Window, cx: &mut App) -> impl IntoElement {
         let theme = current(window, cx);
         let t = theme.tokens();
         let rem = window.rem_size();
@@ -342,6 +371,33 @@ impl RenderOnce for ListItem {
         }
         if let Some((focus, activate)) = self.delegate {
             item = item.interactive(focus, move |window, cx| activate(window, cx));
+        }
+        // FR1: `swipe` with only the row's key added, keyed once per value and key.
+        if let Some(host) = self.swipe.take() {
+            let keyed = window.use_keyed_state(
+                ElementId::Name(format!("{}-swipe-key", self.id).into()),
+                cx,
+                |_, _| None::<(Rc<SwipeHost>, Option<ItemKey>, Rc<SwipeHost>)>,
+            );
+            let reuse = keyed.read(cx).as_ref().and_then(|(from, key, value)| {
+                (Rc::ptr_eq(from, &host) && *key == self.item_key).then(|| value.clone())
+            });
+            let value = match reuse {
+                Some(value) => value,
+                None => {
+                    let value = swipe_with_item_key(&host, self.item_key.as_ref());
+                    let stored = (host.clone(), self.item_key.clone(), value.clone());
+                    keyed.update(cx, |k, _| *k = Some(stored));
+                    value
+                }
+            };
+            item = item.swipe_host(Some(value));
+        }
+        if let Some(actions) = self.swipe_actions.take() {
+            item = item.swipe_actions(actions);
+        }
+        if let Some(behavior) = self.swipe_behavior {
+            item = item.swipe_behavior(behavior);
         }
 
         // FR4: the marker, on the label's first line.
@@ -467,10 +523,11 @@ impl RenderOnce for ListItem {
         theme.refine(item.style(), "list-item", &[], None);
         item.style().refine(&self.style);
 
-        // While the row is dragged it rides the pointer in the List's
-        // overlay; its place keeps a dimmed copy of its text, grip and
-        // divider (GPUI draws an element once), or opens as the gap under
-        // shift feedback. Rows a shifting drag passes slide aside.
+        // While the row is dragged it dims in place and a copy of it, its kept
+        // frame (fork patch R3), follows the pointer; under shift feedback its
+        // place opens as the gap. A renderer without offscreen layers draws the
+        // row itself at the pointer, and its place keeps this dimmed copy of its
+        // text, grip and divider. Rows a shifting drag passes slide aside.
         let copy = {
             let (label, description) = (self.label_text.clone(), self.description_string.clone());
             let (id, align, selected) = (self.id.clone(), self.align, self.selected);

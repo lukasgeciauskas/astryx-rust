@@ -428,19 +428,21 @@ impl<T: TableRecord> RenderOnce for Table<T> {
             astryx_primitives::scroll_area::ScrollAxis::Inline
         };
         let scroll_state = astryx_primitives::scroll_area::measure(axis, &scroll);
-        let mut overlay = crate::scrollable_area::fade::visible_box(&scroll).children(
-            crate::scrollable_area::fade::scroll_edge_fades(
-                &format!("{name}-scroll"),
-                scroll_state.inline,
-                crate::scrollable_area::fade::FadeScrollbar::Native,
-                astryx_primitives::coarse_primary_pointer(window, cx),
-                focus_visible,
-                (wrapper.fade_off_start, wrapper.fade_off_end),
-                t.spacing.s8.to_pixels(rem),
-                dir,
-                t,
-            ),
+        let fades = crate::scrollable_area::fade::scroll_edge_fades(
+            &format!("{name}-scroll"),
+            scroll_state.inline,
+            crate::scrollable_area::fade::FadeScrollbar::Native,
+            astryx_primitives::coarse_primary_pointer(window, cx),
+            focus_visible,
+            (wrapper.fade_off_start, wrapper.fade_off_end),
+            &astryx_effects::edge_fade_stops(px(0.), t.spacing.s8.to_pixels(rem)),
+            dir,
+            window.supports_offscreen_layers(),
+            t,
         );
+        // The viewport itself is masked (fork patch R3), as upstream's `mask-image`.
+        region_el = fades.mask(region_el);
+        let mut overlay = crate::scrollable_area::fade::visible_box(&scroll).children(fades.edges);
         if focus_visible {
             overlay = overlay.child(crate::focus::focus_ring_inset(t, px(0.), rem));
         }

@@ -29,6 +29,7 @@ use web_time::Instant;
 
 use super::disclosure::Disclosure;
 use super::motion::{clearance, entrance, gutter, viewport_cap};
+pub(crate) use super::presentation::presents_as_sheet;
 use crate::button::{Button, ButtonVariant};
 use crate::layout::SpacingStep;
 
@@ -57,21 +58,6 @@ pub enum PopoverPresentation {
     Adaptive,
 }
 
-/// A compact touch screen: where the adaptive presentations use a sheet,
-/// and menus drill into submenus.
-pub(crate) fn compact_touch(window: &Window) -> bool {
-    window.viewport_size().width <= gpui::px(640.) && window.last_input_was_touch()
-}
-
-/// Whether `presentation` shows as a BottomSheet now.
-pub(crate) fn presents_as_sheet(presentation: PopoverPresentation, window: &Window) -> bool {
-    match presentation {
-        PopoverPresentation::Popover => false,
-        PopoverPresentation::BottomSheet => true,
-        PopoverPresentation::Adaptive => compact_touch(window),
-    }
-}
-
 /// A popover's state between frames.
 pub(crate) struct PopoverState {
     pub(crate) open: bool,
@@ -90,6 +76,16 @@ pub(crate) struct PopoverState {
     /// The next opening leaves focus where it is.
     skip_focus_once: bool,
     on_open_change: Option<OpenFn>,
+    /// The surface the opening chose (upstream's presentation hold): kept until the
+    /// next opening, so an open sheet stays a sheet and a closing one plays its exit.
+    surface_hold: super::presentation::PresentationHold<bool>,
+    /// Whether the last frame drew it open.
+    drawn_open: bool,
+    /// The touch presentation's growth and shrink (upstream `popoverSurfaceMotion`),
+    /// while this opening is a touch one.
+    touch_motion: Option<super::motion::SurfaceMotion>,
+    /// The trigger's and the surface's boxes, last frame.
+    geometry: Option<(super::motion::SurfaceBox, super::motion::SurfaceBox)>,
 }
 
 impl PopoverState {
@@ -106,6 +102,10 @@ impl PopoverState {
             pending_focus: false,
             skip_focus_once: false,
             on_open_change: None,
+            surface_hold: Default::default(),
+            drawn_open: false,
+            touch_motion: None,
+            geometry: None,
         }
     }
 }
@@ -293,6 +293,9 @@ pub struct Popover {
     light_dismiss: bool,
     escape_dismiss: bool,
     presentation: PopoverPresentation,
+    /// Whether the opening is the touch presentation (a menu decides by its press
+    /// model); the primary pointer by default.
+    touch_motion: Option<bool>,
     style: StyleRefinement,
     /// The owner's handle on the popover's state (a menu drives it).
     controller: Option<PopoverController>,
@@ -304,6 +307,14 @@ pub struct Popover {
 
 impl Popover {
     /// Upstream `label`: the dialog's accessible name.
+    /// Whether this opening grows out of its trigger as the touch presentation does (a
+    /// menu under its UIMenu touch model, opened by a finger); the primary pointer decides
+    /// when unset.
+    pub(crate) fn touch_motion(mut self, touch: Option<bool>) -> Self {
+        self.touch_motion = touch;
+        self
+    }
+
     pub fn new(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Self {
         let label: SharedString = label.into();
         Popover {
@@ -326,6 +337,7 @@ impl Popover {
             light_dismiss: true,
             escape_dismiss: true,
             presentation: PopoverPresentation::Popover,
+            touch_motion: None,
             style: StyleRefinement::default(),
             controller: None,
             surface_target: "popover",
@@ -469,7 +481,13 @@ impl RenderOnce for Popover {
         );
         // The sheet presentations: the trigger stays where it is, and a
         // BottomSheet holds the content.
-        let sheet = presents_as_sheet(self.presentation, window);
+        // An opening chooses its surface, and keeps it until the next one: a phone
+        // rotated past the compact width keeps its open sheet.
+        let resolved = presents_as_sheet(self.presentation, window, cx);
+        let sheet = state.update(cx, |s, _| {
+            let was_open = std::mem::replace(&mut s.drawn_open, open);
+            s.surface_hold.follow(open, was_open, || resolved)
+        });
         if sheet {
             let content = self.content;
             let sheet_state = state.clone();
@@ -502,13 +520,41 @@ impl RenderOnce for Popover {
         } else {
             EscapeBehavior::Block
         });
-        if !open {
-            state.update(cx, |s, _| s.shown_at = None);
+        let now = cx.background_executor().now();
+        // Under a finger the popover grows out of its trigger and shrinks back into it
+        // (upstream `usePopoverSurfaceMotion`), decided as it opens.
+        let exiting = !open
+            && state.update(cx, |s, _| {
+                s.shown_at = None;
+                match s.touch_motion.as_mut() {
+                    Some(m) => m.exit(now),
+                    None => false,
+                }
+            });
+        if !open && !exiting {
+            state.update(cx, |s, _| s.touch_motion = None);
             return layer.into_any_element();
         }
-
-        let now = cx.background_executor().now();
-        let since = state.update(cx, |s, _| *s.shown_at.get_or_insert(now));
+        let opening = open && state.read(cx).shown_at.is_none();
+        if opening {
+            let touch = self
+                .touch_motion
+                .unwrap_or_else(|| astryx_primitives::coarse_primary_pointer(window, cx));
+            state.update(cx, |s, _| {
+                if touch {
+                    s.touch_motion
+                        .get_or_insert_with(Default::default)
+                        .enter(now);
+                } else {
+                    s.touch_motion = None;
+                }
+            });
+        }
+        let since = if open {
+            state.update(cx, |s, _| *s.shown_at.get_or_insert(now))
+        } else {
+            now
+        };
         let (surface_focus, side) = {
             let s = state.read(cx);
             (s.surface.clone(), s.side)
@@ -607,7 +653,81 @@ impl RenderOnce for Popover {
         }
         theme.refine(surface.style(), self.surface_target, &[], None);
         surface.style().refine(&self.style);
-        let surface = entrance(surface, since, side, rtl, t, window, cx);
+        let touch_frame = {
+            let reduced = astryx_primitives::prefers_reduced_motion(cx);
+            let cross_fade = std::time::Duration::from_millis(
+                astryx_primitives::motion::uikit::timing::REDUCED_MOTION_CROSS_FADE_MS as u64,
+            );
+            let timing = super::motion::SurfaceTiming {
+                enter: if reduced {
+                    (cross_fade, t.ease.standard)
+                } else {
+                    (t.duration.medium_min, t.ease.entrance)
+                },
+                exit: if reduced {
+                    (cross_fade, t.ease.standard)
+                } else {
+                    (t.duration.exit, t.ease.exit)
+                },
+                reduced,
+            };
+            state.update(cx, |s, _| {
+                let geometry = s.geometry;
+                s.touch_motion
+                    .as_mut()
+                    .map(|m| (m.frame(geometry, timing, now), m.growing))
+            })
+        };
+        let hold_key = ElementId::Name(format!("{}-grow-hold", self.id).into());
+        let surface = match touch_frame {
+            Some((Some((frame, (ox, oy), moving)), growing)) => {
+                if moving {
+                    window.request_animation_frame();
+                }
+                // While it grows no touch reaches anything, as UIKit ignores touches
+                // while it presents a popover (a fine primary pointer stays live).
+                match growing {
+                    Some((grow_since, _))
+                        if open && astryx_primitives::coarse_primary_pointer(window, cx) =>
+                    {
+                        let theme_enter = if astryx_primitives::prefers_reduced_motion(cx) {
+                            std::time::Duration::from_millis(
+                                astryx_primitives::motion::uikit::timing::REDUCED_MOTION_CROSS_FADE_MS
+                                    as u64,
+                            )
+                        } else {
+                            t.duration.medium_min
+                        };
+                        astryx_primitives::gestures::input_hold::hold_input(
+                            window,
+                            hold_key,
+                            astryx_primitives::gestures::input_hold::HoldScope::Viewport,
+                            grow_since + theme_enter,
+                            cx,
+                        );
+                    }
+                    _ => astryx_primitives::gestures::input_hold::release_input_hold(
+                        window, &hold_key, cx,
+                    ),
+                }
+                surface
+                    .opacity(frame.opacity)
+                    .scale_xy(frame.scale_x, frame.scale_y)
+                    .transform_origin(ox, oy)
+                    .inert(exiting)
+                    .child(astryx_primitives::gestures::input_hold::hold_probe())
+            }
+            Some((None, _)) => {
+                // The shrink has ended.
+                state.update(cx, |s, _| s.touch_motion = None);
+                astryx_primitives::gestures::input_hold::release_input_hold(window, &hold_key, cx);
+                return layer.into_any_element();
+            }
+            None => {
+                astryx_primitives::gestures::input_hold::release_input_hold(window, &hold_key, cx);
+                entrance(surface, since, side, rtl, t, window, cx)
+            }
+        };
 
         let options = LayerOptions {
             placement: self.placement,
@@ -625,6 +745,17 @@ impl RenderOnce for Popover {
             })
             .on_placed(move |position, _, cx| {
                 placed.update(cx, |s, _| s.side = position.side);
+            })
+            .on_geometry({
+                let state = state.clone();
+                move |anchor, surface, _, cx| {
+                    state.update(cx, |s, _| {
+                        s.geometry = Some((
+                            super::motion::SurfaceBox::from_bounds(surface),
+                            super::motion::SurfaceBox::from_bounds(anchor),
+                        ));
+                    });
+                }
             });
         layer.into_any_element()
     }

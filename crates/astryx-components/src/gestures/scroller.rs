@@ -88,6 +88,8 @@ pub fn scroll_begin(
                 s.borrow_mut()
                     .push((overflows(handle.as_ref(), axes), Some(shown)))
             });
+            // The fields inside find their nearest scroller (the keyboard's reveal).
+            astryx_primitives::keyboard::push_scroller(handle.clone().map(|h| (h, shown)));
         },
         |_, _, _, _| {},
     )
@@ -102,6 +104,7 @@ pub fn scroll_end() -> impl IntoElement {
             STACK.with(|s| {
                 s.borrow_mut().pop();
             });
+            astryx_primitives::keyboard::pop_scroller();
         },
         |_, _, _, _| {},
     )
@@ -183,7 +186,9 @@ impl Element for ScrollerScope {
             gesture_host(window, cx).register_native_scroller(scroller);
         }
         STACK.with(|s| s.borrow_mut().push((scrolls, Some(bounds))));
+        astryx_primitives::keyboard::push_scroller(self.handle.clone().map(|h| (h, bounds)));
         self.child.prepaint(window, cx);
+        astryx_primitives::keyboard::pop_scroller();
         STACK.with(|s| {
             s.borrow_mut().pop();
         });

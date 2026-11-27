@@ -1073,6 +1073,12 @@ impl GestureHost {
         // Every finger's raw touches (fork patch R23), before GPUI's own
         // recognizer: a touch the host claims is the arena's alone.
         window.on_touch_event(move |event: &TouchEvent, window, cx| {
+            // A finger a presenting layer holds (upstream `holdsTouch`) reaches no
+            // recognizer; the layer's probe claims it from GPUI.
+            let window_id = window.window_handle().window_id();
+            if super::input_hold::holds_touch(window_id, event, cx) {
+                return false;
+            }
             // A tap the host replays to GPUI is GPUI's: never claimed again.
             host.0.replaying.get() == 0
                 && host.begin_dispatch(event, window, cx)

@@ -641,15 +641,21 @@ impl RenderOnce for ToastViewport {
         }
 
         let viewport = window.viewport_size();
-        let gutter = t.spacing.s4;
+        let gutter = t.spacing.s4.to_pixels(window.rem_size());
+        let (edge_top, edge_bottom, edge_start, edge_end) = toast_viewport_insets(
+            gutter,
+            window.insets().safe_area,
+            dir.is_rtl(),
+            astryx_primitives::modality::coarse_primary_pointer_now(window, cx),
+        );
         let mut column = div()
             .absolute()
             .flex()
             .gap(t.spacing.s2)
-            .pt(gutter)
-            .pb(gutter)
-            .padding_start(dir, gutter)
-            .padding_end(dir, gutter)
+            .pt(edge_top)
+            .pb(edge_bottom)
+            .padding_start(dir, edge_start)
+            .padding_end(dir, edge_end)
             .max_w(viewport.width);
         column = if top {
             column.top_0().flex_col_reverse()
@@ -696,4 +702,68 @@ pub(crate) fn queued(cx: &App) -> usize {
             .filter(|e| e.exiting_since.is_none())
             .count()
     })
+}
+
+/// Upstream ToastViewport's safe-area padding: the top and inline sides keep the
+/// gutter or the system's inset, whichever is larger; the bottom keeps the gutter plus
+/// the inset, and under a coarse pointer at least 34 px of it (a Face ID iPhone's
+/// bottom inset, which Safari reports only with `viewport-fit=cover`). Returns (top,
+/// bottom, inline start, inline end).
+pub(crate) fn toast_viewport_insets(
+    gutter: gpui::Pixels,
+    safe: gpui::Edges<gpui::Pixels>,
+    rtl: bool,
+    coarse: bool,
+) -> (gpui::Pixels, gpui::Pixels, gpui::Pixels, gpui::Pixels) {
+    let (start, end) = if rtl {
+        (safe.right, safe.left)
+    } else {
+        (safe.left, safe.right)
+    };
+    let bottom = if coarse {
+        safe.bottom.max(px(34.))
+    } else {
+        safe.bottom
+    };
+    (
+        gutter.max(safe.top),
+        gutter + bottom,
+        gutter.max(start),
+        gutter.max(end),
+    )
+}
+
+#[cfg(test)]
+mod safe_area_tests {
+    use super::toast_viewport_insets;
+    use gpui::{Edges, px};
+
+    #[test]
+    fn keeps_the_gutter_or_the_safe_area_and_under_a_coarse_pointer_clears_34_px_at_the_bottom() {
+        let none = Edges::default();
+        assert_eq!(
+            toast_viewport_insets(px(16.), none, false, false),
+            (px(16.), px(16.), px(16.), px(16.))
+        );
+        // Under a finger the bottom clears 34 px even where no inset is reported.
+        assert_eq!(toast_viewport_insets(px(16.), none, false, true).1, px(50.));
+        let notch = Edges {
+            top: px(47.),
+            right: px(0.),
+            bottom: px(34.),
+            left: px(20.),
+        };
+        let (top, bottom, start, end) = toast_viewport_insets(px(16.), notch, false, false);
+        assert_eq!(
+            (top, bottom, start, end),
+            (px(47.), px(50.), px(20.), px(16.))
+        );
+        // A larger reported inset wins over the 34 px floor; RTL swaps the inline sides.
+        let tall = Edges {
+            bottom: px(48.),
+            ..notch
+        };
+        let (_, bottom, start, end) = toast_viewport_insets(px(16.), tall, true, true);
+        assert_eq!((bottom, start, end), (px(64.), px(16.), px(20.)));
+    }
 }

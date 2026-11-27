@@ -391,6 +391,7 @@ impl RenderOnce for RadioList {
                 );
                 let select = self.on_change.clone();
                 let value = item.value.clone();
+                let row_id_for_area = row_id.clone();
                 let mut row = div()
                     .id(row_id)
                     .group(group)
@@ -399,6 +400,29 @@ impl RenderOnce for RadioList {
                     .min_w_0()
                     .child(row_item)
                     .child(feedback.probe().absolute().top_0().left_0().size_full());
+                // Upstream RadioListItem's `useTouchHitArea`: the row's target grows toward
+                // 44 px under a coarse pointer.
+                {
+                    let (select, value) = (select.clone(), value.clone());
+                    let activate: crate::gestures::touch_hit_area::ActivateFn =
+                        Rc::new(move |window, cx| {
+                            if !checked && let Some(f) = &select {
+                                f(value.clone(), window, cx);
+                            }
+                        });
+                    row = row.children(crate::gestures::touch_hit_area::hit_area_with(
+                        &row_id_for_area,
+                        !item_disabled,
+                        Some(activate),
+                        None,
+                        crate::gestures::touch_hit_area::HitLinks {
+                            gestures: None,
+                            press: Some(&feedback),
+                        },
+                        window,
+                        cx,
+                    ));
+                }
                 if item_disabled {
                     row = row.on_click(|_, _, cx| cx.stop_propagation());
                 } else {
@@ -751,15 +775,28 @@ impl RenderOnce for CheckboxList {
                     (_, _, Some(on_check)) => Rc::new(move |window, cx| on_check(next, window, cx)),
                     _ => Rc::new(|_, _| {}),
                 };
-                row = crate::press::touch_press(
-                    row,
+                let row_feedback = crate::gestures::use_press_feedback(
                     ElementId::Name(format!("{row_press_id}-press").into()),
-                    false,
-                    rest,
-                    pressed,
                     window,
                     cx,
                 );
+                row = crate::press::touch_press_with(row, &row_feedback, rest, pressed, window, cx);
+                // Upstream CheckboxInput's row `useTouchHitArea`; a finger on the grown
+                // area shows the row's press paint.
+                row = row
+                    .relative()
+                    .children(crate::gestures::touch_hit_area::hit_area_with(
+                        &ElementId::Name(format!("{row_press_id}-hit").into()),
+                        true,
+                        Some(toggle.clone()),
+                        None,
+                        crate::gestures::touch_hit_area::HitLinks {
+                            gestures: None,
+                            press: Some(&row_feedback),
+                        },
+                        window,
+                        cx,
+                    ));
                 row = row
                     .cursor_pointer()
                     .hover(move |s| s.bg(composite(rest, hover)))

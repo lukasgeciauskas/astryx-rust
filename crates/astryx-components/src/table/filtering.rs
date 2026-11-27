@@ -577,7 +577,7 @@ impl RenderOnce for FunnelTrigger {
             .aria_label(self.label)
             .aria_has_popup(HasPopup::Dialog);
         // A 44 px target for touch (upstream's `(pointer: coarse)`).
-        if window.last_input_was_touch() {
+        if astryx_primitives::coarse_primary_pointer(window, cx) {
             el = el.min_w(px(44.)).min_h(px(44.));
         }
         if !self.active && !visible {

@@ -9,11 +9,11 @@
 //! As upstream, only a row drawn in the area's visible part plays its exit; a row removed
 //! out of view goes at once.
 //!
-//! GPUI draws an element once a frame and keeps none from the last, so a removed row's
-//! exit draws what the List kept of it: its label, description, alignment, selection and
-//! divider (as a dragged row's place does); its start and end content are not kept. A
-//! faithful copy needs a snapshot of the row's last frame, which comes with fork patch R3
-//! (offscreen layers) in M11 stage 5.
+//! GPUI draws an element once a frame and keeps none from the last, so each keyed row
+//! keeps its last frame as an offscreen layer (fork patch R3), and a removed row's exit
+//! draws that snapshot: the row as it was, start and end content included. A renderer
+//! without offscreen layers (Metal) keeps no frame; there the exit draws what the List
+//! kept of the row: its label, description, alignment, selection and divider.
 
 use std::collections::{HashMap, HashSet};
 
@@ -74,6 +74,11 @@ pub(super) struct ListMotion {
 /// The element id that names a keyed row from frame to frame (its reveal and its glide).
 pub(super) fn row_id(list: &ElementId, key: &ItemKey) -> ElementId {
     ElementId::Name(format!("{list}-row-{key:?}").into())
+}
+
+/// The id a keyed row's last frame is kept under, for its exit's copy (fork patch R3).
+pub(super) fn row_copy_id(list: &ElementId, key: &ItemKey) -> ElementId {
+    ElementId::Name(format!("{list}-row-copy-{key:?}").into())
 }
 
 /// The order of rows and exits: an exit sits before the keyed row that has `before`

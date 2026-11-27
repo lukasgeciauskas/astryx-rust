@@ -24,6 +24,7 @@
 mod gestures;
 mod handoff;
 mod harness;
+mod keyboard;
 mod panel;
 mod resize;
 mod stacking;

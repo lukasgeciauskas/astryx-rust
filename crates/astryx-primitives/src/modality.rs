@@ -48,18 +48,99 @@ impl Global for LastPointer {}
 /// `(pointer: coarse)` media query, natively fine. A key press is no
 /// pointer, so typing or tabbing keeps the answer (a tablet with a keyboard
 /// stays coarse).
+///
+/// An app that knows its device (a phone or a tablet build, or a test) declares the
+/// primary pointer with [`set_primary_pointer_coarse`], which wins over every reading.
 pub fn coarse_primary_pointer(window: &Window, cx: &mut App) -> bool {
+    let (coarse, store) = read_primary_pointer(window, cx);
+    if let Some(store) = store {
+        let id = window.window_handle().window_id();
+        cx.default_global::<LastPointer>().0.insert(id, store);
+        if store {
+            cx.default_global::<SeenTouch>().0.insert(id);
+        }
+    }
+    coarse
+}
+
+/// The windows that have seen a finger.
+#[derive(Default)]
+struct SeenTouch(std::collections::HashSet<WindowId>);
+
+impl Global for SeenTouch {}
+
+/// Whether any pointer the device has is coarse, upstream `(any-pointer: coarse)`: a
+/// touch screen is present even where the primary pointer is a mouse or a trackpad (a
+/// touchscreen laptop). On the web the browser's own query answers; natively a window
+/// that has seen a finger counts, and on Windows a digitizer that reports touch
+/// (`GetSystemMetrics(SM_DIGITIZER)` with `NID_INTEGRATED_TOUCH` or
+/// `NID_EXTERNAL_TOUCH`). A declaration ([`set_primary_pointer_coarse`]) answers both
+/// queries.
+pub fn any_pointer_coarse(window: &Window, cx: &App) -> bool {
     use crate::gestures::PointerKind;
 
+    if let Some(declared) = declared_primary_pointer(cx) {
+        return declared;
+    }
+    if read_primary_pointer(window, cx).0 {
+        return true;
+    }
+    let id = window.window_handle().window_id();
+    if cx
+        .try_global::<SeenTouch>()
+        .is_some_and(|seen| seen.0.contains(&id))
+        || crate::gestures::host::last_pointer_kind(id, cx) == Some(PointerKind::Touch)
+    {
+        return true;
+    }
+    platform_any_coarse_pointer()
+}
+
+/// The platform's `(any-pointer: coarse)`.
+fn platform_any_coarse_pointer() -> bool {
+    #[cfg(target_family = "wasm")]
+    {
+        web_sys::window()
+            .and_then(|window| window.match_media("(any-pointer: coarse)").ok().flatten())
+            .is_some_and(|list| list.matches())
+    }
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_DIGITIZER};
+        /// `NID_INTEGRATED_TOUCH | NID_EXTERNAL_TOUCH` (winuser.h).
+        const TOUCH_DIGITIZER: i32 = 0x01 | 0x02;
+        // SAFETY: GetSystemMetrics reads a system value and has no preconditions.
+        unsafe { GetSystemMetrics(SM_DIGITIZER) & TOUCH_DIGITIZER != 0 }
+    }
+    #[cfg(not(any(target_family = "wasm", windows)))]
+    {
+        false
+    }
+}
+
+/// [`coarse_primary_pointer`] for a reader that holds only `&App` (the theme's
+/// pointer adaptations): the same answer, without recording the window's reading.
+pub fn coarse_primary_pointer_now(window: &Window, cx: &App) -> bool {
+    read_primary_pointer(window, cx).0
+}
+
+/// The answer, and the reading to record for the window when the last input was a
+/// pointer.
+fn read_primary_pointer(window: &Window, cx: &App) -> (bool, Option<bool>) {
+    use crate::gestures::PointerKind;
+
+    if let Some(declared) = declared_primary_pointer(cx) {
+        return (declared, None);
+    }
     let id = window.window_handle().window_id();
     let stored = cx
         .try_global::<LastPointer>()
         .and_then(|last| last.0.get(&id).copied());
     if window.last_input_was_keyboard() {
         if let Some(kind) = crate::gestures::host::last_pointer_kind(id, cx) {
-            return kind == PointerKind::Touch;
+            return (kind == PointerKind::Touch, None);
         }
-        return stored.unwrap_or_else(platform_coarse_pointer);
+        return (stored.unwrap_or_else(platform_coarse_pointer), None);
     }
     let coarse = if window.last_input_was_touch() {
         true
@@ -67,12 +148,33 @@ pub fn coarse_primary_pointer(window: &Window, cx: &mut App) -> bool {
         kind == PointerKind::Touch
     } else if stored.is_none() {
         // No pointer input the window could tell from its first state.
-        return platform_coarse_pointer();
+        return (platform_coarse_pointer(), None);
     } else {
         false
     };
-    cx.default_global::<LastPointer>().0.insert(id, coarse);
-    coarse
+    (coarse, Some(coarse))
+}
+
+/// The app's declaration of its device's primary pointer.
+#[derive(Default)]
+struct DeclaredPointer(Option<bool>);
+
+impl Global for DeclaredPointer {}
+
+/// Declares the device's primary pointer coarse (`Some(true)`: a phone or a tablet) or
+/// fine (`Some(false)`), the counterpart of the browser's `(pointer: coarse)` for a
+/// platform that cannot tell; `None` leaves it to the platform and the window's last
+/// pointer. Every touch presentation follows it: the adaptive sheets, the menus' touch
+/// model, the press controller, Reduce Motion's cross-fades and the theme's pointer
+/// adaptations. Tests use it to present the touch forms.
+pub fn set_primary_pointer_coarse(coarse: Option<bool>, cx: &mut App) {
+    cx.set_global(DeclaredPointer(coarse));
+    cx.refresh_windows();
+}
+
+/// What [`set_primary_pointer_coarse`] declared, if anything.
+pub fn declared_primary_pointer(cx: &App) -> Option<bool> {
+    cx.try_global::<DeclaredPointer>().and_then(|d| d.0)
 }
 
 /// The platform's primary pointer before any input: the browser's

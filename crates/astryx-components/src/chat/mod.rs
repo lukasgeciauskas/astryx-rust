@@ -11,6 +11,7 @@ mod composer_token;
 mod context;
 mod dictation;
 pub mod examples;
+mod keyboard;
 mod layout;
 mod message;
 mod message_list;
@@ -33,6 +34,8 @@ mod composer_parts_tests;
 mod composer_tests;
 #[cfg(test)]
 mod dictation_tests;
+#[cfg(test)]
+mod keyboard_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

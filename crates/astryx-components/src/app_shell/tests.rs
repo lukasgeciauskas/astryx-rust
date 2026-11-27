@@ -348,3 +348,57 @@ fn fr17_under_reduce_motion_with_a_mouse_it_lands_at_once(cx: &mut TestAppContex
     assert!(main < open - px(100.), "no glide: {main:?}");
     assert_eq!(main, cx.debug_bounds("nav").unwrap().right());
 }
+
+#[gpui::test]
+fn fr17_the_content_swaps_its_old_wrap_for_a_snapshot_copy_that_fades_out(cx: &mut TestAppContext) {
+    let cx = collapsible_shell(cx);
+    let before = cx.debug_bounds("shell-main").unwrap();
+    assert!(shown(cx, "content"));
+    assert!(
+        cx.debug_bounds("app-shell-content-copy").is_none(),
+        "at rest, no copy"
+    );
+    click(cx, "side-nav-collapse");
+    frames(cx, 32);
+    let copy = cx
+        .debug_bounds("app-shell-content-copy")
+        .expect("AST-105 FR8: the old wrap, held as a snapshot of main's last frame");
+    assert_eq!(copy.size, before.size, "at main's old size");
+    frames(cx, 700);
+    assert!(
+        cx.debug_bounds("app-shell-content-copy").is_none(),
+        "removed when the swap ends"
+    );
+}
+
+#[gpui::test]
+fn fr17_a_change_during_a_running_swap_starts_its_cross_fade_from_what_the_content_shows(
+    cx: &mut TestAppContext,
+) {
+    super::app_shell::SWAP_STARTS.with(|s| s.borrow_mut().clear());
+    let cx = collapsible_shell(cx);
+    click(cx, "side-nav-collapse");
+    frames(cx, 160);
+    assert!(cx.debug_bounds("app-shell-content-copy").is_some());
+    click(cx, "side-nav-collapse");
+    frames(cx, 32);
+    assert!(
+        cx.debug_bounds("app-shell-content-copy").is_some(),
+        "the new change holds the content shown now as its copy"
+    );
+    let starts = super::app_shell::SWAP_STARTS.with(|s| s.borrow().clone());
+    assert_eq!(starts.len(), 2, "{starts:?}");
+    assert_eq!(
+        starts[0],
+        (1., 0.),
+        "from rest: the copy opaque, the content unseen"
+    );
+    let (held, entering) = starts[1];
+    assert!(
+        held > 0. && held < 1. && entering > 0. && entering < 1.,
+        "mid-swap each starts at what it shows: {starts:?}"
+    );
+    assert!((held + entering - 1.).abs() < 1e-4, "{starts:?}");
+    frames(cx, 800);
+    assert!(cx.debug_bounds("app-shell-content-copy").is_none());
+}

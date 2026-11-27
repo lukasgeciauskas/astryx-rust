@@ -8,12 +8,20 @@
 //! ([`crate::animated_layout::inline`]) snaps the layout to the final width and moves the
 //! rail's inline-end edge from the width it shows to the new one, riding the glide of
 //! AppShell's content column (AppShell FR17); SideNav keeps only its labels' and icons'
-//! fades. A collapse presents the old, expanded rail (upstream's transient copy) with its
-//! labels fading over the first 40%, then the real collapsed rail, icons only; an expand
-//! reveals the real rail with its labels fading in over the last 60%. A change during a
-//! motion starts from what the rail shows. The two layers upstream cross-fades (its
-//! transient copy of the old rail over the real one) wait for a snapshot of the rail's
-//! last frame, fork patch R3's offscreen layers in M11 stage 5.
+//! fades. The rail's old state is one transient copy: a snapshot of the rail's old look
+//! (fork patch R3's kept offscreen layers), inert and out of the accessibility tree, for
+//! every change, the toggle's or a controlled `is_collapsed`'s. GPUI keeps no frame it was
+//! not asked to, so the rail takes the copy as the change plays: a collapse keeps the
+//! frames in which it still presents its old state, and an expand presents the old,
+//! collapsed rail in its first frame and keeps it (upstream's copy covers the rail in full
+//! then, so that frame looks the same). A
+//! collapse presents the old, expanded rail with its labels fading over the first 40%;
+//! over the last 30% the copy of it fades out while the real collapsed rail, raised
+//! above it, fades in, icons only. An expand reveals the real rail with its labels
+//! fading in over the last 60%, under the copy of the old, collapsed rail, which fades
+//! over the first 60%. A change during a motion starts from what the rail shows. A
+//! renderer without offscreen layers (Metal) keeps no snapshot: there the rail presents
+//! its old state until the copy would fade, then its new one.
 //!
 //! Outside AppShell there is no content column to ride, so the rail's own box follows its
 //! edge and what sits beside it reflows.
@@ -266,12 +274,24 @@ impl RenderOnce for SideNav {
                 }
             })
         };
+        let shell = use_context::<SideNavShell>(cx);
+        // FR6's transient copy is a snapshot of the rail's old look (fork patch R3), and
+        // which state it shows: kept across frames.
+        let copy_shows = window
+            .use_keyed_state(
+                ElementId::Name(format!("{:?}-rail-copy-shows", self.id).into()),
+                cx,
+                |_, _| Rc::new(std::cell::Cell::new(None::<bool>)),
+            )
+            .read(cx)
+            .clone();
+        let copy_id = ElementId::Name(format!("{}-rail-copy", self.id).into());
+        let snapshots = window.supports_offscreen_layers();
         let resizable = !matches!(self.resizable, Resizable::Off);
         // FR6: the rail's edge, its fades, and which state it presents.
         let rem = window.rem_size();
         let collapsed_width = t.spacing.s12.to_pixels(rem);
         let expanded_width = if resizable { px(region.size) } else { px(260.) };
-        let shell = use_context::<SideNavShell>(cx);
         let rail_id = ElementId::Name(format!("{}-rail-edge", self.id).into());
         let edge = (mode == SideNavRenderMode::Rail).then(|| {
             use_two_state_edge(
@@ -308,8 +328,18 @@ impl RenderOnce for SideNav {
                         from_icons * (1. - clamp(p / 0.6)),
                     )
                 };
-                // A collapse presents the old, expanded rail until the copy would fade.
-                let presented = if edge.conceals && edge.presents_old(0.7) && !edge.cross_fade {
+                // A collapse presents the old, expanded rail until the copy would fade. An
+                // expand's first frame presents the old, collapsed rail once more and keeps
+                // it, when no copy of it is kept yet: at that moment upstream's copy covers
+                // the real rail in full, so the frame looks the same.
+                let capture_old = snapshots
+                    && !edge.conceals
+                    && !edge.cross_fade
+                    && edge.old != edge.state
+                    && copy_shows.get() != Some(edge.old);
+                let presented = if (edge.conceals && edge.presents_old(0.7) && !edge.cross_fade)
+                    || capture_old
+                {
                     edge.old
                 } else {
                     real_collapsed
@@ -324,7 +354,64 @@ impl RenderOnce for SideNav {
             }
             None => (1., 1., real_collapsed),
         };
-        let _ = icons;
+        // FR6's transient copy: a snapshot of the rail's last frame (fork patch R3). A
+        // collapse draws it from 70%, under the real collapsed rail; an expand draws it
+        // over the real rail until it has faded, at 60%. The rail keeps its frames while
+        // no copy shows, so the copy is the last frame of the old state.
+        // An expand captures the old rail in its first frame (above).
+        let capturing = edge.as_ref().is_some_and(|e| {
+            e.moving && !e.conceals && !e.cross_fade && e.old != e.state && snapshots
+        }) && collapsed != real_collapsed;
+        let copy = match &edge {
+            Some(edge)
+                if edge.moving
+                    && !edge.cross_fade
+                    && edge.old != edge.state
+                    && snapshots
+                    && !capturing =>
+            {
+                let p = edge.progress;
+                if edge.conceals {
+                    // Before 70% the rail presents its old state itself and keeps its
+                    // frames, so the copy is the old rail with its labels faded; drawn
+                    // unseen until then, which keeps it.
+                    Some(RailCopy {
+                        opacity: if p < 0.7 {
+                            0.
+                        } else {
+                            1. - clamp((p - 0.7) / 0.3)
+                        },
+                        width: expanded_width,
+                        above: false,
+                        keeps: p < 0.7,
+                    })
+                } else {
+                    (p < 0.6).then_some(RailCopy {
+                        opacity: icons,
+                        width: collapsed_width,
+                        above: true,
+                        keeps: false,
+                    })
+                }
+            }
+            _ => None,
+        };
+        // A collapse's real collapsed rail fades in under the copy's fade, icons only.
+        let incoming = copy
+            .as_ref()
+            .filter(|c| !c.above && !c.keeps)
+            .map(|_| icons);
+        // AppShell's content swaps on the rail's clock (AppShell FR17, AST-105 FR8).
+        if let Some(shell) = &shell {
+            let swap = edge
+                .as_ref()
+                .filter(|e| e.moving && e.old != e.state)
+                .map(|e| super::RailSwap {
+                    progress: e.progress,
+                    cross_fade: e.cross_fade,
+                });
+            shell.swap.set(swap);
+        }
         let context = SideNavCollapse {
             collapsed,
             collapsible,
@@ -560,7 +647,46 @@ impl RenderOnce for SideNav {
                     }),
             );
         }
-        nav = nav.child(parts);
+        if let Some(opacity) = incoming {
+            parts = parts.layer_opacity(opacity);
+        }
+        let rtl = astryx_i18n::use_direction(cx).is_rtl();
+        let copy_element = copy.as_ref().map(|c| {
+            let el = div()
+                .debug_selector({
+                    let s = format!("{}-rail-copy", self.id);
+                    move || s
+                })
+                .absolute()
+                .top_0()
+                .h_full()
+                .w(c.width)
+                .child(
+                    gpui::layer_snapshot(copy_id.clone())
+                        .size_full()
+                        .layer_opacity(c.opacity),
+                );
+            if rtl { el.right_0() } else { el.left_0() }
+        });
+        if capturing || copy.as_ref().is_some_and(|c| c.keeps) {
+            // Kept for the copy: an expand's first frame, which presents the old,
+            // collapsed rail, and a collapse's frames while the rail presents its old,
+            // expanded state.
+            parts = parts.retain_layer(copy_id.clone());
+            copy_shows.set(Some(collapsed));
+        }
+        if !edge.as_ref().is_some_and(|e| e.moving) && copy_shows.take().is_some() {
+            // At rest no copy is kept: the next change takes its own.
+            window.release_layer_snapshot(&copy_id);
+        }
+        nav = nav.relative();
+        let above = copy.as_ref().is_some_and(|c| c.above);
+        let (below, over) = if above {
+            (None, copy_element)
+        } else {
+            (copy_element, None)
+        };
+        nav = nav.children(below).child(parts).children(over);
         let nav = provide(context, nav);
         if !resizable {
             return nav.into_any_element();
@@ -582,4 +708,15 @@ impl RenderOnce for SideNav {
             })
             .into_any_element()
     }
+}
+
+/// The rail's transient copy this frame (FR6).
+struct RailCopy {
+    opacity: f32,
+    /// The old state's width, which the copy keeps under the clip.
+    width: gpui::Pixels,
+    /// Over the real rail (an expand) rather than under it (a collapse).
+    above: bool,
+    /// Unseen while the rail presents its old state and keeps its frames for it.
+    keeps: bool,
 }

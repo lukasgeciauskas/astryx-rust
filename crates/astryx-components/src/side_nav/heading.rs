@@ -184,6 +184,9 @@ impl RenderOnce for SideNavHeading {
                 ElementId::Name(format!("{:?}-menu-popover", self.id).into()),
                 label.clone(),
             )
+            // Built on the popover runtime, not upstream's Popover component: no touch
+            // growth.
+            .touch_motion(Some(false))
             .controller(controller)
             .placement(if collapsed {
                 Placement::End
