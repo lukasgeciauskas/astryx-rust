@@ -642,6 +642,11 @@ impl RenderOnce for Slider {
             container = container.cursor_pointer().on_mouse_down(
                 MouseButton::Left,
                 move |e, window, cx| {
+                    // Only a primary click presses: an Apple control-click is the
+                    // platform's context request.
+                    if !astryx_primitives::is_primary_click(e.button, &e.modifiers, cx) {
+                        return;
+                    }
                     let Some(bounds) = state.bounds.get() else {
                         return;
                     };

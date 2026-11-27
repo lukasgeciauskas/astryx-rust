@@ -38,6 +38,8 @@ Don't guess. GPUI changes often, and upstream Astryx is the specification.
 | Gallery, browser | `cargo xtask web` (http://127.0.0.1:8080; `?page=buttons&theme=butter&mode=light&scroll=400` picks the start state) |
 | Publish the gallery | `cargo xtask deploy --scope lamit` (after each milestone; https://astryx-gallery.vercel.app) |
 | Screenshot (Windows) | `powershell -File tools/capture-window.ps1 -Exe target/debug/astryx-gallery.exe -Out shot.png`; for a running window, `tools/capture-running.ps1 -Name astryx-gallery -Out shot.png` |
+| Screenshots (macOS) | CI's `macos` job runs `tools/ci-macos.sh gallery|fork`; `gh run download <id> -n macos-screenshots`, then read the PNGs |
+| Type-check for macOS | `cargo check --target aarch64-apple-darwin` (see HANDOFF's macOS lessons for the Metal placeholder) |
 | Tests | `cargo test --workspace` |
 | Regenerate from upstream | `node tools/export/export-all.mjs ../Astryx`, then `cargo xtask codegen` (see `UPSTREAM.md`) |
 

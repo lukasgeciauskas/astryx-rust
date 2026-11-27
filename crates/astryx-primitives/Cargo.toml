@@ -26,5 +26,11 @@ js-sys = "0.3"
 [target.'cfg(windows)'.dependencies]
 windows.workspace = true
 
+# NSSpellChecker and NSHapticFeedbackManager.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2.workspace = true
+objc2-app-kit.workspace = true
+objc2-foundation.workspace = true
+
 [dev-dependencies]
 gpui = { workspace = true, features = ["test-support"] }

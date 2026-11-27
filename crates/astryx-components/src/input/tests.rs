@@ -97,7 +97,9 @@ fn click_at(cx: &mut VisualTestContext, x: f32) {
 }
 
 fn press(cx: &mut VisualTestContext, key: &'static str) {
-    let Ok(keystroke) = gpui::Keystroke::parse(key) else {
+    // `secondary-` is Cmd on a Mac and Ctrl elsewhere.
+    let os = cx.read(|cx| cx.platform_info().os);
+    let Ok(keystroke) = gpui::Keystroke::parse_with_os(key, os) else {
         panic!("not a keystroke: {key}")
     };
     cx.simulate_event(gpui::KeyDownEvent {

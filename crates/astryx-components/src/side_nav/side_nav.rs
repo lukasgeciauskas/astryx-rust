@@ -20,7 +20,7 @@
 //! above it, fades in, icons only. An expand reveals the real rail with its labels
 //! fading in over the last 60%, under the copy of the old, collapsed rail, which fades
 //! over the first 60%. A change during a motion starts from what the rail shows. A
-//! renderer without offscreen layers (Metal) keeps no snapshot: there the rail presents
+//! renderer without offscreen layers keeps no snapshot: there the rail presents
 //! its old state until the copy would fade, then its new one.
 //!
 //! Outside AppShell there is no content column to ride, so the rail's own box follows its

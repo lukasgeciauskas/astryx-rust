@@ -786,8 +786,8 @@ impl MenuPress {
                 cx,
             );
         } else if on_trigger {
-            // A control-click is the context menu's on macOS.
-            if cfg!(target_os = "macos") && event.modifiers.control {
+            // A control-click is the context menu's on Apple platforms.
+            if !astryx_primitives::is_primary_click(event.button, &event.modifiers, cx) {
                 return;
             }
             self.0.pointer.set(Some(Pointer::Mouse(event.button)));

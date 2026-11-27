@@ -73,7 +73,12 @@ impl FontStack {
         self.0
             .iter()
             .map(|f| f.as_ref())
-            .filter(|f| !Self::GENERIC.contains(f))
+            .filter(|f| !Self::is_generic(f))
+    }
+
+    /// Whether `family` is a generic CSS family, which names no font file.
+    pub fn is_generic(family: &str) -> bool {
+        Self::GENERIC.contains(&family)
     }
 
     /// True when the stack asks for a monospace face.

@@ -5,7 +5,7 @@
 //! [`edge_mask`] is the mask itself, an alpha gradient over the element's box
 //! drawn through an offscreen layer (fork patch R3's `mask_linear`), so the
 //! content fades to whatever lies behind it. A renderer without offscreen
-//! layers (Metal) draws no mask; there [`edge_fade`] stands in: an overlay in
+//! layers draws no mask; there [`edge_fade`] stands in: an overlay in
 //! the surface's color, opaque at the edge and clear at `length`, which looks
 //! the same as the mask over a surface of that color.
 

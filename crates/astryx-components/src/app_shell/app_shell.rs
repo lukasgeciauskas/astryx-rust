@@ -15,7 +15,7 @@
 //! (fork patch R3's kept offscreen layers: the change's first frame lays main out at its
 //! old size and keeps it), riding the column's glide and fading out as the new content
 //! fades in. A change during a running swap starts its cross-fade from what the content
-//! shows. A renderer without offscreen layers (Metal) plays upstream's no-copy path.
+//! shows. A renderer without offscreen layers plays upstream's no-copy path.
 //! Under Reduce Motion it cross-fades with a coarse pointer and lands at once with a fine
 //! one.
 

@@ -76,6 +76,15 @@ fn text(cx: &mut VisualTestContext, state: &Entity<TextEditState>) -> String {
     state.read_with(cx, |s, _| s.text().to_string())
 }
 
+/// The word modifier where the test runs: Option on a Mac, Ctrl elsewhere.
+fn word_key(cx: &mut VisualTestContext) -> &'static str {
+    if cx.read(|cx| cx.platform_info().os) == gpui::OperatingSystem::Mac {
+        "alt"
+    } else {
+        "ctrl"
+    }
+}
+
 #[gpui::test]
 fn typing_edits_and_reports_each_change(cx: &mut TestAppContext) {
     let (cx, state, log) = field(cx, "", false);
@@ -89,9 +98,10 @@ fn typing_edits_and_reports_each_change(cx: &mut TestAppContext) {
 #[gpui::test]
 fn word_keys_and_selection_replace_text(cx: &mut TestAppContext) {
     let (cx, state, _) = field(cx, "hello brave world", false);
-    cx.simulate_keystrokes("ctrl-backspace");
+    let word = word_key(cx);
+    cx.simulate_keystrokes(&format!("{word}-backspace"));
     assert_eq!(text(cx, &state), "hello brave ");
-    cx.simulate_keystrokes("ctrl-shift-left");
+    cx.simulate_keystrokes(&format!("{word}-shift-left"));
     cx.simulate_input("big");
     assert_eq!(text(cx, &state), "hello big");
 }
@@ -101,10 +111,42 @@ fn undo_and_redo_step_through_edits(cx: &mut TestAppContext) {
     let (cx, state, _) = field(cx, "", false);
     cx.simulate_input("one ");
     cx.simulate_input("two");
-    cx.simulate_keystrokes("ctrl-z");
+    cx.simulate_keystrokes("secondary-z");
     assert_eq!(text(cx, &state), "one ");
-    cx.simulate_keystrokes("ctrl-y");
+    cx.simulate_keystrokes("secondary-shift-z");
     assert_eq!(text(cx, &state), "one two");
+    if word_key(cx) == "ctrl" {
+        // Windows and Linux also redo with Ctrl+Y.
+        cx.simulate_keystrokes("secondary-z ctrl-y");
+        assert_eq!(text(cx, &state), "one two");
+    }
+}
+
+/// On a Mac the fields take macOS's keys: Cmd for shortcuts, Option for words,
+/// Cmd with the arrows for line and document ends (checked on any host by
+/// reporting a Mac before the keys are bound).
+#[gpui::test]
+fn text_fields_take_macos_keys_on_a_mac(cx: &mut TestAppContext) {
+    cx.set_platform_info(gpui::PlatformInfo {
+        os: gpui::OperatingSystem::Mac,
+        target: gpui::PlatformTarget::Native,
+    });
+    let (cx, state, _) = field(cx, "hello brave world", false);
+    cx.simulate_keystrokes("alt-backspace");
+    assert_eq!(text(cx, &state), "hello brave ");
+    cx.simulate_keystrokes("cmd-z");
+    assert_eq!(text(cx, &state), "hello brave world");
+    cx.simulate_keystrokes("cmd-shift-z cmd-z cmd-left");
+    cx.simulate_input("A ");
+    assert_eq!(text(cx, &state), "A hello brave world");
+    cx.simulate_keystrokes("cmd-right alt-shift-left");
+    cx.simulate_input("day");
+    assert_eq!(text(cx, &state), "A hello brave day");
+    cx.simulate_keystrokes("cmd-a");
+    assert_eq!(state.read_with(cx, |s, _| s.buffer().selection()), 0..17);
+    // Ctrl does nothing of the sort there.
+    cx.simulate_keystrokes("right ctrl-backspace");
+    assert_eq!(text(cx, &state), "A hello brave day");
 }
 
 #[gpui::test]
@@ -135,7 +177,7 @@ fn read_only_fields_select_but_never_change(cx: &mut TestAppContext) {
         })
     });
     cx.simulate_input("x");
-    cx.simulate_keystrokes("backspace ctrl-a");
+    cx.simulate_keystrokes("backspace secondary-a");
     assert_eq!(text(cx, &state), "fixed");
     assert_eq!(state.read_with(cx, |s, _| s.buffer().selection()), 0..5);
 }
@@ -332,12 +374,12 @@ fn an_object_takes_its_box_width_in_the_line(cx: &mut TestAppContext) {
     cx.simulate_keystrokes("left left backspace");
     assert_eq!(text(cx, &state), "abcd");
     assert!(state.read_with(cx, |s, _| s.buffer().objects().is_empty()));
-    cx.simulate_keystrokes("ctrl-z");
+    cx.simulate_keystrokes("secondary-z");
     assert_eq!(
         state.read_with(cx, |s, _| s.buffer().objects().to_vec()),
         vec![9]
     );
-    cx.simulate_keystrokes("ctrl-a ctrl-c");
+    cx.simulate_keystrokes("secondary-a secondary-c");
     let copied = cx.update(|_, cx| cx.read_from_clipboard().and_then(|c| c.text()));
     assert_eq!(copied.as_deref(), Some("ab<9>cd"));
 }

@@ -114,6 +114,46 @@ fn pressing_the_track_moves_the_thumb_there(cx: &mut TestAppContext) {
     assert_eq!(*log.borrow(), [SliderValue::Single(50.)]);
 }
 
+/// Upstream `isPrimaryClick`: on an Apple platform a control-click is the context click
+/// and moves nothing; elsewhere it presses as any click does.
+#[gpui::test]
+fn a_control_click_on_a_mac_moves_nothing(cx: &mut TestAppContext) {
+    cx.set_platform_info(gpui::PlatformInfo {
+        os: gpui::OperatingSystem::Mac,
+        target: gpui::PlatformTarget::Native,
+    });
+    let log = Rc::new(RefCell::new(Vec::new()));
+    let cx = host(cx, {
+        let log = log.clone();
+        move || {
+            let log = log.clone();
+            div()
+                .w(px(220.))
+                .child(
+                    Slider::new("s", "Volume", 0.)
+                        .label_hidden(true)
+                        .on_change(move |value, _, _| log.borrow_mut().push(value)),
+                )
+                .into_any_element()
+        }
+    });
+    let control = Modifiers {
+        control: true,
+        ..Modifiers::default()
+    };
+    cx.simulate_mouse_down(point(px(130.), px(30.)), gpui::MouseButton::Left, control);
+    cx.simulate_mouse_up(point(px(130.), px(30.)), gpui::MouseButton::Left, control);
+    cx.run_until_parked();
+    assert!(log.borrow().is_empty(), "the context click");
+    cx.simulate_mouse_down(
+        point(px(130.), px(30.)),
+        gpui::MouseButton::Left,
+        Modifiers::none(),
+    );
+    cx.run_until_parked();
+    assert_eq!(*log.borrow(), [SliderValue::Single(50.)]);
+}
+
 #[gpui::test]
 fn under_a_coarse_pointer_the_track_takes_at_least_24_px_across(cx: &mut TestAppContext) {
     let build = || {

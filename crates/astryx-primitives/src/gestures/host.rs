@@ -1290,12 +1290,9 @@ impl GestureHost {
         self.stop_momentum(window, cx);
         let point = to_point(event.position);
         let path = self.path(window, false);
-        let context_click = event.button == MouseButton::Right
-            || (cfg!(target_os = "macos")
-                && event.button == MouseButton::Left
-                && event.modifiers.control);
+        let context_click = crate::is_context_click(event.button, &event.modifiers, cx);
         if context_click {
-            // A right click (a ctrl-click on macOS) is a context click and
+            // A right click (a ctrl-click on Apple platforms) is a context click and
             // starts no press; the innermost request answers it.
             for area in &path {
                 let handler = area.0.context.borrow().clone();

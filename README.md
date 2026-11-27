@@ -2,13 +2,14 @@
 
 A Rust port of [Astryx](https://github.com/meta/astryx), Meta's open source
 design system, built on [GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui),
-Zed's GPU-accelerated UI framework. It runs natively on Windows and Linux and
-in the browser (WebAssembly), with no React or web view.
+Zed's GPU-accelerated UI framework. It runs natively on Windows, macOS and Linux
+and in the browser (WebAssembly), with no React or web view.
 
-> **Status: in development.** Milestones M0 to M5 are done: the theme pipeline,
-> the developer tooling, foundations, actions and controls, the editing engine
-> and fields, and the layer runtime with every overlay and menu. 72 of
-> upstream's 110 core components are ported; collections (M6) are next. See
+> **Status: in development.** Milestones M0 to M11 are done: the theme pipeline
+> and tooling, foundations, controls, the editing engine and fields, overlays,
+> collections, tables, dates, the shell and navigation, content (Markdown,
+> CodeBlock, Chat), and motion and touch. 105 of upstream's 110 core components
+> are ported; theme authoring (M12) is next. See
 > [`docs/PLAN.md`](docs/PLAN.md) for the full-parity roadmap,
 > [`docs/HANDOFF.md`](docs/HANDOFF.md) for the current state,
 > [`UPSTREAM.md`](UPSTREAM.md) for the synced upstream commit, and
@@ -37,8 +38,8 @@ revision**, or Cargo builds two copies of GPUI whose types do not mix.
 ```toml
 [dependencies]
 astryx = { git = "<this repository>", branch = "main" } # or path = "../Astryx Rust/crates/astryx"
-gpui = { git = "https://github.com/lukasgeciauskas/zed", rev = "d1d2962db9ddac49e8d518b4cd6170549c6f455c" }
-gpui_platform = { git = "https://github.com/lukasgeciauskas/zed", rev = "d1d2962db9ddac49e8d518b4cd6170549c6f455c", default-features = false }
+gpui = { git = "https://github.com/lukasgeciauskas/zed", rev = "769561f35b2eefa2fe86cd970fad7b4c1a9ea36f" }
+gpui_platform = { git = "https://github.com/lukasgeciauskas/zed", rev = "769561f35b2eefa2fe86cd970fad7b4c1a9ea36f", default-features = false }
 
 # Zed patches these crates for GPUI. Patches apply only at a workspace root,
 # so your app must repeat them.
@@ -65,7 +66,9 @@ off default features and enable `theme-neutral` (or any other `theme-*`).
 
 Use the Rust toolchain in [`rust-toolchain.toml`](rust-toolchain.toml); it
 matches the pinned Zed revision. On Linux, enable `gpui_platform`'s `wayland`
-and `x11` features.
+and `x11` features; on macOS, its `font-kit` feature (GPUI's Core Text text
+system: without it macOS draws no text). `examples/consumer/Cargo.toml` shows
+both.
 
 ## Development
 
@@ -88,6 +91,10 @@ shows what is left to port. Guides are in [`docs/guide/`](docs/guide/).
 
 Windows release builds compile GPUI's shaders with `fxc.exe` from the Windows
 10/11 SDK; debug builds compile them at run time.
+
+macOS builds compile GPUI's Metal shaders with Xcode's `metal` compiler (in Xcode 26
+the Metal Toolchain component: `xcodebuild -downloadComponent MetalToolchain`);
+`gpui_platform`'s `runtime_shaders` feature compiles them at run time instead.
 
 ## License
 

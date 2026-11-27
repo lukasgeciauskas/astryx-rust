@@ -26,7 +26,7 @@ by a parity manifest.
 | GPUI | Zed git main pinned at `2b248e607288f229695be89ca2e73face27e5c54` (2026-11-24), declared once in `[workspace.dependencies]`. Library crates depend on `gpui` only. Apps (gallery, user apps) add `gpui_platform`. Consumers must pin the same rev; the README documents a `[patch]` recipe. |
 | Toolchain | `rust-toolchain.toml` uses channel `1.100.0`, matching Zed main, with target `wasm32-unknown-unknown`. The user has 1.91, and rustup auto-installs the pinned channel. |
 | Foundation | Our own headless primitives on raw GPUI. No gpui-base or gpui-component. |
-| Platforms | Windows (primary dev and test), Linux (CI), Web (`gpui_web`, single canvas window). macOS works but is untested. |
+| Platforms | Windows (primary dev and test), macOS and Linux (CI: tests, and on macOS gallery and example screenshots), Web (`gpui_web`, single canvas window). |
 | Scope | All of core, the 7 themes with fonts, i18n (30 locales), Markdown/CodeBlock, Chat, the mobile/touch layer, charts, all 31 lab components, richtext, the 58 page templates, RTL, and high contrast. |
 | Out | `vega` (wraps the Vega JS runtime; charts covers the use case), the CLI/build/docsite/storybook/sandbox tooling (replaced by gallery + xtask + rustdoc), React/StyleX/Tailwind/Next.js-specific APIs (swizzle is "copy the source"), and the Swift native package. |
 
@@ -185,7 +185,7 @@ The remaining primitives:
 7. Mark the component done in the parity tracker. Page templates are ported as soon as their
    components exist.
 
-## Milestones (dependency-ordered; each ends green on Windows + Linux CI + wasm build)
+## Milestones (dependency-ordered; each ends green on Windows, Linux and macOS CI + wasm build)
 - **M0 Bootstrap & spikes**
   - `git init`; workspace, toolchain, pinned GPUI; gallery opens on Windows, runs in the
     browser, builds on Linux CI (GitHub Actions).
@@ -995,7 +995,7 @@ The remaining primitives:
       rotation, scale, translation, group opacity, blur, brightness, grayscale and a linear
       or painted mask, with hit testing through the transform, and kept snapshots of an
       element's last look; DirectX and wgpu (Linux and the web), checked natively and by
-      headless pixel tests. Metal draws layers directly, without rotation, filters or masks.
+      headless pixel tests. Metal came with the macOS work after M11 (below).
     - Swipe (`create_swipe`, the actions layer, UIKit's release rule) and Item and List
       swipe actions; the animator's rotate channel and group opacity; the transient copies
       as snapshots (SideNav's two rail layers, AppShell's held content, a List exit, a
@@ -1017,6 +1017,27 @@ The remaining primitives:
     halfway to registered neighbours, with press paint; the remaining coarse rules
     (Slider, ProgressBar, Toast safe area, column resize, heading links); `any_pointer_coarse`.
   - M11 done (2026-11-27).
+- **macOS support (done, 2026-11-27, between M11 and M12):** macOS is a first-class target,
+  checked by a `macos-latest` CI job (fmt, clippy, the full test suite, then the gallery
+  and the fork's `astryx_*` examples run and captured with `screencapture`, uploaded as
+  the `macos-screenshots` artifact, and the fork's Metal tests).
+  - Fork patch R3 on Metal (`ee135b6`): offscreen layers drawn into pooled textures as
+    encoders of the frame's command buffer, through a target origin every shader takes;
+    composites with rotation, group opacity, blur, brightness, grayscale, linear and
+    painted masks; snapshots; `supports_offscreen_layers` on; the DirectX and wgpu pixel
+    tests ported to the headless Metal renderer.
+  - Fork patch R16 on macOS (`769561f`): an `NSDatePicker` in a popover; DateInput,
+    TimeInput and DateTimeInput's `Native` surface opens it.
+  - The platform audit: upstream's `isApplePlatform` and `isPrimaryClick` read the
+    platform GPUI reports at run time (`astryx_primitives::platform`), so `mod`
+    shortcuts, Kbd's symbols and the control-click context click follow macOS natively
+    and in a Mac browser, and Slider ignores a control-click as upstream does; haptics on
+    a Force Touch trackpad; `NSSpellChecker`; `-apple-system` and `system-ui` stacks
+    draw in the system font through Core Text; the gallery and the consumer example
+    enable `gpui_platform`'s `font-kit` (macOS draws no text without it); the editing
+    tests type each platform's keys, and the macOS bindings are tested on any host.
+    Storage (`~/Library/Application Support/astryx`), the coarse-pointer reading (no
+    touchscreens) and the keyboard module (no on-screen keyboard) needed no change.
 - **M12 Theme authoring parity:** a Rust `defineTheme` builder with type/radius/motion scale
   expansion (with the motion tempo the animator plays at, carried from M11), OKLCH palette engine (`palette/`), HCT generator (`theme/hct.ts`), status-role
   derivation, contrast, `onDark`/`onLight`, adaptations, per-theme icons.
@@ -1027,8 +1048,11 @@ The remaining primitives:
     plus the tokenizer; MediaPlayer and ThreeD carry risk.
 - **M14 Rich text:** a document model + editor on the engine, toolbar, lossless Markdown round
   trip (AST-062/064/106).
-- **M15 RTL, high contrast, polish:** RTL mirroring, Windows high contrast, reduced-motion
-  audit, remaining page templates, theme-showcase, rustdoc on every public item, README.
+- **M15 RTL, high contrast, polish:** RTL mirroring, Windows high contrast and macOS's
+  Increase Contrast, reduced-motion audit (reading the system's Reduce Motion setting
+  natively: Windows' client-area animation setting, macOS's
+  `accessibilityDisplayShouldReduceMotion`), remaining page templates, theme-showcase,
+  rustdoc on every public item, README.
 
 ## Verification
 - On every milestone, on Windows:
@@ -1040,6 +1064,9 @@ The remaining primitives:
 - Web: `cargo xtask web` builds the gallery for `wasm32-unknown-unknown` and serves it. Check
   it in Chrome, screenshotting via Claude in Chrome.
 - Linux: the GitHub Actions ubuntu job runs build + tests.
+- macOS: the `macos-latest` job runs fmt, clippy and the tests, then captures the gallery
+  and the fork's examples (`tools/ci-macos.sh`); read the `macos-screenshots` artifact
+  (`gh run download <id> -n macos-screenshots`).
 - Visual: gallery vs Astryx Storybook side by side per component, light and dark, two themes.
 - Accessibility: Accessibility Insights for Windows / Narrator pass at the end of M3, M4, M5
   and M6.

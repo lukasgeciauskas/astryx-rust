@@ -5,23 +5,23 @@ of the work, the owner's standing instructions, the workflow that every
 milestone has followed, and what comes next. Update it at the end of each
 milestone.
 
-_Last updated: 2026-11-27, after M11 (Motion & touch)._
+_Last updated: 2026-11-27, after M11 (Motion & touch) and macOS support._
 
 ## State
 
-- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8, M9, M10 and M11. Details and dates are in
+- **Milestones done:** M0, M1, M1.5, M2, M3, M4, M5, M6, M7, M8, M9, M10 and M11, then macOS
+  support (a first-class platform, between M11 and M12). Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
 - **Parity:** 105 of 110 core components (`cargo run -q -p astryx-cli -- parity`;
   `component --list` marks ported ones with `*`).
-- **Last commits on `main`:** M10's stages: the syntax engine (`astryx-syntax`) and
-  SyntaxTheme, CodeBlock, Markdown on `astryx-markdown` (upstream's own parser, its plugin
-  system and incremental parsing, all checked against fixtures of upstream's output), and
-  the Chat family. CI runs on
-  ubuntu, windows and wasm for each push; check it with `gh run list`.
+- **Last commits on `main`:** macOS support: Metal offscreen layers (fork patch R3), the
+  macOS native pickers (R16), the platform audit and the `macos-latest` CI job. CI runs on
+  ubuntu, windows, macos and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
-  `d1d2962db9ddac49e8d518b4cd6170549c6f455c` (patches R1, R3 and R5 to R24; see
+  `769561f35b2eefa2fe86cd970fad7b4c1a9ea36f` (patches R1, R3 and R5 to R24, with R3's Metal path and
+  R16's macOS picker; see
   [`gpui-fork.md`](gpui-fork.md)). The `[patch.crates-io]` block in
   `Cargo.toml` (async-task, calloop) is legitimate and stays.
 - **Repository:** https://github.com/lukasgeciauskas/astryx-rust, private.
@@ -43,7 +43,7 @@ _Last updated: 2026-11-27, after M11 (Motion & touch)._
 | Lightbox video playback and `hasAutoPlay` (a video opens in the system player now) | MediaPlayer's decoder (M13) |
 | Backdrop blur (Lightbox, scrims, ChatLayout's frosted dock) | Fork patch R2 |
 | ChatTypingIndicator, ChatUnreadDivider, ChatVirtualizer, ChatEmojiPicker, ChatReactionBar (lab components) | Lab (M13) |
-| Native date and time pickers on macOS and Linux (`Native` shows the Astryx surface there) | Fork patch R16 built and checked on those platforms |
+| Native date and time pickers on Linux (`Native` shows the Astryx surface there; GPUI has no toolkit on Linux) | Fork patch R16 built and checked on Linux (a GTK picker) |
 
 ## The owner's standing instructions
 
@@ -191,6 +191,30 @@ time:
   "http://127.0.0.1:8080/?page=dates&backend=webgl"`, with a scratch
   `--user-data-dir`. The query picks the page, theme, mode and scroll.
 
+## Lessons from macOS support
+
+- **Check macOS from Windows first.** `rustup target add aarch64-apple-darwin` is installed;
+  `cargo check --target aarch64-apple-darwin` type-checks the workspace and the fork's
+  Apple crates once `gpui_apple`'s `OUT_DIR` has a placeholder `shaders.metallib` (its
+  build script compiles Metal only on a Mac). The fork's examples need a C compiler for
+  the Mac target, so check them natively instead. Metal shader errors show only on the Mac
+  runner: read the job log (`gh run view --job=<id> --log`).
+- **The macOS job is the Mac.** `tools/ci-macos.sh gallery|fork` runs each window,
+  captures it alone with `screencapture -l` and uploads `macos-screenshots`; read them
+  with `gh run download <id> -n macos-screenshots`. The runner is an M1 VM with a working
+  Metal device, Xcode 26 with the Metal toolchain, and a 1024 by 768 screen, which clamps
+  the gallery's window.
+- **`gpui_platform` needs `font-kit` on macOS,** or GPUI uses its no-op text system and
+  draws no text at all.
+- **Platform rules read `cx.platform_info()`,** not `cfg!(target_os)`: the web build runs
+  on every platform, and tests can report a Mac (`cx.set_platform_info`) to check the
+  macOS bindings on Windows. Tests type `secondary-` for Cmd/Ctrl shortcuts.
+- **AppKit from a test thread:** `NSSpellChecker` and the haptics run only on the main
+  thread (`MainThreadMarker::new()`), so unit tests on macOS see neither.
+- **Showing an AppKit popover from GPUI's update re-enters it** (the popover takes key
+  status from the window): open it from the window's foreground executor, as `prompt`
+  does.
+
 ## Next: M12 Theme authoring parity
 
 M11 (Motion & touch) is done: the motion engine and `useAnimator`, animated layout (fork
@@ -199,8 +223,9 @@ patches R19 glides and R20 inert) with every glide earlier milestones carried, g
 across core, drag-to-snap-points and BottomSheet's full gestures, offscreen layers (R3:
 rotation, group opacity, filters, masks, snapshots) with Swipe and the transient copies,
 the on-screen keyboard, and the coarse-pointer variants. R22 lets the web gallery's
-browser context menu (Inspect) open when the app takes no right click. Open: R3 on Metal
-needs a Mac to build and check; backdrop blur is fork patch R2.
+browser context menu (Inspect) open when the app takes no right click. macOS support followed
+(R3 on Metal, R16's macOS picker, the platform audit, the macOS CI job). Open: backdrop blur
+is fork patch R2.
 
 M12 builds theme authoring (see `PLAN.md`): a Rust `defineTheme` with type, radius and
 motion scale expansion (including the motion tempo the animator already reads), the OKLCH

@@ -12,7 +12,7 @@
 //! GPUI draws an element once a frame and keeps none from the last, so each keyed row
 //! keeps its last frame as an offscreen layer (fork patch R3), and a removed row's exit
 //! draws that snapshot: the row as it was, start and end content included. A renderer
-//! without offscreen layers (Metal) keeps no frame; there the exit draws what the List
+//! without offscreen layers keeps no frame; there the exit draws what the List
 //! kept of the row: its label, description, alignment, selection and divider.
 
 use std::collections::{HashMap, HashSet};

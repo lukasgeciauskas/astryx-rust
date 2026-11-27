@@ -41,7 +41,7 @@ Each patch lands before the components that need it.
 |---|---|---|---|
 | R1 | Element transforms (**landed**, `4d4a306`) | Translate, scale and mirror any subtree around an origin, including text. Mouse hit testing follows the transform. | Button press scale (M3); dialog and popover entrances (M5); Carousel, Swipe (M9, M11) |
 | R2 | Backdrop blur | A blurred copy of what is already drawn behind an element, clipped to its rounded rect | Chat composer, Lightbox, SegmentedControl (M5, M10); lab TabBar, MediaPlayer |
-| R3 | Offscreen layers (**landed**, `598e0ca`; Metal draws them directly, without rotation, filters or masks, until it is built on a Mac) | A subtree drawn to a texture, then composited with group opacity, filters (blur, brightness, grayscale) or an alpha mask | Dialog, Drawer and MobileNav backdrops; PowerSearch, Swipe, Table (M5+) |
+| R3 | Offscreen layers (**landed**, `598e0ca`; Metal `ee135b6`) | A subtree drawn to a texture, then composited with group opacity, rotation, filters (blur, brightness, grayscale) or an alpha mask, and kept as a snapshot; DirectX, wgpu (Linux, the web) and Metal | Dialog, Drawer and MobileNav backdrops; PowerSearch, Swipe, Table (M5+) |
 | R4 | Blend modes | Multiply and screen in fixed-function blending; the rest through R3 layers | Not used by upstream today; lowest priority |
 | R5 | Inline layout (**landed**, `7ce1c61`) | Inline-level boxes (`inline-flex`, `inline-block`, `inline-grid`) that flow in line boxes inside block containers; `min-content`, `max-content` and `fit-content` sizes; text baselines | Every `inline-flex` component (M2, M3); inline text flow (Link in Text, Markdown, Chat) |
 | R6 | ARIA states (**landed**, `de7e405`) | `aria_disabled`, `aria_read_only`, `aria_required`, `aria_invalid`, `aria_busy`, `aria_modal` and `aria_multiselectable` on any stateful element, setting the matching AccessKit flags | Every form control (M4 onward): disabled, read-only, required and invalid fields; busy controls; modal dialogs and multi-select lists (M5) |
@@ -54,7 +54,7 @@ Each patch lands before the components that need it.
 | R13 | Active descendants across layers (**landed**, `01da1ad`) | `aria_active_descendant_of(&FocusHandle)`: an element is the active descendant of the element tracking that handle while it is focused, wherever it sits in the tree | Selector's listbox options (M6), and every combobox popup after it |
 | R14 | `aria-sort` (**landed**, `d436e06`) | `aria_sort(SortDirection)` on any stateful element, setting AccessKit's sort direction; `SortDirection` is re-exported | A sortable Table column's header (M7) |
 | R15 | Named nodes and `aria-controls` (**landed**, `52f7859`) | `aria_id(name)` names an element's node as an HTML `id` does; `aria_controls(names)` points at named nodes. Both are collected per frame and resolved when the tree is finished, so a relation may name a node that comes later; unknown names are skipped | A tree table's expanders and row expansion's toggles (M7) |
-| R16 | Native pickers (**landed**, `b39b0e1`) | `Window::show_native_picker(NativePickerRequest)` opens the platform's date, time or date-and-time picker below an anchor and answers `Picked` (an ISO value), `Cleared` or `Dismissed` through a channel; `native_picker_supported(kind)` says whether one exists | The native surfaces of DateInput, TimeInput and DateTimeInput (M8) |
+| R16 | Native pickers (**landed**, `b39b0e1`; macOS `769561f`) | `Window::show_native_picker(NativePickerRequest)` opens the platform's date, time or date-and-time picker below an anchor (Windows, macOS, the web) and answers `Picked` (an ISO value), `Cleared` or `Dismissed` through a channel; `native_picker_supported(kind)` says whether one exists | The native surfaces of DateInput, TimeInput and DateTimeInput (M8) |
 | R17 | Scroll chaining, overscroll containment and scrollbars (**landed**, `1aea36f`) | A scroll moves the innermost element that can take it and chains to its ancestor at an edge; `overscroll_contain` keeps it there; every scrolling `div` draws scrollbars (drag the thumb, press the track to page), auto-hiding where the platform does; `scrollbar_thin`, `scrollbar_none` and `scrollbar_color` follow CSS | ScrollableArea and the scrolling parts of Layout, the navs and AppShell (M9, AST-025 FR14 and FR15); every scroll region already ported |
 | R18 | Sticky positioning (**landed**, `5bf80b6`) | `sticky_top`, `sticky_bottom`, `sticky_left` and `sticky_right` follow CSS `position: sticky`: an element stays at its offset from its scrollport's edge while scrolling would carry it past, never leaving its parent; a sticky element draws and takes the pointer above its siblings | AppShell's `auto` header and side region (M9, AppShell FR6); later sticky table headers and columns |
 | R19 | Layout glides (**landed**, `3112acc`) | `layout_glide(LayoutGlide)` makes a `div` an area: when a change is reported through its `armed` flag, every `div` inside it whose place relative to its parent changed (and that is visible before or after) glides from where it was drawn to its new place on the area's duration and curve; a child that keeps its place rides its parent, a change mid-glide adds to the glide, absolute and stuck sticky elements jump, hit testing follows; an optional cross-fade replaces the travel | `useAnimatedLayout` and every adopter (M11, AST-105 FR3) |
@@ -176,6 +176,18 @@ Each patch lands before the components that need it.
   - Web (`gpui_web/src/window.rs`): a transparent `<input>` of the kind (`step=1` with
     seconds) placed over the anchor, focused, then `showPicker()`; `change` answers,
     `cancel`, `blur` and Escape dismiss, and the IME mirror takes focus back.
+  - macOS (`gpui_macos/src/native_picker.rs`): an `NSDatePicker` in a transient
+    `NSPopover` below the anchor, in the user's locale: the graphical calendar for a
+    date, the text field with a stepper for a time or a date and time (as Windows'
+    date-time picker). It works in the Gregorian calendar at GMT, so ISO values map to
+    its dates exactly. A click on another day of the month shown answers at once (the
+    calendar's arrows, which move the value by a month, keep it open); Return answers
+    with the value; Escape dismisses; any other close (a click outside, the window
+    going) answers with the value after a change and dismisses without one. It opens
+    from the window's executor, outside GPUI's update, since the popover takes key
+    status from the window. The picker has no clear, so `Cleared` never comes.
+  - `ASTRYX_NATIVE_PICKER_OPEN=date` (`time`, `datetime`) opens one in the example
+    once it has drawn, for screenshots.
   - The test platform is off by default; `set_native_pickers_supported`,
     `native_picker_request` and `simulate_native_picker` drive it.
   - Example: `crates/gpui/examples/astryx_native_picker.rs`.
@@ -215,5 +227,33 @@ Each patch lands before the components that need it.
     clipped to the element's corner radii.
   - Then it resumes with load-on-begin.
   - The surface texture needs copy-source usage on wgpu.
-- **R3 (offscreen layers):** a paint-time layer stack renders a subtree to its own texture,
-  then composites it through a filter shader.
+- **R3 (offscreen layers), as built:**
+  - Scene: `push_offscreen`/`pop_offscreen` build a layer's content as a scene of its
+    own (nested layers live in their parent's content), composited through a
+    `LayerComposite` primitive in the draw order. A layer's texture covers its painted
+    area plus a 2 px border and room for the blur, within the viewport;
+    `push_offscreen_mask` paints an element mask; `insert_layer_snapshot` composites
+    kept content again. `batches_with_layers()` gives the composites among the batches.
+  - Window: `with_offscreen_layer`, `with_layer_mask`, `paint_layer_snapshot`,
+    `supports_offscreen_layers`; styles `rotate`, `layer_opacity`, `filter_blur`,
+    `filter_brightness`, `filter_grayscale`, `mask_linear`, `mask`, `retain_layer`. Hit
+    testing maps through rotated and scaled layers; text in a layer has no subpixel
+    antialiasing. Without `supports_offscreen_layers` (or with
+    `GPUI_DISABLE_OFFSCREEN_LAYERS`), the subtree is painted directly.
+  - Renderers: each layer is drawn into a pooled texture with its own depth buffer
+    before the pass that composites it, through a target origin every shader subtracts
+    from positions and adds back to fragment coordinates; a composite pipeline samples
+    it with the filters, mask, clip and transform, blending premultiplied colors; blur is
+    a two-pass separable Gaussian through a scratch texture. Textures are pooled by size
+    (multiples of 64 px) and dropped after 120 unused frames.
+    - DirectX and wgpu (`598e0ca`): a submission per layer pass.
+    - Metal (`ee135b6`, `gpui_apple`): every pass is an encoder on the frame's one
+      command buffer, run in encoding order; the origin is a new global slot
+      (`GlobalInputIndex::Origin`, the primitives' slots one up), the uniforms are
+      `LayerUniforms` (exported to the shader header with cbindgen), the depth buffers
+      are memoryless on Apple GPUs. `MacWindow::supports_offscreen_layers` is true.
+  - Tests: `scene` unit tests; the same pixel cases on each renderer's headless path
+    (`wgpu_renderer::layer_tests` on Linux and Windows, `metal_renderer::layer_tests`
+    on macOS, run by this repo's macOS CI job), plus a layer away from the corner.
+  - Example: `cargo run -p gpui --example astryx_layers` (`GPUI_DISABLE_OFFSCREEN_LAYERS=1`
+    shows the fallback).

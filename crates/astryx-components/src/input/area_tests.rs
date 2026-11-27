@@ -124,7 +124,7 @@ fn fr9_disabled_areas_take_no_edits_or_pastes(cx: &mut TestAppContext) {
     });
     click(cx, 100., 40.);
     cx.update(|_, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string("x".into())));
-    press(cx, "ctrl-v");
+    press(cx, "secondary-v");
     type_text(cx, "y");
     press(cx, "enter");
     assert!(probe.log().is_empty());
@@ -144,7 +144,7 @@ fn pastes_are_reported_before_the_change(cx: &mut TestAppContext) {
     });
     click(cx, 100., 40.);
     cx.update(|_, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string("hi".into())));
-    press(cx, "ctrl-v");
+    press(cx, "secondary-v");
     assert_eq!(probe.log(), ["paste:hi", "hi"]);
 }
 

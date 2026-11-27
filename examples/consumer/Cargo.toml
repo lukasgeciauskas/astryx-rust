@@ -9,4 +9,14 @@ publish.workspace = true
 [dependencies]
 astryx.workspace = true
 gpui.workspace = true
+
+# Each platform's features, as a downstream app sets them: Wayland and X11 on
+# Linux, the Core Text text system on macOS (without it macOS draws no text).
+[target.'cfg(target_os = "linux")'.dependencies]
+gpui_platform = { workspace = true, features = ["wayland", "x11"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+gpui_platform = { workspace = true, features = ["font-kit"] }
+
+[target.'cfg(not(any(target_os = "linux", target_os = "macos")))'.dependencies]
 gpui_platform.workspace = true

@@ -546,7 +546,7 @@ fn fr5_paste_goes_to_the_caller_then_tokens_then_text(cx: &mut TestAppContext) {
     click(cx, "i-editor");
     let paste = |cx: &mut VisualTestContext, text: &str| {
         cx.update(|_, cx| cx.write_to_clipboard(ClipboardItem::new_string(text.to_string())));
-        key(cx, "ctrl-v");
+        key(cx, "secondary-v");
     };
     paste(cx, "mine: keep out");
     assert_eq!(*taken.borrow(), ["mine: keep out"]);
@@ -592,13 +592,13 @@ fn fr6_pasted_and_dropped_files_go_to_on_files_unless_disabled(cx: &mut TestAppC
         ))],
     };
     cx.update(|_, cx| cx.write_to_clipboard(item.clone()));
-    key(cx, "ctrl-v");
+    key(cx, "secondary-v");
     assert_eq!(*files.borrow(), ["a.png", "b.txt"], "in order");
     assert_eq!(last(&log), "", "nothing inserted");
     *disabled.borrow_mut() = true;
     settle(cx);
     cx.update(|_, cx| cx.write_to_clipboard(item));
-    key(cx, "ctrl-v");
+    key(cx, "secondary-v");
     assert_eq!(files.borrow().len(), 2, "not while disabled");
 }
 

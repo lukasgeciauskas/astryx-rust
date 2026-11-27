@@ -82,8 +82,14 @@ fn dom_key(gpui_key: &str) -> String {
     }
 }
 
-/// Whether `keys` matches a keystroke, upstream `matchesCombo`.
-pub fn matches_combo(keys: &str, keystroke: &Keystroke) -> bool {
+/// Whether `keys` matches a keystroke, upstream `matchesCombo`: `mod` is Cmd on an
+/// Apple platform ([`crate::is_apple_platform`]) and Ctrl elsewhere.
+pub fn matches_combo(keys: &str, keystroke: &Keystroke, cx: &App) -> bool {
+    matches_combo_on(keys, keystroke, crate::is_apple_platform(cx))
+}
+
+/// [`matches_combo`] on an Apple platform (`apple`) or another.
+pub fn matches_combo_on(keys: &str, keystroke: &Keystroke, apple: bool) -> bool {
     let lower = keys.to_lowercase();
     // `+` is a separator, so a trailing `+` alone is the plus key.
     let parts: Vec<&str> = if lower == "+" {
@@ -98,7 +104,6 @@ pub fn matches_combo(keys: &str, keystroke: &Keystroke) -> bool {
     let Some((&key, mods)) = parts.split_last() else {
         return false;
     };
-    let apple = cfg!(target_os = "macos");
     let wants_mod = mods.contains(&"mod");
     let wants_ctrl = mods.contains(&"ctrl") || (wants_mod && !apple);
     let wants_meta = mods.contains(&"meta") || (wants_mod && apple);
@@ -169,7 +174,7 @@ fn on_keystroke(shortcuts: &[Hotkey], event: &KeystrokeEvent, window: &mut Windo
         if shortcut.disabled || (typing && !shortcut.allow_in_inputs) {
             continue;
         }
-        if matches_combo(&shortcut.keys, &event.keystroke) {
+        if matches_combo(&shortcut.keys, &event.keystroke, cx) {
             (shortcut.on_press)(&event.keystroke, window, cx);
             return;
         }
@@ -256,13 +261,43 @@ mod tests {
         keystroke
     }
 
+    /// Off Apple platforms, where the rest of these cases read the same.
+    fn matches_combo(keys: &str, keystroke: &Keystroke) -> bool {
+        matches_combo_on(keys, keystroke, false)
+    }
+
     #[test]
-    fn mod_is_ctrl_off_macos() {
+    fn mod_is_ctrl_off_apple_platforms() {
         let ctrl_k = stroke("ctrl-k", None);
-        assert_eq!(matches_combo("mod+k", &ctrl_k), !cfg!(target_os = "macos"));
+        assert!(matches_combo("mod+k", &ctrl_k));
         assert!(matches_combo("ctrl+k", &ctrl_k));
         assert!(!matches_combo("k", &ctrl_k));
         assert!(!matches_combo("mod+shift+k", &ctrl_k));
+        assert!(!matches_combo("mod+k", &stroke("cmd-k", None)));
+    }
+
+    #[test]
+    fn mod_is_cmd_on_apple_platforms() {
+        let cmd_k = stroke("cmd-k", None);
+        assert!(matches_combo_on("mod+k", &cmd_k, true));
+        assert!(matches_combo_on("meta+k", &cmd_k, true));
+        assert!(!matches_combo_on("mod+k", &stroke("ctrl-k", None), true));
+        assert!(matches_combo_on("ctrl+k", &stroke("ctrl-k", None), true));
+    }
+
+    #[gpui::test]
+    fn mod_follows_the_platform_gpui_reports(cx: &mut gpui::TestAppContext) {
+        cx.set_platform_info(gpui::PlatformInfo {
+            os: gpui::OperatingSystem::Mac,
+            target: gpui::PlatformTarget::Web,
+        });
+        let cmd_k = stroke("cmd-k", None);
+        assert!(cx.read(|cx| super::matches_combo("mod+k", &cmd_k, cx)));
+        cx.set_platform_info(gpui::PlatformInfo {
+            os: gpui::OperatingSystem::Linux,
+            target: gpui::PlatformTarget::Web,
+        });
+        assert!(!cx.read(|cx| super::matches_combo("mod+k", &cmd_k, cx)));
     }
 
     #[test]

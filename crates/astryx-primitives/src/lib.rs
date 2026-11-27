@@ -21,6 +21,7 @@ pub mod list_focus;
 pub mod list_window;
 pub mod modality;
 pub mod motion;
+pub mod platform;
 pub mod props;
 pub mod scroll_area;
 pub mod size;
@@ -53,6 +54,7 @@ pub use modality::{
     InteractionModality, coarse_primary_pointer, interaction_modality, is_focus_visible,
     is_focus_within_visible, prefers_reduced_motion, set_reduced_motion,
 };
+pub use platform::{is_apple_platform, is_context_click, is_primary_click};
 pub use size::{ElementSize, resolve_size};
 pub use typeahead::Typeahead;
 

@@ -104,8 +104,9 @@
     use the box's own last baseline.
   - Bidirectional text is laid out left to right, and text in a paragraph cannot be
     selected.
-- **Spell checking depends on the platform's dictionaries.** Windows uses the system
-  checker. Linux reads Hunspell dictionaries from `/usr/share/hunspell` and similar folders
+- **Spell checking depends on the platform's dictionaries.** Windows and macOS use the
+  system checker (`ISpellChecker`, `NSSpellChecker`, the one Safari and Chrome use on a
+  Mac). Linux reads Hunspell dictionaries from `/usr/share/hunspell` and similar folders
   (packages such as `hunspell-en-us`); with none installed, nothing is marked. Browsers do
   not expose their checker, so on the web an app installs one with
   `astryx_primitives::spell::set_spell_checker(DictionaryChecker::new(aff, dic))`.
@@ -195,8 +196,12 @@
 - **No server render, so today is always known (M8).** Calendar FR12's hydration rules
   (an empty month until today is known) and DateRangeInput's year-while-today-is-unknown
   trigger text have nothing to apply to.
-- **The picker wheels have no haptics (M8).** GPUI has no vibration API, so the touch
-  wheel's selection ticks are silent (upstream ticks only where the platform vibrates).
+- **Haptics play where the platform has them (M8, M11).** Upstream vibrates only through
+  `navigator.vibrate` (Android browsers), as the web build does. A native macOS build
+  also plays them on a Force Touch trackpad (`NSHapticFeedbackManager`): the wheels'
+  selection ticks as level changes and a sheet settling onto a detent as an alignment,
+  felt while a finger is on the trackpad. Windows and Linux have no system haptics; an app
+  installs a player there with `set_haptic_player`.
 - **A trackpad without lift phases lifts on a pause (M8).** Under a finger the touch wheel
   follows a trackpad's two-finger scroll (DateInput FR15). Where the platform reports the
   lift (macOS), the wheel coasts from it; elsewhere a 50 ms pause counts as the lift, so
@@ -217,21 +222,24 @@
 - **DateRangeInput's applied preset in dark mode is 3.88:1 (M8).** As upstream (its spec's
   implementation gap): the label in `text-accent` on the `accent-muted` fill, on the
   popover surface, is under 4.5:1. The tokens are upstream's.
-- **Native pickers exist on Windows and the web only (M8).** Fork patch R16 opens the
-  Common Controls month calendar or date-time picker on Windows and the browser's
-  `<input type=date|time|datetime-local>` picker on the web. macOS and Linux report
-  `native_picker_supported` false, and `Native` (or `AdaptiveNative` under a finger)
-  resolves to the pointer's Astryx surface: the sheet under a finger, otherwise the
-  popover (DateInput, DateTimeInput) or the typed field (TimeInput). An AppKit
-  `NSDatePicker` or GTK picker needs those platforms to build and check on.
+- **Native pickers exist on Windows, macOS and the web (M8).** Fork patch R16 opens the
+  Common Controls month calendar or date-time picker on Windows, an `NSDatePicker` in a
+  popover on macOS (the graphical calendar for a date, the text field with a stepper for a
+  time or a date and time), and the browser's `<input type=date|time|datetime-local>`
+  picker on the web. Linux reports `native_picker_supported` false (GPUI has no toolkit
+  there), and `Native` (or `AdaptiveNative` under a finger) resolves to the pointer's
+  Astryx surface: the sheet under a finger, otherwise the popover (DateInput,
+  DateTimeInput) or the typed field (TimeInput). The macOS picker has no clear, as the
+  Windows one has none.
 - **The native field paints its own text (M8).** Upstream lays its text over the browser's
   control and lets a press reach it. Here the value is Astryx text in the field's box, and
   a press, Space, ArrowDown or F4 opens the platform's picker below the box (Enter
-  commits, as in upstream's control). The Windows popup is drawn by the system, in the
-  system's style rather than the theme's.
+  commits, as in upstream's control). The Windows popup and the macOS popover are drawn
+  by the system, in the system's style rather than the theme's.
 - **The browser's picker popup is not in captures (M8).** It is drawn outside the page,
   so a headless capture shows the native field but not the popup. The Windows popups
-  were captured from the gallery and the fork's `astryx_native_picker` example.
+  were captured from the gallery and the fork's `astryx_native_picker` example, the
+  macOS popovers from that example in the macOS CI job.
 
 - **Sticky containment has no effect (M9).** Fork patch R18 brings `position: sticky`, but
   a ScrollableArea's viewport always clips, so it is always its descendants' sticky
@@ -314,10 +322,6 @@
   animated layout keeps each keyed row's last look for its exit copy, so its rows draw
   that way. Outside AppShell, or in an `auto`-height AppShell, the SideNav rail's own
   width follows its edge and its neighbours reflow.
-- **macOS draws offscreen layers directly.** Fork patch R3 is built for DirectX and wgpu
-  (Linux, the web); on Metal a layer's content is painted as it is, so rotation, filters,
-  masks and snapshots are left out and opacity applies per piece, until the Metal path is
-  built and checked on a Mac.
 - **App-owned docked bars don't ride the on-screen keyboard (AST-099 FR9).** GPUI has no
   `position: fixed`, so an app's own bottom bar cannot be told apart from other layout;
   Astryx's own docks (ChatLayout, BottomSheet) ride it.

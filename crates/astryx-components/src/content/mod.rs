@@ -97,12 +97,6 @@ impl RenderOnce for Code {
 // ----------------------------------------------------------------------------
 // Kbd
 
-/// Whether shortcuts show Apple's modifier symbols, as upstream's
-/// `isApplePlatform`.
-fn is_apple() -> bool {
-    cfg!(any(target_os = "macos", target_os = "ios"))
-}
-
 /// How one key is drawn, upstream `getKeyDisplay`.
 pub fn key_display(key: &str, apple: bool, i18n: &I18n) -> SharedString {
     if apple {
@@ -216,7 +210,8 @@ impl RenderOnce for Kbd {
         let theme = current(window, cx);
         let t = theme.tokens();
         let i18n = i18n(cx);
-        let apple = is_apple();
+        // Upstream `isApplePlatform`: Apple's modifier symbols there, the web included.
+        let apple = astryx_primitives::is_apple_platform(cx);
         let keys = parse_keys(&self.keys);
         let name = keys
             .iter()

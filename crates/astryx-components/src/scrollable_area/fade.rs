@@ -6,7 +6,7 @@
 //!
 //! The fade is upstream's alpha mask on the viewport (fork patch R3's `mask_linear`),
 //! so the content fades to whatever lies behind it. A renderer without offscreen layers
-//! (Metal) draws no mask; there each edge gets an overlay in `background-body` instead.
+//! draws no mask; there each edge gets an overlay in `background-body` instead.
 
 use astryx_effects::{EdgeStop, FadeEdge, MaskAxis, edge_fade, edge_mask};
 use astryx_i18n::Direction;

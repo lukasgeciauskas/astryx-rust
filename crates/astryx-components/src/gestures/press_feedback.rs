@@ -859,9 +859,10 @@ impl PressFeedback {
             window.on_mouse_event(move |event: &MouseDownEvent, phase, window, cx| {
                 // A finger's synthesized press is the finger's, not a button's.
                 // A touch-first device paints every mouse press here; elsewhere only a
-                // surface that owns a control's box does, and a macOS control-click is a
+                // surface that owns a control's box does, and an Apple control-click is a
                 // context click there.
-                let context_click = cfg!(target_os = "macos") && event.modifiers.control;
+                let context_click =
+                    astryx_primitives::is_context_click(event.button, &event.modifiers, cx);
                 if phase == DispatchPhase::Capture
                     && event.button == MouseButton::Left
                     && !window.last_input_was_touch()

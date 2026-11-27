@@ -6,6 +6,9 @@
 //! ([`set_spell_checker`]), the platform's own is used:
 //! - Windows: the system checker (`ISpellChecker`), in the user's language,
 //!   with the words they added to its dictionary;
+//! - macOS: the system checker (`NSSpellChecker`), as Safari and Chrome use
+//!   there, in the languages the user chose in System Settings, with the
+//!   words they taught it;
 //! - Linux: the Hunspell dictionary for `$LANG` from the usual system
 //!   folders, read by [`DictionaryChecker`];
 //! - the web: none, since browsers do not expose theirs; an app installs a
@@ -57,7 +60,12 @@ fn platform_checker() -> Option<Rc<dyn SpellChecker>> {
     windows_checker::SystemChecker::for_user().map(|c| Rc::new(c) as Rc<dyn SpellChecker>)
 }
 
-#[cfg(all(unix, not(target_family = "wasm")))]
+#[cfg(target_os = "macos")]
+fn platform_checker() -> Option<Rc<dyn SpellChecker>> {
+    mac_checker::SystemChecker::new().map(|c| Rc::new(c) as Rc<dyn SpellChecker>)
+}
+
+#[cfg(all(unix, not(target_os = "macos"), not(target_family = "wasm")))]
 fn platform_checker() -> Option<Rc<dyn SpellChecker>> {
     DictionaryChecker::from_system().map(|c| Rc::new(c) as Rc<dyn SpellChecker>)
 }
@@ -115,7 +123,7 @@ impl DictionaryChecker {
     /// The system's dictionary for the user's language (`$LC_ALL`,
     /// `$LC_MESSAGES` or `$LANG`, else `en_US`), from the folders Hunspell
     /// reads.
-    #[cfg(all(unix, not(target_family = "wasm")))]
+    #[cfg(all(unix, not(target_os = "macos"), not(target_family = "wasm")))]
     pub fn from_system() -> Option<Self> {
         let lang = ["LC_ALL", "LC_MESSAGES", "LANG"]
             .iter()
@@ -169,6 +177,110 @@ impl SpellChecker for DictionaryChecker {
     }
 }
 
+/// A UTF-16 offset in `text`, as a byte offset: the system checkers count
+/// UTF-16 units.
+#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
+fn byte_offset(text: &str, utf16: usize) -> usize {
+    let mut units = 0;
+    for (i, c) in text.char_indices() {
+        if units >= utf16 {
+            return i;
+        }
+        units += c.len_utf16();
+    }
+    text.len()
+}
+
+#[cfg(target_os = "macos")]
+mod mac_checker {
+    //! The macOS spell checker (`NSSpellChecker`), the one Safari and Chrome
+    //! use there. AppKit's checker runs on the main thread, where GPUI's app
+    //! runs; elsewhere (a test's thread) it finds nothing.
+
+    use std::ops::Range;
+
+    use objc2::MainThreadMarker;
+    use objc2::rc::Retained;
+    use objc2_app_kit::NSSpellChecker;
+    use objc2_foundation::{NSInteger, NSNotFound, NSRange, NSString};
+
+    use super::{SpellChecker, byte_offset};
+
+    pub struct SystemChecker {
+        checker: Retained<NSSpellChecker>,
+        /// The document tag the fields' words share: words ignored for it are
+        /// ignored everywhere in the app.
+        tag: NSInteger,
+    }
+
+    impl SystemChecker {
+        /// The shared checker; `None` off the main thread.
+        pub fn new() -> Option<Self> {
+            MainThreadMarker::new()?;
+            Some(SystemChecker {
+                checker: NSSpellChecker::sharedSpellChecker(),
+                tag: NSSpellChecker::uniqueSpellDocumentTag(),
+            })
+        }
+    }
+
+    impl SpellChecker for SystemChecker {
+        fn check(&self, text: &str) -> Vec<Range<usize>> {
+            if MainThreadMarker::new().is_none() {
+                return Vec::new();
+            }
+            let string = NSString::from_str(text);
+            let length = text.encode_utf16().count();
+            let mut out = Vec::new();
+            let mut start = 0usize;
+            while start < length {
+                // SAFETY: A null word count is allowed.
+                let found = unsafe {
+                    self.checker
+                        .checkSpellingOfString_startingAt_language_wrap_inSpellDocumentWithTag_wordCount(
+                            &string,
+                            start as NSInteger,
+                            None,
+                            false,
+                            self.tag,
+                            std::ptr::null_mut(),
+                        )
+                };
+                if found.location == NSNotFound as usize
+                    || found.length == 0
+                    || found.location < start
+                {
+                    break;
+                }
+                let end = found.location + found.length;
+                out.push(byte_offset(text, found.location)..byte_offset(text, end));
+                start = end;
+            }
+            out
+        }
+
+        fn suggest(&self, word: &str) -> Vec<String> {
+            if MainThreadMarker::new().is_none() {
+                return Vec::new();
+            }
+            let string = NSString::from_str(word);
+            let range = NSRange::new(0, word.encode_utf16().count());
+            self.checker
+                .guessesForWordRange_inString_language_inSpellDocumentWithTag(
+                    range, &string, None, self.tag,
+                )
+                .map(|guesses| guesses.iter().map(|guess| guess.to_string()).collect())
+                .unwrap_or_default()
+        }
+
+        fn add(&self, word: &str) {
+            if MainThreadMarker::new().is_some() {
+                self.checker.learnWord(&NSString::from_str(word));
+            }
+        }
+    }
+}
+
 #[cfg(windows)]
 mod windows_checker {
     //! The Windows spell checker (`ISpellChecker`, Windows 8 and later).
@@ -182,7 +294,7 @@ mod windows_checker {
     use windows::Win32::System::Com::{CLSCTX_INPROC_SERVER, CoCreateInstance, CoTaskMemFree};
     use windows::core::{HSTRING, PWSTR};
 
-    use super::SpellChecker;
+    use super::{SpellChecker, byte_offset};
 
     pub struct SystemChecker {
         checker: ISpellChecker,
@@ -209,18 +321,6 @@ mod windows_checker {
             }
             None
         }
-    }
-
-    /// A UTF-16 offset in `text`, as a byte offset.
-    fn byte_offset(text: &str, utf16: usize) -> usize {
-        let mut units = 0;
-        for (i, c) in text.char_indices() {
-            if units >= utf16 {
-                return i;
-            }
-            units += c.len_utf16();
-        }
-        text.len()
     }
 
     impl SpellChecker for SystemChecker {
@@ -306,6 +406,15 @@ don't
         for (range, word) in words(text) {
             assert_eq!(&text[range], word);
         }
+    }
+
+    #[test]
+    fn utf16_offsets_become_byte_offsets() {
+        let text = "née 😀 wrold";
+        // "née " is four UTF-16 units and five bytes; the emoji two and four.
+        assert_eq!(byte_offset(text, 4), 5);
+        assert_eq!(byte_offset(text, 7), 10);
+        assert_eq!(byte_offset(text, 12), text.len());
     }
 
     #[test]

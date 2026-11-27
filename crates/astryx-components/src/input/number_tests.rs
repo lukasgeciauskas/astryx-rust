@@ -178,7 +178,7 @@ fn blur(cx: &mut VisualTestContext) {
 }
 
 fn select_all_and_type(cx: &mut VisualTestContext, text: &str) {
-    press(cx, "ctrl-a");
+    press(cx, "secondary-a");
     type_text(cx, text);
 }
 

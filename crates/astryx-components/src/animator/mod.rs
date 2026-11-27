@@ -150,7 +150,7 @@ impl AnimatorHandle {
     /// patch R1), `rotate` turns it clockwise about the same origin, in degrees, and
     /// `opacity` fades it as one group, as CSS `opacity` does. A rotation or a fade draws
     /// the element through an offscreen layer (fork patch R3), and hit testing follows the
-    /// rotation; a renderer without offscreen layers (Metal) draws it unrotated and fades
+    /// rotation; a renderer without offscreen layers draws it unrotated and fades
     /// each primitive. Frames are requested while anything moves.
     pub fn apply<E: Styled>(&self, el: E, window: &mut Window, cx: &App) -> E {
         let now = self.now(cx);

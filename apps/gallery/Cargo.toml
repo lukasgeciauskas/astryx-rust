@@ -29,7 +29,12 @@ backtrace = { version = "0.3", optional = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 gpui_platform = { workspace = true, features = ["wayland", "x11"] }
 
-[target.'cfg(not(target_os = "linux"))'.dependencies]
+# GPUI's macOS text system (Core Text through font-kit); without it macOS
+# draws no text.
+[target.'cfg(target_os = "macos")'.dependencies]
+gpui_platform = { workspace = true, features = ["font-kit"] }
+
+[target.'cfg(not(any(target_os = "linux", target_os = "macos")))'.dependencies]
 gpui_platform.workspace = true
 
 [target.'cfg(target_family = "wasm")'.dependencies]

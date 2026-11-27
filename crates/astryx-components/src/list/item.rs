@@ -200,8 +200,8 @@ impl ListItem {
 }
 
 /// What a List keeps of a keyed row to draw its exit once it is gone (List FR12), where
-/// the renderer keeps no snapshot of the row's last frame (fork patch R3's offscreen
-/// layers are missing on Metal): its text and selection; its start and end content are
+/// the renderer keeps no snapshot of the row's last frame (a renderer without fork
+/// patch R3's offscreen layers): its text and selection; its start and end content are
 /// not kept.
 #[derive(Clone, Default)]
 pub(super) struct RowGhost {

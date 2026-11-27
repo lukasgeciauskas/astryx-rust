@@ -14,7 +14,7 @@
 //! drop (or, with shift feedback, slide aside on `springs.settle` to open the
 //! gap, [`super::slide`]); the source dims in place, and a copy of it, its
 //! last frame kept as an offscreen layer (fork patch R3), follows the pointer as
-//! the preview. A renderer without offscreen layers (Metal) keeps no frame: there
+//! the preview. A renderer without offscreen layers keeps no frame: there
 //! the item itself, dimmed, follows the pointer, and its place keeps a copy of
 //! its text (the List's) or what an app gives; an accent line marks
 //! the candidate; and the scroller the collection sits in autoscrolls near its

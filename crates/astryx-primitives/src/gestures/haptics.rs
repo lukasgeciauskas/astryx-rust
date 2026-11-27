@@ -2,11 +2,15 @@
 //!
 //! The web has one haptics API, `navigator.vibrate` (Android browsers);
 //! [`play_haptic`] uses it on wasm with each UIKit feedback kind's pattern
-//! (`HAPTIC_VIBRATION_PATTERNS`). Natively GPUI has no haptics, so
-//! [`play_haptic`] calls a player an app installs with
-//! [`set_haptic_player`] (a Taptic Engine or a gamepad rumble), and plays
-//! nothing without one. UIKit's haptics follow the system setting, not
-//! Reduce Motion, so neither path reads it.
+//! (`HAPTIC_VIBRATION_PATTERNS`). On macOS it plays the trackpad's feedback
+//! (`NSHapticFeedbackManager`), which a Force Touch trackpad gives while a
+//! finger is on it: a selection tick as a level change, an impact (a sheet
+//! settling onto a detent) as an alignment, a notification as the generic
+//! pattern. Elsewhere natively [`play_haptic`] calls a player an app installs
+//! with [`set_haptic_player`] (a Taptic Engine or a gamepad rumble), and
+//! plays nothing without one; an installed player replaces the platform's
+//! everywhere. UIKit's haptics follow the system setting, not Reduce Motion,
+//! so no path reads it.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -30,10 +34,10 @@ fn installed() -> Option<HapticPlayer> {
     PLAYER.with(|slot| slot.borrow().clone())
 }
 
-/// Whether anything can vibrate: an installed player, or the browser's
-/// `navigator.vibrate`.
+/// Whether anything can vibrate: an installed player, the browser's
+/// `navigator.vibrate`, or macOS's trackpad feedback.
 pub fn can_vibrate() -> bool {
-    installed().is_some() || web::can_vibrate()
+    installed().is_some() || web::can_vibrate() || mac::can_vibrate()
 }
 
 /// Whether the platform knows iOS Safari's switch control, the one element
@@ -46,6 +50,9 @@ pub fn supports_switch_control() -> bool {
 pub fn play_haptic(kind: HapticFeedbackKind) -> bool {
     if let Some(player) = installed() {
         return player(kind);
+    }
+    if mac::can_vibrate() {
+        return mac::play(kind);
     }
     web::vibrate(kind.vibration_pattern())
 }
@@ -95,5 +102,88 @@ mod web {
 
     pub fn vibrate(_pattern: &[u32]) -> bool {
         false
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod mac {
+    //! The trackpad's feedback, `NSHapticFeedbackManager`.
+
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{
+        NSHapticFeedbackManager, NSHapticFeedbackPattern, NSHapticFeedbackPerformanceTime,
+        NSHapticFeedbackPerformer,
+    };
+
+    use super::HapticFeedbackKind;
+
+    /// AppKit's feedback runs on the main thread, where GPUI's app runs.
+    pub fn can_vibrate() -> bool {
+        MainThreadMarker::new().is_some()
+    }
+
+    /// The pattern a UIKit kind plays as.
+    pub fn pattern(kind: HapticFeedbackKind) -> NSHapticFeedbackPattern {
+        match kind {
+            HapticFeedbackKind::Selection => NSHapticFeedbackPattern::LevelChange,
+            HapticFeedbackKind::ImpactLight
+            | HapticFeedbackKind::ImpactMedium
+            | HapticFeedbackKind::ImpactHeavy
+            | HapticFeedbackKind::ImpactSoft
+            | HapticFeedbackKind::ImpactRigid => NSHapticFeedbackPattern::Alignment,
+            HapticFeedbackKind::NotificationSuccess
+            | HapticFeedbackKind::NotificationWarning
+            | HapticFeedbackKind::NotificationError => NSHapticFeedbackPattern::Generic,
+        }
+    }
+
+    /// Asks the trackpad to play `kind`. It plays only while a finger rests on a
+    /// Force Touch trackpad, which AppKit does not report, so this says whether
+    /// it was asked.
+    pub fn play(kind: HapticFeedbackKind) -> bool {
+        if !can_vibrate() {
+            return false;
+        }
+        NSHapticFeedbackManager::defaultPerformer().performFeedbackPattern_performanceTime(
+            pattern(kind),
+            NSHapticFeedbackPerformanceTime::Now,
+        );
+        true
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+mod mac {
+    use super::HapticFeedbackKind;
+
+    pub fn can_vibrate() -> bool {
+        false
+    }
+
+    pub fn play(_kind: HapticFeedbackKind) -> bool {
+        false
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use objc2_app_kit::NSHapticFeedbackPattern;
+
+    use super::*;
+
+    #[test]
+    fn uikit_kinds_map_to_trackpad_patterns() {
+        assert_eq!(
+            mac::pattern(HapticFeedbackKind::Selection),
+            NSHapticFeedbackPattern::LevelChange
+        );
+        assert_eq!(
+            mac::pattern(HapticFeedbackKind::ImpactLight),
+            NSHapticFeedbackPattern::Alignment
+        );
+        assert_eq!(
+            mac::pattern(HapticFeedbackKind::NotificationError),
+            NSHapticFeedbackPattern::Generic
+        );
     }
 }

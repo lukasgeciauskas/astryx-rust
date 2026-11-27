@@ -55,3 +55,32 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build the gallery for the browser
         run: cargo build -p astryx-gallery --target wasm32-unknown-unknown
+
+  # macOS: the same checks, then the platform's own proof. The gallery and the
+  # GPUI fork's astryx_* examples run and are captured (tools/ci-macos.sh), and
+  # the fork's Metal renderer tests run; the screenshots are the
+  # `macos-screenshots` artifact (`gh run download <id> -n macos-screenshots`).
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --workspace
+      - name: Build the gallery
+        run: cargo build -p astryx-gallery
+      - name: Gallery screenshots
+        run: tools/ci-macos.sh gallery
+      - name: The GPUI fork's Metal tests and astryx examples
+        run: tools/ci-macos.sh fork
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-screenshots
+          path: target/screenshots
+          if-no-files-found: warn
