@@ -445,8 +445,22 @@ mod smoke {
         false
     }
 
+    /// CI's Windows runners are headless servers: no audio endpoint for Media Foundation's
+    /// audio renderer and no GPU video decoding (frames come out black). The smoke tests
+    /// need real media hardware, so they run on a desktop and are skipped on CI.
+    fn on_ci() -> bool {
+        if std::env::var_os("CI").is_some() {
+            eprintln!("skipped on CI: needs an audio endpoint and GPU video decoding");
+            return true;
+        }
+        false
+    }
+
     #[test]
     fn media_foundation_loads_and_plays_a_wav_file() {
+        if on_ci() {
+            return;
+        }
         let dir = std::env::temp_dir().join(format!("astryx-media-smoke-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("tone.wav");
@@ -590,6 +604,9 @@ mod smoke {
 
     #[test]
     fn frames_of_an_uncompressed_avi_reach_a_gpui_image() {
+        if on_ci() {
+            return;
+        }
         let dir = std::env::temp_dir().join(format!("astryx-media-clip-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("clip.avi");
