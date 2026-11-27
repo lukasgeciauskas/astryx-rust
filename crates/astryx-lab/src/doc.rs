@@ -47,4 +47,10 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::sankey::SANKEY_CHART_DOC,
     crate::transfer_list::TRANSFER_LIST_SELECTOR_DOC,
     crate::list_input::LIST_INPUT_DOC,
+    crate::chat::CHAT_TYPING_INDICATOR_DOC,
+    crate::chat::CHAT_UNREAD_DIVIDER_DOC,
+    crate::chat::CHAT_VIRTUALIZER_DOC,
+    crate::chat::CHAT_EMOJI_PICKER_DOC,
+    crate::chat::CHAT_REACTION_BAR_DOC,
+    crate::emoji_picker::EMOJI_PICKER_DOC,
 ];

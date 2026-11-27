@@ -10,6 +10,8 @@
 //! - `crates/astryx-i18n/src/generated/cldr.rs`: CLDR tables for dates.
 //! - `crates/astryx-syntax/src/generated/`: CodeBlock's grammars and the syntax presets.
 //! - `crates/astryx-markdown/src/generated/`: Markdown's named character references.
+//! - `crates/astryx-lab/src/emoji_picker/generated/emoji_data.rs`: EmojiPicker's bundled
+//!   emoji set.
 //! - `docs/theme-overrides-todo.md`: overrides that need a hand port.
 //!
 //! `--check` writes nothing and fails when any file differs from what it
@@ -17,6 +19,7 @@
 
 mod cldr;
 mod code;
+mod emoji;
 mod literal;
 mod locales;
 mod markdown;
@@ -181,6 +184,11 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
             "{HEADER}{}",
             markdown::render_references(&references)?
         ))?,
+    ));
+    let emoji = read_json(&spec.join("emoji.json"))?;
+    files.push((
+        PathBuf::from("crates/astryx-lab/src/emoji_picker/generated/emoji_data.rs"),
+        rustfmt(&format!("{HEADER}{}", emoji::render(&emoji)?))?,
     ));
     files.push((
         PathBuf::from("docs/theme-overrides-todo.md"),
