@@ -17,6 +17,7 @@ pub mod types;
 pub mod generated {
     pub mod tokens;
     pub mod default_theme;
+    pub mod token_defaults;
 }
 
 pub use generated::tokens::*;

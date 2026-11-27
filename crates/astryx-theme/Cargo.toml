@@ -13,7 +13,9 @@ json = ["dep:serde_json"]
 
 [dependencies]
 anyhow.workspace = true
-serde_json = { workspace = true, optional = true }
+# preserve_order: a theme definition's component rules keep their order (a later
+# rule wins), as they do in upstream's objects.
+serde_json = { workspace = true, optional = true, features = ["preserve_order"] }
 astryx-primitives.workspace = true
 gpui.workspace = true
 

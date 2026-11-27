@@ -2,6 +2,8 @@
 //!
 //! - `crates/astryx-theme/src/generated/tokens.rs`: the typed token surface.
 //! - `crates/astryx-theme/src/generated/default_theme.rs`: core's defaults.
+//! - `crates/astryx-theme/src/generated/token_defaults.rs`: every token's default as
+//!   upstream's `tokenDefaults` writes it, for theme authoring.
 //! - `crates/astryx-themes/src/generated/*.rs`: one module per theme.
 //! - `crates/astryx-icons/src/generated.rs`: the embedded icon files.
 //! - `crates/astryx-i18n/src/generated/catalogs.rs`: message catalogs.
@@ -114,6 +116,10 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
     files.push((
         PathBuf::from("crates/astryx-theme/src/generated/default_theme.rs"),
         rustfmt(&default_module)?,
+    ));
+    files.push((
+        PathBuf::from("crates/astryx-theme/src/generated/token_defaults.rs"),
+        rustfmt(&render_token_defaults(&spec)?)?,
     ));
 
     let lucide = icons["lucide"].as_object().context("icons.lucide")?;
@@ -236,4 +242,23 @@ fn rustfmt(source: &str) -> Result<String> {
         );
     }
     Ok(String::from_utf8(output.stdout)?.replace("\r\n", "\n"))
+}
+
+/// Upstream's `tokenDefaults` (`spec/token-defaults.json`, `[name, value]` pairs in
+/// upstream's order) as a static table.
+fn render_token_defaults(spec: &Path) -> Result<String> {
+    let entries = read_json(&spec.join("token-defaults.json"))?;
+    let entries = entries
+        .as_array()
+        .context("spec/token-defaults.json is not an array")?;
+    let mut out = format!(
+        "{HEADER}/// Every token's default as upstream's `tokenDefaults` writes it: a CSS value, a\n/// light and dark pair as `light-dark(light, dark)`, in upstream's order.\npub const TOKEN_DEFAULTS: &[(&str, &str)] = &[\n"
+    );
+    for entry in entries {
+        let name = entry[0].as_str().context("token default without a name")?;
+        let value = entry[1].as_str().context("token default without a value")?;
+        out.push_str(&format!("    ({name:?}, {value:?}),\n"));
+    }
+    out.push_str("];\n");
+    Ok(out)
 }

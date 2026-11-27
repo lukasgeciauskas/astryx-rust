@@ -1072,6 +1072,26 @@ The remaining primitives:
     export also writes each shipped theme's `defineTheme` input
     (`spec/theme-definitions`) and each generated palette's request and output
     (`spec/palettes`), for stages 2 and 3.
+  - Stage 2 (done): the palette engine (`authoring::palette`: `types`, `generator` with
+    both recipes, `mapping`, `derive_look`, `editor_look`, `theme_palette`), which
+    regenerates all six shipped palettes exactly from their receipts' requests;
+    `color_scale` (`expandColorScale`); `token_values` (one value per mode, `color-mix`,
+    `resolveDefaultTokens`) on a generated `TOKEN_DEFAULTS` table (`spec/token-defaults.json`,
+    upstream's `tokenDefaults`); and `css_values`, the CSS readers that turn a resolved
+    value into a typed token (every color syntax, `calc`, lengths, weights, line heights,
+    shadows), which read all 286 default tokens to exactly the generated defaults in both
+    modes.
+  - Stage 3 (done): `define_theme` (`authoring::define`, with `extends`, motion
+    inheritance and upstream's refusals), `resolve_values`, `merge_components`,
+    `local_tokens`, `status_roles` (status-role derivation and the scoped defaults, with
+    the declaration boundary they read), `on_media`, `theme_tokens`
+    (`resolveThemeTokens`) and `to_theme`, which makes a defined theme this crate's typed
+    `Theme` the way the export reads upstream's. `DefineThemeInput::from_json` reads a
+    definition (behind `json`, whose reader keeps key order, since a later rule wins).
+    `astryx-themes/tests/define_theme.rs` defines all seven shipped themes from their
+    exported definitions and gets their compiled twins exactly: every token in both
+    modes, every component rule in order, both surfaces; a name alone gives core's
+    defaults. 462 authoring tests.
 - **M13 Charts & lab:**
   - `astryx-charts`: d3-scale and d3-shape essentials; bar, line, area, dot, band,
     candlestick, errorBar, referenceLine, heatmap and stream marks.

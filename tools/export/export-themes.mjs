@@ -40,6 +40,7 @@ export async function exportThemes(root, specDir, warnings) {
   }
   writeDefinitions(specDir, sources);
   await writePalettes(root, specDir, sources);
+  await writeTokenDefaults(root, specDir);
 
   const outDir = path.join(specDir, 'themes');
   fs.mkdirSync(outDir, {recursive: true});
@@ -273,7 +274,11 @@ function writeDefinitions(specDir, sources) {
     if (!source.theme) continue;
     const input = globalThis.__astryxDefinitions.get(source.theme.name);
     if (!input) throw new Error(`${source.name}: its defineTheme input was not recorded`);
-    fs.writeFileSync(path.join(dir, `${source.name}.json`), stableStringify(definitionJson(input)));
+    // Upstream's key order, not sorted: a theme's later component rules win.
+    fs.writeFileSync(
+      path.join(dir, `${source.name}.json`),
+      JSON.stringify(definitionJson(input), null, 2) + '\n',
+    );
     console.log(`wrote spec/theme-definitions/${source.name}.json`);
   }
 }
@@ -298,4 +303,18 @@ async function writePalettes(root, specDir, sources) {
     fs.writeFileSync(path.join(dir, `${source.name}.json`), stableStringify(out));
     console.log(`wrote spec/palettes/${source.name}.json`);
   }
+}
+
+/**
+ * Every token's default as upstream's `tokenDefaults` writes it (a CSS value,
+ * `light-dark(...)` for a pair), in its order: the flat map `defineTheme` and
+ * the token resolvers start from.
+ */
+async function writeTokenDefaults(root, specDir) {
+  const {tokenDefaults} = await importFile(root, 'packages/core/dist/theme/tokenDefaults.js');
+  fs.writeFileSync(
+    path.join(specDir, 'token-defaults.json'),
+    JSON.stringify(Object.entries(tokenDefaults), null, 1) + '\n',
+  );
+  console.log('wrote spec/token-defaults.json');
 }
