@@ -401,6 +401,25 @@
   GPUI's hitboxes let both hear the pointer, so the hover and its card work as the mark
   intends.
 
+- **Lab components, where GPUI differs (M13).**
+  - LineClamp's tooltip text comes from its text and inline Text and Link children;
+    text inside another element child is not measured.
+  - DialogHeroHeader, CommentPin, TabBar and others name things from text props: GPUI
+    cannot read an element's text, so a title given as an element still needs its text.
+  - ChatReasoning's streaming shimmer colors whole characters (GPUI has no
+    gradient-clipped text); LogStream's level labels have no letter spacing and its
+    scrollbar is GPUI's; appended rows are announced through `announce` (no
+    `aria-live`).
+  - Tour: Tab from a callout wraps to the page's first tab stop (the callout is drawn
+    above the page, so its stops come last); it still leaves the callout.
+  - TabBar has no backdrop blur behind its capsule and sits at the bottom of its nearest
+    positioned ancestor (upstream `position: fixed`); TabBarMoreList's badge may be
+    read twice by a screen reader.
+  - NavigationStack's back swipe starts anywhere on the screen (no separate edge
+    recognizer), and its scroll-edge veil is a band and one gradient.
+  - An interrupted PageControl window slide restarts from where it is drawn without its
+    velocity; CircleCheckIndicator fades its colors only when given an `id`.
+
 ## Tooling
 
 - **True hot-patching needs our patched dx.** `cargo xtask dev --hot-patch` patches

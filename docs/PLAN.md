@@ -1135,6 +1135,17 @@ The remaining primitives:
     ChartTooltip, every mark, the chart colors (checked against upstream on every
     palette) and the formatters (checked against Node's `Intl`); the CLI counts parity
     per package, and the gallery has a Charts page.
+  - Stage 2 (done): the lab's small components, Stat, InfoTip (Core's, deprecated),
+    LineClamp, CircleCheckIndicator, CircularProgress, SelectableCardGroup, PageControl,
+    DialogHeroHeader, ChatReasoning, LogStream, CommentPin and Tour, with the Core
+    parity they needed (SelectableCard's input context, the indicator registry's check,
+    radio and checkbox entries, a public touch hit area, InlineFlow's truncation report,
+    a dialog name from a title that takes no focus). TabBarMoreList moved to stage 3
+    with TabBar, which it belongs to.
+  - Stage 3 (done): TabBar and TabBarMoreList, NavigationStack, RefreshControl
+    (`use_refresh_control`), TransferList and TransferListSelector, ListInput,
+    RadialChart and SankeyChart, their model and geometry checked against upstream
+    under Node (V8's sine and cosine ported for the radial geometry's last digit).
 - **M14 Rich text:** a document model + editor on the engine, toolbar, lossless Markdown round
   trip (AST-062/064/106).
 - **M15 RTL, high contrast, polish:** RTL mirroring, Windows high contrast and macOS's

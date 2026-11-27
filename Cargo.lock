@@ -410,13 +410,18 @@ dependencies = [
 name = "astryx-lab"
 version = "0.1.0"
 dependencies = [
+ "astryx-charts",
  "astryx-components",
  "astryx-i18n",
  "astryx-primitives",
  "astryx-theme",
  "astryx-themes",
  "gpui",
+ "icu_list",
+ "icu_locale",
+ "serde_json",
  "web-time",
+ "writeable",
 ]
 
 [[package]]

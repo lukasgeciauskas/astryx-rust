@@ -207,7 +207,7 @@ impl Reorderable {
         }
     }
 
-    pub(crate) fn can_move(&self, key: &ItemKey) -> bool {
+    pub fn can_move(&self, key: &ItemKey) -> bool {
         self.0
             .options
             .is_reorderable

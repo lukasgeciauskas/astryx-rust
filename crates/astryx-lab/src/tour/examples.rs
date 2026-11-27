@@ -282,7 +282,7 @@ fn scoped_theme(window: &mut Window, cx: &mut App) -> AnyElement {
 /// Upstream's `Placement` story: every side and alignment of the callout around a
 /// centered target (the story's controls are buttons here).
 fn placement(window: &mut Window, cx: &mut App) -> AnyElement {
-    let active = switch("tour-placement", true, window, cx);
+    let active = switch("tour-placement", false, window, cx);
     let is_active = *active.read(cx);
     let choice = window.use_keyed_state(
         ElementId::Name("tour-placement-choice".into()),
@@ -366,7 +366,7 @@ fn placement(window: &mut Window, cx: &mut App) -> AnyElement {
                     cx,
                 ))
                 .children((!is_active).then(|| {
-                    Button::new("tour-placement-show", "Show step")
+                    Button::new("tour-placement-show", "Start tour")
                         .on_click(move |_, window, cx| show(window, cx))
                 }))
                 .child(

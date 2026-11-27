@@ -40,4 +40,11 @@ pub const REGISTRY: &[ComponentDoc] = &[
     crate::log_stream::LOG_STREAM_DOC,
     crate::comment_pin::COMMENT_PIN_DOC,
     crate::tour::TOUR_DOC,
+    crate::tab_bar::TAB_BAR_DOC,
+    crate::tab_bar_more_list::TAB_BAR_MORE_LIST_DOC,
+    crate::navigation_stack::NAVIGATION_STACK_DOC,
+    crate::radial::RADIAL_CHART_DOC,
+    crate::sankey::SANKEY_CHART_DOC,
+    crate::transfer_list::TRANSFER_LIST_SELECTOR_DOC,
+    crate::list_input::LIST_INPUT_DOC,
 ];

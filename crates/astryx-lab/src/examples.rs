@@ -90,5 +90,37 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
             crate::comment_pin::examples::examples(window, cx),
         ))
         .child(example("Tour", crate::tour::examples::examples(window, cx)))
+        .child(example(
+            "TabBar",
+            crate::tab_bar::examples::examples(window, cx),
+        ))
+        .child(example(
+            "TabBarMoreList",
+            crate::tab_bar_more_list::examples::examples(window, cx),
+        ))
+        .child(example(
+            "NavigationStack",
+            crate::navigation_stack::examples::examples(window, cx),
+        ))
+        .child(example(
+            "RefreshControl",
+            crate::refresh_control::examples::examples(window, cx),
+        ))
+        .child(example(
+            "TransferList",
+            crate::transfer_list::examples::examples(window, cx),
+        ))
+        .child(example(
+            "ListInput",
+            crate::list_input::examples::examples(window, cx),
+        ))
+        .child(example(
+            "RadialChart",
+            crate::radial::examples::examples(window, cx),
+        ))
+        .child(example(
+            "SankeyChart",
+            crate::sankey::examples::examples(window, cx),
+        ))
         .into_any_element()
 }

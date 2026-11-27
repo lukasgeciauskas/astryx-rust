@@ -8,13 +8,18 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
+astryx-charts.workspace = true
 astryx-components.workspace = true
 astryx-i18n.workspace = true
 astryx-primitives.workspace = true
 astryx-theme.workspace = true
 gpui.workspace = true
+icu_list.workspace = true
+icu_locale.workspace = true
 web-time.workspace = true
+writeable.workspace = true
 
 [dev-dependencies]
+serde_json.workspace = true
 gpui = { workspace = true, features = ["test-support"] }
 astryx-themes = { workspace = true, features = ["neutral"] }
