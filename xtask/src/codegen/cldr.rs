@@ -1,4 +1,4 @@
-//! `crates/astryx-i18n/src/generated/cldr.rs` from `spec/cldr.json`: the CLDR
+//! `crates/rustryx-i18n/src/generated/cldr.rs` from `spec/cldr.json`: the CLDR
 //! tables the date components read that ICU4X does not carry (upstream's
 //! weekday header names and stand-alone month capitals, and the calendar and
 //! week-field display names upstream reads from `Intl.DisplayNames`).

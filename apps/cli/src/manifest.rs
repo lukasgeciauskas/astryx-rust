@@ -25,7 +25,7 @@ impl Entry {
 
     /// A top-level component: core, with a capitalized category (lowercase
     /// categories are hooks), and not a sub-part of another component.
-    /// What `astryx parity` counts in its package: core's top-level components, and
+    /// What `rustryx parity` counts in its package: core's top-level components, and
     /// every component of the charts and lab packages (a lab part of a core component,
     /// such as Chat's, included).
     pub fn is_ported_unit(&self) -> bool {

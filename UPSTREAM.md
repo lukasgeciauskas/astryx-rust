@@ -26,8 +26,8 @@ snapshots in `spec/` and never runs Node.
    changed upstream. `spec/code/fixtures.json` and the `spec/markdown/*-fixtures.json` files
    hold upstream's own tokenizer and Markdown parser output (core, plugins, streaming,
    legacy shapes); when they change, the
-   fixture tests in `astryx-syntax` and `astryx-markdown` fail until the port follows.
+   fixture tests in `rustryx-syntax` and `rustryx-markdown` fail until the port follows.
    `spec/theme-definitions/*.json` (each shipped theme's `defineTheme` input) and
    `spec/palettes/*.json` (each generated palette's request and output) do the same for
-   theme authoring (`astryx_theme::authoring`).
+   theme authoring (`rustryx_theme::authoring`).
 5. Update the commit hash in the table above.

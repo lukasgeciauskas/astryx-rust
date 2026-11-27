@@ -166,7 +166,7 @@ fn patch(src: &Path) -> Result<()> {
         "                            // jmp [rip+0] with the address inline: clobbers no register\n                            // (RAX carries __chkstk's argument).\n                            let mut code = vec![0xFF, 0x25, 0x00, 0x00, 0x00, 0x00];\n                            code.extend_from_slice(&abs_addr.to_le_bytes());\n                            code",
     )?;
     // dx watched only the app's direct path dependencies, so an edit in a
-    // crate further down (astryx-components under the `astryx` facade) was
+    // crate further down (rustryx-components under the `rustryx` facade) was
     // never noticed. Walk path dependencies transitively instead.
     replace(
         &src.join("src/serve/runner.rs"),
@@ -179,8 +179,8 @@ fn patch(src: &Path) -> Result<()> {
         "            let dir = krate\n                .manifest_path\n                .parent()\n                .unwrap()\n                .to_path_buf()\n                .into_std_path_buf();\n            if !paths.contains(&dir) {\n                paths.push(dir);\n            }\n            if let Some(id) = self.workspace.krates.nid_for_kid(&krates::Kid::from(krate.id.clone())) {\n                stack.push(id);\n            }\n        }\n        }\n\n        paths\n    }",
     )?;
     // The change cascade took every workspace crate that depends on the
-    // edited one, including crates the app never builds (astryx-cli depends
-    // on astryx-components). dx has no rustc args for those and the patch
+    // edited one, including crates the app never builds (rustryx-cli depends
+    // on rustryx-components). dx has no rustc args for those and the patch
     // failed with "Missing rustc args for replay". Keep only dependents
     // that reach the app.
     replace(

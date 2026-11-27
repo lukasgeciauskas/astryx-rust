@@ -8,7 +8,7 @@ Add-Type -ReferencedAssemblies System.Drawing @"
 using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
-public static class AstryxCapture {
+public static class RustryxCapture {
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
     public delegate bool EnumProc(IntPtr hWnd, IntPtr lParam);
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc proc, IntPtr lParam);
@@ -58,13 +58,13 @@ public static class AstryxCapture {
     }
 }
 "@
-[AstryxCapture]::SetProcessDPIAware() | Out-Null
+[RustryxCapture]::SetProcessDPIAware() | Out-Null
 
 # Waits up to $Seconds for a visible window of process $ProcessId.
-function Wait-AstryxWindow([int]$ProcessId, [double]$Seconds) {
+function Wait-RustryxWindow([int]$ProcessId, [double]$Seconds) {
     $deadline = (Get-Date).AddSeconds($Seconds)
     do {
-        $hwnd = [AstryxCapture]::LargestWindow([uint32]$ProcessId)
+        $hwnd = [RustryxCapture]::LargestWindow([uint32]$ProcessId)
         if ($hwnd -ne [IntPtr]::Zero) { return $hwnd }
         Start-Sleep -Milliseconds 250
     } while ((Get-Date) -lt $deadline)

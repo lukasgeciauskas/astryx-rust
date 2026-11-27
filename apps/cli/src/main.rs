@@ -1,4 +1,4 @@
-//! `astryx`: the Rust port's counterpart of upstream's agent-facing CLI.
+//! `rustryx`: the Rust port's counterpart of upstream's agent-facing CLI.
 //!
 //! Every answer is short by default; `--dense` is shorter still, for coding
 //! agents that read every byte a command prints.
@@ -8,17 +8,17 @@ mod manifest;
 
 use std::process::ExitCode;
 
-const HELP: &str = "astryx: Astryx for GPUI
+const HELP: &str = "rustryx: Rustryx
 
 USAGE
-  astryx component --list [--all]          components by category (ported ones marked *)
-  astryx component <Name> [--dense] [--package core|lab|charts|richtext]
+  rustryx component --list [--all]         components by category (ported ones marked *)
+  rustryx component <Name> [--dense] [--package core|lab|charts|richtext]
                                            upstream props and guidance, and the Rust API
-  astryx tokens [filter] [--theme <name>] [--mode light|dark]
+  rustryx tokens [filter] [--theme <name>] [--mode light|dark]
                                            CSS token, Rust field and value
-  astryx themes                            the themes compiled in
-  astryx docs [topic]                      guides: gpui, conventions, customization, effects, porting
-  astryx parity [--missing]                how much of upstream is ported; fails on unmapped props
+  rustryx themes                           the themes compiled in
+  rustryx docs [topic]                     guides: gpui, conventions, customization, effects, porting
+  rustryx parity [--missing]               how much of upstream is ported; fails on unmapped props
 ";
 
 fn main() -> ExitCode {

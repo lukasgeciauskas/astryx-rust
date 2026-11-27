@@ -1,12 +1,12 @@
 //! Gallery pages. Each component milestone adds its pages here; a component
 //! page renders the component's own `examples` module, the same code
-//! `astryx component <Name>` prints.
+//! `rustryx component <Name>` prints.
 
 mod effects;
 mod tokens;
 
-use astryx::theme::ResolvedTheme;
 use gpui::{AnyElement, App, IntoElement, ParentElement, Styled, Window};
+use rustryx::theme::ResolvedTheme;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Page {
@@ -112,117 +112,131 @@ impl Page {
         match self {
             Page::Tokens => tokens::render(theme, window, cx),
             Page::Effects => effects::render(theme, window, cx),
-            Page::Text => astryx::components::text::examples::examples(),
-            Page::Layout => astryx::components::layout::examples::examples(window, cx),
-            Page::Icon => astryx::components::icon::examples::examples(window, cx),
-            Page::Status => astryx::components::status::examples::examples(window, cx),
+            Page::Text => rustryx::components::text::examples::examples(),
+            Page::Layout => rustryx::components::layout::examples::examples(window, cx),
+            Page::Icon => rustryx::components::icon::examples::examples(window, cx),
+            Page::Status => rustryx::components::status::examples::examples(window, cx),
             Page::Content => gpui::div()
                 .flex()
                 .flex_col()
                 .gap(gpui::px(48.))
-                .child(astryx::components::content::examples::examples(window, cx))
-                .child(astryx::components::syntax_theme::examples::examples(
+                .child(rustryx::components::content::examples::examples(window, cx))
+                .child(rustryx::components::syntax_theme::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::code_block::examples::examples(
+                .child(rustryx::components::code_block::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::markdown::examples::examples(window, cx))
+                .child(rustryx::components::markdown::examples::examples(
+                    window, cx,
+                ))
                 .into_any_element(),
-            Page::People => astryx::components::people::examples::examples(window, cx),
-            Page::Containers => astryx::components::containers::examples::examples(window, cx),
-            Page::Feedback => astryx::components::feedback::examples::examples(window, cx),
-            Page::Media => astryx::components::media::examples::examples(window, cx),
-            Page::Time => astryx::components::time::examples::examples(window, cx),
-            Page::Buttons => astryx::components::button::examples::examples(window, cx),
-            Page::Links => astryx::components::link::examples::examples(window, cx),
-            Page::Choices => astryx::components::choice::examples::examples(window, cx),
-            Page::Inputs => astryx::components::input::examples::examples(window, cx),
-            Page::Overlays => astryx::components::overlay::examples::examples(window, cx),
-            Page::Navigation => astryx::components::segmented::examples::examples(window, cx),
-            Page::Wayfinding => astryx::components::pagination::examples::examples(window, cx),
-            Page::Tables => astryx::components::table::examples::examples(window, cx),
+            Page::People => rustryx::components::people::examples::examples(window, cx),
+            Page::Containers => rustryx::components::containers::examples::examples(window, cx),
+            Page::Feedback => rustryx::components::feedback::examples::examples(window, cx),
+            Page::Media => rustryx::components::media::examples::examples(window, cx),
+            Page::Time => rustryx::components::time::examples::examples(window, cx),
+            Page::Buttons => rustryx::components::button::examples::examples(window, cx),
+            Page::Links => rustryx::components::link::examples::examples(window, cx),
+            Page::Choices => rustryx::components::choice::examples::examples(window, cx),
+            Page::Inputs => rustryx::components::input::examples::examples(window, cx),
+            Page::Overlays => rustryx::components::overlay::examples::examples(window, cx),
+            Page::Navigation => rustryx::components::segmented::examples::examples(window, cx),
+            Page::Wayfinding => rustryx::components::pagination::examples::examples(window, cx),
+            Page::Tables => rustryx::components::table::examples::examples(window, cx),
             Page::Shell => gpui::div()
                 .flex()
                 .flex_col()
                 .gap(gpui::px(48.))
-                .child(astryx::components::scrollable_area::examples::examples(
+                .child(rustryx::components::scrollable_area::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::resizable::examples::examples(
+                .child(rustryx::components::resizable::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::layout::examples::regions_examples(
+                .child(rustryx::components::layout::examples::regions_examples(
                     window, cx,
                 ))
-                .child(astryx::components::nav::examples::examples(window, cx))
-                .child(astryx::components::side_nav::examples::examples(window, cx))
-                .child(astryx::components::top_nav::examples::examples(window, cx))
-                .child(astryx::components::mobile_nav::examples::examples(
+                .child(rustryx::components::nav::examples::examples(window, cx))
+                .child(rustryx::components::side_nav::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::app_shell::examples::examples(
+                .child(rustryx::components::top_nav::examples::examples(window, cx))
+                .child(rustryx::components::mobile_nav::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::outline::examples::examples(window, cx))
-                .child(astryx::components::carousel::examples::examples(window, cx))
+                .child(rustryx::components::app_shell::examples::examples(
+                    window, cx,
+                ))
+                .child(rustryx::components::outline::examples::examples(window, cx))
+                .child(rustryx::components::carousel::examples::examples(
+                    window, cx,
+                ))
                 .into_any_element(),
-            Page::Chat => astryx::components::chat::examples::examples(window, cx),
-            Page::Motion => astryx::components::animator::examples::examples(window, cx),
-            Page::Theme => astryx::components::theming::examples::examples(window, cx),
-            Page::Charts => astryx::charts::examples::examples(window, cx),
-            Page::Lab => astryx::lab::examples::examples(window, cx),
+            Page::Chat => rustryx::components::chat::examples::examples(window, cx),
+            Page::Motion => rustryx::components::animator::examples::examples(window, cx),
+            Page::Theme => rustryx::components::theming::examples::examples(window, cx),
+            Page::Charts => rustryx::charts::examples::examples(window, cx),
+            Page::Lab => rustryx::lab::examples::examples(window, cx),
             // The 3D charts turn by themselves and draw thousands of shapes: their own
             // page keeps the Lab page still.
-            Page::ThreeD => astryx::lab::three_d::examples::examples(window, cx),
+            Page::ThreeD => rustryx::lab::three_d::examples::examples(window, cx),
             Page::Dates => gpui::div()
                 .flex()
                 .flex_col()
                 .gap(gpui::px(48.))
-                .child(astryx::components::date_input::examples::examples(
+                .child(rustryx::components::date_input::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::time_input::examples::examples(
+                .child(rustryx::components::time_input::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::date_time_input::examples::examples(
+                .child(rustryx::components::date_time_input::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::date_range_input::examples::examples(
+                .child(rustryx::components::date_range_input::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::calendar::examples::examples(window, cx))
+                .child(rustryx::components::calendar::examples::examples(
+                    window, cx,
+                ))
                 .into_any_element(),
             Page::Collections => gpui::div()
                 .flex()
                 .flex_col()
                 .gap(gpui::px(48.))
-                .child(astryx::components::selector::examples::examples(window, cx))
-                .child(astryx::components::list::examples::examples(window, cx))
-                .child(astryx::components::container_reveal::examples::examples(
+                .child(rustryx::components::selector::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::reorderable::examples::examples(
+                .child(rustryx::components::list::examples::examples(window, cx))
+                .child(rustryx::components::container_reveal::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::metadata::examples::examples(window, cx))
-                .child(astryx::components::overflow::examples::examples(window, cx))
-                .child(astryx::components::typeahead::examples::examples(
+                .child(rustryx::components::reorderable::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::tokenizer::examples::examples(
+                .child(rustryx::components::metadata::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::multi_selector::examples::examples(
+                .child(rustryx::components::overflow::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::complex_selector::examples::examples(
+                .child(rustryx::components::typeahead::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::tree_list::examples::examples(
+                .child(rustryx::components::tokenizer::examples::examples(
                     window, cx,
                 ))
-                .child(astryx::components::power_search::examples::examples(
+                .child(rustryx::components::multi_selector::examples::examples(
+                    window, cx,
+                ))
+                .child(rustryx::components::complex_selector::examples::examples(
+                    window, cx,
+                ))
+                .child(rustryx::components::tree_list::examples::examples(
+                    window, cx,
+                ))
+                .child(rustryx::components::power_search::examples::examples(
                     window, cx,
                 ))
                 .into_any_element(),
@@ -240,7 +254,7 @@ mod tests {
 
     impl Render for PageView {
         fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-            let theme = astryx::theme::current(window, cx);
+            let theme = rustryx::theme::current(window, cx);
             div().child(self.0.render(&theme, window, cx))
         }
     }
@@ -249,7 +263,7 @@ mod tests {
     /// component example (debug assertions included).
     #[gpui::test]
     fn every_page_renders(cx: &mut TestAppContext) {
-        cx.update(astryx::init);
+        cx.update(rustryx::init);
         for &page in Page::ALL {
             let (_, cx) = cx.add_window_view(move |_, _| PageView(page));
             cx.run_until_parked();

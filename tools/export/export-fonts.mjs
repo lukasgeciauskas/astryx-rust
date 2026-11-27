@@ -1,5 +1,5 @@
 // Downloads the static TTF of every font face the themes use, as Google
-// Fonts serves it, into crates/astryx-themes/fonts/<family>/. GPUI needs raw
+// Fonts serves it, into crates/rustryx-themes/fonts/<family>/. GPUI needs raw
 // TTF/OTF; the themes ship woff2 subsets. Every Astryx theme font is a Google
 // Font. Existing files are kept, so a re-run is offline unless a face is new.
 //
@@ -13,7 +13,7 @@ export const fontFileName = (family, weight, style) =>
   `${family.replace(/\s+/g, '')}-${weight}${style === 'italic' ? 'Italic' : ''}.ttf`;
 
 export async function exportFonts(root, repoRoot, specDir, warnings) {
-  const fontsDir = path.join(repoRoot, 'crates', 'astryx-themes', 'fonts');
+  const fontsDir = path.join(repoRoot, 'crates', 'rustryx-themes', 'fonts');
   const faces = new Map();
   for (const file of fs.readdirSync(path.join(specDir, 'themes'))) {
     const theme = JSON.parse(fs.readFileSync(path.join(specDir, 'themes', file), 'utf8'));

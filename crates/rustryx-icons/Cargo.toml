@@ -1,0 +1,12 @@
+[package]
+name = "rustryx-icons"
+description = "Rustryx's built-in icons (upstream Astryx's) and the icons its themes map to, embedded as SVG"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+gpui.workspace = true

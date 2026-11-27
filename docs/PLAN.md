@@ -47,16 +47,16 @@ spec/                     committed JSON snapshots exported from ../Astryx (toke
 tools/export/             Node ESM scripts run against ../Astryx; only needed to re-sync
 xtask/                    cargo xtask: codegen [--check] | parity [<Name>] | web | bump-gpui
 crates/
-  astryx/                 facade: prelude, astryx::init(cx), feature flags (theme-*, i18n-all, markdown, chat, touch, charts, lab, richtext)
-  astryx-theme/           Tokens (generated), Theme, Appearance, registry, cx.theme(), scopes, color math, overrides, theme builder
-  astryx-primitives/      headless behavior (list below)
-  astryx-icons/           core fallback SVGs + Lucide subset, IconName registry, embedded AssetSource
-  astryx-components/      every core component, one module per upstream directory
-  astryx-themes/          7 generated themes + TTF fonts, one cargo feature per theme
-  astryx-charts/  astryx-lab/  astryx-richtext/
+  rustryx/                facade: prelude, rustryx::init(cx), feature flags (theme-*, i18n-all, markdown, chat, touch, charts, lab, richtext)
+  rustryx-theme/           Tokens (generated), Theme, Appearance, registry, cx.theme(), scopes, color math, overrides, theme builder
+  rustryx-primitives/      headless behavior (list below)
+  rustryx-icons/           core fallback SVGs + Lucide subset, IconName registry, embedded AssetSource
+  rustryx-components/      every core component, one module per upstream directory
+  rustryx-themes/          7 generated themes + TTF fonts, one cargo feature per theme
+  rustryx-charts/  rustryx-lab/  astryx-richtext/
 apps/gallery/             Storybook equivalent: sidebar, per-component Default + Theme Sheet pages, Tokens page, Templates
                           section, switchers for theme/mode/size/locale/direction; native + wasm
-examples/consumer/        tiny app using `astryx` via path, to keep the public API and rev alignment honest
+examples/consumer/        tiny app using `rustryx` via path, to keep the public API and rev alignment honest
 ```
 
 ## Theme pipeline (machine-generated, never hand-copied)
@@ -78,10 +78,10 @@ examples/consumer/        tiny app using `astryx` via path, to keep the public A
    - fonts: prefer the original TTFs from the upstream Google Fonts projects, else
      woff2→ttf (fontTools). OFL texts go into `THIRD_PARTY_NOTICES.md`.
 3. `cargo xtask codegen` generates Rust from the JSON:
-   - `astryx-theme/src/generated/tokens.rs`: a typed `Tokens` struct grouped as
+   - `rustryx-theme/src/generated/tokens.rs`: a typed `Tokens` struct grouped as
      `color/space/radius/size/border/focus/shadow/duration/ease/font/text/data/syntax`,
      named by the Swift G6 rule in snake_case;
-   - `astryx-themes/src/generated/<theme>.rs`: light and dark `Tokens`, plus
+   - `rustryx-themes/src/generated/<theme>.rs`: light and dark `Tokens`, plus
      `ComponentOverrides`;
    - the locale tables.
    `--check` is the drift test. The Rust build never needs Node.
@@ -134,7 +134,7 @@ examples/consumer/        tiny app using `astryx` via path, to keep the public A
     interpreter over icu4x plurals and decimals.
   - Logical start/end helpers are used from day one, so RTL is a toggle later.
 
-## Primitives (`astryx-primitives`), each mapped to its upstream source and spec
+## Primitives (`rustryx-primitives`), each mapped to its upstream source and spec
 | Primitive | Upstream source | Specs |
 |---|---|---|
 | context + size cascade | `SizeContext/`, `InteractiveRoleContext/` | `architecture/component-size-cascade.md` |
@@ -172,7 +172,7 @@ The remaining primitives:
    - `docs/specs/components/<Name>/<Name>.spec.md` (FR/AR tables);
    - the family contract in `docs/families/`;
    - Playwright a11y and interaction specs in `__tests__/`.
-3. Implement `astryx-components/src/<name>/`:
+3. Implement `rustryx-components/src/<name>/`:
    - every prop, or a waiver with a reason in `parity.toml`;
    - token styles and theming targets;
    - keyboard behavior via actions, `key_context` and default keybindings;
@@ -198,9 +198,9 @@ The remaining primitives:
     - (f) keystroke simulation in `#[gpui::test]`;
     - (g) `examples/consumer` with rev alignment and the `[patch]` recipe.
   - Fallbacks get decided if any spike fails.
-- **M1 Theme pipeline:** export scripts, codegen and drift check; `astryx-theme` runtime
+- **M1 Theme pipeline:** export scripts, codegen and drift check; `rustryx-theme` runtime
   (Appearance, registry, scopes, MediaTheme, color math, adaptations, overrides);
-  `astryx::init`; fonts and icons registered.
+  `rustryx::init`; fonts and icons registered.
   - Exit: the gallery Tokens page renders every theme in both modes and matches Storybook.
 - **M2 Primitives I + foundations (done, 2026-11-24):** context, direction, modality and
   focus ring, press, overlays, hotkeys, a11y helpers, i18n runtime + catalogs, link handler.
@@ -211,7 +211,7 @@ The remaining primitives:
     Citation, Avatar(+Group), Card, Section, EmptyState, Thumbnail, Timestamp, Timer,
     ProgressBar, Banner.
 - **M3 Actions & simple controls (done, 2026-11-24):** list focus and typeahead.
-  - Primitives: Tab/Shift+Tab traversal (`astryx::init`), `control_focus`, `ListKeys` and
+  - Primitives: Tab/Shift+Tab traversal (`rustryx::init`), `control_focus`, `ListKeys` and
     `ListFocus` (roving tab stop, `on_move`), `RovingScope` (one tab stop among arbitrary
     controls), `Typeahead` (ICU4X folding).
   - Components: Button (all variants, loading, icon-only, href, clickAction), IconButton,
@@ -250,7 +250,7 @@ The remaining primitives:
     presses and takes focus as one; any other element is an inline box on the baseline.
     Text `display`, Center `isInline`.
   - Text `hasCapsize`: the box trimmed to cap height and baseline from font metrics.
-  - Spell checking (`astryx_primitives::spell`): the Windows system checker, Hunspell
+  - Spell checking (`rustryx_primitives::spell`): the Windows system checker, Hunspell
     dictionaries elsewhere; misspellings get a wavy underline once a field has had focus.
     Suggestions and "Add to dictionary" came with ContextMenu (M5).
   - Touch keyboards (fork patch R11): `inputMode`, `enterKeyHint`, `autoCapitalize`,
@@ -364,7 +364,7 @@ The remaining primitives:
     lists (FR14, FR17), Add filter's content search with its inline suggestions and
     FR30's value-only rows and "More" rows (FR13, FR30), nested groups in the value step
     (FR14), numbers staged as they are typed (FR17), FR16's focus rules (through the new
-    `astryx_primitives::request_focus`), and the result count's announcement in both
+    `rustryx_primitives::request_focus`), and the result count's announcement in both
     presentations (FR19), and "More" rows carrying the typed text into the editor they
     open (a text field's value, or a search editor's opening query: BaseTypeahead FR18,
     Tokenizer FR31, built here though upstream lists FR31 as an implementation gap),
@@ -372,11 +372,11 @@ The remaining primitives:
     PowerSearch is done; its date and time values came with M8 (stage 8).
   - TreeList (done): data-driven rows with chevrons, guides, start and end content,
     density and variants; row actions (FR7); the WAI-ARIA tree keys as the
-    `astryx_primitives::tree_focus` primitive (upstream `useTreeFocus`) with one tab stop
+    `rustryx_primitives::tree_focus` primitive (upstream `useTreeFocus`) with one tab stop
     and typeahead (AR1); focus kept when a branch collapses around it (AR2); and the
     theme's `tree-disclosure` mark (FR10). Theme indicators (`indicator::set_theme_indicator`,
     Indicator FR7) also give Spinner a theme's `spinner` picture.
-  - Long-list windowing (done): `astryx_primitives::list_window`, upstream's one private
+  - Long-list windowing (done): `rustryx_primitives::list_window`, upstream's one private
     windowing module (`virtualization/`, `architecture:list-windowing`). The fixed-pitch
     window with four rows of overscan, the range over items of varying size, first-visible-key
     anchoring and the focus island are ported with upstream's tests. The record's FR1-FR4,
@@ -494,7 +494,7 @@ The remaining primitives:
     the full and windowed bodies share.
 - **M8 Dates (done, 2026-11-25):** calendar systems (jiff + icu4x, AST-111), Calendar, DateInput (segmented),
   DateRangeInput, DateTimeInput, TimeInput.
-  - Stage 1 (done): calendar systems and Calendar. `astryx_i18n::date` ports
+  - Stage 1 (done): calendar systems and Calendar. `rustryx_i18n::date` ports
     `plainDate`, `calendarSystem`, `calendarDateParser`, `dateParser`, `timeParser` and
     `timeFormat`: ICU4X's `icu_calendar` does Temporal's arithmetic (month codes,
     constrain and reject) and `icu_datetime` writes Intl's text, read as parts. The typed
@@ -546,7 +546,7 @@ The remaining primitives:
     wrapping row whose divider shows only between the parts (FR5), clear, `changeAction`
     and disabled. Escape drops a range in progress and leaves the popover open.
   - Stage 6a (done): the picker wheels and TimeInput's bottom sheet.
-    - Pulled forward from M11 into `astryx_primitives`: `motion` (closed-form springs,
+    - Pulled forward from M11 into `rustryx_primitives`: `motion` (closed-form springs,
       UIScrollView's decay, projection, rubber band and the UIKit tables the wheels read)
       and `gestures::VelocityTracker`.
     - `wheel/`: the shared rules (`wheelOptions`), the release physics (`wheelPhysics`) and
@@ -561,7 +561,7 @@ The remaining primitives:
       read-only combobox, the BottomSheet of wheels with Save, UIDatePicker's TimeWheels
       under a finger (the AM/PM wheel follows the hour across 11 and 12, the minutes loop
       and keep the hour) and one-column-at-a-time wheels under a mouse (FR7).
-    - `coarse_primary_pointer` (`astryx_primitives::modality`): upstream's
+    - `coarse_primary_pointer` (`rustryx_primitives::modality`): upstream's
       `(pointer: coarse)` remembers the last pointer through key presses, so typing never
       flips a field's surface.
   - Stage 6b (done): DateInput's bottom sheet (`date_input/sheet.rs`): the read-only
@@ -592,7 +592,7 @@ The remaining primitives:
       keeping ISO values.
     - FormLayout's `defaultEntryErrorBehavior`: read by DateInput, TimeInput and
       DateTimeInput since stages 2 to 4.
-    - `astryx_i18n::datetime`: `day_of_instant`, `midnight_in_zone`,
+    - `rustryx_i18n::datetime`: `day_of_instant`, `midnight_in_zone`,
       `wall_clock_in_zone`, `instant_in_zone`.
   - Stage 7 (done): the platform's pickers, through fork patch R16 (`b39b0e1`).
     - `Window::show_native_picker` and `native_picker_supported`: the Common Controls
@@ -626,7 +626,7 @@ The remaining primitives:
     `scrollbar_color` (CSS `scrollbar-width` and `scrollbar-color`). Every scroll region
     already ported gains them; TabList's strip hides its bar, as upstream's does.
   - Stage 2 (done): ScrollableArea and `useScrollableArea` (AST-025).
-    `astryx_primitives::scroll_area` is the hook: the requested logical axes, the
+    `rustryx_primitives::scroll_area` is the hook: the requested logical axes, the
     effective-axis and edge state measured after each layout and published at most once
     a frame when it changes (FR4-FR9, PR1), a named tab stop only while a requested axis
     scrolls that keeps focus when the overflow goes (FR12-FR13, AR1-AR2), the scrolling
@@ -649,7 +649,7 @@ The remaining primitives:
     a lift (with the release velocity's projection) or a key step, controlled and
     uncontrolled collapse, `collapse`, `expand` and `resize`, and `autoSaveId`
     persistence written once a person resizes and once per gesture
-    (`astryx_primitives::storage`: localStorage in a browser, a JSON file natively).
+    (`rustryx_primitives::storage`: localStorage in a browser, a JSON file natively).
     `ResizeHandle` is the APG window splitter: the separator's value, bounds and
     "Collapsed" text, the grab zone, the grip pill and its placement, inline or overlay,
     the divider, a pointer drag inverted under right-to-left (FR3), the arrow keys with
@@ -663,7 +663,7 @@ The remaining primitives:
     inset (`padding`, else the nearest padding container's, else step 4) or the inner
     inset, collapses beside a header or footer without a divider, and publishes what it
     applies. The divider default stops at a layer, as do the container kind and the
-    padding container (`astryx_primitives::provide_in_layer` and `use_layer_context`,
+    padding container (`rustryx_primitives::provide_in_layer` and `use_layer_context`,
     upstream's layer-scoped contexts). Content and panels scroll on `scroll_area`,
     named only while they scroll; a panel takes a `resizable` region's size, draws its
     divider on its content-facing edge or overlaps the content by the inner inset, and
@@ -740,7 +740,7 @@ The remaining primitives:
     first frame reads the window.
     - Carried to M11: the content area's swap as the side nav collapses (FR17).
   - Stage 10 (done): Outline and `useOutlineFromDOM` (`outline/`), on in-page anchors
-    (`astryx_primitives::anchor`: a Heading with an id records its box and the scroll root
+    (`rustryx_primitives::anchor`: a Heading with an id records its box and the scroll root
     it sits in, which AppShell's main region and ScrollableArea provide). Links indented by
     level, each in the Tab order, `aria-current="location"` on the current one, over a 2px
     track whose indicator slides to it (FR1-FR3, FR6, FR7). A link scrolls its heading
@@ -763,7 +763,7 @@ The remaining primitives:
     steps about a view onto a stop.
 - **M9 done.** Every M9 component is ported; its carried items are in HANDOFF's table.
 - **M10 Content:**
-  - Markdown: upstream's own parser ported (`astryx-markdown`) onto its canonical AST;
+  - Markdown: upstream's own parser ported (`rustryx-markdown`) onto its canonical AST;
     upstream plugins; streaming parse; URL safety.
   - CodeBlock: port of the in-house grammar tokenizer with `fancy-regex`, 30 languages, 12
     syntax presets.
@@ -790,7 +790,7 @@ The remaining primitives:
        `useChatDictation`, ChatDictationButton), and the Chat family's doc.
     - The typing indicator, unread divider, virtualizer, emoji picker and reaction bar are
       `@astryxdesign/lab` components, so they land with the lab in M13.
-  - Stage 1 (done): the syntax engine, the new `astryx-syntax` crate. `tools/export/export-code.mjs`
+  - Stage 1 (done): the syntax engine, the new `rustryx-syntax` crate. `tools/export/export-code.mjs`
     exports upstream's grammars (17 built-in grammars under 42 identifiers, and the 9
     language modules), the 12 syntax presets, and fixtures of upstream's own tokenizer over
     one sample in every language; codegen translates each JS regex into `fancy-regex`
@@ -813,7 +813,7 @@ The remaining primitives:
     - Carried to M11: the collapse's height animation.
   - Stage 3 (done): Markdown's core. The parser is upstream's own, ported rather than a
     CommonMark library, because upstream's dialect is its own (FR23) and its plugins hook into
-    its scanner: the new `astryx-markdown` crate (`parser.ts`, `ast.ts`,
+    its scanner: the new `rustryx-markdown` crate (`parser.ts`, `ast.ts`,
     `characterReferences.ts`, `url.ts`), onto the canonical mdast-aligned tree with UTF-8
     offsets. `tools/export/export-markdown.mjs` exports the HTML character references
     (codegen'd into a sorted table) and fixtures of upstream's own parser: every string its
@@ -833,9 +833,9 @@ The remaining primitives:
     written without a math renderer (FR6). Along the way: CodeBlock now
     sizes to its content as upstream's `fit-content` (it had stretched across its column),
     CheckboxListItem takes a rich label (`new_element`, upstream's `ReactNode`), and
-    `astryx_i18n::first_strong_direction` ports upstream's classifier.
+    `rustryx_i18n::first_strong_direction` ports upstream's classifier.
   - Stage 4 (done): Markdown's extensions. The parser crate gained upstream's whole plugin
-    system (`astryx_markdown::plugins`: `create_markdown_plugin`, syntax contributions in the
+    system (`rustryx_markdown::plugins`: `create_markdown_plugin`, syntax contributions in the
     block and inline scanners, ordered transforms with their validation, extension text, the
     diagnostic channel), the first-party plugins (text transforms, semantic fences, source
     decorations, frontmatter, soft breaks, source lines, heading links), the heading
@@ -869,7 +869,7 @@ The remaining primitives:
     as upstream finds them in the DOM.
     - Carried to M11: `useChatKeyboard`'s virtual-keyboard lift (the touch layer's keyboard
       clearance).
-  - Stage 6 (done): the composer. The editing engine (`astryx_primitives::editing`) gained
+  - Stage 6 (done): the composer. The editing engine (`rustryx_primitives::editing`) gained
     inline objects: each token is one U+FFFC in the buffer with its id beside the text,
     atomic to the caret, deletion, IME and undo, drawn as an inline box of its measured
     width (lines holding one wrap with a UAX #14 wrapper), and copied as its value. On it:
@@ -902,7 +902,7 @@ The remaining primitives:
   - Upstream: `motion/` (the animator, roles, timing, reduced-motion plans, animated
     layout), `animator/`, `gestures/`, `dragToSnapPoints/`, `keyboard/`, `Swipe/`,
     `BottomSheet/`'s gestures and stack, and the hooks over them; the motion math
-    (`astryx_primitives::motion`), the velocity tracker and a first BottomSheet came earlier.
+    (`rustryx_primitives::motion`), the velocity tracker and a first BottomSheet came earlier.
   - Stages, each closed with tests, a gallery check, docs, the gate, a commit and CI:
     1. The motion engine: motion roles and theme timing, reduced-motion plans, curves
        (bezier, linear easing, coast, paging, progress), the animator that drives an
@@ -927,7 +927,7 @@ The remaining primitives:
     6. The keyboard: the mobile keyboard's model, height and layout guide, layers'
        keyboard clearance, `useChatKeyboard`'s lift, the pasted token's touch tap-stop.
     7. Coarse-pointer variants (sheet-backed overlays and selectors) and the close.
-  - Stage 1 (done): the motion engine in `astryx_primitives::motion`, pure Rust on an
+  - Stage 1 (done): the motion engine in `rustryx_primitives::motion`, pure Rust on an
     injectable clock: roles and their values, theme timing and tempo, reduced-motion
     plans, bezier and linear easings, coast, paging, progress, snap-point resolution, the
     UIKit tables the roles read, and the animator engine (springs carrying velocity
@@ -970,7 +970,7 @@ The remaining primitives:
       (`05754b3`, the browser's own context menu opens on the web when the app takes no
       right press) and R23 (`5115fb5`, raw touch listeners: `Window::on_touch_event` sees
       every finger and may claim it from GPUI's recognizer).
-    - `astryx_primitives::gestures`: upstream's arena, Tap, LongPress, Pan, Pinch, Swipe and
+    - `rustryx_primitives::gestures`: upstream's arena, Tap, LongPress, Pan, Pinch, Swipe and
       ScreenEdgePan recognizers, PressTracker, the velocity tracker, wheel segmenter,
       finger scroll, page hold, selection lock, touch-action rules, context requests and
       haptics (`navigator.vibrate` on the web), checked against upstream's gesture tests;
@@ -1001,7 +1001,7 @@ The remaining primitives:
       as snapshots (SideNav's two rail layers, AppShell's held content, a List exit, a
       dragged row's copy); real edge-fade masks (CodeBlock, Carousel, Table, Tokenizer,
       the touch wheel, ChatLayout).
-  - Stage 6 (done): the on-screen keyboard (AST-099): `astryx_primitives::keyboard` (height
+  - Stage 6 (done): the on-screen keyboard (AST-099): `rustryx_primitives::keyboard` (height
     from the visual viewport or the platform's inset, the keyboard model and layout guide,
     the ride, the reveal band, Android's timing), every text field kept clear of it with no
     prop, anchored layers capped above it, BottomSheet's tall sheet riding it, ChatLayout's
@@ -1029,19 +1029,19 @@ The remaining primitives:
   - Fork patch R16 on macOS (`769561f`): an `NSDatePicker` in a popover; DateInput,
     TimeInput and DateTimeInput's `Native` surface opens it.
   - The platform audit: upstream's `isApplePlatform` and `isPrimaryClick` read the
-    platform GPUI reports at run time (`astryx_primitives::platform`), so `mod`
+    platform GPUI reports at run time (`rustryx_primitives::platform`), so `mod`
     shortcuts, Kbd's symbols and the control-click context click follow macOS natively
     and in a Mac browser, and Slider ignores a control-click as upstream does; haptics on
     a Force Touch trackpad; `NSSpellChecker`; `-apple-system` and `system-ui` stacks
     draw in the system font through Core Text; the gallery and the consumer example
     enable `gpui_platform`'s `font-kit` (macOS draws no text without it); the editing
     tests type each platform's keys, and the macOS bindings are tested on any host.
-    Storage (`~/Library/Application Support/astryx`), the coarse-pointer reading (no
+    Storage (`~/Library/Application Support/rustryx`), the coarse-pointer reading (no
     touchscreens) and the keyboard module (no on-screen keyboard) needed no change.
 - **M12 Theme authoring parity:** a Rust `defineTheme` builder with type/radius/motion scale
   expansion (with the motion tempo the animator plays at, carried from M11), OKLCH palette
   engine (`palette/`), HCT generator (`theme/hct.ts`), status-role derivation, contrast,
-  `onDark`/`onLight`, adaptations, per-theme icons. In `astryx_theme::authoring`.
+  `onDark`/`onLight`, adaptations, per-theme icons. In `rustryx_theme::authoring`.
   - Stages, each closed with tests, a gallery check, docs, the gate, a commit and CI:
     1. Color science and scales: `utils/color.ts` and `palette/color.ts` (OKLab, OKLCH,
        gamut), `theme/contrast.ts`, `theme/hct.ts`, `theme/statusColor.ts`;
@@ -1061,7 +1061,7 @@ The remaining primitives:
        icons and icon variants, the theme registry, the motion tempo reaching the
        animator, MediaTheme's `auto` mode, the Theme and MediaTheme docs, a theme
        authoring gallery page, and the close.
-  - Stage 1 (done): `astryx_theme::authoring`: `color` (`utils/color.ts` and
+  - Stage 1 (done): `rustryx_theme::authoring`: `color` (`utils/color.ts` and
     `palette/color.ts`: parsing, sRGB, OKLab, OKLCH, gamut clamping), `contrast`, `hct`
     (upstream's HCT is CIELAB hue and chroma with L* tone, not CAM16), `status_color`,
     `type_scale`, `radius_scale`, `motion_scale`, `motion_knobs`, `theme_motion`,
@@ -1088,7 +1088,7 @@ The remaining primitives:
     (`resolveThemeTokens`) and `to_theme`, which makes a defined theme this crate's typed
     `Theme` the way the export reads upstream's. `DefineThemeInput::from_json` reads a
     definition (behind `json`, whose reader keeps key order, since a later rule wins).
-    `astryx-themes/tests/define_theme.rs` defines all seven shipped themes from their
+    `rustryx-themes/tests/define_theme.rs` defines all seven shipped themes from their
     exported definitions and gets their compiled twins exactly: every token in both
     modes, every component rule in order, both surfaces; a name alone gives core's
     defaults. 462 authoring tests.
@@ -1109,15 +1109,15 @@ The remaining primitives:
       contrast or reduced motion, which apply nowhere until then.
   - M12 done (2026-11-27).
 - **M13 Charts & lab:**
-  - `astryx-charts`: d3-scale and d3-shape essentials; bar, line, area, dot, band,
+  - `rustryx-charts`: d3-scale and d3-shape essentials; bar, line, area, dot, band,
     candlestick, errorBar, referenceLine, heatmap and stream marks.
-  - `astryx-lab`: all 31 lab components. CodeEditor and DiffViewer are built on the engine
+  - `rustryx-lab`: all 31 lab components. CodeEditor and DiffViewer are built on the engine
     plus the tokenizer; MediaPlayer and ThreeD carry risk.
   - Stages, each closed with tests, a gallery check, docs, the gate, a commit and CI:
-    1. `astryx-charts`: the scales and shapes the marks need, Chart and its context,
+    1. `rustryx-charts`: the scales and shapes the marks need, Chart and its context,
        ChartAxis, ChartGrid, ChartLegend, ChartSwatch, ChartTooltip, the colors and
        formatters, and every mark (the GL marks drawn with GPUI paths and quads).
-    2. `astryx-lab` and its small components: Stat, InfoTip, LineClamp,
+    2. `rustryx-lab` and its small components: Stat, InfoTip, LineClamp,
        CircleCheckIndicator, CircularProgress, DialogHeroHeader, SelectableCardGroup,
        ChatReasoning, LogStream, CommentPin, Tour, PageControl, TabBarMoreList.
     3. The navigation and input components: TabBar, NavigationStack, RefreshControl,
@@ -1127,7 +1127,7 @@ The remaining primitives:
        Schedule.
     5. The lab Chart, DiffViewer and CodeEditor, SVGIcon, ThreeD, MediaPlayer (and the
        Lightbox video playback carried from M10), and the close.
-  - Stage 1 (done): `astryx-charts`. The d3 subset (linear and band scales, d3-array's
+  - Stage 1 (done): `rustryx-charts`. The d3 subset (linear and band scales, d3-array's
     ticks, d3-format for tick labels, line and area generators with their curves,
     stacking) checked bit for bit against d3 under Node; `Chart` (one layout pass for
     every series, the measured plot, the pointer layer and its context), ChartAxis
@@ -1157,12 +1157,12 @@ The remaining primitives:
     and GL marks, axis, grid, legend, tooltip, brush, select, zoom, m4 and
     useChartRange), CodeEditor (the editing engine with syntax highlights and unwrapped
     lines), DiffViewer, SVGIcon and WeightedSVGIcon (their icons generated from
-    upstream), a fix for astryx-i18n's Portuguese month-year panic (an ICU4X data defect),
+    upstream), a fix for rustryx-i18n's Portuguese month-year panic (an ICU4X data defect),
     ChatMessageList's label and in-flow layer dismissal for Comments.
   - Stage 5, part two (done): ThreeD (ThreeDChart, ThreeDBar, ThreeDScatter,
     ThreeDScatterGL, ThreeDSurface, with V8's fdlibm trig and sort so the projection
     matches upstream bit for bit), and MediaPlayer (VideoPlayer, AudioPlayer, the root and
-    every control part) on a media engine in `astryx_primitives::media`: Media Foundation
+    every control part) on a media engine in `rustryx_primitives::media`: Media Foundation
     on Windows, AVFoundation on macOS, the browser's media elements on the web, none yet
     on Linux. Lightbox plays video in place, `hasAutoPlay` included (carried from M10).
   - M13 done (2026-11-27): core 110/110, charts 6/6, lab 47/47.
@@ -1233,7 +1233,7 @@ The remaining primitives:
   (`cargo xtask codegen`), 30 locales behind the facade's default `locales` feature.
 - **Agent tooling is part of the port (M1.5).**
   - `CLAUDE.md`;
-  - the `astryx` CLI (`apps/cli`), with upstream docs, the Rust API, tokens and parity;
+  - the `rustryx` CLI (`apps/cli`), with upstream docs, the Rust API, tokens and parity;
   - `cargo xtask gpui-src`;
   - hot reload through `cargo xtask dev`.
   The goal is fast, accurate agentic iteration.

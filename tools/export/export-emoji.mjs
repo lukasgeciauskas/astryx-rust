@@ -2,7 +2,7 @@
 // generated packages/lab/src/EmojiPicker/emojiData.ts (emojibase-data, built from Unicode
 // CLDR): every CLDR group but the component group, in CLDR order, each emoji as
 // [character, CLDR name, keywords joined by spaces]. `cargo xtask codegen` turns it into
-// crates/astryx-lab/src/emoji_picker/generated/emoji_data.rs.
+// crates/rustryx-lab/src/emoji_picker/generated/emoji_data.rs.
 //
 //   node tools/export/export-emoji.mjs [path/to/Astryx]   (also run by export-all.mjs)
 

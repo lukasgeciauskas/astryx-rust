@@ -13,12 +13,12 @@ _Last updated: 2026-11-27, after M13 (Charts & lab)._
   support (a first-class platform), M12 and M13. Details and dates are in
   [`PLAN.md`](PLAN.md); each milestone's notes list what was pulled forward,
   invented or carried.
-- **Parity:** core 110/110, charts 6/6, lab 47/47 (`cargo run -q -p astryx-cli -- parity`,
+- **Parity:** core 110/110, charts 6/6, lab 47/47 (`cargo run -q -p rustryx-cli -- parity`,
   which counts each package).
-- **Last commits on `main`:** M13's stages: `astryx-charts` (the d3 subset, `Chart` and its
-  chrome, every mark including the WebGL ones) and `astryx-lab` (all 47 lab components,
+- **Last commits on `main`:** M13's stages: `rustryx-charts` (the d3 subset, `Chart` and its
+  chrome, every mark including the WebGL ones) and `rustryx-lab` (all 47 lab components,
   with the Core parity they exposed and a native media engine in
-  `astryx_primitives::media`). CI runs on
+  `rustryx_primitives::media`). CI runs on
   ubuntu, windows, macos and wasm for each push; check it with `gh run list`.
 - **GPUI:** the owner's public fork, https://github.com/lukasgeciauskas/zed,
   branch `astryx`, cloned at `../zed-astryx`. The workspace pins rev
@@ -26,7 +26,7 @@ _Last updated: 2026-11-27, after M13 (Charts & lab)._
   R16's macOS picker; see
   [`gpui-fork.md`](gpui-fork.md)). The `[patch.crates-io]` block in
   `Cargo.toml` (async-task, calloop) is legitimate and stays.
-- **Repository:** https://github.com/lukasgeciauskas/astryx-rust, public (made public for
+- **Repository:** https://github.com/lukasgeciauskas/rustryx, public (made public for
   unlimited Actions minutes).
   Upstream Astryx (the specification) is at `../Astryx`.
 
@@ -56,7 +56,7 @@ _Last updated: 2026-11-27, after M13 (Charts & lab)._
 - **Privacy.** The owner's email never goes to an outside service.
 - **Publish the gallery after each milestone.** Once a milestone is closed and its CI is
   green, run `cargo xtask deploy --scope lamit`: it builds the browser gallery in release
-  and publishes it to https://astryx-gallery.vercel.app (the `astryx-gallery` project of
+  and publishes it to https://rustryx-gallery.vercel.app (the `rustryx-gallery` project of
   the "lamit" Vercel team) through the logged-in Vercel CLI.
 - **Commits.** Each stage: run the gate, then commit and push to `main` with the
   global git identity. Messages end with the attribution lines the session
@@ -65,20 +65,20 @@ _Last updated: 2026-11-27, after M13 (Charts & lab)._
 
 ## Workflow per stage
 
-1. `cargo run -q -p astryx-cli -- component <Name> --dense` for the props, then
+1. `cargo run -q -p rustryx-cli -- component <Name> --dense` for the props, then
    read `../Astryx/packages/core/src/<Name>/` and
    `../Astryx/docs/specs/components/<Name>/<Name>.spec.md`. Number the tests after
    the FR items.
-2. Implement in `crates/astryx-components/src/<module>/`, with every prop mapped
+2. Implement in `crates/rustryx-components/src/<module>/`, with every prop mapped
    in a `ComponentDoc` (`doc.rs` registry) and a gallery example in
    `examples.rs`.
 3. Tests: `#[gpui::test]` with a host view; see the patterns in
    `overlay/menu_tests.rs`, `overlay/lightbox_tests.rs` and
    `overlay/palette_tests.rs`.
 4. Look at it: temporarily default an example open (mark the line
-   `// TEMP-SCREENSHOT`), `cargo build -p astryx-gallery`, then
+   `// TEMP-SCREENSHOT`), `cargo build -p rustryx-gallery`, then
    `$env:GALLERY_PAGE='overlays'; $env:GALLERY_SCROLL='400'; powershell -File
-   tools/capture-window.ps1 -Exe target/debug/astryx-gallery.exe -Out <png>
+   tools/capture-window.ps1 -Exe target/debug/rustryx-gallery.exe -Out <png>
    -WaitSeconds 20`, read the PNG, and revert (grep `TEMP-SCREENSHOT` must find
    nothing).
 5. Update `PLAN.md` (the milestone's notes), `KNOWN_ISSUES.md` and this file.
@@ -87,7 +87,7 @@ _Last updated: 2026-11-27, after M13 (Charts & lab)._
    - `cargo clippy --workspace --all-targets -- -D warnings`
    - `cargo test --workspace`
    - `cargo xtask codegen --check`
-   - `cargo build -p astryx-gallery --target wasm32-unknown-unknown`
+   - `cargo build -p rustryx-gallery --target wasm32-unknown-unknown`
    - `cargo fmt --all -- --check`
 7. Commit, push, and watch CI: `gh run list --limit 3`, `gh run watch <id>`.
 
@@ -95,7 +95,7 @@ _Last updated: 2026-11-27, after M13 (Charts & lab)._
 
 GPUI facts are in [`guide/gpui.md`](guide/gpui.md) and this layer's patterns in
 [`guide/conventions.md`](guide/conventions.md) (both also print with
-`astryx docs gpui` / `astryx docs conventions`). The ones that cost the most
+`rustryx docs gpui` / `rustryx docs conventions`). The ones that cost the most
 time:
 
 - **Keyed state is scoped to where `render` runs.** A component that makes
@@ -116,7 +116,7 @@ time:
   `python <file> .`. Re-read code after `cargo fmt` before matching text in it.
 - **Tests:** an element needs `.debug_selector(..)` for `cx.debug_bounds`; menu
   rows carry `<list id>-<row key>`, palette rows `command-palette-item-<id>`.
-  Read announcements with `astryx_primitives::announce::announcement(..)`.
+  Read announcements with `rustryx_primitives::announce::announcement(..)`.
   Background `spawn` needs `Send`; items holding an `Rc` use `cx.spawn`.
 
 ## Lessons from M6
@@ -220,7 +220,7 @@ time:
   `String(n)`): Rust's formatting rounds ties and picks digits differently, and a token
   value must be upstream's string.
 - **Key order matters for rules.** A later component rule wins, so definitions are
-  exported in upstream's key order and `astryx-theme`'s JSON reader keeps it
+  exported in upstream's key order and `rustryx-theme`'s JSON reader keeps it
   (`serde_json/preserve_order`).
 
 ## Lessons from M13
@@ -233,7 +233,7 @@ time:
 - **Check computations against upstream's own code under Node.** Helpers bundled
   upstream's TypeScript with the esbuild in `../Astryx` and compared hundreds to
   hundreds of thousands of cases bit for bit (d3, layouts, projections, formatters).
-  JavaScript details matter: V8's fdlibm `Math.sin`/`cos` (`crates/astryx-lab/src/trig.rs`),
+  JavaScript details matter: V8's fdlibm `Math.sin`/`cos` (`crates/rustryx-lab/src/trig.rs`),
   V8's sort with NaN comparisons, `-0`, `Math.min`/`max` with NaN.
 - **Large data is generated, never copied:** the emoji set and the SVG icons come from
   upstream through `tools/export` and `cargo xtask codegen` like the tokens.
@@ -242,11 +242,11 @@ time:
 
 ## Next: M14 Rich text
 
-M13 (Charts & lab) is done: `astryx-charts` ports `@astryxdesign/charts` and
-`astryx-lab` all 47 lab components, with a native media engine (Media Foundation,
+M13 (Charts & lab) is done: `rustryx-charts` ports `@astryxdesign/charts` and
+`rustryx-lab` all 47 lab components, with a native media engine (Media Foundation,
 AVFoundation, the browser's media elements) for MediaPlayer and Lightbox video. M14 builds
 the rich-text package (`../Astryx/packages/richtext`: RichTextEditor, its toolbar and
 auto-link plugin, RichTextView) on the editing engine: a document model, the editor, the
 toolbar, and a lossless Markdown round trip (`AST-062`, `AST-064`, `AST-106`). The CLI
-already lists the richtext entries (`astryx component RichTextEditor --package richtext`);
-add a `richtext` package count to `astryx parity` with the crate.
+already lists the richtext entries (`rustryx component RichTextEditor --package richtext`);
+add a `richtext` package count to `rustryx parity` with the crate.

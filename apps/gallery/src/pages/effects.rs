@@ -1,4 +1,4 @@
-//! Effects that GPUI lacks upstream and our fork or `astryx-effects` adds.
+//! Effects that GPUI lacks upstream and our fork or `rustryx-effects` adds.
 //! The visual check for each: every kind of primitive (fills, borders,
 //! corner radii, shadows, text, icons, clipping) under the effect.
 //!
@@ -7,17 +7,17 @@
 
 use std::time::Duration;
 
-use astryx::effects::{
-    FadeEdge, GradientDirection, Pointing, StopPosition, edge_fade, gradient, polygon, stop,
-    triangle,
-};
-use astryx::icons::core_icon_path;
-use astryx::prelude::*;
-use astryx::theme::{ResolvedTheme, Tokens};
 use gpui::{
     Animation, AnimationExt as _, AnyElement, App, Div, Window, div, ease_in_out, point,
     prelude::*, px, relative, svg,
 };
+use rustryx::effects::{
+    FadeEdge, GradientDirection, Pointing, StopPosition, edge_fade, gradient, polygon, stop,
+    triangle,
+};
+use rustryx::icons::core_icon_path;
+use rustryx::prelude::*;
+use rustryx::theme::{ResolvedTheme, Tokens};
 
 use crate::gallery::section;
 
@@ -128,7 +128,7 @@ pub fn render(theme: &ResolvedTheme, _window: &mut Window, _cx: &mut App) -> Any
         .into_any_element()
 }
 
-/// Multi-stop gradients with length stops (astryx-effects).
+/// Multi-stop gradients with length stops (rustryx-effects).
 fn gradients(t: &Tokens) -> Div {
     let accent = t.color.accent;
     let band = |direction| {

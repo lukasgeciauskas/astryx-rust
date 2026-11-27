@@ -14,13 +14,13 @@
     `window.use_keyed_state`.
   - Text fields (TextInput, TextArea, NumberInput) stay controlled by `value`, as
     upstream. Their editing state (caret, selection, undo, IME) lives in a keyed
-    `astryx_primitives::editing::TextEditState` that follows `value` every render.
+    `rustryx_primitives::editing::TextEditState` that follows `value` every render.
   - Heavy editors (Table, Calendar, CodeEditor) use an app-owned `Entity<XState>` plus
     `X::new(&state)`.
-- **Context:** `astryx_primitives::provide(value, child)` / `use_context::<T>(cx)`.
+- **Context:** `rustryx_primitives::provide(value, child)` / `use_context::<T>(cx)`.
   - Read context during render only.
   - Size cascade: `resolve_size(explicit, default, cx)`.
-- **Tokens:** `let theme = astryx_theme::current(window, cx); let t = theme.tokens();`.
+- **Tokens:** `let theme = rustryx_theme::current(window, cx); let t = theme.tokens();`.
   Never hard-code a color, length or font that a token provides.
 - **Theme overrides:**
   - Name each part's theming target as upstream does (`button`, `segmented-control-item`).
@@ -48,7 +48,7 @@
   `aria_invalid` and `aria_busy` (fork patch R6) and `aria_current` (R9) on the element
   that carries the role.
 - **Anchored layers** (tooltips, popovers, menu flyouts): wrap the trigger in
-  `astryx_primitives::anchored_layer(id, trigger)` and give it `.surface(content,
+  `rustryx_primitives::anchored_layer(id, trigger)` and give it `.surface(content,
   LayerOptions { placement, align, offset, margin, rtl, .. }, on_dismiss)`. The layer is
   layout-transparent, measures the surface, places it with `position_layer` (flip to the
   other side, then slide into the viewport, mirrored in RTL), paints it deferred and joins
@@ -125,14 +125,14 @@
   - the disabled and busy guards: focusable, but inert.
 
 - **The port's own strings** (text for what upstream leaves to the browser, such as a
-  text field's context menu) live in `astryx-i18n/src/local.rs`, English only, as the
+  text field's context menu) live in `rustryx-i18n/src/local.rs`, English only, as the
   catalog's last fallback. Use the `@astryx.<area>.<name>` key style; a test fails if
   upstream ever ships the same key.
 
 ## Code
 
-- Generated files (`*/generated/*`, `spec/`, `crates/astryx-icons/assets`,
-  `crates/astryx-themes/fonts`) are never edited by hand. Change the exporter or the
+- Generated files (`*/generated/*`, `spec/`, `crates/rustryx-icons/assets`,
+  `crates/rustryx-themes/fonts`) are never edited by hand. Change the exporter or the
   codegen and regenerate.
 - Comments explain why, not what. Public items get a one-line doc comment naming the
   upstream prop or concept they map to.

@@ -1,0 +1,27 @@
+[package]
+name = "rustryx-theme"
+description = "Rustryx design tokens and themes for GPUI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+# Load themes from their typed JSON at run time (live theme reload).
+json = ["dep:serde_json"]
+
+[dependencies]
+anyhow.workspace = true
+# preserve_order: a theme definition's component rules keep their order (a later
+# rule wins), as they do in upstream's objects.
+serde_json = { workspace = true, optional = true, features = ["preserve_order"] }
+rustryx-primitives.workspace = true
+gpui.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+# The system's text size (`UISettings::TextScaleFactor`), which Dynamic Type follows.
+windows = { workspace = true, features = ["UI_ViewManagement"] }
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }

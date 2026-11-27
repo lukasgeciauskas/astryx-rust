@@ -1,0 +1,15 @@
+[package]
+name = "rustryx-effects"
+description = "CSS effects GPUI lacks, drawn with its existing paint APIs: multi-stop gradients, edge fades and shapes"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+gpui.workspace = true
+smallvec = "1"
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }

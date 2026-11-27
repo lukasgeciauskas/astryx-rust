@@ -33,7 +33,7 @@ as a pull request; otherwise keep carrying it.
 2. `node tools/export/export-all.mjs ../Astryx`, then `cargo xtask codegen`
    (see [`../UPSTREAM.md`](../UPSTREAM.md); record the synced commit there).
 3. Review what changed:
-   - `cargo run -q -p astryx-cli -- parity` for new components;
+   - `cargo run -q -p rustryx-cli -- parity` for new components;
    - `git diff spec/` for token, theme, locale and manifest changes;
    - `git -C ../Astryx log --stat <last synced>..HEAD -- docs/specs` for spec
      changes to existing components; port each changed FR item with its test.
@@ -45,11 +45,11 @@ cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo xtask codegen --check
-cargo build -p astryx-gallery --target wasm32-unknown-unknown
+cargo build -p rustryx-gallery --target wasm32-unknown-unknown
 cargo fmt --all -- --check
 ```
 
-Then look over the gallery (`cargo run -p astryx-gallery`, and `cargo xtask
+Then look over the gallery (`cargo run -p rustryx-gallery`, and `cargo xtask
 web` for the browser) in light and dark.
 
 ## 5. Release

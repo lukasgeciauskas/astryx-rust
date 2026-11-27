@@ -15,7 +15,7 @@ from another version may not exist here.
 - **Component (stateless):** `#[derive(IntoElement)] struct C { .. }` +
   `impl RenderOnce for C { fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement }`.
   `render` runs during the parent's `request_layout`, which is why
-  `astryx_primitives::use_context` works inside it.
+  `rustryx_primitives::use_context` works inside it.
 - **Custom element:** `impl Element for E`. Do not also `impl IntoElement`; GPUI has
   a blanket impl for every `Element`.
 - **Uncontrolled state in a component:** `window.use_keyed_state(id, cx, |window, cx| init)`
@@ -93,7 +93,7 @@ from another version may not exist here.
   `fit_content()`, `min_content()`, `max_content()` wherever a `Length` goes. A custom
   measured element can report its first baseline with `window.set_layout_baseline(id, y)`.
 - Overlays: `deferred(anchored().position(point).child(..))` draws above later siblings.
-  Astryx wraps this in `astryx_primitives::layer` and `anchored_layer` (see
+  Astryx wraps this in `rustryx_primitives::layer` and `anchored_layer` (see
   conventions).
 - Active descendants: GPUI's `aria_active_descendant()` works only under the focused
   element, and a deferred layer paints at the accessibility root. Our fork's
@@ -118,7 +118,7 @@ from another version may not exist here.
 
 ## Running and testing
 
-- App: `gpui_platform::application().with_assets(astryx::Assets::new()).run(|cx| ..)`;
+- App: `gpui_platform::application().with_assets(rustryx::Assets::new()).run(|cx| ..)`;
   on the web, call `gpui_platform::web_init()` first inside `#[wasm_bindgen(start)]`.
 - Tests: `#[gpui::test] fn t(cx: &mut TestAppContext)`, with
   `gpui = { workspace = true, features = ["test-support"] }` in dev-dependencies.
@@ -127,8 +127,8 @@ from another version may not exist here.
     `cx.simulate_click(point(px(10.), px(10.)), Modifiers::none())`,
     `view.read_with(cx, |v, _| ..)`.
   - Elements: `cx.add_empty_window().draw(origin, space, |window, cx| element)`.
-  - Working examples: `crates/astryx-primitives/src/tests.rs`,
-    `crates/astryx-theme/src/tests.rs`.
+  - Working examples: `crates/rustryx-primitives/src/tests.rs`,
+    `crates/rustryx-theme/src/tests.rs`.
   - Layout: give an element `.debug_selector(|| "name".into())` (a no-op in release, so
     components may carry them) and read `cx.debug_bounds("name")`. Astryx's text
     controls carry `<id>-control`, menu rows `<list id>-<row key>` (a DropdownMenu
@@ -141,8 +141,8 @@ from another version may not exist here.
   - Pointer: `simulate_mouse_down`, `simulate_mouse_move(point, button, mods)` and
     `simulate_mouse_up` drive drags and press-and-release gestures; a moved pointer
     updates hover, a down or up alone does not.
-  - Announcements: render `astryx_primitives::announcer()` in the host, then read
-    `astryx_primitives::announce::announcement(Politeness::Polite, window, cx)`.
+  - Announcements: render `rustryx_primitives::announcer()` in the host, then read
+    `rustryx_primitives::announce::announcement(Politeness::Polite, window, cx)`.
   - Text input: `cx.simulate_input("abc")`; file dialogs:
     `cx.simulate_path_prompt_response(|_| Some(paths))`; OS file drops:
     `cx.simulate_event(FileDropEvent::Entered { position, paths })`, then `Pending` and

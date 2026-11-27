@@ -1,6 +1,6 @@
 [package]
-name = "astryx-gallery"
-description = "Storybook-style gallery for the Astryx GPUI components"
+name = "rustryx-gallery"
+description = "Storybook-style gallery for the Rustryx GPUI components"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,7 +8,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [[bin]]
-name = "astryx-gallery"
+name = "rustryx-gallery"
 path = "src/main.rs"
 
 [features]
@@ -17,7 +17,7 @@ hot-reload = ["gpui/hot-reload", "dep:backtrace"]
 
 [dependencies]
 anyhow.workspace = true
-astryx = { workspace = true, features = ["json-themes", "charts", "lab"] }
+rustryx = { workspace = true, features = ["json-themes", "charts", "lab"] }
 gpui.workspace = true
 
 [dev-dependencies]

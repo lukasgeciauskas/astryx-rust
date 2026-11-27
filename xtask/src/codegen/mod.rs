@@ -1,18 +1,18 @@
 //! `cargo xtask codegen [--check]`: generates Rust sources from `spec/`.
 //!
-//! - `crates/astryx-theme/src/generated/tokens.rs`: the typed token surface.
-//! - `crates/astryx-theme/src/generated/default_theme.rs`: core's defaults.
-//! - `crates/astryx-theme/src/generated/token_defaults.rs`: every token's default as
+//! - `crates/rustryx-theme/src/generated/tokens.rs`: the typed token surface.
+//! - `crates/rustryx-theme/src/generated/default_theme.rs`: core's defaults.
+//! - `crates/rustryx-theme/src/generated/token_defaults.rs`: every token's default as
 //!   upstream's `tokenDefaults` writes it, for theme authoring.
-//! - `crates/astryx-themes/src/generated/*.rs`: one module per theme.
-//! - `crates/astryx-icons/src/generated.rs`: the embedded icon files.
-//! - `crates/astryx-i18n/src/generated/catalogs.rs`: message catalogs.
-//! - `crates/astryx-i18n/src/generated/cldr.rs`: CLDR tables for dates.
-//! - `crates/astryx-syntax/src/generated/`: CodeBlock's grammars and the syntax presets.
-//! - `crates/astryx-markdown/src/generated/`: Markdown's named character references.
-//! - `crates/astryx-lab/src/emoji_picker/generated/emoji_data.rs`: EmojiPicker's bundled
+//! - `crates/rustryx-themes/src/generated/*.rs`: one module per theme.
+//! - `crates/rustryx-icons/src/generated.rs`: the embedded icon files.
+//! - `crates/rustryx-i18n/src/generated/catalogs.rs`: message catalogs.
+//! - `crates/rustryx-i18n/src/generated/cldr.rs`: CLDR tables for dates.
+//! - `crates/rustryx-syntax/src/generated/`: CodeBlock's grammars and the syntax presets.
+//! - `crates/rustryx-markdown/src/generated/`: Markdown's named character references.
+//! - `crates/rustryx-lab/src/emoji_picker/generated/emoji_data.rs`: EmojiPicker's bundled
 //!   emoji set.
-//! - `crates/astryx-lab/src/svg_icon/generated/icons.rs`: SVGIcon's and WeightedSVGIcon's
+//! - `crates/rustryx-lab/src/svg_icon/generated/icons.rs`: SVGIcon's and WeightedSVGIcon's
 //!   starter icons.
 //! - `docs/theme-overrides-todo.md`: overrides that need a hand port.
 //!
@@ -103,7 +103,7 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
 
     let mut files = Vec::new();
     files.push((
-        PathBuf::from("crates/astryx-theme/src/generated/tokens.rs"),
+        PathBuf::from("crates/rustryx-theme/src/generated/tokens.rs"),
         rustfmt(&format!(
             "{HEADER}use crate::generated_prelude::*;\n\n{}",
             tokens::render_types(&surface)?
@@ -120,11 +120,11 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
         ));
     }
     files.push((
-        PathBuf::from("crates/astryx-theme/src/generated/default_theme.rs"),
+        PathBuf::from("crates/rustryx-theme/src/generated/default_theme.rs"),
         rustfmt(&default_module)?,
     ));
     files.push((
-        PathBuf::from("crates/astryx-theme/src/generated/token_defaults.rs"),
+        PathBuf::from("crates/rustryx-theme/src/generated/token_defaults.rs"),
         rustfmt(&render_token_defaults(&spec)?)?,
     ));
 
@@ -136,9 +136,9 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
             .with_context(|| format!("theme {name}"))?;
         todo.insert(name.clone(), output.todo);
         files.push((
-            PathBuf::from(format!("crates/astryx-themes/src/generated/{name}.rs")),
+            PathBuf::from(format!("crates/rustryx-themes/src/generated/{name}.rs")),
             rustfmt(&format!(
-                "{HEADER}use astryx_theme::generated_prelude::*;\n\n{}",
+                "{HEADER}use rustryx_theme::generated_prelude::*;\n\n{}",
                 output.module
             ))?,
         ));
@@ -146,7 +146,7 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
             "#[cfg(feature = \"{name}\")]\n#[rustfmt::skip]\npub mod {name};\n"
         ));
     }
-    mod_rs.push_str("\n/// Every theme compiled in through cargo features.\npub fn all() -> Vec<astryx_theme::Theme> {\n    vec![\n");
+    mod_rs.push_str("\n/// Every theme compiled in through cargo features.\npub fn all() -> Vec<rustryx_theme::Theme> {\n    vec![\n");
     for name in themes.keys() {
         mod_rs.push_str(&format!(
             "        #[cfg(feature = \"{name}\")]\n        {name}::theme(),\n"
@@ -154,35 +154,35 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
     }
     mod_rs.push_str("    ]\n}\n");
     files.push((
-        PathBuf::from("crates/astryx-themes/src/generated/mod.rs"),
+        PathBuf::from("crates/rustryx-themes/src/generated/mod.rs"),
         rustfmt(&mod_rs)?,
     ));
 
     files.push((
-        PathBuf::from("crates/astryx-icons/src/generated.rs"),
+        PathBuf::from("crates/rustryx-icons/src/generated.rs"),
         rustfmt(&render_icons(root, &icons)?)?,
     ));
     files.push((
-        PathBuf::from("crates/astryx-i18n/src/generated/catalogs.rs"),
+        PathBuf::from("crates/rustryx-i18n/src/generated/catalogs.rs"),
         rustfmt(&locales::render(&spec)?)?,
     ));
     files.push((
-        PathBuf::from("crates/astryx-i18n/src/generated/cldr.rs"),
+        PathBuf::from("crates/rustryx-i18n/src/generated/cldr.rs"),
         rustfmt(&cldr::render(&spec)?)?,
     ));
     let languages = read_json(&spec.join("code/languages.json"))?;
     files.push((
-        PathBuf::from("crates/astryx-syntax/src/generated/languages.rs"),
+        PathBuf::from("crates/rustryx-syntax/src/generated/languages.rs"),
         rustfmt(&format!("{HEADER}{}", code::render_languages(&languages)?))?,
     ));
     let presets = read_json(&spec.join("code/syntax-themes.json"))?;
     files.push((
-        PathBuf::from("crates/astryx-syntax/src/generated/presets.rs"),
+        PathBuf::from("crates/rustryx-syntax/src/generated/presets.rs"),
         rustfmt(&format!("{HEADER}{}", code::render_presets(&presets)?))?,
     ));
     let references = read_json(&spec.join("markdown/character-references.json"))?;
     files.push((
-        PathBuf::from("crates/astryx-markdown/src/generated/character_references.rs"),
+        PathBuf::from("crates/rustryx-markdown/src/generated/character_references.rs"),
         rustfmt(&format!(
             "{HEADER}{}",
             markdown::render_references(&references)?
@@ -190,12 +190,12 @@ fn generate(root: &Path) -> Result<Vec<(PathBuf, String)>> {
     ));
     let emoji = read_json(&spec.join("emoji.json"))?;
     files.push((
-        PathBuf::from("crates/astryx-lab/src/emoji_picker/generated/emoji_data.rs"),
+        PathBuf::from("crates/rustryx-lab/src/emoji_picker/generated/emoji_data.rs"),
         rustfmt(&format!("{HEADER}{}", emoji::render(&emoji)?))?,
     ));
     let svg_icons = read_json(&spec.join("svg-icons.json"))?;
     files.push((
-        PathBuf::from("crates/astryx-lab/src/svg_icon/generated/icons.rs"),
+        PathBuf::from("crates/rustryx-lab/src/svg_icon/generated/icons.rs"),
         rustfmt(&format!("{HEADER}{}", svg_icons::render(&svg_icons)?))?,
     ));
     files.push((
@@ -221,7 +221,7 @@ fn render_icons(root: &Path, icons: &Value) -> Result<String> {
     out.push_str("];\n\n/// Every embedded icon file, by asset path.\npub const FILES: &[(&str, &[u8])] = &[\n");
     let mut files = Vec::new();
     for set in ["core", "lucide"] {
-        let dir = root.join("crates/astryx-icons/assets").join(set);
+        let dir = root.join("crates/rustryx-icons/assets").join(set);
         for entry in fs::read_dir(&dir).with_context(|| format!("reading {}", dir.display()))? {
             let file = entry?.file_name().to_string_lossy().to_string();
             if file.ends_with(".svg") {

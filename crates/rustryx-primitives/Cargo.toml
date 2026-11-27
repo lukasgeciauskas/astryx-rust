@@ -1,0 +1,40 @@
+[package]
+name = "rustryx-primitives"
+description = "Headless behavior primitives for Rustryx on GPUI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+accesskit.workspace = true
+gpui.workspace = true
+icu_normalizer.workspace = true
+web-time.workspace = true
+unicode-segmentation.workspace = true
+unicode-linebreak.workspace = true
+spellbook.workspace = true
+serde_json.workspace = true
+image.workspace = true
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+web-sys = { version = "0.3", features = ["Window", "Storage", "Navigator", "MediaQueryList", "VisualViewport", "Document", "Element", "HtmlElement", "Node", "CssStyleDeclaration", "ScrollIntoViewOptions", "ScrollLogicalPosition", "ScrollBehavior", "HtmlMediaElement", "HtmlVideoElement", "HtmlAudioElement", "HtmlCanvasElement", "CanvasRenderingContext2d", "ImageData", "TimeRanges", "MediaError", "Event", "EventTarget"] }
+# navigator.vibrate's pattern array (haptics on the web).
+wasm-bindgen.workspace = true
+js-sys = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+windows.workspace = true
+windows-core.workspace = true
+
+# NSSpellChecker and NSHapticFeedbackManager.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2.workspace = true
+objc2-app-kit.workspace = true
+objc2-foundation.workspace = true
+objc2-core-foundation.workspace = true
+objc2-core-video.workspace = true
+
+[dev-dependencies]
+gpui = { workspace = true, features = ["test-support"] }

@@ -1,5 +1,5 @@
 //! CodeBlock's grammars and the syntax theme presets, from `spec/code/`, into
-//! `crates/astryx-syntax/src/generated/`. Each rule's JS regex is translated into the
+//! `crates/rustryx-syntax/src/generated/`. Each rule's JS regex is translated into the
 //! `fancy-regex` dialect: flags become an inline group, and the ASCII meanings JS gives
 //! `\w` and `\d` are spelled out (Rust's are Unicode). `\b` stays Unicode:
 //! `fancy-regex` has no ASCII boundary, so it differs from JS only beside a non-ASCII letter.

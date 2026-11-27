@@ -265,239 +265,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "astryx"
-version = "0.1.0"
-dependencies = [
- "astryx-charts",
- "astryx-components",
- "astryx-effects",
- "astryx-i18n",
- "astryx-icons",
- "astryx-lab",
- "astryx-markdown",
- "astryx-primitives",
- "astryx-syntax",
- "astryx-theme",
- "astryx-themes",
- "gpui",
-]
-
-[[package]]
-name = "astryx-charts"
-version = "0.1.0"
-dependencies = [
- "astryx-components",
- "astryx-effects",
- "astryx-i18n",
- "astryx-icons",
- "astryx-primitives",
- "astryx-theme",
- "astryx-themes",
- "gpui",
- "icu_calendar",
- "icu_datetime",
- "icu_decimal",
- "icu_experimental",
- "icu_list",
- "icu_locale",
- "jiff",
- "unicode-segmentation",
- "web-time",
- "writeable",
-]
-
-[[package]]
-name = "astryx-cli"
-version = "0.1.0"
-dependencies = [
- "astryx-charts",
- "astryx-components",
- "astryx-lab",
- "astryx-theme",
- "astryx-themes",
- "serde_json",
-]
-
-[[package]]
-name = "astryx-components"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "astryx-effects",
- "astryx-i18n",
- "astryx-icons",
- "astryx-markdown",
- "astryx-primitives",
- "astryx-syntax",
- "astryx-theme",
- "astryx-themes",
- "fancy-regex",
- "gpui",
- "gpui_web",
- "image",
- "js-sys",
- "serde_json",
- "smallvec",
- "unicode-linebreak",
- "unicode-segmentation",
- "wasm-bindgen",
- "web-sys",
- "web-time",
-]
-
-[[package]]
-name = "astryx-consumer-example"
-version = "0.1.0"
-dependencies = [
- "astryx",
- "gpui",
- "gpui_platform",
-]
-
-[[package]]
-name = "astryx-effects"
-version = "0.1.0"
-dependencies = [
- "gpui",
- "smallvec",
-]
-
-[[package]]
-name = "astryx-gallery"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "astryx",
- "backtrace",
- "gpui",
- "gpui_platform",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "astryx-i18n"
-version = "0.1.0"
-dependencies = [
- "astryx-primitives",
- "gpui",
- "icu_calendar",
- "icu_collator",
- "icu_datetime",
- "icu_decimal",
- "icu_experimental",
- "icu_list",
- "icu_locale",
- "icu_normalizer",
- "icu_plurals",
- "icu_properties",
- "icu_time",
- "jiff",
- "unicode-segmentation",
- "web-time",
- "writeable",
-]
-
-[[package]]
-name = "astryx-icons"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "gpui",
-]
-
-[[package]]
-name = "astryx-lab"
-version = "0.1.0"
-dependencies = [
- "astryx-charts",
- "astryx-components",
- "astryx-i18n",
- "astryx-markdown",
- "astryx-primitives",
- "astryx-syntax",
- "astryx-theme",
- "astryx-themes",
- "fancy-regex",
- "gpui",
- "icu_collator",
- "icu_datetime",
- "icu_decimal",
- "icu_experimental",
- "icu_list",
- "icu_locale",
- "icu_time",
- "jiff",
- "serde_json",
- "web-time",
- "writeable",
-]
-
-[[package]]
-name = "astryx-markdown"
-version = "0.1.0"
-dependencies = [
- "icu_normalizer",
- "regex",
- "serde",
- "serde_json",
- "url",
-]
-
-[[package]]
-name = "astryx-primitives"
-version = "0.1.0"
-dependencies = [
- "accesskit",
- "gpui",
- "icu_normalizer",
- "image",
- "js-sys",
- "objc2 0.6.5",
- "objc2-app-kit 0.3.2",
- "objc2-core-foundation",
- "objc2-core-video",
- "objc2-foundation 0.3.2",
- "serde_json",
- "spellbook",
- "unicode-linebreak",
- "unicode-segmentation",
- "wasm-bindgen",
- "web-sys",
- "web-time",
- "windows 0.62.2",
- "windows-core 0.62.2",
-]
-
-[[package]]
-name = "astryx-syntax"
-version = "0.1.0"
-dependencies = [
- "fancy-regex",
- "serde_json",
-]
-
-[[package]]
-name = "astryx-theme"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "astryx-primitives",
- "gpui",
- "serde_json",
- "windows 0.62.2",
-]
-
-[[package]]
-name = "astryx-themes"
-version = "0.1.0"
-dependencies = [
- "astryx-theme",
- "gpui",
- "serde_json",
-]
-
-[[package]]
 name = "async-broadcast"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5245,6 +5012,239 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "windows-sys",
+]
+
+[[package]]
+name = "rustryx"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "rustryx-charts",
+ "rustryx-components",
+ "rustryx-effects",
+ "rustryx-i18n",
+ "rustryx-icons",
+ "rustryx-lab",
+ "rustryx-markdown",
+ "rustryx-primitives",
+ "rustryx-syntax",
+ "rustryx-theme",
+ "rustryx-themes",
+]
+
+[[package]]
+name = "rustryx-charts"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "icu_calendar",
+ "icu_datetime",
+ "icu_decimal",
+ "icu_experimental",
+ "icu_list",
+ "icu_locale",
+ "jiff",
+ "rustryx-components",
+ "rustryx-effects",
+ "rustryx-i18n",
+ "rustryx-icons",
+ "rustryx-primitives",
+ "rustryx-theme",
+ "rustryx-themes",
+ "unicode-segmentation",
+ "web-time",
+ "writeable",
+]
+
+[[package]]
+name = "rustryx-cli"
+version = "0.1.0"
+dependencies = [
+ "rustryx-charts",
+ "rustryx-components",
+ "rustryx-lab",
+ "rustryx-theme",
+ "rustryx-themes",
+ "serde_json",
+]
+
+[[package]]
+name = "rustryx-components"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fancy-regex",
+ "gpui",
+ "gpui_web",
+ "image",
+ "js-sys",
+ "rustryx-effects",
+ "rustryx-i18n",
+ "rustryx-icons",
+ "rustryx-markdown",
+ "rustryx-primitives",
+ "rustryx-syntax",
+ "rustryx-theme",
+ "rustryx-themes",
+ "serde_json",
+ "smallvec",
+ "unicode-linebreak",
+ "unicode-segmentation",
+ "wasm-bindgen",
+ "web-sys",
+ "web-time",
+]
+
+[[package]]
+name = "rustryx-consumer-example"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui_platform",
+ "rustryx",
+]
+
+[[package]]
+name = "rustryx-effects"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "smallvec",
+]
+
+[[package]]
+name = "rustryx-gallery"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "backtrace",
+ "gpui",
+ "gpui_platform",
+ "rustryx",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
+name = "rustryx-i18n"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "icu_calendar",
+ "icu_collator",
+ "icu_datetime",
+ "icu_decimal",
+ "icu_experimental",
+ "icu_list",
+ "icu_locale",
+ "icu_normalizer",
+ "icu_plurals",
+ "icu_properties",
+ "icu_time",
+ "jiff",
+ "rustryx-primitives",
+ "unicode-segmentation",
+ "web-time",
+ "writeable",
+]
+
+[[package]]
+name = "rustryx-icons"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "gpui",
+]
+
+[[package]]
+name = "rustryx-lab"
+version = "0.1.0"
+dependencies = [
+ "fancy-regex",
+ "gpui",
+ "icu_collator",
+ "icu_datetime",
+ "icu_decimal",
+ "icu_experimental",
+ "icu_list",
+ "icu_locale",
+ "icu_time",
+ "jiff",
+ "rustryx-charts",
+ "rustryx-components",
+ "rustryx-i18n",
+ "rustryx-markdown",
+ "rustryx-primitives",
+ "rustryx-syntax",
+ "rustryx-theme",
+ "rustryx-themes",
+ "serde_json",
+ "web-time",
+ "writeable",
+]
+
+[[package]]
+name = "rustryx-markdown"
+version = "0.1.0"
+dependencies = [
+ "icu_normalizer",
+ "regex",
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
+name = "rustryx-primitives"
+version = "0.1.0"
+dependencies = [
+ "accesskit",
+ "gpui",
+ "icu_normalizer",
+ "image",
+ "js-sys",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "objc2-core-foundation",
+ "objc2-core-video",
+ "objc2-foundation 0.3.2",
+ "serde_json",
+ "spellbook",
+ "unicode-linebreak",
+ "unicode-segmentation",
+ "wasm-bindgen",
+ "web-sys",
+ "web-time",
+ "windows 0.62.2",
+ "windows-core 0.62.2",
+]
+
+[[package]]
+name = "rustryx-syntax"
+version = "0.1.0"
+dependencies = [
+ "fancy-regex",
+ "serde_json",
+]
+
+[[package]]
+name = "rustryx-theme"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "gpui",
+ "rustryx-primitives",
+ "serde_json",
+ "windows 0.62.2",
+]
+
+[[package]]
+name = "rustryx-themes"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "rustryx-theme",
+ "serde_json",
 ]
 
 [[package]]

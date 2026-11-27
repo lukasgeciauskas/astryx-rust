@@ -1,10 +1,10 @@
-//! The `astryx` commands. Each returns `Err(message)` on a usage or parity
+//! The `rustryx` commands. Each returns `Err(message)` on a usage or parity
 //! failure.
 
 use std::collections::BTreeMap;
 
-use astryx_components::doc::{self, ComponentDoc, RustApi};
-use astryx_theme::{Appearance, Theme, Tokens};
+use rustryx_components::doc::{self, ComponentDoc, RustApi};
+use rustryx_theme::{Appearance, Theme, Tokens};
 use serde_json::Value;
 
 use crate::manifest::{self, Entry};
@@ -15,8 +15,8 @@ type Result = std::result::Result<(), String>;
 fn registries() -> [(&'static str, &'static [ComponentDoc]); 3] {
     [
         ("core", doc::REGISTRY),
-        ("charts", astryx_charts::doc::REGISTRY),
-        ("lab", astryx_lab::doc::REGISTRY),
+        ("charts", rustryx_charts::doc::REGISTRY),
+        ("lab", rustryx_lab::doc::REGISTRY),
     ]
 }
 
@@ -67,7 +67,7 @@ pub fn component_list(all: bool) -> Result {
         total += names.len();
         println!("{group}: {}", names.join(", "));
     }
-    println!("\n{total} listed; * = ported. `astryx component <Name>` for details.");
+    println!("\n{total} listed; * = ported. `rustryx component <Name>` for details.");
     Ok(())
 }
 
@@ -104,7 +104,7 @@ pub fn component(name: &str, dense: bool, package: Option<&str>) -> Result {
             .take(8)
             .collect();
         return Err(if close.is_empty() {
-            format!("no upstream doc named `{name}`; try `astryx component --list`")
+            format!("no upstream doc named `{name}`; try `rustryx component --list`")
         } else {
             format!(
                 "no upstream doc named `{name}`; did you mean {}?",
@@ -280,10 +280,10 @@ fn find_theme(name: &str) -> std::result::Result<Theme, String> {
     if name == "default" {
         return Ok(Theme::default());
     }
-    astryx_themes::all()
+    rustryx_themes::all()
         .into_iter()
         .find(|t| t.name == name)
-        .ok_or_else(|| format!("no theme `{name}`; see `astryx themes`"))
+        .ok_or_else(|| format!("no theme `{name}`; see `rustryx themes`"))
 }
 
 pub fn tokens(filter: Option<&str>, theme: &str, mode: &str) -> Result {
@@ -304,7 +304,7 @@ pub fn tokens(filter: Option<&str>, theme: &str, mode: &str) -> Result {
         shown += 1;
     }
     println!(
-        "\n{shown} tokens · theme {} · {mode}. In code: `let t = astryx_theme::current(window, cx); t.tokens().<field>`",
+        "\n{shown} tokens · theme {} · {mode}. In code: `let t = rustryx_theme::current(window, cx); t.tokens().<field>`",
         theme.name
     );
     Ok(())
@@ -312,7 +312,7 @@ pub fn tokens(filter: Option<&str>, theme: &str, mode: &str) -> Result {
 
 pub fn themes() -> Result {
     println!("default (core defaults, system fonts)");
-    for theme in astryx_themes::all() {
+    for theme in rustryx_themes::all() {
         println!("{} ({} font files)", theme.name, theme.fonts.len());
     }
     Ok(())
@@ -329,7 +329,7 @@ pub fn docs(topic: Option<&str>) -> Result {
                     .trim_start_matches("# ");
                 println!("{name:<14} {title}");
             }
-            println!("\n`astryx docs <topic>` prints one guide.");
+            println!("\n`rustryx docs <topic>` prints one guide.");
             Ok(())
         }
         Some(topic) => match GUIDES.iter().find(|(name, _)| *name == topic) {
@@ -337,7 +337,7 @@ pub fn docs(topic: Option<&str>) -> Result {
                 print!("{body}");
                 Ok(())
             }
-            None => Err(format!("no guide `{topic}`; run `astryx docs`")),
+            None => Err(format!("no guide `{topic}`; run `rustryx docs`")),
         },
     }
 }

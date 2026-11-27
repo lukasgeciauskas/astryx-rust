@@ -1,6 +1,6 @@
 [package]
-name = "astryx-cli"
-description = "The astryx CLI for the Rust port: component docs, tokens, guides and port parity, for people and coding agents"
+name = "rustryx-cli"
+description = "The rustryx CLI for the Rust port: component docs, tokens, guides and port parity, for people and coding agents"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,13 +8,13 @@ rust-version.workspace = true
 publish.workspace = true
 
 [[bin]]
-name = "astryx"
+name = "rustryx"
 path = "src/main.rs"
 
 [dependencies]
-astryx-components.workspace = true
-astryx-charts.workspace = true
-astryx-lab.workspace = true
-astryx-theme.workspace = true
-astryx-themes = { workspace = true, features = ["all"] }
+rustryx-components.workspace = true
+rustryx-charts.workspace = true
+rustryx-lab.workspace = true
+rustryx-theme.workspace = true
+rustryx-themes = { workspace = true, features = ["all"] }
 serde_json.workspace = true

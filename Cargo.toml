@@ -1,18 +1,18 @@
 [workspace]
 resolver = "3"
 members = [
-    "crates/astryx",
-    "crates/astryx-theme",
-    "crates/astryx-primitives",
-    "crates/astryx-i18n",
-    "crates/astryx-effects",
-    "crates/astryx-icons",
-    "crates/astryx-components",
-    "crates/astryx-themes",
-    "crates/astryx-syntax",
-    "crates/astryx-markdown",
-    "crates/astryx-charts",
-    "crates/astryx-lab",
+    "crates/rustryx",
+    "crates/rustryx-theme",
+    "crates/rustryx-primitives",
+    "crates/rustryx-i18n",
+    "crates/rustryx-effects",
+    "crates/rustryx-icons",
+    "crates/rustryx-components",
+    "crates/rustryx-themes",
+    "crates/rustryx-syntax",
+    "crates/rustryx-markdown",
+    "crates/rustryx-charts",
+    "crates/rustryx-lab",
     "apps/gallery",
     "apps/cli",
     "examples/consumer",
@@ -37,18 +37,18 @@ gpui_platform = { git = "https://github.com/lukasgeciauskas/zed", rev = "769561f
 # Browser files (fork patch R8), for wasm builds only.
 gpui_web = { git = "https://github.com/lukasgeciauskas/zed", rev = "769561f35b2eefa2fe86cd970fad7b4c1a9ea36f", default-features = false }
 
-astryx = { path = "crates/astryx" }
-astryx-theme = { path = "crates/astryx-theme" }
-astryx-primitives = { path = "crates/astryx-primitives" }
-astryx-i18n = { path = "crates/astryx-i18n", default-features = false }
-astryx-effects = { path = "crates/astryx-effects" }
-astryx-icons = { path = "crates/astryx-icons" }
-astryx-components = { path = "crates/astryx-components" }
-astryx-themes = { path = "crates/astryx-themes", default-features = false }
-astryx-syntax = { path = "crates/astryx-syntax" }
-astryx-markdown = { path = "crates/astryx-markdown" }
-astryx-charts = { path = "crates/astryx-charts" }
-astryx-lab = { path = "crates/astryx-lab" }
+rustryx = { path = "crates/rustryx" }
+rustryx-theme = { path = "crates/rustryx-theme" }
+rustryx-primitives = { path = "crates/rustryx-primitives" }
+rustryx-i18n = { path = "crates/rustryx-i18n", default-features = false }
+rustryx-effects = { path = "crates/rustryx-effects" }
+rustryx-icons = { path = "crates/rustryx-icons" }
+rustryx-components = { path = "crates/rustryx-components" }
+rustryx-themes = { path = "crates/rustryx-themes", default-features = false }
+rustryx-syntax = { path = "crates/rustryx-syntax" }
+rustryx-markdown = { path = "crates/rustryx-markdown" }
+rustryx-charts = { path = "crates/rustryx-charts" }
+rustryx-lab = { path = "crates/rustryx-lab" }
 
 # The accessibility tree types GPUI uses; keep it at GPUI's version.
 accesskit = "0.24.1"

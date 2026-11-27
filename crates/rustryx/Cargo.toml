@@ -1,0 +1,43 @@
+[package]
+name = "rustryx"
+description = "Rustryx: Meta's Astryx design system for GPUI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+default = ["themes", "locales"]
+# The 30 translated catalogs Astryx ships (English is always included).
+locales = ["rustryx-i18n/locales"]
+# Every published theme. Turn off default features and pick `theme-*`
+# features to ship only the themes (and fonts) an app uses.
+themes = ["theme-butter", "theme-chocolate", "theme-gothic", "theme-matcha", "theme-neutral", "theme-stone", "theme-y2k"]
+theme-butter = ["dep:rustryx-themes", "rustryx-themes/butter"]
+theme-chocolate = ["dep:rustryx-themes", "rustryx-themes/chocolate"]
+theme-gothic = ["dep:rustryx-themes", "rustryx-themes/gothic"]
+theme-matcha = ["dep:rustryx-themes", "rustryx-themes/matcha"]
+theme-neutral = ["dep:rustryx-themes", "rustryx-themes/neutral"]
+theme-stone = ["dep:rustryx-themes", "rustryx-themes/stone"]
+theme-y2k = ["dep:rustryx-themes", "rustryx-themes/y2k"]
+# Load themes from their typed JSON at run time (`Theme::from_json`).
+json-themes = ["rustryx-theme/json"]
+# Charts (upstream `@astryxdesign/charts`).
+charts = ["dep:rustryx-charts"]
+# The lab components (upstream `@astryxdesign/lab`).
+lab = ["dep:rustryx-lab", "charts"]
+
+[dependencies]
+gpui.workspace = true
+rustryx-theme.workspace = true
+rustryx-syntax.workspace = true
+rustryx-markdown.workspace = true
+rustryx-themes = { workspace = true, optional = true }
+rustryx-primitives.workspace = true
+rustryx-i18n.workspace = true
+rustryx-effects.workspace = true
+rustryx-icons.workspace = true
+rustryx-components.workspace = true
+rustryx-charts = { workspace = true, optional = true }
+rustryx-lab = { workspace = true, optional = true }

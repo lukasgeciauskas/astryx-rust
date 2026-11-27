@@ -46,7 +46,7 @@ capture() {
 }
 
 gallery() {
-    local exe="$root/target/debug/astryx-gallery"
+    local exe="$root/target/debug/rustryx-gallery"
     # Text in the system font, Kbd's Apple symbols, the controls, the fields
     # (spelling marks), dates, overlays, and the offscreen layers (Effects, Motion).
     for page in Tokens Text Content Buttons Inputs Dates Overlays Effects Motion; do

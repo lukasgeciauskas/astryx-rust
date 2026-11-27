@@ -1,5 +1,5 @@
 [package]
-name = "astryx-consumer-example"
+name = "rustryx-consumer-example"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -7,7 +7,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-astryx.workspace = true
+rustryx.workspace = true
 gpui.workspace = true
 
 # Each platform's features, as a downstream app sets them: Wayland and X11 on

@@ -15,14 +15,14 @@ fn run() {
     #[cfg(all(windows, feature = "hot-reload"))]
     overflow_probe::install();
     application()
-        .with_assets(astryx::Assets::new())
+        .with_assets(rustryx::Assets::new())
         .run(|cx: &mut App| {
-            astryx::init(cx);
+            rustryx::init(cx);
             let themes = gallery::available_themes();
             // Every theme's fonts load up front so switching never reflows
             // through a fallback face.
             for theme in &themes {
-                astryx::theme::register_fonts(theme, cx);
+                rustryx::theme::register_fonts(theme, cx);
             }
             // Under `cargo xtask dev` the saved state reopens the gallery in
             // place. Otherwise GALLERY_THEME, GALLERY_MODE, GALLERY_PAGE and
@@ -40,7 +40,7 @@ fn run() {
                 .find(|t| t.name == wanted.as_str())
                 .cloned()
                 .unwrap_or_else(|| themes[0].clone());
-            astryx::theme::set_theme(start, cx);
+            rustryx::theme::set_theme(start, cx);
             live_themes::watch(themes.clone(), cx);
             let mode = state
                 .as_ref()
@@ -48,8 +48,8 @@ fn run() {
                 .filter(|m| !m.is_empty())
                 .or_else(|| env("GALLERY_MODE"));
             match mode.as_deref() {
-                Some("light") => astryx::theme::set_mode(astryx::theme::ThemeMode::Light, cx),
-                Some("dark") => astryx::theme::set_mode(astryx::theme::ThemeMode::Dark, cx),
+                Some("light") => rustryx::theme::set_mode(rustryx::theme::ThemeMode::Light, cx),
+                Some("dark") => rustryx::theme::set_mode(rustryx::theme::ThemeMode::Dark, cx),
                 _ => {}
             }
 

@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-use astryx::theme::{self, Theme};
 use gpui::App;
+use rustryx::theme::{self, Theme};
 
 fn scan(dir: &Path) -> HashMap<PathBuf, SystemTime> {
     std::fs::read_dir(dir)
@@ -26,7 +26,7 @@ pub fn watch(compiled: Vec<Arc<Theme>>, cx: &mut App) {
     let Some(dir) = std::env::var_os("GALLERY_LIVE_THEMES").map(PathBuf::from) else {
         return;
     };
-    eprintln!("astryx dev: live theme reload from {}", dir.display());
+    eprintln!("rustryx dev: live theme reload from {}", dir.display());
     cx.spawn(async move |cx| {
         let mut seen = scan(&dir);
         loop {
@@ -53,11 +53,11 @@ pub fn watch(compiled: Vec<Arc<Theme>>, cx: &mut App) {
                         .unwrap_or_default();
                     match Theme::from_json(&json, &base) {
                         Ok(loaded) if loaded.name == active.name => {
-                            eprintln!("astryx dev: reloaded theme {}", loaded.name);
+                            eprintln!("rustryx dev: reloaded theme {}", loaded.name);
                             theme::set_theme(loaded, cx);
                         }
                         Ok(_) => {}
-                        Err(error) => eprintln!("astryx dev: {}: {error:#}", path.display()),
+                        Err(error) => eprintln!("rustryx dev: {}: {error:#}", path.display()),
                     }
                 });
             }

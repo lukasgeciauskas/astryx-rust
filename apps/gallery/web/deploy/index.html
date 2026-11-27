@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=0" />
-    <title>Astryx for GPUI: component gallery</title>
+    <title>Rustryx: component gallery</title>
     <meta name="description" content="Meta's Astryx design system, ported to Rust on Zed's GPUI and running in the browser through WebAssembly." />
     <style>
       html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1b1b; }
@@ -26,13 +26,13 @@
   </head>
   <body>
     <div id="splash">
-      <h1>Astryx for GPUI</h1>
+      <h1>Rustryx</h1>
       <p>Meta's Astryx design system, rewritten in Rust on Zed's GPUI and rendered here by WebAssembly.</p>
       <div id="bar"><div id="fill"></div></div>
       <p id="status">Downloading the gallery…</p>
     </div>
     <script type="module">
-      import init from './astryx-gallery.js';
+      import init from './rustryx-gallery.js';
       // The wasm's size, written in by `cargo xtask deploy`.
       const EXPECTED = __WASM_BYTES__;
       const fill = document.getElementById('fill');
@@ -57,7 +57,7 @@
         return new Response(new Blob(chunks), {headers: {'content-type': 'application/wasm'}});
       }
       try {
-        const module = await fetchWithProgress('./astryx-gallery_bg.wasm');
+        const module = await fetchWithProgress('./rustryx-gallery_bg.wasm');
         status.textContent = 'Starting…';
         await init({module_or_path: module});
         document.getElementById('splash').remove();

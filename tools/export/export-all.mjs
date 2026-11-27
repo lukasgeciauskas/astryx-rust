@@ -4,7 +4,7 @@
 //   node tools/export/export-all.mjs [path/to/Astryx] [--strict] [--no-fonts]
 //
 // Writes spec/ (themes, icons, manifest, locales, cldr.json, code/, markdown/, emoji.json, svg-icons.json, upstream.json), the icon SVGs in
-// crates/astryx-icons/assets, and the theme fonts in crates/astryx-themes/fonts.
+// crates/rustryx-icons/assets, and the theme fonts in crates/rustryx-themes/fonts.
 // Then run `cargo xtask codegen`. See UPSTREAM.md.
 
 import fs from 'node:fs';

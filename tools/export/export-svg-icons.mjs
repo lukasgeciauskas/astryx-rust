@@ -2,7 +2,7 @@
 // from upstream's packages/lab/src/SVGIcon/icons.ts (SVGIconDef objects: each shape's
 // element type, attributes and role) and weightedIcons.ts (generated WeightedIconDef
 // objects: one filled drawing per weight range). Attributes keep their order, as pairs.
-// `cargo xtask codegen` turns it into crates/astryx-lab/src/svg_icon/generated/icons.rs.
+// `cargo xtask codegen` turns it into crates/rustryx-lab/src/svg_icon/generated/icons.rs.
 //
 //   node tools/export/export-svg-icons.mjs [path/to/Astryx]   (also run by export-all.mjs)
 

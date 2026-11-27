@@ -1,6 +1,6 @@
 //! Hot-reload diagnostics (Windows): when the gallery's main thread
 //! overflows its stack, write the innermost frames, symbolized, to
-//! `%TEMP%/astryx-stack-overflow.txt` before the process dies. Used to chase
+//! `%TEMP%/rustryx-stack-overflow.txt` before the process dies. Used to chase
 //! the crash after a hot patch (docs/KNOWN_ISSUES.md).
 
 use std::ffi::c_void;
@@ -56,7 +56,7 @@ unsafe extern "system" fn on_exception(info: *const ExceptionPointers) -> i32 {
         out.push_str(&line);
         out.push('\n');
     }
-    let _ = std::fs::write(std::env::temp_dir().join("astryx-stack-overflow.txt"), out);
+    let _ = std::fs::write(std::env::temp_dir().join("rustryx-stack-overflow.txt"), out);
     EXCEPTION_CONTINUE_SEARCH
 }
 

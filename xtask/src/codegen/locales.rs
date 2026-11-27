@@ -1,4 +1,4 @@
-//! `crates/astryx-i18n/src/generated/catalogs.rs` from `spec/locales/*.json`:
+//! `crates/rustryx-i18n/src/generated/catalogs.rs` from `spec/locales/*.json`:
 //! every message key, English for each, and the shipped translations as
 //! sparse (key index, message) pairs, so lookups are binary searches over
 //! static data.

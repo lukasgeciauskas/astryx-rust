@@ -5,7 +5,7 @@ a fork of Zed with renderer patches:
 
 - Repository: https://github.com/lukasgeciauskas/zed (public, so the patches
   can also go upstream as pull requests).
-- Branch: `astryx`. It is Zed main plus our patches, one commit per feature.
+- Branch: `rustryx`. It is Zed main plus our patches, one commit per feature.
 - Base: Zed `2b248e6`, 2026-11-24.
 
 Every app that uses Astryx pins the same fork revision as this workspace

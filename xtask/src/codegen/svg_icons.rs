@@ -1,6 +1,6 @@
 //! The starter icons of lab's SVGIcon and WeightedSVGIcon, from `spec/svg-icons.json`
 //! (upstream's `packages/lab/src/SVGIcon/icons.ts` and generated `weightedIcons.ts`), into
-//! `crates/astryx-lab/src/svg_icon/generated/icons.rs`: each starter icon's shapes (element
+//! `crates/rustryx-lab/src/svg_icon/generated/icons.rs`: each starter icon's shapes (element
 //! type, attributes in order, role) and each weighted icon's drawings per weight range.
 
 use anyhow::{Context, Result};

@@ -5,7 +5,7 @@
 - **A font stack with no available family panics.** GPUI's text system panics when a
   font family and every fallback are missing (for example `"SF Mono", Monaco, Consolas`
   in a browser).
-  - Astryx avoids it: every theme passes through `astryx_theme::prepare`, which keeps
+  - Astryx avoids it: every theme passes through `rustryx_theme::prepare`, which keeps
     only families the text system has and appends a bundled face (Figtree or
     JetBrains Mono).
   - Code that sets `font_family` directly on GPUI elements must use a registered family.
@@ -109,7 +109,7 @@
   Mac). Linux reads Hunspell dictionaries from `/usr/share/hunspell` and similar folders
   (packages such as `hunspell-en-us`); with none installed, nothing is marked. Browsers do
   not expose their checker, so on the web an app installs one with
-  `astryx_primitives::spell::set_spell_checker(DictionaryChecker::new(aff, dic))`.
+  `rustryx_primitives::spell::set_spell_checker(DictionaryChecker::new(aff, dic))`.
   `spellbook`, which reads the dictionaries, is MPL-2.0.
 
 - **Toasts need a ToastViewport in the window.** Upstream mounts a fallback viewport on
@@ -124,7 +124,7 @@
   ("Cut", "Add to dictionary"...) are the port's own, not upstream's, and ship in
   English: an app translates the `@astryx.textField.*` keys with its catalogs.
 - **Lightbox has no backdrop blur, and plays no video.** GPUI has no backdrop blur (fork
-  patch R2; see `astryx docs effects`), and video items open in the system player until
+  patch R2; see `rustryx docs effects`), and video items open in the system player until
   MediaPlayer's decoder (M13).
 - **A CommandPalette source has no identity across renders.** React compares the
   `searchSource` object; a Rust value built in `render` is new every frame. A source kept
@@ -344,7 +344,7 @@
   view are not followed.
 - **Remembered sizes live in a file natively (M9).** `autoSaveId` writes to
   `localStorage` in a browser, as upstream does; a native app keeps the entries in
-  `<data dir>/astryx/<executable>.json` (`astryx_primitives::storage`, which an app can
+  `<data dir>/rustryx/<executable>.json` (`rustryx_primitives::storage`, which an app can
   replace with `set_storage`).
 
 - **A one-panel Layout with a content width keeps its whole middle to that width (M9).**
@@ -395,7 +395,7 @@
   not cs, fi, pt-PT, en-AU or si, and ru, uk, kk, mn, bg and mk put a narrow no-break
   space where `Intl` has a space; `shortDate` differs in as, bg, pt-PT, ta and si. The
   exact fix is a table of `Intl`'s month-year and month-day patterns generated into
-  astryx-i18n.
+  rustryx-i18n.
 - **`dot_gl_interactive` hovers (M13).** Upstream's chart lays its transparent pointer
   rectangle over the mark's canvas, so in a browser the mark's hover never fires; here
   GPUI's hitboxes let both hear the pointer, so the hover and its card work as the mark

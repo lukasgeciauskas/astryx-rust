@@ -234,7 +234,7 @@ function literalAssignments(source) {
 
 /**
  * The test plugins: each named set is an ordered plugin list. The Rust test
- * (crates/astryx-markdown/tests/plugin_fixtures.rs) defines the same plugins.
+ * (crates/rustryx-markdown/tests/plugin_fixtures.rs) defines the same plugins.
  */
 function pluginSets(api) {
   const {createMarkdownPlugin} = api.plugins;

@@ -3,12 +3,12 @@
 
 use std::sync::Arc;
 
-use astryx::prelude::*;
-use astryx::theme::{self, ResolvedTheme, Theme};
 use gpui::{
     AnyElement, Context, ElementId, Hsla, ScrollHandle, SharedString, Window, div, point,
     prelude::*, px,
 };
+use rustryx::prelude::*;
+use rustryx::theme::{self, ResolvedTheme, Theme};
 
 use crate::dev_state::DevState;
 use crate::pages::Page;
@@ -16,7 +16,7 @@ use crate::pages::Page;
 /// Core's defaults plus every theme compiled into the gallery.
 pub fn available_themes() -> Vec<Arc<Theme>> {
     let mut themes = vec![Arc::new(Theme::default())];
-    themes.extend(astryx::themes::all().into_iter().map(Arc::new));
+    themes.extend(rustryx::themes::all().into_iter().map(Arc::new));
     themes
 }
 
@@ -184,14 +184,14 @@ impl Render for Gallery {
                             .overflow_y_scroll()
                             .p(t.spacing.s8)
                             // The page's scroller, for windowed lists on it.
-                            .child(astryx::primitives::provide(
-                                astryx::primitives::ScrollHost(self.scroll.clone()),
+                            .child(rustryx::primitives::provide(
+                                rustryx::primitives::ScrollHost(self.scroll.clone()),
                                 self.page.render(&resolved, window, cx),
                             )),
                     ),
             )
             // Toasts shown from any page.
-            .child(astryx::components::overlay::ToastViewport::new())
+            .child(rustryx::components::overlay::ToastViewport::new())
     }
 }
 
@@ -207,7 +207,7 @@ fn chip(
     } else {
         (t.color.background_muted, t.color.text_primary)
     };
-    let hover_bg = astryx::theme::color::composite(bg, t.color.overlay_hover);
+    let hover_bg = rustryx::theme::color::composite(bg, t.color.overlay_hover);
     div()
         .id(id)
         .px(t.spacing.s3)

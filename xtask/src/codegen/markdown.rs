@@ -1,5 +1,5 @@
 //! Markdown's named character references, from `spec/markdown/character-references.json`,
-//! into `crates/astryx-markdown/src/generated/character_references.rs`: a table sorted by
+//! into `crates/rustryx-markdown/src/generated/character_references.rs`: a table sorted by
 //! name for binary search.
 
 use anyhow::{Context, Result};

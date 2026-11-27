@@ -1,9 +1,9 @@
 //! Every token of the active theme: colors, type scale, radius, shadow and
 //! spacing. The visual check for the theme pipeline.
 
-use astryx::prelude::*;
-use astryx::theme::{ResolvedTheme, TextStyleTokens, TokenValue, Tokens};
 use gpui::{AbsoluteLength, AnyElement, App, Hsla, Window, div, prelude::*, px};
+use rustryx::prelude::*;
+use rustryx::theme::{ResolvedTheme, TextStyleTokens, TokenValue, Tokens};
 
 use crate::gallery::section;
 

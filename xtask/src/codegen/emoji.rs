@@ -1,6 +1,6 @@
 //! The bundled emoji set of lab's EmojiPicker, from `spec/emoji.json` (upstream's generated
 //! `packages/lab/src/EmojiPicker/emojiData.ts`), into
-//! `crates/astryx-lab/src/emoji_picker/generated/emoji_data.rs`: the CLDR groups in order,
+//! `crates/rustryx-lab/src/emoji_picker/generated/emoji_data.rs`: the CLDR groups in order,
 //! each emoji as its character, CLDR name and keywords.
 
 use anyhow::{Context, Result};

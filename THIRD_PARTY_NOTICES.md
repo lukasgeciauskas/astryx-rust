@@ -5,11 +5,11 @@
 The design, tokens, themes, behavior specifications, and component structure
 come from [Astryx](https://github.com/meta/astryx), MIT License,
 Copyright (c) 2026 Meta Platforms, Inc. See [`LICENSE`](LICENSE). Core's
-fallback icons (`crates/astryx-icons/assets/core/`) are Astryx's own.
+fallback icons (`crates/rustryx-icons/assets/core/`) are Astryx's own.
 
 ## Lucide icons
 
-`crates/astryx-icons/assets/lucide/` holds the Lucide icons the published
+`crates/rustryx-icons/assets/lucide/` holds the Lucide icons the published
 themes map semantic names to, generated from lucide-react's icon data.
 ISC License, Copyright (c) 2026 Lucide Icons and Contributors; the license text
 is in that folder.
@@ -18,7 +18,7 @@ is in that folder.
 
 Theme fonts are unmodified static TTF files as served by Google Fonts. Each
 family is licensed under the SIL Open Font License 1.1; its license text
-(`OFL.txt`) sits next to its files in `crates/astryx-themes/fonts/<family>/`.
+(`OFL.txt`) sits next to its files in `crates/rustryx-themes/fonts/<family>/`.
 
 | Family | Used by | Reserved Font Name |
 |---|---|---|
@@ -42,9 +42,9 @@ Names restrict only modified versions.
 
 ## V8
 
-`crates/astryx-lab/src/three_d/sort.rs` follows V8's TimSort
+`crates/rustryx-lab/src/three_d/sort.rs` follows V8's TimSort
 (`third_party/v8/builtins/array-sort.tq`) so that the 3D charts' depth order
-matches `Array.prototype.sort`; `crates/astryx-lab/src/trig.rs` follows V8's
+matches `Array.prototype.sort`; `crates/rustryx-lab/src/trig.rs` follows V8's
 `src/base/ieee754.cc` (see fdlibm below). BSD-3-Clause License,
 Copyright 2018 the V8 project authors. All rights reserved.
 
@@ -76,7 +76,7 @@ Copyright 2018 the V8 project authors. All rights reserved.
 
 ## fdlibm
 
-`crates/astryx-lab/src/trig.rs` adapts fdlibm's sine, cosine and argument
+`crates/rustryx-lab/src/trig.rs` adapts fdlibm's sine, cosine and argument
 reduction (`k_sin.c`, `k_cos.c`, `e_rem_pio2.c`, `k_rem_pio2.c`, `s_sin.c`,
 `s_cos.c`) as V8 carries them, so that `Math.sin` and `Math.cos` match V8's
 to the bit; the radial and 3D charts use it.

@@ -14,7 +14,7 @@ use anyhow::{Context, Result, bail};
 use crate::workspace_root;
 
 const TARGET: &str = "wasm32-unknown-unknown";
-const BIN: &str = "astryx-gallery";
+const BIN: &str = "rustryx-gallery";
 
 pub fn run(args: &[String]) -> Result<()> {
     let release = args.iter().any(|a| a == "--release");

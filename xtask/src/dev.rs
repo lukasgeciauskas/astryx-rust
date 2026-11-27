@@ -71,7 +71,7 @@ fn snapshot(root: &Path) -> BTreeMap<PathBuf, SystemTime> {
 fn build(root: &Path) -> Result<bool> {
     let status = Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()))
         .current_dir(root)
-        .args(["build", "-p", "astryx-gallery"])
+        .args(["build", "-p", "rustryx-gallery"])
         .status()
         .context("failed to run cargo build")?;
     Ok(status.success())
@@ -84,11 +84,11 @@ fn launch(root: &Path, state_file: &Path, generation: u32) -> Result<(Child, Pat
     let built = root
         .join("target")
         .join("debug")
-        .join(format!("astryx-gallery{}", std::env::consts::EXE_SUFFIX));
+        .join(format!("rustryx-gallery{}", std::env::consts::EXE_SUFFIX));
     let run_dir = root.join("target").join("dev-run");
     std::fs::create_dir_all(&run_dir)?;
     let copy = run_dir.join(format!(
-        "astryx-gallery-{generation}{}",
+        "rustryx-gallery-{generation}{}",
         std::env::consts::EXE_SUFFIX
     ));
     std::fs::copy(&built, &copy).context("failed to copy the gallery build")?;
@@ -105,7 +105,7 @@ fn hot_restart() -> Result<()> {
     let root = workspace_root();
     let state_file = root.join("target").join("gallery-dev-state.txt");
     println!(
-        "astryx dev: watching {} — edit and save to relaunch the gallery in place",
+        "rustryx dev: watching {} — edit and save to relaunch the gallery in place",
         WATCHED.join(", ")
     );
 
@@ -121,7 +121,7 @@ fn hot_restart() -> Result<()> {
         if let Some((running, _)) = child.as_mut()
             && running.try_wait()?.is_some()
         {
-            println!("astryx dev: the gallery closed; exiting");
+            println!("rustryx dev: the gallery closed; exiting");
             return Ok(());
         }
         let now = snapshot(&root);
@@ -141,11 +141,11 @@ fn hot_restart() -> Result<()> {
                 let _ = std::fs::remove_file(old_copy);
             }
             println!(
-                "astryx dev: relaunched in {:.1}s",
+                "rustryx dev: relaunched in {:.1}s",
                 started.elapsed().as_secs_f32()
             );
         } else {
-            println!("astryx dev: build failed; the running gallery is unchanged");
+            println!("rustryx dev: build failed; the running gallery is unchanged");
         }
     }
 }
@@ -200,7 +200,7 @@ fn hot_patch(args: &[String]) -> Result<()> {
             "--platform",
             platform,
             "--package",
-            "astryx-gallery",
+            "rustryx-gallery",
             "--features",
             "hot-reload",
         ])

@@ -1,7 +1,7 @@
 // Writes spec/manifest.json: every upstream component and hook doc
 // (`*.doc.mjs` in core, lab, charts and richtext), the full `docs` export
-// and the agent-oriented `docsDense` export where one exists. The `astryx`
-// CLI embeds it, so `astryx component <Name>` shows upstream's props and
+// and the agent-oriented `docsDense` export where one exists. The `rustryx`
+// CLI embeds it, so `rustryx component <Name>` shows upstream's props and
 // guidance next to the Rust port's API.
 
 import fs from 'node:fs';

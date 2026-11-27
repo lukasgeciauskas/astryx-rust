@@ -2,14 +2,14 @@
 
 Repeat this for every upstream component.
 
-1. **Upstream API:** `astryx component <Name>` (add `--dense` for a short form) shows
+1. **Upstream API:** `rustryx component <Name>` (add `--dense` for a short form) shows
    upstream's props, types, defaults and guidance, and what is ported so far.
 2. **Read upstream:**
    - `../Astryx/packages/core/src/<Name>/*.tsx`;
    - `../Astryx/docs/specs/components/<Name>/<Name>.spec.md` (numbered FR/AR items);
    - the family contract in `../Astryx/docs/families/`;
    - the Playwright specs in `__tests__/`.
-3. **Implement** in `crates/astryx-components/src/<name>/`:
+3. **Implement** in `crates/rustryx-components/src/<name>/`:
    - every prop, or a `RustApi::Waived` reason;
    - token styles;
    - theming targets through `theme.refine`;
@@ -22,4 +22,4 @@ Repeat this for every upstream component.
 7. **Check:** compare the gallery with Astryx Storybook (`pnpm storybook` in `../Astryx`)
    in light and dark, neutral plus one other theme. Capture the native gallery with
    `tools/capture-window.ps1`.
-8. **Parity:** `astryx parity` must list the component as ported, with no unmapped props.
+8. **Parity:** `rustryx parity` must list the component as ported, with no unmapped props.

@@ -1,15 +1,18 @@
-# Astryx for GPUI
+# Rustryx
 
-A Rust port of [Astryx](https://github.com/meta/astryx), Meta's open source
+## cold and L9
+
+Rustryx is a Rust port of [Astryx](https://github.com/meta/astryx), Meta's open source
 design system, built on [GPUI](https://github.com/zed-industries/zed/tree/main/crates/gpui),
 Zed's GPU-accelerated UI framework. It runs natively on Windows, macOS and Linux
 and in the browser (WebAssembly), with no React or web view.
 
-> **Status: in development.** Milestones M0 to M11 are done: the theme pipeline
+> **Status: in development.** Milestones M0 to M13 are done: the theme pipeline
 > and tooling, foundations, controls, the editing engine and fields, overlays,
 > collections, tables, dates, the shell and navigation, content (Markdown,
-> CodeBlock, Chat), and motion and touch. 105 of upstream's 110 core components
-> are ported; theme authoring (M12) is next. See
+> CodeBlock, Chat), motion and touch, theme authoring, charts and the lab. All of
+> upstream's 110 core components, 6 chart components and 47 lab components are
+> ported; rich text (M14) is next. See
 > [`docs/PLAN.md`](docs/PLAN.md) for the full-parity roadmap,
 > [`docs/HANDOFF.md`](docs/HANDOFF.md) for the current state,
 > [`UPSTREAM.md`](UPSTREAM.md) for the synced upstream commit, and
@@ -19,25 +22,29 @@ and in the browser (WebAssembly), with no React or web view.
 
 | Crate | Purpose |
 |---|---|
-| `astryx` | Facade. Depend on this one. |
-| `astryx-theme` | Design tokens, themes, light/dark appearance |
-| `astryx-primitives` | Headless behavior: context, focus, keyboard, layers, editing |
-| `astryx-i18n` | Locales, message catalogs (ICU MessageFormat), text direction |
-| `astryx-effects` | CSS effects GPUI lacks: multi-stop gradients, edge fades, shapes |
-| `astryx-themes` | The seven published themes and their fonts, one cargo feature each |
-| `astryx-icons` | Built-in icons |
-| `astryx-components` | The components |
-| `astryx-cli` (`apps/cli`) | The `astryx` CLI |
+| `rustryx` | Facade. Depend on this one. |
+| `rustryx-theme` | Design tokens, themes, light/dark appearance |
+| `rustryx-primitives` | Headless behavior: context, focus, keyboard, layers, editing |
+| `rustryx-i18n` | Locales, message catalogs (ICU MessageFormat), text direction |
+| `rustryx-effects` | CSS effects GPUI lacks: multi-stop gradients, edge fades, shapes |
+| `rustryx-themes` | The seven published themes and their fonts, one cargo feature each |
+| `rustryx-icons` | Built-in icons |
+| `rustryx-components` | The components |
+| `rustryx-syntax` | Syntax highlighting for CodeBlock and the code editors |
+| `rustryx-markdown` | Markdown: upstream's parser and its mdast-aligned AST |
+| `rustryx-charts` | Charts: scales, shapes, `Chart` and its marks |
+| `rustryx-lab` | The lab components (upstream's experimental package) |
+| `rustryx-cli` (`apps/cli`) | The `rustryx` CLI |
 
-## Using Astryx in your app
+## Using Rustryx in your app
 
-GPUI is not published on crates.io at a current version, so Astryx depends on
+GPUI is not published on crates.io at a current version, so Rustryx depends on
 Zed's git repository at one pinned revision. **Your app must use the same
 revision**, or Cargo builds two copies of GPUI whose types do not mix.
 
 ```toml
 [dependencies]
-astryx = { git = "<this repository>", branch = "main" } # or path = "../Astryx Rust/crates/astryx"
+rustryx = { git = "<this repository>", branch = "main" } # or path = "../rustryx/crates/rustryx"
 gpui = { git = "https://github.com/lukasgeciauskas/zed", rev = "769561f35b2eefa2fe86cd970fad7b4c1a9ea36f" }
 gpui_platform = { git = "https://github.com/lukasgeciauskas/zed", rev = "769561f35b2eefa2fe86cd970fad7b4c1a9ea36f", default-features = false }
 
@@ -48,20 +55,20 @@ async-task = { git = "https://github.com/smol-rs/async-task", rev = "41fd3359c75
 calloop = { git = "https://github.com/zed-industries/calloop", rev = "3759371fee14c40066d64777e2a36b6ffcc22590" }
 ```
 
-Then set up Astryx when the app starts:
+Then set up Rustryx when the app starts:
 
 ```rust
 gpui_platform::application()
-    .with_assets(astryx::Assets::new()) // serves the icons; wrap your own source with `with_fallback`
+    .with_assets(rustryx::Assets::new()) // serves the icons; wrap your own source with `with_fallback`
     .run(|cx| {
-        astryx::init(cx);
-        astryx::theme::set_theme(astryx::themes::neutral::theme(), cx);
-        astryx::theme::set_mode(astryx::theme::ThemeMode::System, cx);
-        // open windows; components read `astryx::theme::current(window, cx)`
+        rustryx::init(cx);
+        rustryx::theme::set_theme(rustryx::themes::neutral::theme(), cx);
+        rustryx::theme::set_mode(rustryx::theme::ThemeMode::System, cx);
+        // open windows; components read `rustryx::theme::current(window, cx)`
     });
 ```
 
-The `astryx` crate enables every theme by default. To ship fewer fonts, turn
+The `rustryx` crate enables every theme by default. To ship fewer fonts, turn
 off default features and enable `theme-neutral` (or any other `theme-*`).
 
 Use the Rust toolchain in [`rust-toolchain.toml`](rust-toolchain.toml); it
@@ -73,17 +80,17 @@ both.
 ## Development
 
 ```sh
-cargo run -p astryx-gallery          # the component gallery, native
+cargo run -p rustryx-gallery          # the component gallery, native
 cargo xtask dev                      # edit loop: relaunches the gallery in place on save; theme JSON reloads live
 cargo xtask web                      # the gallery in the browser, at http://127.0.0.1:8080
 cargo test --workspace
-cargo run -q -p astryx-cli -- help   # the astryx CLI: component docs, tokens, guides, parity
+cargo run -q -p rustryx-cli -- help   # the rustryx CLI: component docs, tokens, guides, parity
 cargo xtask gpui-src                 # where the pinned GPUI source is checked out
 ```
 
-Coding agents start at [`CLAUDE.md`](CLAUDE.md). The `astryx` CLI is the Rust
-port's counterpart of upstream's agent-facing CLI: `astryx component Button --dense`
-shows upstream's props and guidance next to the Rust API, and `astryx parity`
+Coding agents start at [`CLAUDE.md`](CLAUDE.md). The `rustryx` CLI is the Rust
+port's counterpart of upstream's agent-facing CLI: `rustryx component Button --dense`
+shows upstream's props and guidance next to the Rust API, and `rustryx parity`
 shows what is left to port. Guides are in [`docs/guide/`](docs/guide/).
 
 `cargo xtask web` needs `wasm-bindgen-cli` at the version in `Cargo.lock`

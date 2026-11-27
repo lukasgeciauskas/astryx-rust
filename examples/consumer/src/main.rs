@@ -1,9 +1,9 @@
-//! A minimal app that uses Astryx the way a downstream project does: through
-//! the `astryx` facade only. It keeps the public API and the GPUI revision
+//! A minimal app that uses Rustryx the way a downstream project does: through
+//! the `rustryx` facade only. It keeps the public API and the GPUI revision
 //! alignment honest.
 
-use astryx::prelude::*;
 use gpui::{App, Bounds, Context, Window, WindowBounds, WindowOptions, div, prelude::*, px, size};
+use rustryx::prelude::*;
 
 struct Consumer;
 
@@ -11,7 +11,7 @@ impl Render for Consumer {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div().size_full().child(provide(
             ElementSize::Sm,
-            div().child("Hello from an Astryx consumer"),
+            div().child("Hello from a Rustryx consumer"),
         ))
     }
 }

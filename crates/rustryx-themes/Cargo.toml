@@ -1,0 +1,27 @@
+[package]
+name = "rustryx-themes"
+description = "The published Astryx themes for Rustryx, each behind a cargo feature"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+default = ["all"]
+all = ["butter", "chocolate", "gothic", "matcha", "neutral", "stone", "y2k"]
+butter = []
+chocolate = []
+gothic = []
+matcha = []
+neutral = []
+stone = []
+y2k = []
+
+[dependencies]
+rustryx-theme.workspace = true
+
+[dev-dependencies]
+rustryx-theme = { workspace = true, features = ["json"] }
+gpui.workspace = true
+serde_json.workspace = true

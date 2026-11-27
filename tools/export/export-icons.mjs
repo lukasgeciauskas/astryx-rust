@@ -1,4 +1,4 @@
-// Writes the icon SVGs that astryx-icons embeds, plus spec/icons.json:
+// Writes the icon SVGs that rustryx-icons embeds, plus spec/icons.json:
 // - core's fallback icons (packages/core/src/Icon/defaultIcons.tsx), rendered
 //   to static SVG by react-dom/server;
 // - every lucide icon a theme maps a semantic name to, built from lucide's
@@ -15,7 +15,7 @@ import {importFile} from './lib/astryx.mjs';
 import {stableStringify} from './lib/values.mjs';
 
 export async function exportIcons(root, repoRoot, specDir, lucideComponents, warnings) {
-  const assets = path.join(repoRoot, 'crates', 'astryx-icons', 'assets');
+  const assets = path.join(repoRoot, 'crates', 'rustryx-icons', 'assets');
   const core = await exportCoreIcons(root, path.join(assets, 'core'));
   const lucide = await exportLucideIcons(root, path.join(assets, 'lucide'), lucideComponents, warnings);
   fs.writeFileSync(path.join(specDir, 'icons.json'), stableStringify({core, lucide}));

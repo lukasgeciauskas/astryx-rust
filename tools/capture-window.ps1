@@ -1,5 +1,5 @@
 # Opens a GUI executable, captures its window to a PNG, and closes it.
-# Usage: powershell -File tools/capture-window.ps1 -Exe target/debug/astryx-gallery.exe -Out shot.png
+# Usage: powershell -File tools/capture-window.ps1 -Exe target/debug/rustryx-gallery.exe -Out shot.png
 #   [-WaitSeconds 6] [-EnvName GALLERY_THEME -EnvValue butter]
 #
 # The capture reads the window's own content (see capture-common.ps1), so it
@@ -17,7 +17,7 @@ param(
 
 if ($EnvName -ne "") { [Environment]::SetEnvironmentVariable($EnvName, $EnvValue, "Process") }
 $p = Start-Process -FilePath $Exe -PassThru
-$hwnd = Wait-AstryxWindow $p.Id $WaitSeconds
+$hwnd = Wait-RustryxWindow $p.Id $WaitSeconds
 if ($hwnd -eq [IntPtr]::Zero) {
     $p.Refresh()
     if ($p.HasExited) { Write-Output "EXITED code=$($p.ExitCode)" } else { Write-Output "no window after ${WaitSeconds}s" }
@@ -27,8 +27,8 @@ if ($hwnd -eq [IntPtr]::Zero) {
 # Let the first frames settle (fonts, images, restored scroll), then take the
 # window again in case a larger one appeared.
 Start-Sleep -Seconds 2
-$hwnd = Wait-AstryxWindow $p.Id 1
-$size = [AstryxCapture]::Capture($hwnd, (Resolve-Path -LiteralPath (Split-Path -Parent $Out)).Path + "\" + (Split-Path -Leaf $Out))
+$hwnd = Wait-RustryxWindow $p.Id 1
+$size = [RustryxCapture]::Capture($hwnd, (Resolve-Path -LiteralPath (Split-Path -Parent $Out)).Path + "\" + (Split-Path -Leaf $Out))
 Stop-Process -Id $p.Id -Confirm:$false
 if (-not $size) { Write-Output "PrintWindow failed"; exit 1 }
 Write-Output "captured $size -> $Out"

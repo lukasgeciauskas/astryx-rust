@@ -1,5 +1,5 @@
 //! Typed spec values (see tools/export/lib/values.mjs) as `const` Rust
-//! expressions over `astryx_theme` and GPUI types.
+//! expressions over `rustryx_theme` and GPUI types.
 
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
