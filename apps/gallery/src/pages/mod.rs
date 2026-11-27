@@ -6,6 +6,7 @@ mod effects;
 mod tokens;
 
 use gpui::{AnyElement, App, IntoElement, ParentElement, Styled, Window};
+use rustryx::lab::examples::Section;
 use rustryx::theme::ResolvedTheme;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -105,6 +106,16 @@ impl Page {
             Page::Charts => "Charts",
             Page::Lab => "Lab",
             Page::ThreeD => "3D",
+        }
+    }
+
+    /// The page's sections, when it shows one at a time: pages of many live examples, where
+    /// one animating example would otherwise rebuild them all on every frame.
+    pub fn sections(self) -> &'static [Section] {
+        match self {
+            Page::Lab => rustryx::lab::examples::SECTIONS,
+            Page::ThreeD => rustryx::lab::three_d::examples::SECTIONS,
+            _ => &[],
         }
     }
 

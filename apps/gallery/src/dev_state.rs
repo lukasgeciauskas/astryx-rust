@@ -1,4 +1,4 @@
-//! Where the gallery is: page, theme, mode, window bounds and scroll. When
+//! Where the gallery is: page and section, theme, mode, window bounds and scroll. When
 //! `cargo xtask dev` relaunches the gallery after a rebuild, it passes a
 //! state file in `GALLERY_STATE_FILE`, and the gallery reopens in place.
 
@@ -7,6 +7,8 @@ use std::path::PathBuf;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DevState {
     pub page: String,
+    /// The page's section, for pages that show one at a time.
+    pub section: String,
     pub theme: String,
     pub mode: String,
     /// x, y, width, height in logical pixels.
@@ -29,6 +31,7 @@ impl DevState {
             };
             match key {
                 "page" => state.page = value.to_string(),
+                "section" => state.section = value.to_string(),
                 "theme" => state.theme = value.to_string(),
                 "mode" => state.mode = value.to_string(),
                 "scroll_y" => state.scroll_y = value.parse().unwrap_or(0.0),
@@ -52,8 +55,8 @@ impl DevState {
             .map(|[x, y, w, h]| format!("{x},{y},{w},{h}"))
             .unwrap_or_default();
         let text = format!(
-            "page={}\ntheme={}\nmode={}\nbounds={bounds}\nscroll_y={}\n",
-            self.page, self.theme, self.mode, self.scroll_y
+            "page={}\nsection={}\ntheme={}\nmode={}\nbounds={bounds}\nscroll_y={}\n",
+            self.page, self.section, self.theme, self.mode, self.scroll_y
         );
         let _ = std::fs::write(path, text);
     }

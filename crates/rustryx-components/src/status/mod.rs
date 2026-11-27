@@ -99,6 +99,8 @@ pub struct Spinner {
     /// Upstream `aria-hidden`: no accessibility node, for a spinner that only
     /// echoes a busy state its control already reports.
     decorative: bool,
+    /// The ring holds still (see [`Spinner::paused`]).
+    paused: bool,
     id: ElementId,
     style: StyleRefinement,
 }
@@ -112,6 +114,7 @@ impl Spinner {
             label: None,
             aria_label: None,
             decorative: false,
+            paused: false,
             id: id.into(),
             style: StyleRefinement::default(),
         }
@@ -132,6 +135,14 @@ impl Spinner {
     /// a busy state shown some other way.
     pub fn decorative(mut self) -> Self {
         self.decorative = true;
+        self
+    }
+
+    /// Holds the ring still, for a spinner kept in the layout while hidden (Schedule keeps
+    /// its loading spinner at opacity 0 between loads, as upstream does). A turning ring
+    /// redraws the whole window on every frame, where CSS turns a hidden one for free.
+    pub fn paused(mut self, paused: bool) -> Self {
+        self.paused = paused;
         self
     }
 }
@@ -195,7 +206,9 @@ impl RenderOnce for Spinner {
         };
         let turns = elapsed(cx).as_secs_f32() / period.as_secs_f32().max(0.001);
         let angle = turns.fract() * TAU;
-        window.request_animation_frame();
+        if !self.paused {
+            window.request_animation_frame();
+        }
 
         // A theme's `spinner` indicator replaces the ring (Indicator FR7).
         let ring = match crate::indicator::theme_indicator(crate::indicator::SPINNER, cx) {

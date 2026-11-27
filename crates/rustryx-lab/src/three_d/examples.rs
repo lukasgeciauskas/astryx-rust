@@ -20,7 +20,8 @@ use super::{
     ThreeDAxis, ThreeDBar, ThreeDChart, ThreeDGrid, ThreeDScatter, ThreeDScatterGl, ThreeDSurface,
     use_3d,
 };
-use crate::lab_chart::{Datum, SequentialHue, use_chart_colors};
+use crate::examples::Section;
+use crate::lab_chart::{ChartColorsApi, Datum, SequentialHue, use_chart_colors};
 
 /// A seeded stand-in for the stories' `Math.random()`.
 struct Seeded(f64);
@@ -435,12 +436,138 @@ thread_local! {
     static STORY_DATA: Rc<StoryData> = Rc::new(StoryData::new());
 }
 
-/// Upstream's stories, top to bottom.
-pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
+/// The theme's first categorical color and the stories' data.
+fn setup(window: &mut Window, cx: &mut App) -> (ChartColorsApi, Hsla, Rc<StoryData>) {
     let colors = use_chart_colors(window, cx);
     let c = colors.categorical(1)[0];
-    let data = STORY_DATA.with(Rc::clone);
-    let shapes = data.shapes.clone();
+    (colors, c, STORY_DATA.with(Rc::clone))
+}
+
+/// One side of the SVG-vs-WebGL comparison: the sphere as SVG circles or GL points.
+fn sphere_side(
+    data: &StoryData,
+    id: &'static str,
+    label: &'static str,
+    gl: bool,
+) -> impl IntoElement {
+    card(
+        0x0064e0,
+        MediaThemeMode::Dark,
+        div().child(Caption(label.into())).child(
+            ThreeDChart::new(id, data.sphere.clone(), "x", "y", "z")
+                .height(300.)
+                .azimuth(30.)
+                .elevation(20.)
+                .interactive(true)
+                .auto_rotate(0.3)
+                .when(gl, |chart| {
+                    chart.child(
+                        ThreeDScatterGl::new(rgb(0xdfe2e5).into())
+                            .size(3.)
+                            .opacity(0.85),
+                    )
+                })
+                .when(!gl, |chart| {
+                    chart.child(
+                        ThreeDScatter::new(rgb(0xdfe2e5).into())
+                            .radius(1.5)
+                            .opacity(0.85),
+                    )
+                }),
+        ),
+    )
+}
+
+fn scatter_section(window: &mut Window, cx: &mut App) -> AnyElement {
+    let (_, c, data) = setup(window, cx);
+    example(
+        "3D Scatter Plot",
+        "200 points. Drag to rotate. Depth encoded via size and opacity.",
+        ThreeDChart::new("three-d-scatter", data.scatter.clone(), "x", "y", "z")
+            .height(400.)
+            .interactive(true)
+            .child(ThreeDGrid::new())
+            .child(ThreeDAxis::new())
+            .child(ThreeDScatter::new(c).radius(4.)),
+    )
+}
+
+fn bar_section(window: &mut Window, cx: &mut App) -> AnyElement {
+    let (_, c, data) = setup(window, cx);
+    example(
+        "3D Bar Chart",
+        "Sales by product x region. Drag to rotate.",
+        ThreeDChart::new(
+            "three-d-bars",
+            data.bars.clone(),
+            "product",
+            "sales",
+            "region",
+        )
+        .height(400.)
+        .interactive(true)
+        .child(ThreeDGrid::new().divisions(3))
+        .child(ThreeDAxis::new())
+        .child(ThreeDBar::new(c).bar_width(0.12).bar_depth(0.12)),
+    )
+}
+
+fn surface_section(window: &mut Window, cx: &mut App) -> AnyElement {
+    let (colors, _, data) = setup(window, cx);
+    example(
+        "3D Surface",
+        "sin(x) * cos(z) surface. Drag to rotate. Color maps to height.",
+        ThreeDChart::new("three-d-surface", data.surface.clone(), "x", "y", "z")
+            .height(450.)
+            .interactive(true)
+            .child(ThreeDGrid::new())
+            .child(ThreeDAxis::new())
+            .child(ThreeDSurface::new(
+                colors.sequential(SequentialHue::Blue, 5),
+            )),
+    )
+}
+
+fn wireframe_section(window: &mut Window, cx: &mut App) -> AnyElement {
+    let (colors, _, data) = setup(window, cx);
+    example(
+        "3D Wireframe",
+        "",
+        ThreeDChart::new("three-d-wireframe", data.surface.clone(), "x", "y", "z")
+            .height(450.)
+            .interactive(true)
+            .child(ThreeDGrid::new())
+            .child(ThreeDSurface::new(colors.sequential(SequentialHue::Teal, 5)).wireframe(true)),
+    )
+}
+
+fn svg_vs_gl_section(window: &mut Window, cx: &mut App) -> AnyElement {
+    let (_, _, data) = setup(window, cx);
+    example(
+        "SVG vs WebGL",
+        "The same sphere, camera and depth cues as SVG circles and WebGL points.",
+        div()
+            .grid()
+            .grid_cols(2)
+            .gap(px(12.))
+            .max_w(px(780.))
+            .child(sphere_side(
+                &data,
+                "three-d-svg",
+                "SVG (ThreeDScatter)",
+                false,
+            ))
+            .child(sphere_side(
+                &data,
+                "three-d-gl",
+                "WebGL (ThreeDScatterGL)",
+                true,
+            )),
+    )
+}
+
+fn gallery_section(window: &mut Window, cx: &mut App) -> AnyElement {
+    let (_, _, data) = setup(window, cx);
     let palettes = [
         (0x0064e0, MediaThemeMode::Dark),
         (0xe3193b, MediaThemeMode::Dark),
@@ -449,127 +576,66 @@ pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
         (0x0b991f, MediaThemeMode::Dark),
         (0xeb6e00, MediaThemeMode::Dark),
     ];
-    let sphere_side = |id: &'static str, label: &'static str, gl: bool| {
-        card(
-            0x0064e0,
-            MediaThemeMode::Dark,
-            div().child(Caption(label.into())).child(
-                ThreeDChart::new(id, data.sphere.clone(), "x", "y", "z")
-                    .height(300.)
-                    .azimuth(30.)
-                    .elevation(20.)
-                    .interactive(true)
-                    .auto_rotate(0.3)
-                    .when(gl, |chart| {
-                        chart.child(
-                            ThreeDScatterGl::new(rgb(0xdfe2e5).into())
-                                .size(3.)
-                                .opacity(0.85),
-                        )
-                    })
-                    .when(!gl, |chart| {
-                        chart.child(
-                            ThreeDScatter::new(rgb(0xdfe2e5).into())
-                                .radius(1.5)
-                                .opacity(0.85),
-                        )
-                    }),
+    example(
+        "Gallery",
+        "",
+        div()
+            .grid()
+            .grid_cols(3)
+            .gap(px(12.))
+            .max_w(px(780.))
+            .children(
+                data.shapes
+                    .clone()
+                    .into_iter()
+                    .zip(palettes)
+                    .map(|((data, label, az, el), (bg, mode))| cell(bg, mode, data, label, az, el)),
             ),
-        )
-    };
-    Stack::vertical()
-        .gap(SpacingStep::S8)
-        .child(example(
-            "3D Scatter Plot",
-            "200 points. Drag to rotate. Depth encoded via size and opacity.",
-            ThreeDChart::new("three-d-scatter", data.scatter.clone(), "x", "y", "z")
-                .height(400.)
-                .interactive(true)
-                .child(ThreeDGrid::new())
-                .child(ThreeDAxis::new())
-                .child(ThreeDScatter::new(c).radius(4.)),
-        ))
-        .child(example(
-            "3D Bar Chart",
-            "Sales by product x region. Drag to rotate.",
-            ThreeDChart::new(
-                "three-d-bars",
-                data.bars.clone(),
-                "product",
-                "sales",
-                "region",
-            )
-            .height(400.)
-            .interactive(true)
-            .child(ThreeDGrid::new().divisions(3))
-            .child(ThreeDAxis::new())
-            .child(ThreeDBar::new(c).bar_width(0.12).bar_depth(0.12)),
-        ))
-        .child(example(
-            "3D Surface",
-            "sin(x) * cos(z) surface. Drag to rotate. Color maps to height.",
-            ThreeDChart::new("three-d-surface", data.surface.clone(), "x", "y", "z")
-                .height(450.)
-                .interactive(true)
-                .child(ThreeDGrid::new())
-                .child(ThreeDAxis::new())
-                .child(ThreeDSurface::new(
-                    colors.sequential(SequentialHue::Blue, 5),
-                )),
-        ))
-        .child(example(
-            "3D Wireframe",
-            "",
-            ThreeDChart::new("three-d-wireframe", data.surface.clone(), "x", "y", "z")
-                .height(450.)
-                .interactive(true)
-                .child(ThreeDGrid::new())
-                .child(
-                    ThreeDSurface::new(colors.sequential(SequentialHue::Teal, 5)).wireframe(true),
-                ),
-        ))
-        .child(example(
-            "SVG vs WebGL",
-            "The same sphere, camera and depth cues as SVG circles and WebGL points.",
-            div()
-                .grid()
-                .grid_cols(2)
-                .gap(px(12.))
-                .max_w(px(780.))
-                .child(sphere_side("three-d-svg", "SVG (ThreeDScatter)", false))
-                .child(sphere_side("three-d-gl", "WebGL (ThreeDScatterGL)", true)),
-        ))
-        .child(example(
-            "Gallery",
-            "",
-            div()
-                .grid()
-                .grid_cols(3)
-                .gap(px(12.))
-                .max_w(px(780.))
-                .children(shapes.into_iter().zip(palettes).map(
-                    |((data, label, az, el), (bg, mode))| cell(bg, mode, data, label, az, el),
-                )),
-        ))
-        .child(example(
-            "Split backdrop",
-            "A custom mark: points take the color of the half they project onto.",
-            Stack::vertical()
-                .gap(SpacingStep::S4)
-                .child(backdrop(
-                    "three-d-split",
-                    data.sphere.clone(),
-                    0.15,
-                    [0x0a1317, 0xf1f4f7],
-                    [0xdfe2e5, 0x0a1317],
-                ))
-                .child(backdrop(
-                    "three-d-split-bold",
-                    data.torus_knot.clone(),
-                    0.2,
-                    [0x0064e0, 0xe3193b],
-                    [0xffffff, 0xffffff],
-                )),
-        ))
-        .into_any_element()
+    )
+}
+
+fn split_backdrop_section(window: &mut Window, cx: &mut App) -> AnyElement {
+    let (_, _, data) = setup(window, cx);
+    example(
+        "Split backdrop",
+        "A custom mark: points take the color of the half they project onto.",
+        Stack::vertical()
+            .gap(SpacingStep::S4)
+            .child(backdrop(
+                "three-d-split",
+                data.sphere.clone(),
+                0.15,
+                [0x0a1317, 0xf1f4f7],
+                [0xdfe2e5, 0x0a1317],
+            ))
+            .child(backdrop(
+                "three-d-split-bold",
+                data.torus_knot.clone(),
+                0.2,
+                [0x0064e0, 0xe3193b],
+                [0xffffff, 0xffffff],
+            )),
+    )
+}
+
+/// Upstream's stories as sections, top to bottom. The gallery draws one at a time: the
+/// charts turn by themselves, so a page of all of them would redraw every chart every
+/// frame.
+pub const SECTIONS: &[Section] = &[
+    ("Scatter", scatter_section),
+    ("Bars", bar_section),
+    ("Surface", surface_section),
+    ("Wireframe", wireframe_section),
+    ("SVG vs WebGL", svg_vs_gl_section),
+    ("Gallery", gallery_section),
+    ("Split backdrop", split_backdrop_section),
+];
+
+/// Upstream's stories, top to bottom, all at once.
+pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
+    let mut stack = Stack::vertical().gap(SpacingStep::S8);
+    for (_, section) in SECTIONS {
+        stack = stack.child(section(window, cx));
+    }
+    stack.into_any_element()
 }

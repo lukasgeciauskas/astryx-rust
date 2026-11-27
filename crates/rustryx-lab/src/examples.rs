@@ -44,119 +44,58 @@ fn stats() -> AnyElement {
         .into_any_element()
 }
 
-/// The lab gallery: each component's own examples.
+/// A gallery section: its title and what draws it.
+pub type Section = (&'static str, fn(&mut Window, &mut App) -> AnyElement);
+
+/// A section that shows one module's examples under its title.
+macro_rules! section {
+    ($title:literal, $module:ident) => {
+        ($title, |window: &mut Window, cx: &mut App| {
+            example($title, crate::$module::examples::examples(window, cx))
+        })
+    };
+}
+
+/// The lab's examples as sections, one per component, in the gallery's order. The gallery
+/// draws one at a time: a page of all of them rebuilds every example whenever any one of
+/// them animates.
+pub const SECTIONS: &[Section] = &[
+    ("Stat", |_, _| example("Stat", stats())),
+    section!("LineClamp", line_clamp),
+    section!("CircleCheckIndicator", circle_check_indicator),
+    section!("CircularProgress", circular_progress),
+    section!("SelectableCardGroup", selectable_card_group),
+    section!("PageControl", page_control),
+    section!("InfoTip", info_tip),
+    section!("DialogHeroHeader", dialog_hero_header),
+    section!("ChatReasoning", chat_reasoning),
+    section!("LogStream", log_stream),
+    section!("CommentPin", comment_pin),
+    section!("Tour", tour),
+    section!("TabBar", tab_bar),
+    section!("TabBarMoreList", tab_bar_more_list),
+    section!("NavigationStack", navigation_stack),
+    section!("RefreshControl", refresh_control),
+    section!("TransferList", transfer_list),
+    section!("ListInput", list_input),
+    section!("RadialChart", radial),
+    section!("SankeyChart", sankey),
+    section!("Chat additions", chat),
+    section!("EmojiPicker", emoji_picker),
+    section!("Comments", comments),
+    section!("Schedule", schedule),
+    section!("Chart (lab)", lab_chart),
+    section!("CodeEditor", code_editor),
+    section!("DiffViewer", diff_viewer),
+    section!("SVGIcon", svg_icon),
+    section!("MediaPlayer", media_player),
+];
+
+/// Every lab example, top to bottom.
 pub fn examples(window: &mut Window, cx: &mut App) -> AnyElement {
-    Stack::vertical()
-        .gap(SpacingStep::S8)
-        .child(example("Stat", stats()))
-        .child(example(
-            "LineClamp",
-            crate::line_clamp::examples::examples(window, cx),
-        ))
-        .child(example(
-            "CircleCheckIndicator",
-            crate::circle_check_indicator::examples::examples(window, cx),
-        ))
-        .child(example(
-            "CircularProgress",
-            crate::circular_progress::examples::examples(window, cx),
-        ))
-        .child(example(
-            "SelectableCardGroup",
-            crate::selectable_card_group::examples::examples(window, cx),
-        ))
-        .child(example(
-            "PageControl",
-            crate::page_control::examples::examples(window, cx),
-        ))
-        .child(example(
-            "InfoTip",
-            crate::info_tip::examples::examples(window, cx),
-        ))
-        .child(example(
-            "DialogHeroHeader",
-            crate::dialog_hero_header::examples::examples(window, cx),
-        ))
-        .child(example(
-            "ChatReasoning",
-            crate::chat_reasoning::examples::examples(window, cx),
-        ))
-        .child(example(
-            "LogStream",
-            crate::log_stream::examples::examples(window, cx),
-        ))
-        .child(example(
-            "CommentPin",
-            crate::comment_pin::examples::examples(window, cx),
-        ))
-        .child(example("Tour", crate::tour::examples::examples(window, cx)))
-        .child(example(
-            "TabBar",
-            crate::tab_bar::examples::examples(window, cx),
-        ))
-        .child(example(
-            "TabBarMoreList",
-            crate::tab_bar_more_list::examples::examples(window, cx),
-        ))
-        .child(example(
-            "NavigationStack",
-            crate::navigation_stack::examples::examples(window, cx),
-        ))
-        .child(example(
-            "RefreshControl",
-            crate::refresh_control::examples::examples(window, cx),
-        ))
-        .child(example(
-            "TransferList",
-            crate::transfer_list::examples::examples(window, cx),
-        ))
-        .child(example(
-            "ListInput",
-            crate::list_input::examples::examples(window, cx),
-        ))
-        .child(example(
-            "RadialChart",
-            crate::radial::examples::examples(window, cx),
-        ))
-        .child(example(
-            "SankeyChart",
-            crate::sankey::examples::examples(window, cx),
-        ))
-        .child(example(
-            "Chat additions",
-            crate::chat::examples::examples(window, cx),
-        ))
-        .child(example(
-            "EmojiPicker",
-            crate::emoji_picker::examples::examples(window, cx),
-        ))
-        .child(example(
-            "Comments",
-            crate::comments::examples::examples(window, cx),
-        ))
-        .child(example(
-            "Schedule",
-            crate::schedule::examples::examples(window, cx),
-        ))
-        .child(example(
-            "Chart (lab)",
-            crate::lab_chart::examples::examples(window, cx),
-        ))
-        .child(example(
-            "CodeEditor",
-            crate::code_editor::examples::examples(window, cx),
-        ))
-        .child(example(
-            "DiffViewer",
-            crate::diff_viewer::examples::examples(window, cx),
-        ))
-        .child(example(
-            "SVGIcon",
-            crate::svg_icon::examples::examples(window, cx),
-        ))
-        .child(example(
-            "MediaPlayer",
-            crate::media_player::examples::examples(window, cx),
-        ))
-        .into_any_element()
+    let mut stack = Stack::vertical().gap(SpacingStep::S8);
+    for (_, section) in SECTIONS {
+        stack = stack.child(section(window, cx));
+    }
+    stack.into_any_element()
 }

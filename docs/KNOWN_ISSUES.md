@@ -13,6 +13,23 @@
     so every later event logs `RefCell already borrowed` and the page stops responding.
     Those log lines are a symptom of an earlier panic, not a separate bug; look for the
     first `panicked at` line.
+  - The standard clock (`std::time::Instant::now`, `SystemTime::now`) panics in the
+    browser the same way. Code that can run there reads `web_time`; the
+    `web_clock` test in `rustryx-primitives` fails on any other use.
+
+- **One animating element redraws the whole window.** `window.request_animation_frame()`
+  marks the view dirty, and the next frame rebuilds every element under it (CSS animates
+  one element without touching the rest).
+  - A page of many live examples costs the sum of all of them on every frame. The gallery
+    shows the Lab and 3D pages one section at a time for this reason (`Page::sections`).
+  - A hidden element that keeps animating still costs a full redraw on every frame.
+    Pause it when it is hidden; `Spinner::paused` does this for Schedule's loading
+    spinner, which upstream keeps at opacity 0 between loads.
+  - Work done during render runs on every frame of an animation, so it has to be
+    cheap. Profiling found two examples. A 3D surface formatted thousands of numbers
+    as JavaScript strings to key its grid on every frame; it now keys by the numbers.
+    `js_number_to_string` settled rounding ties by writing the number out to 1100
+    digits; it now uses exact integer arithmetic.
 
 - **Scrollbars overlay the content (fork patch R17).** Where the platform keeps scrollbars
   (Windows with "Always show scrollbars", for example) a browser gives a scroll container a

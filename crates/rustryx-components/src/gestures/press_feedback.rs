@@ -536,20 +536,7 @@ pub fn touch_first_device(window: &Window, cx: &mut App) -> bool {
     if let Some(coarse) = rustryx_primitives::modality::declared_primary_pointer(cx) {
         return coarse;
     }
-    platform_coarse() || coarse_primary_pointer(window, cx)
-}
-
-fn platform_coarse() -> bool {
-    #[cfg(target_family = "wasm")]
-    {
-        web_sys::window()
-            .and_then(|w| w.match_media("(pointer: coarse)").ok().flatten())
-            .is_some_and(|list| list.matches())
-    }
-    #[cfg(not(target_family = "wasm"))]
-    {
-        false
-    }
+    rustryx_primitives::modality::platform_coarse_pointer() || coarse_primary_pointer(window, cx)
 }
 
 /// Upstream `pressFadeMs`: the release fade's clock, the theme's exit duration, no longer

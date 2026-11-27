@@ -391,7 +391,9 @@ pub(crate) fn schedule_frame(
         .when(!is_loading, |d| d.opacity(0.))
         .child(
             Spinner::new(ElementId::Name(format!("{}-loading", context.id).into()))
-                .aria_label("Loading events"),
+                .aria_label("Loading events")
+                // Hidden between loads: no turning, so an idle Schedule draws no frames.
+                .paused(!is_loading),
         );
     let initial = ScheduleHeaderContent {
         start_content: Vec::new(),

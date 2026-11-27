@@ -104,6 +104,24 @@ fn distinct_sorted(data: &[Datum], key: &str) -> Vec<Option<ChartValue>> {
     values
 }
 
+/// A grid cell's key: upstream's `${x},${z}` string, or the two numbers when every x and
+/// z is one (see [`surface_faces`]).
+#[derive(Hash, PartialEq, Eq)]
+enum CellKey {
+    Numbers(u64, u64),
+    Text(String),
+}
+
+/// A number's key: its bits, with every NaN alike and -0 as 0, as their strings are.
+fn number_key(value: Option<&ChartValue>) -> Option<u64> {
+    match value {
+        Some(ChartValue::Number(n)) if n.is_nan() => Some(f64::NAN.to_bits()),
+        Some(ChartValue::Number(n)) if *n == 0. => Some(0f64.to_bits()),
+        Some(ChartValue::Number(n)) => Some(n.to_bits()),
+        _ => None,
+    }
+}
+
 /// The surface's faces far to near (upstream's `faces` memo): one per grid cell whose four
 /// corners exist; none for fewer than two x or z values.
 pub fn surface_faces(ctx: &ThreeDContext, colors: &[Hsla]) -> Vec<SurfaceFace> {
@@ -112,24 +130,39 @@ pub fn surface_faces(ctx: &ThreeDContext, colors: &[Hsla]) -> Vec<SurfaceFace> {
     if xs.len() < 2 || zs.len() < 2 {
         return Vec::new();
     }
-    let key = |x: Option<&ChartValue>, z: Option<&ChartValue>| {
-        format!("{},{}", js_string(x), js_string(z))
+    // Upstream keys its grid by the string `${x},${z}`. When every x and z is a number the
+    // numbers themselves are the key: a number's string is unique to it (NaN aside, and -0
+    // reads as 0), and has no comma to blur where x ends. This skips formatting thousands of
+    // numbers on every frame of a turning surface.
+    let numeric = ctx.data.iter().all(|d| {
+        number_key(d.get(&ctx.x_key)).is_some() && number_key(d.get(&ctx.z_key)).is_some()
+    });
+    let key = |x: Option<&ChartValue>, z: Option<&ChartValue>| match (number_key(x), number_key(z))
+    {
+        (Some(x), Some(z)) if numeric => CellKey::Numbers(x, z),
+        _ => CellKey::Text(format!("{},{}", js_string(x), js_string(z))),
     };
-    let mut grid: HashMap<String, &Datum> = HashMap::new();
+    let mut grid: HashMap<CellKey, &Datum> = HashMap::new();
     for d in ctx.data.iter() {
         grid.insert(key(d.get(&ctx.x_key), d.get(&ctx.z_key)), d);
     }
+    // Each grid point's datum, looked up once rather than once per face that shares it.
+    let points: Vec<Vec<Option<&Datum>>> = zs
+        .iter()
+        .map(|z| {
+            xs.iter()
+                .map(|x| grid.get(&key(x.as_ref(), z.as_ref())).copied())
+                .collect()
+        })
+        .collect();
     let mut faces = Vec::new();
     for r in 0..zs.len() - 1 {
         for c in 0..xs.len() - 1 {
-            let at = |x: &Option<ChartValue>, z: &Option<ChartValue>| {
-                grid.get(&key(x.as_ref(), z.as_ref())).copied()
-            };
             let corners = [
-                at(&xs[c], &zs[r]),
-                at(&xs[c + 1], &zs[r]),
-                at(&xs[c + 1], &zs[r + 1]),
-                at(&xs[c], &zs[r + 1]),
+                points[r][c],
+                points[r][c + 1],
+                points[r + 1][c + 1],
+                points[r + 1][c],
             ];
             let [Some(a), Some(b), Some(cc), Some(dd)] = corners else {
                 continue;

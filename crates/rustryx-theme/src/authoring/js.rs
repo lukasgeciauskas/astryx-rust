@@ -277,22 +277,62 @@ fn shortest_digits(n: f64) -> (String, i64) {
     let last = digits.as_bytes()[digits.len() - 1];
     if last % 2 == 1 {
         // A tie means `n` is exactly the midpoint: the digits one lower,
-        // then a 5. Exact digits run to at most 767 places.
+        // then a 5.
         let mut lower = digits.clone().into_bytes();
         let end = lower.len() - 1;
         lower[end] -= 1;
         let lower = String::from_utf8(lower).unwrap_or_default();
-        let (exact, exact_exponent) = split(&format!("{n:.1100e}"));
-        let is_tie =
-            exact_exponent == exponent && exact.trim_end_matches('0') == format!("{lower}5");
-        let reads_back = format!("{lower}e{}", exponent - (digits.len() as i64 - 1))
-            .parse::<f64>()
-            .is_ok_and(|value| value == n);
-        if is_tie && reads_back {
-            digits = lower.trim_end_matches('0').to_string();
+        let midpoint = format!("{lower}5").parse::<u64>().ok();
+        let place = exponent - digits.len() as i64;
+        let is_tie = midpoint.is_some_and(|m| equals_decimal(n, m, place));
+        if is_tie {
+            let reads_back = format!("{lower}e{}", exponent - (digits.len() as i64 - 1))
+                .parse::<f64>()
+                .is_ok_and(|value| value == n);
+            if reads_back {
+                digits = lower.trim_end_matches('0').to_string();
+            }
         }
     }
     (digits, exponent)
+}
+
+/// Whether the positive finite `n` is exactly `m × 10^q`, in integer arithmetic: both sides
+/// as an odd number times a power of two. (Charts print numbers on every frame, so this
+/// replaces writing `n` out to its last exact digit, hundreds of places.)
+fn equals_decimal(n: f64, m: u64, q: i64) -> bool {
+    let bits = n.to_bits();
+    let biased = ((bits >> 52) & 0x7ff) as i64;
+    let fraction = bits & ((1 << 52) - 1);
+    let (mantissa, twos) = if biased == 0 {
+        (fraction, -1074)
+    } else {
+        (fraction | (1 << 52), biased - 1075)
+    };
+    if mantissa == 0 || m == 0 {
+        return mantissa == m;
+    }
+    // m × 10^q = (m × 5^q) × 2^q, or (m / 5^-q) × 2^q when q is negative.
+    let (odd, power) = if q >= 0 {
+        // The odd part would hold 5^q, more than a double's 53 bits.
+        if q > 22 {
+            return false;
+        }
+        (u128::from(m) * 5u128.pow(q as u32), q)
+    } else {
+        // 5^28 is more than any u64, so it cannot divide m.
+        if -q > 27 {
+            return false;
+        }
+        let five = 5u128.pow((-q) as u32);
+        if !u128::from(m).is_multiple_of(five) {
+            return false;
+        }
+        (u128::from(m) / five, q)
+    };
+    let (zeros, mantissa_zeros) = (odd.trailing_zeros(), mantissa.trailing_zeros());
+    odd >> zeros == u128::from(mantissa >> mantissa_zeros)
+        && power + i64::from(zeros) == twos + i64::from(mantissa_zeros)
 }
 
 /// `Number.prototype.toFixed(digits)`: the value rounded to `digits`
@@ -353,4 +393,91 @@ fn is_fixed_tie(x: f64, digits: usize) -> bool {
         (fraction | (1 << 52), biased - 1075)
     };
     exponent + i64::from(mantissa.trailing_zeros()) == -(digits as i64 + 1)
+}
+
+#[cfg(test)]
+mod shortest_digits_tests {
+    use super::*;
+
+    /// The former tie test: `n` written out to 1100 places.
+    fn reference(n: f64) -> (String, i64) {
+        let split = |formatted: &str| {
+            let (mantissa, exponent) = formatted.split_once('e').unwrap_or((formatted, "0"));
+            let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+            (digits, exponent.parse::<i64>().unwrap_or(0))
+        };
+        let (mut digits, exponent) = split(&format!("{n:e}"));
+        let last = digits.as_bytes()[digits.len() - 1];
+        if last % 2 == 1 {
+            let mut lower = digits.clone().into_bytes();
+            let end = lower.len() - 1;
+            lower[end] -= 1;
+            let lower = String::from_utf8(lower).unwrap_or_default();
+            let (exact, exact_exponent) = split(&format!("{n:.1100e}"));
+            let is_tie =
+                exact_exponent == exponent && exact.trim_end_matches('0') == format!("{lower}5");
+            let reads_back = format!("{lower}e{}", exponent - (digits.len() as i64 - 1))
+                .parse::<f64>()
+                .is_ok_and(|value| value == n);
+            if is_tie && reads_back {
+                digits = lower.trim_end_matches('0').to_string();
+            }
+        }
+        (digits, exponent)
+    }
+
+    /// A small deterministic generator (xorshift64*).
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 >> 12;
+            self.0 ^= self.0 << 25;
+            self.0 ^= self.0 >> 27;
+            self.0.wrapping_mul(0x2545_f491_4f6c_dd1d)
+        }
+    }
+
+    #[test]
+    fn ties_go_to_the_even_digit() {
+        assert_eq!(
+            js_number_to_string(869_631_767_272_949.0 + 0.25),
+            "869631767272949.2"
+        );
+        assert_eq!(js_number_to_string(0.5), "0.5");
+        assert_eq!(js_number_to_string(2.5), "2.5");
+        assert_eq!(js_number_to_string(1e21), "1e+21");
+        assert_eq!(js_number_to_string(5e-324), "5e-324");
+    }
+
+    #[test]
+    fn agrees_with_writing_the_number_out() {
+        let mut rng = Rng(0x9e37_79b9_7f4a_7c15);
+        let mut values = vec![5e-324, f64::MIN_POSITIVE, f64::MAX, 0.1, 0.3, 1. / 3.];
+        for _ in 0..4000 {
+            // Any finite positive double.
+            let v = f64::from_bits(rng.next() >> 1);
+            if v.is_finite() && v > 0. {
+                values.push(v);
+            }
+            // Quarters where the spacing is an eighth: exact ties between two shortest
+            // candidates.
+            let whole = (1u64 << 49) + (rng.next() % (1 << 49));
+            values.push(
+                whole as f64
+                    + if rng.next().is_multiple_of(2) {
+                        0.25
+                    } else {
+                        0.75
+                    },
+            );
+            // Short decimals and binary fractions at many scales.
+            let digits = rng.next() % 100_000_000;
+            let scale = (rng.next() % 40) as i32 - 20;
+            values.push(digits as f64 * 10f64.powi(scale));
+            values.push(digits as f64 / f64::from(1u32 << (rng.next() % 30)));
+        }
+        for v in values.into_iter().filter(|v| *v > 0. && v.is_finite()) {
+            assert_eq!(shortest_digits(v), reference(v), "{v:e}");
+        }
+    }
 }

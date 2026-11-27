@@ -100,9 +100,12 @@ pub fn any_pointer_coarse(window: &Window, cx: &App) -> bool {
 fn platform_any_coarse_pointer() -> bool {
     #[cfg(target_family = "wasm")]
     {
-        web_sys::window()
-            .and_then(|window| window.match_media("(any-pointer: coarse)").ok().flatten())
-            .is_some_and(|list| list.matches())
+        // Parsed once; `matches` stays live (see [`platform_coarse_pointer`]).
+        thread_local! {
+            static ANY_COARSE: Option<web_sys::MediaQueryList> = web_sys::window()
+                .and_then(|window| window.match_media("(any-pointer: coarse)").ok().flatten());
+        }
+        ANY_COARSE.with(|list| list.as_ref().is_some_and(|list| list.matches()))
     }
     #[cfg(windows)]
     {
@@ -178,13 +181,16 @@ pub fn declared_primary_pointer(cx: &App) -> Option<bool> {
 }
 
 /// The platform's primary pointer before any input: the browser's
-/// `(pointer: coarse)` on the web; fine natively.
-fn platform_coarse_pointer() -> bool {
+/// `(pointer: coarse)` on the web; fine natively. Every themed render reads this, so the
+/// browser's query is parsed once and its live `matches` read after that.
+pub fn platform_coarse_pointer() -> bool {
     #[cfg(target_family = "wasm")]
     {
-        web_sys::window()
-            .and_then(|window| window.match_media("(pointer: coarse)").ok().flatten())
-            .is_some_and(|list| list.matches())
+        thread_local! {
+            static COARSE: Option<web_sys::MediaQueryList> = web_sys::window()
+                .and_then(|window| window.match_media("(pointer: coarse)").ok().flatten());
+        }
+        COARSE.with(|list| list.as_ref().is_some_and(|list| list.matches()))
     }
     #[cfg(not(target_family = "wasm"))]
     {

@@ -23,25 +23,45 @@ pub fn available_themes() -> Vec<Arc<Theme>> {
 pub struct Gallery {
     themes: Vec<Arc<Theme>>,
     page: Page,
+    /// The shown section of a page that has sections ([`Page::sections`]).
+    section: usize,
     scroll: ScrollHandle,
     restore_scroll: Option<f32>,
     saved: Option<DevState>,
 }
 
 impl Gallery {
-    /// `page` names the start page (case-insensitive); `scroll_y` restores
-    /// the page's scroll after a `cargo xtask dev` relaunch.
-    pub fn new(themes: Vec<Arc<Theme>>, page: Option<&str>, scroll_y: f32) -> Self {
+    /// `page` names the start page and `section` its section (both case-insensitive;
+    /// a section may also be its number from 0); `scroll_y` restores the page's scroll
+    /// after a `cargo xtask dev` relaunch.
+    pub fn new(
+        themes: Vec<Arc<Theme>>,
+        page: Option<&str>,
+        section: Option<&str>,
+        scroll_y: f32,
+    ) -> Self {
+        let page = page
+            .and_then(|name| {
+                Page::ALL
+                    .iter()
+                    .copied()
+                    .find(|p| p.title().eq_ignore_ascii_case(name))
+            })
+            .unwrap_or(Page::Tokens);
+        let sections = page.sections();
+        let section = section
+            .map(|name| name.replace("%20", " "))
+            .and_then(|name| {
+                sections
+                    .iter()
+                    .position(|(title, _)| title.eq_ignore_ascii_case(&name))
+                    .or_else(|| name.parse().ok().filter(|&i| i < sections.len()))
+            })
+            .unwrap_or(0);
         Gallery {
             themes,
-            page: page
-                .and_then(|name| {
-                    Page::ALL
-                        .iter()
-                        .copied()
-                        .find(|p| p.title().eq_ignore_ascii_case(name))
-                })
-                .unwrap_or(Page::Tokens),
+            page,
+            section,
             scroll: ScrollHandle::new(),
             restore_scroll: (scroll_y > 0.0).then_some(scroll_y),
             saved: None,
@@ -53,6 +73,12 @@ impl Gallery {
         let b = window.bounds();
         let state = DevState {
             page: self.page.title().to_string(),
+            section: self
+                .page
+                .sections()
+                .get(self.section)
+                .map(|(title, _)| title.to_string())
+                .unwrap_or_default(),
             theme: theme.to_string(),
             mode: match mode {
                 ThemeMode::System => "system",
@@ -111,26 +137,61 @@ impl Render for Gallery {
             .on_click(move |_, _, cx| theme::set_mode(value, cx))
         });
 
-        let pages = Page::ALL.iter().map(|&page| {
-            let selected = page == self.page;
-            div()
-                .id(ElementId::Name(format!("page-{}", page.title()).into()))
-                .px(t.spacing.s3)
-                .py(t.spacing.s2)
-                .rounded(t.radius.element)
-                .when(selected, |d| {
-                    d.bg(t.color.background_muted)
-                        .text_color(t.color.text_primary)
-                })
-                .when(!selected, |d| d.text_color(t.color.text_secondary))
-                .hover(|d| d.bg(t.color.overlay_hover))
-                .cursor_pointer()
-                .child(page.title())
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.page = page;
-                    cx.notify();
-                }))
-        });
+        let pages = Page::ALL
+            .iter()
+            .map(|&page| {
+                let selected = page == self.page;
+                div()
+                    .id(ElementId::Name(format!("page-{}", page.title()).into()))
+                    .px(t.spacing.s3)
+                    .py(t.spacing.s2)
+                    .rounded(t.radius.element)
+                    .when(selected, |d| {
+                        d.bg(t.color.background_muted)
+                            .text_color(t.color.text_primary)
+                    })
+                    .when(!selected, |d| d.text_color(t.color.text_secondary))
+                    .hover(|d| d.bg(t.color.overlay_hover))
+                    .cursor_pointer()
+                    .child(page.title())
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        if this.page != page {
+                            this.page = page;
+                            this.section = 0;
+                            this.scroll.set_offset(point(px(0.), px(0.)));
+                        }
+                        cx.notify();
+                    }))
+            })
+            .collect::<Vec<_>>();
+
+        // A page with sections shows one at a time, picked from a row of chips.
+        let sections = self.page.sections();
+        let section = self.section.min(sections.len().saturating_sub(1));
+        let page_body = match sections.get(section) {
+            Some((_, render)) => div()
+                .flex()
+                .flex_col()
+                .gap(t.spacing.s6)
+                .child(div().flex().flex_wrap().gap(t.spacing.s2).children(
+                    sections.iter().enumerate().map(|(i, (title, _))| {
+                        chip(
+                            ElementId::Name(format!("section-{title}").into()),
+                            (*title).into(),
+                            i == section,
+                            &resolved,
+                        )
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.section = i;
+                            this.scroll.set_offset(point(px(0.), px(0.)));
+                            cx.notify();
+                        }))
+                    }),
+                ))
+                .child(render(window, cx))
+                .into_any_element(),
+            None => self.page.render(&resolved, window, cx),
+        };
 
         div()
             .size_full()
@@ -190,7 +251,7 @@ impl Render for Gallery {
                             // The page's scroller, for windowed lists on it.
                             .child(rustryx::primitives::provide(
                                 rustryx::primitives::ScrollHost(self.scroll.clone()),
-                                self.page.render(&resolved, window, cx),
+                                page_body,
                             )),
                     ),
             )

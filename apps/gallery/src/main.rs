@@ -25,9 +25,10 @@ fn run() {
                 rustryx::theme::register_fonts(theme, cx);
             }
             // Under `cargo xtask dev` the saved state reopens the gallery in
-            // place. Otherwise GALLERY_THEME, GALLERY_MODE, GALLERY_PAGE and
-            // GALLERY_SCROLL (pixels down the page) pick
-            // the start, for screenshots; the default is neutral in system mode.
+            // place. Otherwise GALLERY_THEME, GALLERY_MODE, GALLERY_PAGE,
+            // GALLERY_SECTION (on the Lab and 3D pages) and GALLERY_SCROLL (pixels
+            // down the page) pick the start, for screenshots; the default is neutral
+            // in system mode.
             let state = DevState::load();
             let wanted = state
                 .as_ref()
@@ -62,6 +63,11 @@ fn run() {
                 .map(|s| s.page.clone())
                 .filter(|p| !p.is_empty())
                 .or_else(|| env("GALLERY_PAGE"));
+            let section = state
+                .as_ref()
+                .map(|s| s.section.clone())
+                .filter(|s| !s.is_empty())
+                .or_else(|| env("GALLERY_SECTION"));
             let scroll_y = state
                 .as_ref()
                 .map(|s| s.scroll_y)
@@ -72,7 +78,11 @@ fn run() {
                     window_bounds: Some(WindowBounds::Windowed(bounds)),
                     ..Default::default()
                 },
-                |_, cx| cx.new(|_| gallery::Gallery::new(themes, page.as_deref(), scroll_y)),
+                |_, cx| {
+                    cx.new(|_| {
+                        gallery::Gallery::new(themes, page.as_deref(), section.as_deref(), scroll_y)
+                    })
+                },
             )
             .expect("failed to open the gallery window");
             cx.activate(true);
@@ -85,7 +95,7 @@ fn env(name: &str) -> Option<String> {
         std::env::var(name).ok()
     }
     // In the browser the start state comes from the query instead:
-    // `?page=dates&theme=butter&mode=light&scroll=400`.
+    // `?page=dates&theme=butter&mode=light&scroll=400`, or `?page=lab&section=schedule`.
     #[cfg(target_family = "wasm")]
     {
         let key = name.trim_start_matches("GALLERY_").to_ascii_lowercase();
